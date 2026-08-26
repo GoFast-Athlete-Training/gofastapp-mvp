@@ -24,8 +24,7 @@ import { resolveGoalRacePace } from "./goal-pace-calculator";
 import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
 import { ensurePlannedWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
 import { loadCatalogueTitleByIdFromPlanSchedule } from "./catalogue-title-map";
-import { effectivePaceProfileForPreset } from "./pace-key-resolver";
-import type { PresetStrategyFields } from "./preset-strategy";
+import { parseAthletePaceAdjuster } from "./athlete-pace-adjuster";
 
 export class MaterializeWorkoutError extends Error {
   constructor(message: string) {
@@ -222,21 +221,17 @@ async function buildPrescriptionSteps(params: {
     goalDistance: plan.athlete_race?.goalDistance ?? null,
   }).goalPaceSecPerMile;
 
-  const preset = (plan as {
-    training_plan_preset?: {
-      paceProfile?: unknown;
-      athletePersonaCapability?: string | null;
-    } | null;
-    athlete_preset?: { paceProfile?: unknown } | null;
-  }).training_plan_preset;
-  const athletePreset = (plan as { athlete_preset?: { paceProfile?: unknown } | null })
-    .athlete_preset;
-  const paceProfile = effectivePaceProfileForPreset({
-    paceProfile: preset?.paceProfile ?? athletePreset?.paceProfile ?? null,
-    athletePersonaCapability:
-      (preset?.athletePersonaCapability as PresetStrategyFields["athletePersonaCapability"]) ??
-      null,
-  });
+  const paceAdjuster = parseAthletePaceAdjuster(
+    await prisma.athlete.findUnique({
+      where: { id: plan.athleteId },
+      select: {
+        paceAdjusterEasySecPerMile: true,
+        paceAdjusterLongRunSecPerMile: true,
+        paceAdjusterThresholdSecPerMile: true,
+        paceAdjusterIntervalSecPerMile: true,
+      },
+    })
+  );
 
   return prescribe({
     entry: catalogueEntryForDay,
@@ -245,7 +240,7 @@ async function buildPrescriptionSteps(params: {
     racePaceSecondsPerMile: racePaceSec,
     planCycleIndex: scheduled.planCycleIndex ?? null,
     easyWorkPaceOffsetOverrideSecPerMile: null,
-    paceProfile,
+    paceAdjuster,
   });
 }
 
@@ -286,10 +281,10 @@ export async function materializeWorkoutForPlanDay(params: {
         },
       },
       training_plan_preset: {
-        select: { paceProfile: true, athletePersonaCapability: true },
+        select: { athletePersonaCapability: true },
       },
       athlete_preset: {
-        select: { paceProfile: true },
+        select: { id: true },
       },
     },
   });

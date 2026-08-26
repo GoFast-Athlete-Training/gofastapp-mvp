@@ -1,14 +1,17 @@
-import {
-  defaultPaceProfileForCapability,
-  type PaceProfile,
-  type PresetStrategyFields,
-} from "@/lib/training/preset-strategy";
 import { getTrainingPaces } from "@/lib/workout-generator/pace-calculator";
+import {
+  adjusterForWorkoutType,
+  type AthletePaceAdjuster,
+  DEFAULT_ATHLETE_PACE_ADJUSTER,
+} from "@/lib/training/athlete-pace-adjuster";
+import type { WorkoutType } from "@prisma/client";
 
 export type PaceResolutionContext = {
   fitnessAnchorSecPerMile: number;
   racePaceSecPerMile: number | null;
-  paceProfile: PaceProfile | null;
+  /** Sec/mi nudge for the scheduled workout type (Easy / LongRun / Tempo / Intervals). */
+  typeAdjusterSecPerMile: number;
+  workoutType?: WorkoutType | string;
 };
 
 /** Approximate 10K race pace from current 5K fitness anchor (sec/mi). */
@@ -18,7 +21,7 @@ export function tenKAnchorFromFiveK(fiveKSecPerMile: number): number {
 
 function resolveAnchorSecPerMile(
   anchor: "current5k" | "current10k" | "goalRacePace",
-  ctx: PaceResolutionContext
+  ctx: Pick<PaceResolutionContext, "fitnessAnchorSecPerMile" | "racePaceSecPerMile">
 ): number {
   if (anchor === "current5k") return ctx.fitnessAnchorSecPerMile;
   if (anchor === "current10k") return tenKAnchorFromFiveK(ctx.fitnessAnchorSecPerMile);
@@ -27,44 +30,57 @@ function resolveAnchorSecPerMile(
 }
 
 /**
- * Resolve catalogue segment pace:
- * 1) paceKey + preset paceProfile
- * 2) legacy numeric offset vs fitness anchor
+ * Resolve catalogue segment pace: anchor + catalogue offset + per-type athlete adjuster.
+ * paceKey is ignored (legacy catalogue rows may still carry it).
  */
 export function resolveCataloguePaceSecPerMile(params: {
   paceKey?: string | null;
   legacyOffsetSecPerMile?: number | null;
+  /** MP-sim blocks use goal race pace + offset instead of 5K. */
+  mpAnchorSecPerMile?: number | null;
   ctx: PaceResolutionContext;
 }): number | null {
-  const { paceKey, legacyOffsetSecPerMile, ctx } = params;
-  const key = typeof paceKey === "string" ? paceKey.trim() : "";
-  if (key && ctx.paceProfile?.[key]) {
-    const entry = ctx.paceProfile[key]!;
-    const anchorSec = resolveAnchorSecPerMile(entry.anchor, ctx);
-    return Math.max(1, anchorSec + entry.offsetSecPerMile);
-  }
+  const { legacyOffsetSecPerMile, mpAnchorSecPerMile, ctx } = params;
+  const adj = ctx.typeAdjusterSecPerMile;
+  const base =
+    mpAnchorSecPerMile != null
+      ? mpAnchorSecPerMile
+      : ctx.fitnessAnchorSecPerMile;
   if (legacyOffsetSecPerMile != null && Number.isFinite(legacyOffsetSecPerMile)) {
-    return Math.max(1, ctx.fitnessAnchorSecPerMile + legacyOffsetSecPerMile);
+    return Math.max(1, base + legacyOffsetSecPerMile + adj);
+  }
+  if (mpAnchorSecPerMile != null) {
+    return Math.max(1, mpAnchorSecPerMile + adj);
   }
   return null;
 }
 
-export function parsePaceProfileFromJson(raw: unknown): PaceProfile | null {
-  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
-  return raw as PaceProfile;
+export function buildPaceResolutionContext(params: {
+  anchorSecondsPerMile: number;
+  racePaceSecondsPerMile: number | null;
+  workoutType: WorkoutType | string;
+  paceAdjuster?: AthletePaceAdjuster | null;
+}): PaceResolutionContext {
+  const adjuster = params.paceAdjuster ?? DEFAULT_ATHLETE_PACE_ADJUSTER;
+  return {
+    fitnessAnchorSecPerMile: params.anchorSecondsPerMile,
+    racePaceSecPerMile: params.racePaceSecondsPerMile,
+    typeAdjusterSecPerMile: adjusterForWorkoutType(params.workoutType, adjuster),
+    workoutType: params.workoutType,
+  };
 }
 
-/**
- * Preset pace profile for materialization: authored profile wins; otherwise canonical
- * defaults from athletePersonaCapability (null capability → standard competitive offsets).
- */
-export function effectivePaceProfileForPreset(params: {
+/** @deprecated preset paceProfile removed — use athlete pace adjuster columns. */
+export function effectivePaceProfileForPreset(_params: {
   paceProfile: unknown;
-  athletePersonaCapability?: PresetStrategyFields["athletePersonaCapability"] | null;
-}): PaceProfile {
-  const parsed = parsePaceProfileFromJson(params.paceProfile);
-  if (parsed && Object.keys(parsed).length > 0) {
-    return parsed;
-  }
-  return defaultPaceProfileForCapability(params.athletePersonaCapability ?? null);
+  athletePersonaCapability?: string | null;
+}): never {
+  throw new Error("paceProfile is removed — use athlete pace adjuster + catalogue offsets");
 }
+
+/** @deprecated */
+export function parsePaceProfileFromJson(_raw: unknown): null {
+  return null;
+}
+
+export { resolveAnchorSecPerMile };

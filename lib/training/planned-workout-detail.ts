@@ -35,7 +35,7 @@ const plannedDetailInclude = {
         },
       },
       training_plan_preset: {
-        select: { paceProfile: true, athletePersonaCapability: true },
+        select: { athletePersonaCapability: true },
       },
     },
   },

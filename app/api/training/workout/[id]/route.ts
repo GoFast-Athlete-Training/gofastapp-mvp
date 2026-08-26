@@ -13,7 +13,7 @@ import type { Prisma, WorkoutType } from "@prisma/client";
 import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-segment-snapshot";
 import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
 import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
-import { effectivePaceProfileForPreset } from "@/lib/training/pace-key-resolver";
+import { parseAthletePaceAdjuster } from "@/lib/training/athlete-pace-adjuster";
 import { ensureWorkoutPrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
 import { computeWorkoutPerformanceAnalysis } from "@/lib/training/workout-performance-analysis";
 import { loadPlannedWorkoutDetailForAthlete } from "@/lib/training/planned-workout-detail";
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest, context: Ctx) {
                 },
               },
               training_plan_preset: {
-                select: { paceProfile: true, athletePersonaCapability: true },
+                select: { athletePersonaCapability: true },
               },
             },
           },
@@ -244,7 +244,13 @@ export async function GET(request: NextRequest, context: Ctx) {
 
     const athleteFiveKRow = await prisma.athlete.findUnique({
       where: { id: auth.athlete.id },
-      select: { fiveKPace: true },
+      select: {
+        fiveKPace: true,
+        paceAdjusterEasySecPerMile: true,
+        paceAdjusterLongRunSecPerMile: true,
+        paceAdjusterThresholdSecPerMile: true,
+        paceAdjusterIntervalSecPerMile: true,
+      },
     });
 
     const anchorPaceStr =
@@ -290,12 +296,16 @@ export async function GET(request: NextRequest, context: Ctx) {
           const easyCfg = parseEasyRunConfigJson(
             workout.training_plans?.easyRunConfig ?? null
           );
-          const preset = workout.training_plans?.training_plan_preset;
-          const authoredProfile = preset?.paceProfile ?? null;
-          const paceProfile = effectivePaceProfileForPreset({
-            paceProfile: authoredProfile,
-            athletePersonaCapability: preset?.athletePersonaCapability ?? null,
-          });
+          const athleteAdjuster = parseAthletePaceAdjuster(
+            athleteFiveKRow
+              ? {
+                  paceAdjusterEasySecPerMile: athleteFiveKRow.paceAdjusterEasySecPerMile,
+                  paceAdjusterLongRunSecPerMile: athleteFiveKRow.paceAdjusterLongRunSecPerMile,
+                  paceAdjusterThresholdSecPerMile: athleteFiveKRow.paceAdjusterThresholdSecPerMile,
+                  paceAdjusterIntervalSecPerMile: athleteFiveKRow.paceAdjusterIntervalSecPerMile,
+                }
+              : null
+          );
           apiSegs = prescribe({
             entry: workout.workout_catalogue,
             scheduleMiles,
@@ -303,14 +313,8 @@ export async function GET(request: NextRequest, context: Ctx) {
             racePaceSecondsPerMile,
             planCycleIndex: planCycleIndex ?? workout.planCycleIndex ?? null,
             easyWorkPaceOffsetOverrideSecPerMile:
-              workout.workoutType === "Easy" &&
-              (authoredProfile == null ||
-                (typeof authoredProfile === "object" &&
-                  !Array.isArray(authoredProfile) &&
-                  Object.keys(authoredProfile).length === 0))
-                ? easyCfg.paceOffsetSecPerMile
-                : null,
-            paceProfile,
+              workout.workoutType === "Easy" ? easyCfg.paceOffsetSecPerMile : null,
+            paceAdjuster: athleteAdjuster,
           });
         }
 

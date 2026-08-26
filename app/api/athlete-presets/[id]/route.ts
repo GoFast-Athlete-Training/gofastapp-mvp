@@ -12,16 +12,18 @@ import {
   cloneRotationsFromSourcePreset,
   seedWorkoutBlueprintFromSource,
 } from "@/lib/training/clone-preset-configs";
-import {
-  defaultPaceProfileForCapability,
-  parsePaceProfile,
-} from "@/lib/training/preset-strategy";
 import { deleteAthletePresetForAthlete } from "@/lib/training/delete-athlete-preset";
 import {
   coachOverviewFromCoreInfer,
   mergeCoachPlanOverview,
 } from "@/lib/training/athlete-preset-coach-overview";
 import { computeCoreVolumeCalendarPreview } from "@/lib/training/core-volume-compute";
+import { reorderLongRunConfigPositions } from "@/lib/training/reorder-long-run-positions";
+import {
+  adjusterToAthleteColumns,
+  DEFAULT_ATHLETE_PACE_ADJUSTER,
+  parseAdjusterPatch,
+} from "@/lib/training/athlete-pace-adjuster";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-/** PATCH /api/athlete-presets/[id] — builder steps: core cups, workouts, pace */
+/** PATCH /api/athlete-presets/[id] — builder steps: foundation, run types, adjuster */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const auth = await requireAthleteFromBearer(request);
@@ -143,12 +145,22 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
               : [];
           const progressionAggressiveness =
             existing.progressionAggressiveness ?? "MODERATE";
+          const weeklyVolumeBand =
+            overview != null &&
+            typeof overview === "object" &&
+            !Array.isArray(overview) &&
+            typeof (overview as Record<string, unknown>).weeklyVolumeBand === "string"
+              ? String((overview as Record<string, unknown>).weeklyVolumeBand)
+              : undefined;
           data.coachPlanOverview = mergeCoachPlanOverview(
             existing.coachPlanOverview,
             coachOverviewFromCoreInfer({
               weSeeYou,
               barriers,
               progressionAggressiveness,
+              weeklyVolumeBand,
+              minWeeklyMiles: existing.minWeeklyMiles,
+              maxWeeklyMiles: existing.maxWeeklyMiles,
               calendar,
               cupsConfirmed: true,
             })
@@ -159,6 +171,24 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           });
         }
       }
+    }
+
+    if (body.step === "core" && body.action === "setupWorkouts") {
+      if (!existing.sourcePresetId) {
+        return NextResponse.json({ error: "sourcePresetId missing" }, { status: 422 });
+      }
+      await seedWorkoutBlueprintFromSource({
+        athletePresetId: id,
+        sourcePresetId: existing.sourcePresetId,
+      });
+      await cloneRotationsFromSourcePreset({
+        athletePresetId: id,
+        sourcePresetId: existing.sourcePresetId,
+      });
+      const refreshed = await loadOwnedPreset(auth.athlete.id, id);
+      return NextResponse.json({
+        athletePreset: refreshed ? serializeAthletePresetForApi(refreshed) : null,
+      });
     }
 
     if (body.step === "workouts" || "workoutStructure" in body) {
@@ -213,31 +243,71 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    if (body.step === "pace" || "paceProfile" in body) {
-      if ("paceProfile" in body) {
-        if (body.paceProfile === null) {
-          data.paceProfile = Prisma.JsonNull;
-        } else {
-          const parsed = parsePaceProfile(body.paceProfile);
-          if (!parsed) {
-            return NextResponse.json({ error: "Invalid paceProfile" }, { status: 400 });
-          }
-          data.paceProfile = parsed as Prisma.InputJsonValue;
+    if (body.step === "longRun" && body.action === "reorderPositions") {
+      const ordered = body.orderedPositionIds;
+      if (!Array.isArray(ordered) || !ordered.every((x) => typeof x === "string")) {
+        return NextResponse.json({ error: "orderedPositionIds required" }, { status: 400 });
+      }
+      if (!existing.longRunConfigId) {
+        return NextResponse.json({ error: "long run config missing" }, { status: 422 });
+      }
+      await reorderLongRunConfigPositions({
+        longRunConfigId: existing.longRunConfigId,
+        orderedPositionIds: ordered as string[],
+      });
+      data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
+        longRunConfirmed: true,
+      });
+    }
+
+    if (body.step === "longRun" && body.action === "confirm") {
+      data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
+        longRunConfirmed: true,
+      });
+    }
+
+    if (body.step === "easy" && body.action === "confirm") {
+      data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
+        easyConfirmed: true,
+      });
+    }
+
+    if (body.step === "tempo" && body.action === "confirm") {
+      data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
+        tempoConfirmed: true,
+      });
+    }
+
+    if (body.step === "interval" && body.action === "confirm") {
+      data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
+        intervalConfirmed: true,
+      });
+    }
+
+    if (body.step === "adjuster") {
+      const parsed = parseAdjusterPatch(body);
+      if (parsed) {
+        await prisma.athlete.update({
+          where: { id: auth.athlete.id },
+          data: {
+            ...adjusterToAthleteColumns(parsed),
+            updatedAt: new Date(),
+          },
+        });
+      }
+      if (body.action === "confirm" || body.action === "defaultAdjuster") {
+        if (!parsed && body.action === "defaultAdjuster") {
+          await prisma.athlete.update({
+            where: { id: auth.athlete.id },
+            data: {
+              ...adjusterToAthleteColumns(DEFAULT_ATHLETE_PACE_ADJUSTER),
+              updatedAt: new Date(),
+            },
+          });
         }
-      } else if (body.action === "defaultPace") {
-        const source = existing.sourcePresetId
-          ? await prisma.training_plan_preset.findUnique({
-              where: { id: existing.sourcePresetId },
-              select: { paceProfile: true, athletePersonaCapability: true, easyRunConfig: true },
-            })
-          : null;
-        const parsed = source?.paceProfile
-          ? parsePaceProfile(source.paceProfile)
-          : defaultPaceProfileForCapability(source?.athletePersonaCapability ?? null);
-        data.paceProfile = (parsed ?? defaultPaceProfileForCapability(null)) as Prisma.InputJsonValue;
-        if (source?.easyRunConfig) {
-          data.easyRunConfig = source.easyRunConfig as Prisma.InputJsonValue;
-        }
+        data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
+          adjusterConfirmed: true,
+        });
       }
     }
 

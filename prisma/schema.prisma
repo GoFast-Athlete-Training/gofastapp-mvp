@@ -107,6 +107,11 @@ model Athlete {
   ftpWatts                Int?
   /// 400m benchmark expressed as seconds per 100m (not raw 400m time). Swim pace anchor for plan materialization.
   FourHunMSwPace          Int?
+  /// Per run-type sec/mi nudge at materialization: target = 5K + catalogue offset + adjuster.
+  paceAdjusterEasySecPerMile      Int @default(-10)
+  paceAdjusterLongRunSecPerMile   Int @default(-20)
+  paceAdjusterThresholdSecPerMile Int @default(-20)
+  paceAdjusterIntervalSecPerMile  Int @default(-10)
   weeklyMileage           Int?
   role                    AthleteRole               @default(USER)
   runClubId               String?

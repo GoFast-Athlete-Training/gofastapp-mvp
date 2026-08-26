@@ -4,53 +4,54 @@
 
 import type { Prisma } from "@prisma/client";
 import { athletePresetInclude, type LoadedAthletePresetInclude } from "@/lib/training/plan-generate-presets-loader";
+import { builderProgressFromOverview } from "@/lib/training/athlete-preset-builder-progress";
 
 export type AthletePresetBuildStep =
   | "core"
-  | "workouts"
-  | "rotations"
-  | "pace"
+  | "longRun"
+  | "easy"
+  | "tempo"
+  | "interval"
+  | "adjuster"
   | "complete";
 
 export function athletePresetBuildStepLabel(step: AthletePresetBuildStep): string {
   switch (step) {
     case "core":
-      return "Stopped at: confirm cups";
-    case "workouts":
-      return "Stopped at: weekly workouts";
-    case "rotations":
-      return "Stopped at: rotations";
-    case "pace":
-      return "Stopped at: pace profile";
+      return "Stopped at: foundation";
+    case "longRun":
+      return "Stopped at: long run";
+    case "easy":
+      return "Stopped at: easy";
+    case "tempo":
+      return "Stopped at: tempo";
+    case "interval":
+      return "Stopped at: interval";
+    case "adjuster":
+      return "Stopped at: pace adjuster";
     case "complete":
       return "Ready to use";
   }
 }
 
-function cupsConfirmedFromOverview(coachPlanOverview: unknown): boolean {
-  if (coachPlanOverview == null || typeof coachPlanOverview !== "object" || Array.isArray(coachPlanOverview)) {
-    return false;
-  }
-  return (coachPlanOverview as Record<string, unknown>).cupsConfirmed === true;
-}
-
 export type AthletePresetRowForStep = {
-  baseLongRunPoolMiles: number;
-  peakLongRunPoolMiles: number;
-  taperLongRunPoolMiles: number;
   workoutStructure: unknown;
   coachPlanOverview: unknown;
   longRunConfigId: string | null;
   easyConfigId: string | null;
-  paceProfile: unknown;
+  tempoConfigId: string | null;
+  intervalsConfigId: string | null;
 };
 
 export function athletePresetBuildStep(row: AthletePresetRowForStep): AthletePresetBuildStep {
-  if (!row.workoutStructure) {
-    return cupsConfirmedFromOverview(row.coachPlanOverview) ? "workouts" : "core";
-  }
-  if (!row.longRunConfigId || !row.easyConfigId) return "rotations";
-  if (!row.paceProfile) return "pace";
+  const progress = builderProgressFromOverview(row.coachPlanOverview);
+  if (!progress.cupsConfirmed) return "core";
+  if (!row.workoutStructure || !row.longRunConfigId || !row.easyConfigId) return "longRun";
+  if (!progress.longRunConfirmed) return "longRun";
+  if (!progress.easyConfirmed) return "easy";
+  if (!progress.tempoConfirmed) return "tempo";
+  if (!progress.intervalConfirmed) return "interval";
+  if (!progress.adjusterConfirmed) return "adjuster";
   return "complete";
 }
 
@@ -77,24 +78,25 @@ export function serializeAthletePresetForApi(row: {
   longRunDefaultDow: number;
   workoutStructure: unknown;
   coachPlanOverview: unknown;
-  paceProfile: unknown;
   easyRunConfig: unknown;
   longRunConfigId: string | null;
   easyConfigId: string | null;
   tempoConfigId: string | null;
   intervalsConfigId: string | null;
+  longRunConfig?: LoadedAthletePresetInclude["longRunConfig"];
+  easyConfig?: LoadedAthletePresetInclude["easyConfig"];
+  tempoConfig?: LoadedAthletePresetInclude["tempoConfig"];
+  intervalsConfig?: LoadedAthletePresetInclude["intervalsConfig"];
   createdAt: Date;
   updatedAt: Date;
 }) {
   const stepRow: AthletePresetRowForStep = {
-    baseLongRunPoolMiles: row.baseLongRunPoolMiles,
-    peakLongRunPoolMiles: row.peakLongRunPoolMiles,
-    taperLongRunPoolMiles: row.taperLongRunPoolMiles,
     workoutStructure: row.workoutStructure,
     coachPlanOverview: row.coachPlanOverview,
     longRunConfigId: row.longRunConfigId,
     easyConfigId: row.easyConfigId,
-    paceProfile: row.paceProfile,
+    tempoConfigId: row.tempoConfigId,
+    intervalsConfigId: row.intervalsConfigId,
   };
   const buildStep = athletePresetBuildStep(stepRow);
   return {
@@ -116,12 +118,15 @@ export function serializeAthletePresetForApi(row: {
     longRunDefaultDow: row.longRunDefaultDow,
     workoutStructure: row.workoutStructure,
     coachPlanOverview: row.coachPlanOverview,
-    paceProfile: row.paceProfile,
     easyRunConfig: row.easyRunConfig,
     longRunConfigId: row.longRunConfigId,
     easyConfigId: row.easyConfigId,
     tempoConfigId: row.tempoConfigId,
     intervalsConfigId: row.intervalsConfigId,
+    longRunConfig: row.longRunConfig ?? null,
+    easyConfig: row.easyConfig ?? null,
+    tempoConfig: row.tempoConfig ?? null,
+    intervalsConfig: row.intervalsConfig ?? null,
     buildStep,
     buildStepLabel: athletePresetBuildStepLabel(buildStep),
     isComplete: isAthletePresetBlueprintComplete(stepRow),
@@ -135,7 +140,6 @@ export function athletePresetAsRotationSource(
   row: LoadedAthletePresetInclude
 ): LoadedAthletePresetInclude & {
   coachPlanOverview: Prisma.JsonValue;
-  paceProfile: Prisma.JsonValue;
   easyRunConfig: Prisma.JsonValue;
   workoutStructure: Prisma.JsonValue;
   slug: string;
@@ -144,7 +148,6 @@ export function athletePresetAsRotationSource(
     ...row,
     slug: `athlete-${row.id}`,
     coachPlanOverview: row.coachPlanOverview ?? null,
-    paceProfile: row.paceProfile ?? null,
     easyRunConfig: row.easyRunConfig ?? null,
     workoutStructure: row.workoutStructure ?? null,
   };

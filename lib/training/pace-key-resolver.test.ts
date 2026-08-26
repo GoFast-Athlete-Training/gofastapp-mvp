@@ -1,47 +1,35 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  effectivePaceProfileForPreset,
+  buildPaceResolutionContext,
   resolveCataloguePaceSecPerMile,
 } from "@/lib/training/pace-key-resolver";
-import { defaultPaceProfileForCapability } from "@/lib/training/preset-strategy";
+import { DEFAULT_ATHLETE_PACE_ADJUSTER } from "@/lib/training/athlete-pace-adjuster";
 
 const ANCHOR_SEC = 386; // 6:26/mi
 
-test("effectivePaceProfileForPreset preserves authored profile", () => {
-  const authored = {
-    moderate: { anchor: "current5k" as const, offsetSecPerMile: 45 },
-  };
-  const out = effectivePaceProfileForPreset({
-    paceProfile: authored,
-    athletePersonaCapability: null,
+test("resolveCataloguePaceSecPerMile adds catalogue offset and type adjuster", () => {
+  const ctx = buildPaceResolutionContext({
+    anchorSecondsPerMile: ANCHOR_SEC,
+    racePaceSecondsPerMile: null,
+    workoutType: "Tempo",
+    paceAdjuster: { ...DEFAULT_ATHLETE_PACE_ADJUSTER, threshold: -20 },
   });
-  assert.deepEqual(out, authored);
-});
-
-test("effectivePaceProfileForPreset falls back when preset profile is null", () => {
-  const out = effectivePaceProfileForPreset({
-    paceProfile: null,
-    athletePersonaCapability: null,
-  });
-  assert.deepEqual(out, defaultPaceProfileForCapability(null));
-  assert.equal(out.moderate?.offsetSecPerMile, 60);
-  assert.equal(out.threshold?.offsetSecPerMile, 20);
-});
-
-test("resolveCataloguePaceSecPerMile resolves moderate and threshold from default profile", () => {
-  const profile = defaultPaceProfileForCapability(null);
-  const ctx = {
-    fitnessAnchorSecPerMile: ANCHOR_SEC,
-    racePaceSecPerMile: null,
-    paceProfile: profile,
-  };
   assert.equal(
-    resolveCataloguePaceSecPerMile({ paceKey: "moderate", ctx }),
-    ANCHOR_SEC + 60
+    resolveCataloguePaceSecPerMile({ legacyOffsetSecPerMile: 30, ctx }),
+    ANCHOR_SEC + 30 - 20
   );
+});
+
+test("resolveCataloguePaceSecPerMile uses zero adjuster when type not in profile defaults", () => {
+  const ctx = buildPaceResolutionContext({
+    anchorSecondsPerMile: ANCHOR_SEC,
+    racePaceSecondsPerMile: null,
+    workoutType: "Easy",
+    paceAdjuster: { easy: -10, longRun: 0, threshold: 0, interval: 0 },
+  });
   assert.equal(
-    resolveCataloguePaceSecPerMile({ paceKey: "threshold", ctx }),
-    ANCHOR_SEC + 20
+    resolveCataloguePaceSecPerMile({ legacyOffsetSecPerMile: 90, ctx }),
+    ANCHOR_SEC + 90 - 10
   );
 });

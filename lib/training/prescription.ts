@@ -18,11 +18,11 @@ import {
   type CatalogueBetweenRepRecovery,
 } from "@/lib/training/catalogue-interval-recovery";
 import {
-  parsePaceProfileFromJson,
+  buildPaceResolutionContext,
   resolveCataloguePaceSecPerMile,
   type PaceResolutionContext,
 } from "@/lib/training/pace-key-resolver";
-import type { PaceProfile } from "@/lib/training/preset-strategy";
+import type { AthletePaceAdjuster } from "@/lib/training/athlete-pace-adjuster";
 import {
   catalogueSegmentDistanceMiles,
   isTempoWorkSegmentList,
@@ -156,16 +156,18 @@ function mpPaceSecPerMile(params: {
   return off != null ? Math.max(1, fitnessAnchorSec + off) : paces.marathon;
 }
 
-function buildPaceResolutionContext(params: {
+function buildPaceCtx(params: {
   anchorSecondsPerMile: number;
   racePaceSecondsPerMile: number | null;
-  paceProfile: PaceProfile | null;
+  workoutType: WorkoutType | string;
+  paceAdjuster?: AthletePaceAdjuster | null;
 }): PaceResolutionContext {
-  return {
-    fitnessAnchorSecPerMile: params.anchorSecondsPerMile,
-    racePaceSecPerMile: params.racePaceSecondsPerMile,
-    paceProfile: params.paceProfile,
-  };
+  return buildPaceResolutionContext({
+    anchorSecondsPerMile: params.anchorSecondsPerMile,
+    racePaceSecondsPerMile: params.racePaceSecondsPerMile,
+    workoutType: params.workoutType,
+    paceAdjuster: params.paceAdjuster,
+  });
 }
 
 function resolveSegmentPaceSecPerMile(
@@ -400,10 +402,10 @@ export function prescribe(params: {
   anchorSecondsPerMile: number;
   racePaceSecondsPerMile?: number | null;
   planCycleIndex?: number | null;
-  /** When set (e.g. plan easyRunConfig), overrides catalogue work pace offset for Easy type only. Legacy fallback when no paceKey. */
+  /** When set (e.g. plan easyRunConfig), overrides catalogue work pace offset for Easy type only. */
   easyWorkPaceOffsetOverrideSecPerMile?: number | null;
-  /** Preset pace profile — catalogue paceKeys resolve through this before legacy offsets. */
-  paceProfile?: PaceProfile | null;
+  /** Athlete per-type pace adjuster — added after catalogue offset at materialization. */
+  paceAdjuster?: AthletePaceAdjuster | null;
 }): WorkoutStep[] {
   const {
     entry,
@@ -412,28 +414,25 @@ export function prescribe(params: {
     racePaceSecondsPerMile = null,
     planCycleIndex = null,
     easyWorkPaceOffsetOverrideSecPerMile = null,
-    paceProfile = null,
+    paceAdjuster = null,
   } = params;
   const totalMiles = scheduleMiles;
-  const paceCtx = buildPaceResolutionContext({
+  const type = entry.workoutType as WorkoutType;
+  const paceCtx = buildPaceCtx({
     anchorSecondsPerMile,
     racePaceSecondsPerMile,
-    paceProfile: paceProfile ?? null,
+    workoutType: type,
+    paceAdjuster,
   });
 
-  const type = entry.workoutType as WorkoutType;
-
   if (type === "Easy") {
-    const easyPaceKey = paceProfile != null ? "easy" : null;
     const legacyWorkOffset =
-      paceProfile != null
-        ? entry.workPaceOffsetSecPerMile
-        : easyWorkPaceOffsetOverrideSecPerMile != null &&
-            Number.isFinite(easyWorkPaceOffsetOverrideSecPerMile)
-          ? easyWorkPaceOffsetOverrideSecPerMile
-          : entry.workPaceOffsetSecPerMile;
+      easyWorkPaceOffsetOverrideSecPerMile != null &&
+      Number.isFinite(easyWorkPaceOffsetOverrideSecPerMile)
+        ? easyWorkPaceOffsetOverrideSecPerMile
+        : entry.workPaceOffsetSecPerMile;
     const workPaceSec = resolveCataloguePaceSecPerMile({
-      paceKey: easyPaceKey,
+      paceKey: null,
       legacyOffsetSecPerMile: legacyWorkOffset,
       ctx: paceCtx,
     });
