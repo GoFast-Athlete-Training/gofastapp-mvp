@@ -13,7 +13,11 @@ import { normalizeGoFastWithMePhotoType } from "@/lib/gofast-with-me/photo-type"
 import { goFastWithFrontDoorPath } from "@/lib/gofast-with-me/gofast-with-bridge";
 import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
+import GoFastWithMeLandingViewer from "@/components/gofast-with-me/GoFastWithMeLandingViewer";
 import GoFastWithMeCommunityPanel from "@/components/gofast-with-me/GoFastWithMeCommunityPanel";
+import GoFastWithMeAnnouncementsPanel from "@/components/gofast-with-me/GoFastWithMeAnnouncementsPanel";
+import GoFastWithMeChatterPanel from "@/components/gofast-with-me/GoFastWithMeChatterPanel";
+import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
 import GoFastWithMePayoutsPanel from "@/components/gofast-with-me/GoFastWithMePayoutsPanel";
 import GoFastWithMeWorkoutsPanel from "@/components/gofast-with-me/GoFastWithMeWorkoutsPanel";
 import GoFastWithMeCmsContentSection from "@/components/gofast-with-me/GoFastWithMeContentPanel";
@@ -262,6 +266,7 @@ export default function GoFastWithOthersDashboard() {
   const studioShell = (content: React.ReactNode) => (
     <GoFastWithMeStudioAppShell
       activeView={activeView}
+      contentFocus={contentFocus}
       onViewChange={handleViewChange}
       landingNeedsAction={!isWelcomeComplete}
     >
@@ -326,6 +331,16 @@ export default function GoFastWithOthersDashboard() {
   };
 
   const renderStudioContent = () => {
+    if (activeView === "landingView") {
+      return (
+        <GoFastWithMeLandingViewer
+          landingValues={landingValues}
+          liveUrl={liveUrl}
+          onOpenWorkspace={openWorkspace}
+        />
+      );
+    }
+
     if (activeView === "communityHome") {
       return (
         <div className="space-y-6">
@@ -358,7 +373,7 @@ export default function GoFastWithOthersDashboard() {
           <GoFastWithMeDashboardHome
             metrics={dashboardMetrics}
             visitorHeadline={visitorHeadline}
-            onOpenWorkspace={openWorkspace}
+            onOpenMembers={() => openWorkspace('members')}
             onUrlUpdated={(slug, usesHandle) => {
               setPublicSlug(slug);
               setSlugUsesHandle(usesHandle);
@@ -366,6 +381,10 @@ export default function GoFastWithOthersDashboard() {
           />
         </div>
       );
+    }
+
+    if (activeView === "payouts") {
+      return <GoFastWithMePayoutsPanel />;
     }
 
     switch (activeView) {
@@ -381,15 +400,20 @@ export default function GoFastWithOthersDashboard() {
               setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
             }}
             onAvatarSaved={(photoURL) => setProfilePhotoURL(photoURL)}
-            onOpenWorkspace={openWorkspace}
           />
         );
       case "community":
         return (
           <GoFastWithMeCommunityPanel athleteId={athleteId} publicSlug={publicSlug} />
         );
-      case "payouts":
-        return <GoFastWithMePayoutsPanel />;
+      case "announcements":
+        return <GoFastWithMeAnnouncementsPanel athleteId={athleteId} />;
+      case "chatter":
+        return <GoFastWithMeChatterPanel athleteId={athleteId} publicSlug={publicSlug} />;
+      case "members":
+        return (
+          <GoFastWithMeMemberManagementPanel athleteId={athleteId} publicSlug={publicSlug} />
+        );
       case "workouts":
         return (
           <GoFastWithMeWorkoutsPanel
@@ -416,7 +440,7 @@ export default function GoFastWithOthersDashboard() {
   };
 
   return studioShell(
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6">
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}

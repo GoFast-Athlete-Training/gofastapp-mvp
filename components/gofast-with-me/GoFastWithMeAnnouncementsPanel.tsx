@@ -1,17 +1,15 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
-import GoFastWithMeFeedPanel from '@/components/gofast-with-me/GoFastWithMeFeedPanel';
+import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
 
 type Props = {
   athleteId: string;
-  publicSlug: string;
 };
 
-export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Props) {
+export default function GoFastWithMeAnnouncementsPanel({ athleteId }: Props) {
   const [hub, setHub] = useState<ContainerHubPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,11 +22,11 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
       if (res.data?.success && res.data.hub) {
         setHub(res.data.hub as ContainerHubPayload);
       } else {
-        throw new Error(res.data?.error || 'Could not load community');
+        throw new Error(res.data?.error || 'Could not load announcements');
       }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } }; message?: string };
-      setError(e.response?.data?.error || e.message || 'Could not load community');
+      setError(e.response?.data?.error || e.message || 'Could not load announcements');
     } finally {
       setLoading(false);
     }
@@ -39,11 +37,11 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
   }, [loadHub]);
 
   return (
-    <section id="community" className="space-y-6 pb-8">
+    <section id="announcements" className="space-y-6 pb-8">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Daily log</h2>
+        <h2 className="text-lg font-bold text-gray-900">Announcements</h2>
         <p className="text-sm text-gray-600 mt-1">
-          How you&apos;re feeling today — posts spill into the member feed.
+          Journey updates followers see in your community — post and review what&apos;s live.
         </p>
       </div>
 
@@ -53,14 +51,20 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
         </div>
       ) : null}
 
-      <GoFastWithMeFeedPanel
-        athleteId={athleteId}
-        publicSlug={publicSlug}
-        embedded
-        hub={hub}
-        hubLoading={loading}
-        onHubRefresh={loadHub}
-      />
+      {loading ? (
+        <p className="text-sm text-gray-500">Loading…</p>
+      ) : hub ? (
+        <GoFastWithMeHubFeed
+          hostId={athleteId}
+          isHost
+          canAccessFeed
+          upcomingRuns={hub.upcomingRuns}
+          publishedPlan={hub.publishedPlan}
+          initialMessages={hub.messages.filter((m) => m.topic === 'updates')}
+          announcementsMode
+          showHeading={false}
+        />
+      ) : null}
     </section>
   );
 }

@@ -76,7 +76,7 @@ export default function GoFastWithMeMemberManagementPanel({
     <section id="followers" className={embedded ? 'space-y-4' : 'space-y-6'}>
       {!embedded ? (
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Followers</h2>
+          <h2 className="text-lg font-bold text-gray-900">Members</h2>
           <p className="text-sm text-gray-600 mt-1">
             Runners following your athlete community — they see your goal, plan, updates, and
             GoRuns for free after they follow.

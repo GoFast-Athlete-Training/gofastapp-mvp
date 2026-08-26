@@ -16,7 +16,7 @@ import {
 } from '@/lib/gofast-with-me/studio-tutorial';
 
 const CHROME_ICONS: Record<StudioChromeView, LucideIcon> = {
-  page: Layout,
+  landingView: Layout,
   communityHome: Users,
   payouts: Wallet,
 };
@@ -69,10 +69,10 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
           {STUDIO_CHROME_VIEWS.map((view) => {
             const Icon = CHROME_ICONS[view];
             const description =
-              view === 'page'
-                ? `${STUDIO_LANDING_LABEL} — who you are plus recent highlights.`
+              view === 'landingView'
+                ? `${STUDIO_LANDING_LABEL} — who you are plus optional highlights.`
                 : view === 'communityHome'
-                  ? `${STUDIO_COMMUNITY_LABEL} — follower feed, invite link, and build actions.`
+                  ? `${STUDIO_COMMUNITY_LABEL} — follower feed, invite link, and preview.`
                   : 'Stripe Connect and sponsorship earnings.';
             return (
               <TutorialRow
@@ -85,8 +85,8 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
           })}
           <TutorialRow
             icon={Users}
-            label="Build content"
-            description="Daily log, tips, routes, and runs — one pool that surfaces on Landing and Community differently."
+            label="Build & manage"
+            description="Daily log, tips, routes, and runs on the left — announcements, chatter, and members under Manage."
           />
         </ul>
       )}
