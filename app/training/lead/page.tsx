@@ -7,6 +7,7 @@ import { ChevronLeft, Megaphone } from "lucide-react";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
+import { planRaceDisplayName } from "@/lib/training/plan-display-title";
 
 type PlanDetail = {
   id: string;
@@ -139,9 +140,9 @@ export default function LeadTrainingPlanPage() {
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Share this plan</h1>
+            <h1 className="text-xl font-bold text-gray-900">Publish plan</h1>
             <p className="text-xs text-gray-500">
-              Publish your generated schedule with a public preview link
+              Make your generated schedule public with a preview link
             </p>
           </div>
         </div>
@@ -171,14 +172,29 @@ export default function LeadTrainingPlanPage() {
         ) : null}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Plan to share</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Plan to publish</h2>
           <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4">
-            <p className="font-semibold text-gray-900">{plan.name}</p>
+            <p className="font-semibold text-gray-900">
+              {planRaceDisplayName({
+                name: plan.name,
+                race_registry: plan.race_registry?.name
+                  ? { name: plan.race_registry.name }
+                  : null,
+              })}
+            </p>
             <p className="text-sm text-gray-600 mt-1">
               {plan.totalWeeks} weeks
-              {plan.race_registry?.name ? ` · ${plan.race_registry.name}` : ""}
               {plan.race_registry?.distanceLabel ? ` · ${plan.race_registry.distanceLabel}` : ""}
             </p>
+            {plan.name !==
+            planRaceDisplayName({
+              name: plan.name,
+              race_registry: plan.race_registry?.name
+                ? { name: plan.race_registry.name }
+                : null,
+            }) ? (
+              <p className="mt-1 text-xs text-gray-500">Sharing title: {plan.name}</p>
+            ) : null}
           </div>
           <p className="text-sm text-gray-600">
             Your public URL slug is derived from this plan name. Edit the name in plan setup if you
@@ -214,7 +230,7 @@ export default function LeadTrainingPlanPage() {
             onClick={() => void publish()}
             className="inline-flex rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
           >
-            {saving ? "Publishing…" : publishedSlug ? "Update visibility" : "Share plan"}
+            {saving ? "Publishing…" : publishedSlug ? "Update visibility" : "Publish plan"}
           </button>
         </section>
 

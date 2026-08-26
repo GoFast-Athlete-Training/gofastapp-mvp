@@ -4,18 +4,25 @@
 
 import { prisma } from "@/lib/prisma";
 import {
+  athletePresetInclude,
   presetToPlanGenConfig,
   trainingPlanPresetInclude,
+  type LoadedAthletePresetInclude,
   type LoadedPresetInclude,
+  type RotationBlueprintSource,
 } from "@/lib/training/plan-generate-presets-loader";
+import {
+  athletePresetAsRotationSource,
+  isAthletePresetBlueprintComplete,
+} from "@/lib/training/athlete-preset-blueprint";
 import type { training_plan_preset } from "@prisma/client";
 
 export type ResolvedPlanBlueprint = {
   kind: "catalog" | "athlete";
   presetId: string | null;
   athletePresetId: string | null;
-  /** Rotation source — always a staff catalog row when available. */
-  rotationPreset: LoadedPresetInclude;
+  /** Rotation + strategy source for generate / materialize. */
+  rotationPreset: RotationBlueprintSource;
   volumePreset: Pick<
     training_plan_preset,
     | "minWeeklyMiles"
@@ -45,19 +52,17 @@ export async function loadPlanBlueprintForGenerate(params: {
   if (plan.athletePresetId) {
     const athletePreset = await prisma.athlete_presets.findFirst({
       where: { id: plan.athletePresetId, athleteId: params.athleteId },
+      include: athletePresetInclude,
     });
     if (!athletePreset) return null;
 
-    const rotationPresetId = athletePreset.sourcePresetId;
-    if (!rotationPresetId) {
+    if (!isAthletePresetBlueprintComplete(athletePreset)) {
       return null;
     }
 
-    const rotationPreset = await prisma.training_plan_preset.findUnique({
-      where: { id: rotationPresetId },
-      include: trainingPlanPresetInclude,
-    });
-    if (!rotationPreset) return null;
+    const rotationPreset = athletePresetAsRotationSource(
+      athletePreset as LoadedAthletePresetInclude
+    ) as unknown as RotationBlueprintSource;
 
     const volumePreset = {
       minWeeklyMiles: athletePreset.minWeeklyMiles,
@@ -68,7 +73,7 @@ export async function loadPlanBlueprintForGenerate(params: {
       tempoIdealDow: athletePreset.tempoIdealDow,
       intervalIdealDow: athletePreset.intervalIdealDow,
       longRunDefaultDow: athletePreset.longRunDefaultDow,
-      slug: rotationPreset.slug,
+      slug: rotationPreset.slug ?? `athlete-${athletePreset.id}`,
       title: athletePreset.title,
     };
 
@@ -76,7 +81,7 @@ export async function loadPlanBlueprintForGenerate(params: {
       kind: "athlete",
       presetId: null,
       athletePresetId: athletePreset.id,
-      rotationPreset: rotationPreset as LoadedPresetInclude,
+      rotationPreset,
       volumePreset,
       label: athletePreset.title,
     };

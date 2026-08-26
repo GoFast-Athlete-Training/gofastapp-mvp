@@ -520,6 +520,20 @@ export async function POST(request: NextRequest) {
 
     await syncRegistryCourseSegments(row.id, racePayload);
 
+    await prisma.athlete_races.updateMany({
+      where: { raceRegistryId: row.id },
+      data: {
+        name: nameVal,
+        raceDate,
+        ...(distanceMeters !== undefined ? { distanceMeters } : {}),
+        ...(distanceLabel !== undefined ? { distanceLabel } : {}),
+        city: locationCity,
+        state,
+        ...(slugVal ? { slug: slugVal } : {}),
+        updatedAt: new Date(),
+      },
+    });
+
     const response = NextResponse.json({ success: true, race: row });
     Object.entries(corsHeaders).forEach(([k, v]) =>
       response.headers.set(k, v)

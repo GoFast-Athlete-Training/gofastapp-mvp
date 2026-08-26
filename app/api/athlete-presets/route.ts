@@ -11,38 +11,7 @@ import {
 import { presetMatchesDistance } from "@/lib/training/preset-distance-match";
 import { inferAthletePresetCore } from "@/lib/training/athlete-preset-core-service";
 import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
-
-function serializeAthletePreset(row: {
-  id: string;
-  title: string;
-  description: string | null;
-  objectiveOfPlan: string | null;
-  fitnessPhase: AthletePresetFitnessPhase;
-  progressionAggressiveness: ProgressionAggressiveness | null;
-  trainingHistory: string | null;
-  sourcePresetId: string | null;
-  minWeeklyMiles: number;
-  baseMiles: number;
-  peakMiles: number;
-  taperMiles: number;
-  createdAt: Date;
-}) {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    objectiveOfPlan: row.objectiveOfPlan,
-    fitnessPhase: row.fitnessPhase,
-    progressionAggressiveness: row.progressionAggressiveness,
-    trainingHistory: row.trainingHistory,
-    sourcePresetId: row.sourcePresetId,
-    minWeeklyMiles: row.minWeeklyMiles,
-    baseMiles: row.baseMiles,
-    peakMiles: row.peakMiles,
-    taperMiles: row.taperMiles,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
+import { serializeAthletePresetForApi } from "@/lib/training/athlete-preset-blueprint";
 
 /** GET /api/athlete-presets — athlete-owned presets */
 export async function GET(request: NextRequest) {
@@ -58,7 +27,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      athletePresets: rows.map(serializeAthletePreset),
+      athletePresets: rows.map(serializeAthletePresetForApi),
     });
   } catch (e: unknown) {
     console.error("GET /api/athlete-presets", e);
@@ -69,7 +38,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** POST /api/athlete-presets — create athlete-owned preset (never writes catalog) */
+/** POST /api/athlete-presets — Call 1: infer cups, persist athlete_presets stub */
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAthleteFromBearer(request);
@@ -93,7 +62,7 @@ export async function POST(request: NextRequest) {
         : null;
     if (!sourcePresetId) {
       return NextResponse.json(
-        { error: "sourcePresetId is required — rotation stub missing" },
+        { error: "sourcePresetId is required — distance template missing" },
         { status: 400 }
       );
     }
@@ -208,7 +177,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      athletePreset: serializeAthletePreset(row),
+      athletePreset: serializeAthletePresetForApi(row),
       corePreview: {
         weSeeYou: core.weSeeYou,
         barriers: core.barriers,

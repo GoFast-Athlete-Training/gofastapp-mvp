@@ -23,6 +23,7 @@ import {
 } from "@/lib/training/plan-race-snapshots";
 import { isRaceCalendarBeforeTodayUtc } from "@/lib/training/plan-lifecycle";
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
+import { isAthletePresetBlueprintComplete } from "@/lib/training/athlete-preset-blueprint";
 
 /**
  * POST /api/training-plan
@@ -218,14 +219,13 @@ export async function POST(request: NextRequest) {
       const apId = String(bodyAthletePresetId).trim();
       const athletePreset = await prisma.athlete_presets.findFirst({
         where: { id: apId, athleteId: athlete.id },
-        select: { id: true, sourcePresetId: true },
       });
       if (!athletePreset) {
         return NextResponse.json({ error: "athletePresetId not found" }, { status: 404 });
       }
-      if (!athletePreset.sourcePresetId) {
+      if (!isAthletePresetBlueprintComplete(athletePreset)) {
         return NextResponse.json(
-          { error: "Athlete preset needs a GoFast workout template (sourcePresetId)" },
+          { error: "Finish building your athlete preset before creating a plan." },
           { status: 422 }
         );
       }

@@ -1769,8 +1769,26 @@ model athlete_presets {
   ageYearsSnapshot Int?
   genderSnapshot   String?
 
+  /// Generation-useful overview: volume, composition, long-run / quality structure families.
+  coachPlanOverview Json?
+  /// Named pace keys → anchor + offset; catalogue segment paceKeys resolve through this at materialization.
+  paceProfile Json?
+  /// Enabled workout types, weekly counts, cadence — canonical structure snapshot.
+  workoutStructure Json?
+  /// JSON: standardMiles, minMiles, paceOffsetSecPerMile, weeklyTargetBufferMiles (easy-day defaults)
+  easyRunConfig Json?
+
   sourcePresetId   String?
   promotedPresetId String?
+
+  longRunConfigId   String?
+  longRunConfig     long_run_config?   @relation(fields: [longRunConfigId], references: [id], onDelete: SetNull)
+  intervalsConfigId String?
+  intervalsConfig   intervals_config?  @relation(fields: [intervalsConfigId], references: [id], onDelete: SetNull)
+  tempoConfigId     String?
+  tempoConfig       tempo_config?      @relation(fields: [tempoConfigId], references: [id], onDelete: SetNull)
+  easyConfigId      String?
+  easyConfig        easy_config?       @relation(fields: [easyConfigId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1922,8 +1940,9 @@ model long_run_config {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  positions     long_run_config_position[]
-  usedByPresets training_plan_preset[]
+  positions       long_run_config_position[]
+  usedByPresets   training_plan_preset[]
+  athletePresets  athlete_presets[]
 
   @@index([name])
 }
@@ -1954,8 +1973,9 @@ model intervals_config {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  positions     intervals_config_position[]
-  usedByPresets training_plan_preset[]
+  positions      intervals_config_position[]
+  usedByPresets    training_plan_preset[]
+  athletePresets   athlete_presets[]
 
   @@index([name])
 }
@@ -1985,8 +2005,9 @@ model tempo_config {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  positions     tempo_config_position[]
-  usedByPresets training_plan_preset[]
+  positions      tempo_config_position[]
+  usedByPresets    training_plan_preset[]
+  athletePresets   athlete_presets[]
 
   @@index([name])
 }
@@ -2016,8 +2037,9 @@ model easy_config {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  positions     easy_config_position[]
-  usedByPresets training_plan_preset[]
+  positions      easy_config_position[]
+  usedByPresets    training_plan_preset[]
+  athletePresets   athlete_presets[]
 
   @@index([name])
 }

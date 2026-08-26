@@ -191,3 +191,65 @@ export async function applyWorkoutPickerToPreset(
 
   return { longRunConfigId, easyConfigId, intervalsConfigId, tempoConfigId };
 }
+
+export async function applyWorkoutPickerToAthletePreset(
+  athletePresetId: string,
+  input: WorkoutPickerApplyInput
+): Promise<{
+  longRunConfigId: string;
+  easyConfigId: string;
+  intervalsConfigId: string | null;
+  tempoConfigId: string | null;
+}> {
+  const preset = await prisma.athlete_presets.findUnique({ where: { id: athletePresetId } });
+  if (!preset) {
+    throw new Error("Athlete preset not found");
+  }
+
+  const longRunConfigId = await createConfigWithPositions({
+    kind: "longRun",
+    block: input.longRun,
+    expectedWorkoutType: "LongRun",
+    configLabel: "Long run rotation",
+  });
+
+  const easyConfigId = await createConfigWithPositions({
+    kind: "easy",
+    block: input.easy,
+    expectedWorkoutType: "Easy",
+    configLabel: "Easy rotation",
+  });
+
+  let intervalsConfigId: string | null = null;
+  if (input.intervals?.positions?.length) {
+    intervalsConfigId = await createConfigWithPositions({
+      kind: "intervals",
+      block: input.intervals,
+      expectedWorkoutType: "Intervals",
+      configLabel: "Intervals rotation",
+    });
+  }
+
+  let tempoConfigId: string | null = null;
+  if (input.tempo?.positions?.length) {
+    tempoConfigId = await createConfigWithPositions({
+      kind: "tempo",
+      block: input.tempo,
+      expectedWorkoutType: "Tempo",
+      configLabel: "Tempo rotation",
+    });
+  }
+
+  await prisma.athlete_presets.update({
+    where: { id: athletePresetId },
+    data: {
+      longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
+      longRunConfigId,
+      easyConfigId,
+      intervalsConfigId,
+      tempoConfigId,
+    },
+  });
+
+  return { longRunConfigId, easyConfigId, intervalsConfigId, tempoConfigId };
+}

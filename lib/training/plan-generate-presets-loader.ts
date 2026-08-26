@@ -77,6 +77,29 @@ export type LoadedPresetInclude = NonNullable<
   }>
 >;
 
+export const athletePresetInclude = {
+  longRunConfig: { include: { positions: positionsInclude } },
+  intervalsConfig: { include: { positions: positionsInclude } },
+  tempoConfig: { include: { positions: positionsInclude } },
+  easyConfig: { include: { positions: positionsInclude } },
+} as const;
+
+export type LoadedAthletePresetInclude = NonNullable<
+  Prisma.athlete_presetsGetPayload<{
+    include: typeof athletePresetInclude;
+  }>
+>;
+
+/** Rotation configs + strategy JSON fields — shared shape for catalog and athlete blueprints. */
+export type RotationBlueprintSource = LoadedPresetInclude & {
+  coachPlanOverview?: unknown;
+  paceProfile?: unknown;
+  easyRunConfig?: unknown;
+  workoutStructure?: unknown;
+  slug?: string;
+  title?: string;
+};
+
 export type CatalogueGenerationRowSelection =
   Prisma.workout_catalogueGetPayload<{ select: typeof catalogueSelectForGeneration }>;
 
@@ -126,7 +149,10 @@ export function runTypeInputsFromPreset(preset: {
 }
 
 export function catalogueIdsFromPreset(
-  preset: LoadedPresetInclude
+  preset: Pick<
+    RotationBlueprintSource,
+    "longRunConfig" | "intervalsConfig" | "tempoConfig" | "easyConfig"
+  >
 ): string[] {
   const ids: string[] = [];
   for (const p of preset.longRunConfig?.positions ?? []) {

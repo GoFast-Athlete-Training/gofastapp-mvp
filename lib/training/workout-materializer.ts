@@ -227,9 +227,12 @@ async function buildPrescriptionSteps(params: {
       paceProfile?: unknown;
       athletePersonaCapability?: string | null;
     } | null;
+    athlete_preset?: { paceProfile?: unknown } | null;
   }).training_plan_preset;
+  const athletePreset = (plan as { athlete_preset?: { paceProfile?: unknown } | null })
+    .athlete_preset;
   const paceProfile = effectivePaceProfileForPreset({
-    paceProfile: preset?.paceProfile ?? null,
+    paceProfile: preset?.paceProfile ?? athletePreset?.paceProfile ?? null,
     athletePersonaCapability:
       (preset?.athletePersonaCapability as PresetStrategyFields["athletePersonaCapability"]) ??
       null,
@@ -284,6 +287,9 @@ export async function materializeWorkoutForPlanDay(params: {
       },
       training_plan_preset: {
         select: { paceProfile: true, athletePersonaCapability: true },
+      },
+      athlete_preset: {
+        select: { paceProfile: true },
       },
     },
   });

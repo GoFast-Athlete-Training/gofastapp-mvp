@@ -14,7 +14,7 @@ import {
   snapDistanceLabelFromMeters,
 } from "@/lib/training/preset-distance-match";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
-import { AthletePresetIngestForm } from "@/components/training/AthletePresetIngestForm";
+import { AthletePresetBuilder } from "@/components/training/AthletePresetBuilder";
 import { InlineGoalForm, type InlineGoalRow } from "@/components/races/InlineGoalForm";
 import { fetchTrainingPlanDetail } from "@/lib/training/fetch-plan-week-client";
 
@@ -257,6 +257,13 @@ export default function TrainingSetupClient() {
   const [selectedPreset, setSelectedPreset] = useState<PresetForWizard | null>(null);
   const [presetPickMode, setPresetPickMode] = useState<"choose" | "catalog" | "custom">("choose");
   const [selectedAthletePresetId, setSelectedAthletePresetId] = useState<string | null>(null);
+  const [savedAthletePresets, setSavedAthletePresets] = useState<
+    { id: string; title: string; isComplete: boolean; buildStep: string }[]
+  >([]);
+  /** undefined = preset list; null = new builder; string = resume id */
+  const [customBuilderPresetId, setCustomBuilderPresetId] = useState<string | null | undefined>(
+    undefined
+  );
   /** When switching to a different race: null = show fork, same-shape | create-own */
   const [changeRaceForkChoice, setChangeRaceForkChoice] = useState<
     null | "same-shape" | "create-own"
@@ -531,11 +538,39 @@ export default function TrainingSetupClient() {
     setPlanName(suggestPlanName(wizardGoal.athlete_race.name, athleteFirstName));
   }, [wizardGoal?.id, wizardGoal?.athlete_race?.name, athleteFirstName, planNameTouched]);
 
+  useEffect(() => {
+    if (presetPickMode !== "custom") {
+      setCustomBuilderPresetId(undefined);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch("/api/athlete-presets", {
+          headers: athleteBearerFetchHeaders(token),
+        });
+        const data = (await res.json()) as {
+          athletePresets?: { id: string; title: string; isComplete: boolean; buildStep: string }[];
+        };
+        if (!cancelled && res.ok && data.athletePresets) {
+          setSavedAthletePresets(data.athletePresets);
+        }
+      } catch {
+        /* list optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [presetPickMode]);
+
   function beginWizardForGoal(g: GoalRow) {
     setWizardGoal(g);
     setSelectedPreset(null);
     setSelectedAthletePresetId(null);
     setPresetPickMode("choose");
+    setCustomBuilderPresetId(undefined);
     setPlanName("");
     setPlanNameTouched(false);
     setFormError(null);
@@ -949,8 +984,8 @@ export default function TrainingSetupClient() {
                       </p>
                       <p className="mt-2 font-medium text-gray-900">How do you want to build?</p>
                       <p className="mt-1 leading-relaxed text-gray-700">
-                        Use a GoFast training level, or create your own blueprint from your profile
-                        and recent training.
+                        Use a GoFast training level, or create your own blueprint. Tell us your
+                        history and your goal.
                       </p>
                       {replacingFromAddedRace ? (
                         <p className="mt-2 text-xs text-amber-900/90">
@@ -976,32 +1011,102 @@ export default function TrainingSetupClient() {
                         onClick={() => setPresetPickMode("custom")}
                         className="rounded-xl border-2 border-gray-200 bg-gray-50 p-4 text-left hover:border-orange-400 hover:bg-orange-50/50"
                       >
-                        <p className="font-semibold text-gray-900">Create my own</p>
+                        <p className="font-semibold text-gray-900">Create my own preset</p>
                         <p className="mt-1 text-sm text-gray-600">
-                          Peak or base block from your profile — no persona wizard.
+                          Train how you want to train. Tell the AI plan generator your history and
+                          your goal, and it will tailor your daily run cycle to you.
                         </p>
                       </button>
                     </div>
                   </>
                 ) : presetPickMode === "custom" ? (
-                  <AthletePresetIngestForm
+                  customBuilderPresetId !== undefined ? (
+                  <AthletePresetBuilder
                     getToken={getTokenForIngest}
                     templatePresets={presetsForWizardGoal}
+                    resumePresetId={customBuilderPresetId}
                     raceDistanceMeters={rr.distanceMeters ?? null}
                     raceName={rr.name}
                     raceDate={rr.raceDate}
                     planStartDate={startDate || new Date().toISOString()}
                     goalTime={wizardGoal.goalTime}
-                    defaultTitle={suggestPlanName(rr.name, athleteFirstName)}
-                    onCreated={(ap) => {
+                    onComplete={(ap) => {
                       setSelectedAthletePresetId(ap.id);
                       setSelectedPreset(null);
+                      setCustomBuilderPresetId(undefined);
                       if (!planNameTouched) {
                         setPlanName(ap.title);
                       }
                     }}
-                    onCancel={() => setPresetPickMode("choose")}
+                    onCancel={() => setCustomBuilderPresetId(undefined)}
                   />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
+                        <p className="font-medium text-gray-900">Your presets</p>
+                        <p className="mt-1 text-gray-700">
+                          Resume a saved blueprint or create a new one. Finished presets can be
+                          picked when you generate your plan.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setPresetPickMode("choose")}
+                          className="mt-2 text-sm font-medium text-orange-600 hover:text-orange-800"
+                        >
+                          ← Back
+                        </button>
+                      </div>
+                      {savedAthletePresets.length > 0 ? (
+                        <ul className="space-y-2">
+                          {savedAthletePresets.map((ap) => (
+                            <li
+                              key={ap.id}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3"
+                            >
+                              <div>
+                                <p className="font-medium text-gray-900">{ap.title}</p>
+                                <p className="text-xs text-gray-600">
+                                  {ap.isComplete ? "Ready to use" : `In progress — ${ap.buildStep}`}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                {ap.isComplete ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedAthletePresetId(ap.id);
+                                      setSelectedPreset(null);
+                                      if (!planNameTouched) setPlanName(ap.title);
+                                    }}
+                                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                                  >
+                                    Use preset
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setCustomBuilderPresetId(ap.id)}
+                                    className="rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
+                                  >
+                                    Resume
+                                  </button>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-gray-600">No saved presets yet.</p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setCustomBuilderPresetId(null)}
+                        className="w-full rounded-xl border-2 border-orange-300 bg-orange-50 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-100"
+                      >
+                        Create new preset
+                      </button>
+                    </div>
+                  )
                 ) : (
                   <>
                     <div className="mb-6 rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
@@ -1182,7 +1287,7 @@ export default function TrainingSetupClient() {
                         </button>
                         <button
                           type="button"
-                          disabled={creating || loadingOrientation || !selectedPreset}
+                          disabled={creating || loadingOrientation || (!selectedPreset && !selectedAthletePresetId)}
                           onClick={() => void createPlan({ forceReplace: true })}
                           className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                         >
@@ -1272,7 +1377,7 @@ export default function TrainingSetupClient() {
                   <button
                     type="button"
                     onClick={() => void createPlan()}
-                    disabled={creating || loadingOrientation || !selectedPreset}
+                    disabled={creating || loadingOrientation || (!selectedPreset && !selectedAthletePresetId)}
                     className="w-full rounded-lg bg-emerald-600 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
                   >
                     {creating ? "Continuing…" : "Choose preferences"}
