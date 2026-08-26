@@ -1,4 +1,5 @@
 import { formatCalendarDate } from '@/lib/calendar-date';
+import { isCityRunPast } from '@/lib/city-run-clock';
 
 export interface RunClub {
   slug: string;
@@ -151,7 +152,20 @@ export function formatRunDate(d: string, includeYear = true): string {
   });
 }
 
-export function isRunPast(date: string): boolean {
-  const runPlus4h = new Date(new Date(date).getTime() + 4 * 60 * 60 * 1000);
-  return runPlus4h < new Date();
+export function isRunPast(
+  date: string,
+  clock?: {
+    startTimeHour?: number | null;
+    startTimeMinute?: number | null;
+    startTimePeriod?: string | null;
+    timezone?: string | null;
+  }
+): boolean {
+  return isCityRunPast({
+    date,
+    startTimeHour: clock?.startTimeHour,
+    startTimeMinute: clock?.startTimeMinute,
+    startTimePeriod: clock?.startTimePeriod,
+    timezone: clock?.timezone,
+  });
 }

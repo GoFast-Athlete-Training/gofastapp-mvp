@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { requireAthleteFromBearerForRsvp } from '@/lib/training/require-athlete';
 import { prisma } from '@/lib/prisma';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
+import { upsertCityRunStampForAthlete } from '@/lib/city-run/city-run-stamp';
 
 /**
  * GET /api/runs/[runId]/rsvp
@@ -112,7 +113,12 @@ export async function POST(
     }
     const { athlete } = auth;
 
-    const run = await prisma.city_runs.findUnique({ where: { id: resolvedId } });
+    const run = await prisma.city_runs.findUnique({
+      where: { id: resolvedId },
+      include: {
+        runClub: { select: { id: true, slug: true, name: true } },
+      },
+    });
     if (!run) {
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
@@ -137,7 +143,19 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({ success: true, rsvp });
+    let stampResult: Awaited<ReturnType<typeof upsertCityRunStampForAthlete>> | null = null;
+    if (status === 'going' && run.runClubId) {
+      stampResult = await upsertCityRunStampForAthlete(athlete.id, resolvedId);
+    }
+
+    return NextResponse.json({
+      success: true,
+      rsvp,
+      runClubSlug: run.runClub?.slug ?? null,
+      runClubId: run.runClubId,
+      stamp: stampResult,
+      redirectToClub: Boolean(status === 'going' && run.runClub?.slug),
+    });
   } catch (err) {
     console.error('Error RSVPing to CityRun:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

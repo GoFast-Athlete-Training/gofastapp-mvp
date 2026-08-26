@@ -369,7 +369,7 @@ async function duplicateRunForward(
     directionsText: prior.directionsText,
     routeId: prior.routeId,
     workoutId: prior.workoutId,
-    cityRunType: prior.cityRunType,
+    cityRunType: prior.runClubId ? 'CLUB' : prior.cityRunType,
     updatedAt: new Date(),
   };
 

@@ -557,7 +557,7 @@ export async function POST(request: NextRequest) {
       igPostGraphic: igPostGraphic?.trim() || null,
       routeId: resolvedRouteId,
       workoutId: resolvedWorkoutId,
-      cityRunType: resolveCityRunType({
+      cityRunType: finalRunClubId ? 'CLUB' : resolveCityRunType({
         runClubId: finalRunClubId,
         runCrewId: runCrewId?.trim() || null,
         athleteGeneratedId: athleteGeneratedId?.trim() || null,

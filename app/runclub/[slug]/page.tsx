@@ -9,6 +9,7 @@ import TopNav from '@/components/shared/TopNav';
 import UpcomingRunsList, { UpcomingRun } from '@/components/runclub/UpcomingRunsList';
 import ClubNextRunHero, { type NextRunHeroRun } from '@/components/runclub/ClubNextRunHero';
 import ClubCompletedRunFeed from '@/components/runclub/ClubCompletedRunFeed';
+import ClubChatterSection from '@/components/runclub/ClubChatterSection';
 import type { CompletedRunFeedItem } from '@/lib/runclub/completed-run-feed';
 import ClubAnnouncementsList, {
   ClubAnnouncement,
@@ -212,6 +213,12 @@ export default function AuthenticatedRunClubHubPage() {
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-8">
         <ClubNextRunHero run={nextRun} onRsvpChange={() => void fetchClub()} />
+
+        <ClubChatterSection
+          clubSlug={slug}
+          isMember={isMember}
+          onJoinRequired={() => void handleJoinToggle()}
+        />
 
         <section>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">

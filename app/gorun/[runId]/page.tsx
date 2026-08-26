@@ -108,7 +108,12 @@ export default function GoRunPage() {
     if (!run) return;
     setRsvpLoading(true);
     try {
-      await api.post(`/runs/${run.id}/rsvp`, { status });
+      const res = await api.post(`/runs/${run.id}/rsvp`, { status });
+      const slug = res.data?.runClubSlug as string | null | undefined;
+      if (status === 'going' && res.data?.redirectToClub && slug) {
+        router.push(`/runclub/${slug}`);
+        return;
+      }
       await fetchAll();
     } catch (err: any) {
       console.error('RSVP error:', err);
@@ -174,6 +179,17 @@ export default function GoRunPage() {
   }
 
   if (run.currentRSVP === 'going') {
+    const clubSlug = run.runClub?.slug;
+    if (clubSlug) {
+      if (typeof window !== 'undefined') {
+        router.replace(`/runclub/${clubSlug}`);
+      }
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+        </div>
+      );
+    }
     return (
       <>
         <TopNav />
@@ -206,8 +222,15 @@ function CityRunPreRSVP({
   const [runIsPast, setRunIsPast] = useState(false);
 
   useEffect(() => {
-    setRunIsPast(isRunPast(run.date));
-  }, [run.date]);
+    setRunIsPast(
+      isRunPast(run.date, {
+        startTimeHour: run.startTimeHour,
+        startTimeMinute: run.startTimeMinute,
+        startTimePeriod: run.startTimePeriod,
+        timezone: run.timezone,
+      })
+    );
+  }, [run.date, run.startTimeHour, run.startTimeMinute, run.startTimePeriod, run.timezone]);
 
   const isSeries = run.runSeriesId != null;
 

@@ -795,7 +795,9 @@ export async function PUT(
           ? relationshipPatch.raceRegistryId
           : (updateData.raceRegistryId as string | null | undefined) ?? run.raceRegistryId,
     });
-    updateData.cityRunType = cityRunTypeFromSnapshot(mergedRelationships);
+    updateData.cityRunType = mergedRelationships.runClubId
+      ? 'CLUB'
+      : cityRunTypeFromSnapshot(mergedRelationships);
 
     const runClubUpdateData: Record<string, string | null> = {};
     if (body.runClubWebsiteUrl !== undefined) {

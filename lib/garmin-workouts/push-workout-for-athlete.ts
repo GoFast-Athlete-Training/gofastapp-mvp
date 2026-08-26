@@ -299,15 +299,17 @@ export async function pushPlannedWorkoutToGarminForAthlete(
 
     const token = await requireGarminTokenFresh(athleteId);
 
-    const garminTitle = garminPushTitleForPlannedWorkout({
-      title: planned.title,
-      weekNumber: planned.weekNumber,
-      dayAssigned: planned.dayAssigned,
-      catalogueName: planned.workout_catalogue?.name ?? null,
-      planId: planned.planId,
-      workoutType: planned.workoutType,
-      estimatedDistanceInMeters: planned.estimatedDistanceInMeters,
-    });
+    const garminTitle =
+      planned.cityRunMatchLabel?.trim() ||
+      garminPushTitleForPlannedWorkout({
+        title: planned.title,
+        weekNumber: planned.weekNumber,
+        dayAssigned: planned.dayAssigned,
+        catalogueName: planned.workout_catalogue?.name ?? null,
+        planId: planned.planId,
+        workoutType: planned.workoutType,
+        estimatedDistanceInMeters: planned.estimatedDistanceInMeters,
+      });
 
     const garminSegments = expandSegmentsForGarminPush(
       planned.segments.map((seg) => ({

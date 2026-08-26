@@ -7,7 +7,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
-import { Home, Settings, Calendar, Wallet } from 'lucide-react';
+import { Home, Settings, Calendar, Wallet, Footprints } from 'lucide-react';
 
 interface TopNavProps {
   showBack?: boolean;
@@ -95,6 +95,14 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
             >
               <TopNavEarningsLink />
             </Suspense>
+
+            <Link
+              href="/runner"
+              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
+              title="Runner"
+            >
+              <Footprints className="h-5 w-5" />
+            </Link>
 
             {/* Settings Icon */}
             <Link

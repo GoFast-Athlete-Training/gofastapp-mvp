@@ -16,11 +16,16 @@ test("shout CTA expires 24h after check-in", () => {
 });
 
 test("check-in CTA shows only within 24h after run is past", () => {
-  const runDate = new Date("2026-06-20T06:00:00.000Z");
-  const justPast = runDate.getTime() + RUN_PAST_BUFFER_MS + 60_000;
-  const expired = runDate.getTime() + RUN_PAST_BUFFER_MS + POST_RUN_CTA_MAX_AGE_MS + 60_000;
-  const beforePast = runDate.getTime() + RUN_PAST_BUFFER_MS - 60_000;
-  assert.equal(isRunWithinPostRunCheckinCtaWindow(runDate, justPast), true);
-  assert.equal(isRunWithinPostRunCheckinCtaWindow(runDate, expired), false);
-  assert.equal(isRunWithinPostRunCheckinCtaWindow(runDate, beforePast), false);
+  const run = {
+    date: new Date("2026-06-20T06:00:00.000Z"),
+    startTimeHour: 6,
+    startTimeMinute: 0,
+    startTimePeriod: "AM",
+  };
+  const justPast = new Date("2026-06-20T10:05:00.000Z").getTime();
+  const expired = new Date("2026-06-21T11:00:00.000Z").getTime();
+  const beforePast = new Date("2026-06-20T09:00:00.000Z").getTime();
+  assert.equal(isRunWithinPostRunCheckinCtaWindow(run, justPast), true);
+  assert.equal(isRunWithinPostRunCheckinCtaWindow(run, expired), false);
+  assert.equal(isRunWithinPostRunCheckinCtaWindow(run, beforePast), false);
 });

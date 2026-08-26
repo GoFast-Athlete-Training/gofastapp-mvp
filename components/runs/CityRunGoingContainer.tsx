@@ -26,8 +26,15 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
   }, [run.rsvps]);
 
   useEffect(() => {
-    setRunIsPast(isRunPast(run.date));
-  }, [run.date]);
+    setRunIsPast(
+      isRunPast(run.date, {
+        startTimeHour: run.startTimeHour,
+        startTimeMinute: run.startTimeMinute,
+        startTimePeriod: run.startTimePeriod,
+        timezone: run.timezone,
+      })
+    );
+  }, [run.date, run.startTimeHour, run.startTimeMinute, run.startTimePeriod, run.timezone]);
 
   const socialRun = hasSocialRunLifecycle(run);
 

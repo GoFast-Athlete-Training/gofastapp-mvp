@@ -18,7 +18,14 @@ export default function CityRunRunDayCompanion({
   onAddShout,
   checkingIn = false,
 }: CityRunRunDayCompanionProps) {
-  const past = runIsPast ?? isRunPast(run.date);
+  const past =
+    runIsPast ??
+    isRunPast(run.date, {
+      startTimeHour: run.startTimeHour,
+      startTimeMinute: run.startTimeMinute,
+      startTimePeriod: run.startTimePeriod,
+      timezone: run.timezone,
+    });
   const stravaUrl = run.stravaMapUrl?.trim() || null;
   const courseText =
     run.workoutDescription?.trim() ||

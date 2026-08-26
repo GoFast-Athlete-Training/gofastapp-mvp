@@ -1,23 +1,41 @@
 import { prisma } from '@/lib/prisma';
 import { hasSocialRunLifecycle } from '@/lib/city-run-type';
+import {
+  isCityRunPast,
+  isCityRunWithinPostRunCheckinWindow,
+  RUN_PAST_BUFFER_MS,
+} from '@/lib/city-run-clock';
 
-export const RUN_PAST_BUFFER_MS = 4 * 60 * 60 * 1000;
+export { RUN_PAST_BUFFER_MS };
+
 /** Post-run check-in / shout CTA only surfaces for this long after the trigger moment. */
 export const POST_RUN_CTA_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const LOOKBACK_MS = POST_RUN_CTA_MAX_AGE_MS;
 
-function isRunPast(date: Date, nowMs = Date.now()): boolean {
-  return date.getTime() + RUN_PAST_BUFFER_MS < nowMs;
+type RunClockRow = {
+  date: Date;
+  startTimeHour?: number | null;
+  startTimeMinute?: number | null;
+  startTimePeriod?: string | null;
+  timezone?: string | null;
+};
+
+function runClock(run: RunClockRow) {
+  return {
+    date: run.date,
+    startTimeHour: run.startTimeHour,
+    startTimeMinute: run.startTimeMinute,
+    startTimePeriod: run.startTimePeriod,
+    timezone: run.timezone,
+  };
 }
 
 /** RSVP check-in prompt: run ended recently enough to still nudge check-in. */
 export function isRunWithinPostRunCheckinCtaWindow(
-  runDate: Date,
+  run: RunClockRow,
   nowMs = Date.now()
 ): boolean {
-  const runPastAt = runDate.getTime() + RUN_PAST_BUFFER_MS;
-  if (nowMs < runPastAt) return false;
-  return nowMs - runPastAt <= POST_RUN_CTA_MAX_AGE_MS;
+  return isCityRunWithinPostRunCheckinWindow(runClock(run), nowMs);
 }
 
 /** Shout prompt after check-in: only fresh for 24h from check-in time. */
@@ -34,6 +52,20 @@ const RUN_CLUB_SELECT = {
   name: true,
   logoUrl: true,
   city: true,
+} as const;
+
+const RUN_CLOCK_SELECT = {
+  id: true,
+  title: true,
+  date: true,
+  startTimeHour: true,
+  startTimeMinute: true,
+  startTimePeriod: true,
+  timezone: true,
+  cityRunType: true,
+  runClubId: true,
+  athleteGeneratedId: true,
+  runClub: { select: RUN_CLUB_SELECT },
 } as const;
 
 export type CityRunPostRunShoutCta = {
@@ -73,24 +105,14 @@ export async function findCityRunPostRunShoutCta(
       checkedInAt: { gte: since },
     },
     include: {
-      city_runs: {
-        select: {
-          id: true,
-          title: true,
-          date: true,
-          cityRunType: true,
-          runClubId: true,
-          athleteGeneratedId: true,
-          runClub: { select: RUN_CLUB_SELECT },
-        },
-      },
+      city_runs: { select: RUN_CLOCK_SELECT },
     },
     orderBy: { checkedInAt: 'desc' },
   });
 
   for (const checkin of checkins) {
     const run = checkin.city_runs;
-    if (!run || !hasSocialRunLifecycle(run) || !isRunPast(run.date)) continue;
+    if (!run || !hasSocialRunLifecycle(run) || !isCityRunPast(runClock(run))) continue;
     if (!isCheckinWithinPostRunShoutCtaWindow(checkin.checkedInAt)) continue;
     if (checkin.runShouts?.trim()) continue;
 
@@ -140,17 +162,7 @@ export async function findCityRunPostRunShoutCta(
       },
     },
     include: {
-      city_runs: {
-        select: {
-          id: true,
-          title: true,
-          date: true,
-          cityRunType: true,
-          runClubId: true,
-          athleteGeneratedId: true,
-          runClub: { select: RUN_CLUB_SELECT },
-        },
-      },
+      city_runs: { select: RUN_CLOCK_SELECT },
     },
   });
 
@@ -160,8 +172,8 @@ export async function findCityRunPostRunShoutCta(
 
   for (const rsvp of sortedGoingRsvps) {
     const run = rsvp.city_runs;
-    if (!run || !hasSocialRunLifecycle(run) || !isRunPast(run.date)) continue;
-    if (!isRunWithinPostRunCheckinCtaWindow(run.date)) continue;
+    if (!run || !hasSocialRunLifecycle(run) || !isCityRunPast(runClock(run))) continue;
+    if (!isRunWithinPostRunCheckinCtaWindow(run)) continue;
 
     const existingCheckin = await prisma.city_run_checkins.findUnique({
       where: { runId_athleteId: { runId: run.id, athleteId } },

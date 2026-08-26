@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { Camera, MessageSquare } from 'lucide-react';
 import type { CompletedRunFeedItem } from '@/lib/runclub/completed-run-feed';
 
@@ -14,14 +13,8 @@ function formatFeedDate(dateStr: string): string {
 }
 
 function FeedCard({ item }: { item: CompletedRunFeedItem }) {
-  const router = useRouter();
-
   return (
-    <button
-      type="button"
-      onClick={() => router.push(`/gorun/${item.runSlug ?? item.runId}`)}
-      className="w-full overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-gray-200/80 transition-shadow hover:shadow-md"
-    >
+    <article className="w-full overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-gray-200/80">
       {item.postRunPhotoUrl ? (
         <div className="relative aspect-[4/3] w-full bg-gray-100">
           <img
@@ -44,7 +37,7 @@ function FeedCard({ item }: { item: CompletedRunFeedItem }) {
           </p>
         ) : null}
       </div>
-    </button>
+    </article>
   );
 }
 

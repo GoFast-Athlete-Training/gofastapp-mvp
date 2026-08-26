@@ -1042,6 +1042,8 @@ model run_clubs {
   state        String?
   neighborhood String?
   description String?              // General club description (for downstream display)
+  /// Short matcher token for Garmin title / inbound match (e.g. "DCCR").
+  matchToken  String?
   allRunsDescription String?      // Overall description for this club's run series (not per individual run) — drives run_series.description
   websiteUrl String?
   runUrl    String?              // "Runs" page URL — single source of truth for where run/series info came from (seed/hydrate for data entry)
@@ -1327,6 +1329,7 @@ model city_run_messages {
   @@map("city_run_messages")
 }
 
+/// Athlete–run roster junction (I'm in / going). One row per athlete per city run.
 model city_run_rsvps {
   id              String        @id
   runId           String
@@ -1455,6 +1458,7 @@ model city_runs {
   location            run_locations?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
   route               routes?              @relation(fields: [routeId], references: [id], onDelete: SetNull)
   workout             workouts?            @relation(fields: [workoutId], references: [id], onDelete: SetNull)
+  planned_workouts    planned_workouts[]
 
   @@index([athleteGeneratedId])
   @@index([citySlug])
@@ -2387,12 +2391,18 @@ model workout_catalogue {
 }
 
 /// Prescribe-only plan day — segments live on planned_workout_segments until match spawns an instance.
+/// City Run stamps: planId null, cityRunId set — athlete commit + Garmin push without a training plan.
 model planned_workouts {
   id                        String              @id @default(cuid())
   title                     String
   workoutType               WorkoutType
   athleteId                 String
-  planId                    String
+  planId                    String?
+  cityRunId                 String?
+  /// Frozen course at stamp time. Not a live routes FK. Not a Garmin course id.
+  courseSnapJson            Json?
+  /// Stable matcher token when cityRunId is set. e.g. "DCCR Thurs Tempo"
+  cityRunMatchLabel         String?
   catalogueWorkoutId        String?
   date                      DateTime
   estimatedDistanceInMeters Float?
@@ -2407,14 +2417,17 @@ model planned_workouts {
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
   Athlete                   Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  training_plans            training_plans      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  training_plans            training_plans?     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  city_run                  city_runs?          @relation(fields: [cityRunId], references: [id], onDelete: SetNull)
   workout_catalogue         workout_catalogue?  @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
   segments                  planned_workout_segments[]
   spawned_instances         workouts[]
 
   @@unique([athleteId, planId, date])
+  @@unique([athleteId, cityRunId])
   @@index([athleteId, garminWorkoutId])
   @@index([planId, date])
+  @@index([cityRunId])
   @@index([catalogueWorkoutId])
 }
 
