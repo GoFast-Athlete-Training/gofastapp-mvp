@@ -16,6 +16,9 @@ export function coachOverviewFromCoreInfer(input: {
   weSeeYou: string;
   barriers: string[];
   progressionAggressiveness: string;
+  weeklyVolumeBand?: string;
+  minWeeklyMiles?: number;
+  maxWeeklyMiles?: number | null;
   calendar: CoreVolumeCalendarPreview;
   cupsConfirmed?: boolean;
 }): Record<string, unknown> {
@@ -24,6 +27,9 @@ export function coachOverviewFromCoreInfer(input: {
     weSeeYou: input.weSeeYou,
     barriers: input.barriers,
     progressionAggressiveness: input.progressionAggressiveness,
+    weeklyVolumeBand: input.weeklyVolumeBand ?? null,
+    minWeeklyMiles: input.minWeeklyMiles ?? null,
+    maxWeeklyMiles: input.maxWeeklyMiles ?? null,
     peakPoolKey: input.calendar.peakPoolKey,
     peakLongRunDate: input.calendar.peakLongRunDate,
     taperStartDate: input.calendar.taperStartDate,

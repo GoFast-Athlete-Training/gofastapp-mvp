@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { ageYearsFromBirthday } from "@/lib/training/athlete-preset-volume";
+import { weeklyVolumeKeyForDistance } from "@/lib/training/weekly-volume-key";
 
 export type PresetForWizardLite = {
   id: string;
@@ -34,6 +35,9 @@ type CorePreview = {
   weSeeYou: string;
   barriers: string[];
   progressionAggressiveness: string;
+  weeklyVolumeBand?: "FINISH" | "RACE" | "ELITE";
+  minWeeklyMiles?: number;
+  maxWeeklyMiles?: number | null;
   longestSaturdayMiles?: number;
   calendar: {
     totalWeeks: number;
@@ -370,6 +374,7 @@ export function AthletePresetBuilder({
         peakLongRunPoolMiles: Number(peakLongRunPoolMiles),
         taperLongRunPoolMiles: Number(taperLongRunPoolMiles),
         minWeeklyMiles: Number(minWeeklyMiles),
+        maxWeeklyMiles: corePreview?.maxWeeklyMiles ?? null,
       };
 
       if (presetId) {
@@ -608,6 +613,24 @@ export function AthletePresetBuilder({
                   </ul>
                 ) : null}
               </div>
+
+              {corePreview.weeklyVolumeBand ? (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Weekly range from your race goal
+                  </p>
+                  <p className="mt-1 font-semibold text-gray-900">
+                    {
+                      weeklyVolumeKeyForDistance(null)[corePreview.weeklyVolumeBand]
+                        .athleteLabel
+                    }
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {corePreview.minWeeklyMiles ?? "—"}–{corePreview.maxWeeklyMiles ?? "—"} mi per
+                    week — not your long-run pool, not Peak vs Base.
+                  </p>
+                </div>
+              ) : null}
 
               <div className="rounded-xl border border-sky-200 bg-white p-4">
                 <p className="text-sm font-semibold text-gray-900">Peak long-run pool</p>

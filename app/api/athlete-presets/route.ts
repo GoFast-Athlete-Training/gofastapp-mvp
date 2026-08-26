@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AthletePresetFitnessPhase } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { ageYearsFromBirthday, resolveWeeklyMileageForPresetInfer } from "@/lib/training/athlete-preset-volume";
+import { ageYearsFromBirthday } from "@/lib/training/athlete-preset-volume";
 import { presetMatchesDistance } from "@/lib/training/preset-distance-match";
 import { inferAthletePresetCore } from "@/lib/training/athlete-preset-core-service";
 import {
@@ -137,18 +137,10 @@ export async function POST(request: NextRequest) {
         ? Math.round(longRunFromBody * 10) / 10
         : athleteRow.longRunCapabilityMiles;
 
-    const weeklyFromBody =
-      body.weeklyMileage != null && body.weeklyMileage !== ""
-        ? Number(body.weeklyMileage)
+    const currentWeeklyMileage =
+      athleteRow.weeklyMileage != null && Number.isFinite(athleteRow.weeklyMileage)
+        ? Math.round(athleteRow.weeklyMileage)
         : null;
-    const weeklyMileage = resolveWeeklyMileageForPresetInfer({
-      fitnessPhase,
-      trainingHistory,
-      profileWeeklyMileage: athleteRow.weeklyMileage,
-      longRunCapabilityMiles,
-      bodyWeeklyMileage:
-        weeklyFromBody != null && Number.isFinite(weeklyFromBody) ? weeklyFromBody : null,
-    });
 
     const raceName = typeof body.raceName === "string" ? body.raceName.trim() : "Goal race";
     const raceDate = typeof body.raceDate === "string" ? body.raceDate : "";
@@ -163,7 +155,7 @@ export async function POST(request: NextRequest) {
       trainingHistory,
       ageYears: ageYearsFromBirthday(athleteRow.birthday),
       gender: athleteRow.gender?.trim() || null,
-      weeklyMileage,
+      currentWeeklyMileage,
       fiveKPace: athleteRow.fiveKPace?.trim() || null,
       longRunCapabilityMiles,
       raceName,
@@ -177,6 +169,9 @@ export async function POST(request: NextRequest) {
       weSeeYou: core.weSeeYou,
       barriers: core.barriers,
       progressionAggressiveness: core.progressionAggressiveness,
+      weeklyVolumeBand: core.weeklyVolumeBand,
+      minWeeklyMiles: core.minWeeklyMiles,
+      maxWeeklyMiles: core.maxWeeklyMiles,
       longestSaturdayMiles: core.longestSaturdayMiles,
       calendar: core.calendar,
       poolMilesByCycle: core.calendar.poolMilesByCycle,
@@ -266,6 +261,9 @@ export async function POST(request: NextRequest) {
             weSeeYou: core.weSeeYou,
             barriers: core.barriers,
             progressionAggressiveness: core.progressionAggressiveness,
+            weeklyVolumeBand: core.weeklyVolumeBand,
+            minWeeklyMiles,
+            maxWeeklyMiles,
             calendar,
             cupsConfirmed: true,
           })
