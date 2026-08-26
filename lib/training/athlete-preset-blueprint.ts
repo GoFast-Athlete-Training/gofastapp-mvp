@@ -35,9 +35,9 @@ function cupsConfirmedFromOverview(coachPlanOverview: unknown): boolean {
 }
 
 export type AthletePresetRowForStep = {
-  baseMiles: number;
-  peakMiles: number;
-  taperMiles: number;
+  baseLongRunPoolMiles: number;
+  peakLongRunPoolMiles: number;
+  taperLongRunPoolMiles: number;
   workoutStructure: unknown;
   coachPlanOverview: unknown;
   longRunConfigId: string | null;
@@ -69,9 +69,9 @@ export function serializeAthletePresetForApi(row: {
   sourcePresetId: string | null;
   minWeeklyMiles: number;
   maxWeeklyMiles: number | null;
-  baseMiles: number;
-  peakMiles: number;
-  taperMiles: number;
+  baseLongRunPoolMiles: number;
+  peakLongRunPoolMiles: number;
+  taperLongRunPoolMiles: number;
   tempoIdealDow: number;
   intervalIdealDow: number;
   longRunDefaultDow: number;
@@ -87,9 +87,9 @@ export function serializeAthletePresetForApi(row: {
   updatedAt: Date;
 }) {
   const stepRow: AthletePresetRowForStep = {
-    baseMiles: row.baseMiles,
-    peakMiles: row.peakMiles,
-    taperMiles: row.taperMiles,
+    baseLongRunPoolMiles: row.baseLongRunPoolMiles,
+    peakLongRunPoolMiles: row.peakLongRunPoolMiles,
+    taperLongRunPoolMiles: row.taperLongRunPoolMiles,
     workoutStructure: row.workoutStructure,
     coachPlanOverview: row.coachPlanOverview,
     longRunConfigId: row.longRunConfigId,
@@ -108,9 +108,9 @@ export function serializeAthletePresetForApi(row: {
     sourcePresetId: row.sourcePresetId,
     minWeeklyMiles: row.minWeeklyMiles,
     maxWeeklyMiles: row.maxWeeklyMiles,
-    baseMiles: row.baseMiles,
-    peakMiles: row.peakMiles,
-    taperMiles: row.taperMiles,
+    baseLongRunPoolMiles: row.baseLongRunPoolMiles,
+    peakLongRunPoolMiles: row.peakLongRunPoolMiles,
+    taperLongRunPoolMiles: row.taperLongRunPoolMiles,
     tempoIdealDow: row.tempoIdealDow,
     intervalIdealDow: row.intervalIdealDow,
     longRunDefaultDow: row.longRunDefaultDow,

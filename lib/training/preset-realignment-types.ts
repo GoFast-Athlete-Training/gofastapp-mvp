@@ -66,9 +66,9 @@ export type CorePresetServiceResult = {
   volume: {
     minWeeklyMiles: number;
     maxWeeklyMiles: number | null;
-    baseMiles: number;
-    peakMiles: number;
-    taperMiles: number;
+    baseLongRunPoolMiles: number;
+    peakLongRunPoolMiles: number;
+    taperLongRunPoolMiles: number;
   };
   schedule: {
     tempoIdealDow: number;

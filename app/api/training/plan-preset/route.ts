@@ -10,6 +10,7 @@ import {
   parseEasyRunConfigJson,
 } from "@/lib/training/easy-run-config";
 import { Prisma } from "@prisma/client";
+import { readLongRunPoolFromRecord } from "@/lib/training/long-run-pool-fields";
 import { validatePresetRotationConfigs } from "@/lib/training/run-type-config-validation";
 import {
   parsePresetStrategyFromBody,
@@ -183,16 +184,22 @@ export async function POST(request: NextRequest) {
       if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
       return null;
     };
-    const peakMiles = needPositive(body.peakMiles);
-    const baseMiles = needPositive(body.baseMiles);
-    const taperMiles = needPositive(body.taperMiles);
+    const bodyRec = body as Record<string, unknown>;
+    const pools = readLongRunPoolFromRecord(bodyRec, {
+      baseLongRunPoolMiles: 0,
+      peakLongRunPoolMiles: 0,
+      taperLongRunPoolMiles: 0,
+    });
+    const peakLongRunPoolMiles = needPositive(pools.peakLongRunPoolMiles);
+    const baseLongRunPoolMiles = needPositive(pools.baseLongRunPoolMiles);
+    const taperLongRunPoolMiles = needPositive(pools.taperLongRunPoolMiles);
     const minWeeklyMiles = needPositive(body.minWeeklyMiles);
-    if (peakMiles == null || baseMiles == null || taperMiles == null || minWeeklyMiles == null) {
+    if (peakLongRunPoolMiles == null || baseLongRunPoolMiles == null || taperLongRunPoolMiles == null || minWeeklyMiles == null) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "minWeeklyMiles, baseMiles, peakMiles, and taperMiles are required and must be positive numbers",
+            "minWeeklyMiles, baseLongRunPoolMiles, peakLongRunPoolMiles, and taperLongRunPoolMiles are required and must be positive numbers",
         },
         { status: 400 }
       );
@@ -317,9 +324,9 @@ export async function POST(request: NextRequest) {
       longRunCycleWeeks: 4,
       minWeeklyMiles,
       maxWeeklyMiles: maxWeeklyMiles ?? null,
-      baseMiles,
-      peakMiles,
-      taperMiles,
+      baseLongRunPoolMiles,
+      peakLongRunPoolMiles,
+      taperLongRunPoolMiles,
       tempoIdealDow: tNum,
       intervalIdealDow: iNum,
       longRunDefaultDow: lNum,

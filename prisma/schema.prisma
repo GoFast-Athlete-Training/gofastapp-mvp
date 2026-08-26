@@ -1717,9 +1717,12 @@ model training_plan_preset {
   longRunCycleWeeks  Int    @default(4)
   minWeeklyMiles     Int    @default(40)
   maxWeeklyMiles     Int?
-  baseMiles          Float
-  peakMiles          Float
-  taperMiles         Float
+  /// Base-block long-run POOL — sum of 4 Saturday LRs in that block. Not weekly mileage.
+  baseLongRunPoolMiles  Float
+  /// Peak-block long-run POOL — sum of 4 Saturday LRs in the peak block. Not weekly mileage.
+  peakLongRunPoolMiles  Float
+  /// Taper-block long-run POOL — sum of 4 Saturday LRs in the taper block. Not weekly mileage.
+  taperLongRunPoolMiles Float
   tempoIdealDow      Int    @default(2)
   intervalIdealDow   Int    @default(4)
   longRunDefaultDow  Int    @default(6)
@@ -1755,9 +1758,9 @@ model athlete_presets {
   longRunCycleWeeks Int    @default(4)
   minWeeklyMiles    Int    @default(40)
   maxWeeklyMiles    Int?
-  baseMiles         Float
-  peakMiles         Float
-  taperMiles        Float
+  baseLongRunPoolMiles  Float
+  peakLongRunPoolMiles  Float
+  taperLongRunPoolMiles Float
   tempoIdealDow     Int    @default(2)
   intervalIdealDow  Int    @default(4)
   longRunDefaultDow Int    @default(6)
@@ -1768,6 +1771,13 @@ model athlete_presets {
   progressionAggressiveness ProgressionAggressiveness?
   ageYearsSnapshot Int?
   genderSnapshot   String?
+
+  /// Biggest single Saturday inside the peak long-run pool.
+  longestSaturdayMiles Float?
+  peakLongRunDate      DateTime?
+  taperStartDate       DateTime?
+  trainingStartDate    DateTime?
+  raceDateSnapshot     DateTime?
 
   /// Generation-useful overview: volume, composition, long-run / quality structure families.
   coachPlanOverview Json?

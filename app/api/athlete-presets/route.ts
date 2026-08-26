@@ -1,12 +1,17 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { AthletePresetFitnessPhase, Prisma } from "@prisma/client";
+import { AthletePresetFitnessPhase } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { ageYearsFromBirthday } from "@/lib/training/athlete-preset-volume";
 import { presetMatchesDistance } from "@/lib/training/preset-distance-match";
 import { inferAthletePresetCore } from "@/lib/training/athlete-preset-core-service";
+import {
+  coachOverviewFromCoreInfer,
+  mergeCoachPlanOverview,
+} from "@/lib/training/athlete-preset-coach-overview";
+import { computeCoreVolumeCalendarPreview } from "@/lib/training/core-volume-compute";
 import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
 import { serializeAthletePresetForApi } from "@/lib/training/athlete-preset-blueprint";
 
@@ -126,6 +131,15 @@ export async function POST(request: NextRequest) {
     }
     const weeklyMileage = Math.round(Number(weeklyFromBody));
 
+    const longRunFromBody =
+      body.longRunCapabilityMiles != null && body.longRunCapabilityMiles !== ""
+        ? Number(body.longRunCapabilityMiles)
+        : null;
+    const longRunCapabilityMiles =
+      longRunFromBody != null && Number.isFinite(longRunFromBody) && longRunFromBody > 0
+        ? Math.round(longRunFromBody * 10) / 10
+        : athleteRow.longRunCapabilityMiles;
+
     const trainingHistory =
       typeof body.trainingHistory === "string" ? body.trainingHistory.trim() : "";
     if (!trainingHistory) {
@@ -150,7 +164,7 @@ export async function POST(request: NextRequest) {
       gender: athleteRow.gender?.trim() || null,
       weeklyMileage,
       fiveKPace: athleteRow.fiveKPace?.trim() || null,
-      longRunCapabilityMiles: athleteRow.longRunCapabilityMiles,
+      longRunCapabilityMiles,
       raceName,
       raceDate,
       planStartDate,
@@ -162,26 +176,31 @@ export async function POST(request: NextRequest) {
       weSeeYou: core.weSeeYou,
       barriers: core.barriers,
       progressionAggressiveness: core.progressionAggressiveness,
+      longestSaturdayMiles: core.longestSaturdayMiles,
       calendar: core.calendar,
       poolMilesByCycle: core.calendar.poolMilesByCycle,
+      peakPoolKey: core.calendar.peakPoolKey,
+      peakLongRunDate: core.calendar.peakLongRunDate,
+      taperStartDate: core.calendar.taperStartDate,
     };
 
     if (previewOnly) {
       return NextResponse.json({
         corePreview,
         suggestedCups: {
-          baseMiles: core.cups.baseMiles,
-          peakMiles: core.cups.peakMiles,
-          taperMiles: core.cups.taperMiles,
+          baseLongRunPoolMiles: core.cups.baseLongRunPoolMiles,
+          peakLongRunPoolMiles: core.cups.peakLongRunPoolMiles,
+          taperLongRunPoolMiles: core.cups.taperLongRunPoolMiles,
           minWeeklyMiles: core.minWeeklyMiles,
           maxWeeklyMiles: core.maxWeeklyMiles,
+          longestSaturdayMiles: core.longestSaturdayMiles,
         },
       });
     }
 
-    const baseMiles = "baseMiles" in body ? numField(body.baseMiles, core.cups.baseMiles) : core.cups.baseMiles;
-    const peakMiles = "peakMiles" in body ? numField(body.peakMiles, core.cups.peakMiles) : core.cups.peakMiles;
-    const taperMiles = "taperMiles" in body ? numField(body.taperMiles, core.cups.taperMiles) : core.cups.taperMiles;
+    const baseLongRunPoolMiles = "baseLongRunPoolMiles" in body ? numField(body.baseLongRunPoolMiles, core.cups.baseLongRunPoolMiles) : core.cups.baseLongRunPoolMiles;
+    const peakLongRunPoolMiles = "peakLongRunPoolMiles" in body ? numField(body.peakLongRunPoolMiles, core.cups.peakLongRunPoolMiles) : core.cups.peakLongRunPoolMiles;
+    const taperLongRunPoolMiles = "taperLongRunPoolMiles" in body ? numField(body.taperLongRunPoolMiles, core.cups.taperLongRunPoolMiles) : core.cups.taperLongRunPoolMiles;
     const minWeeklyMiles =
       "minWeeklyMiles" in body ? Math.max(1, Math.round(numField(body.minWeeklyMiles, core.minWeeklyMiles))) : core.minWeeklyMiles;
     const maxWeeklyRaw = body.maxWeeklyMiles;
@@ -189,6 +208,20 @@ export async function POST(request: NextRequest) {
       maxWeeklyRaw == null || maxWeeklyRaw === ""
         ? core.maxWeeklyMiles
         : Math.max(minWeeklyMiles, Math.round(numField(maxWeeklyRaw, core.maxWeeklyMiles ?? minWeeklyMiles)));
+
+    const planStart = new Date(planStartDate);
+    const raceDt = new Date(raceDate);
+    const calendar = computeCoreVolumeCalendarPreview({
+      planStartDate: planStart,
+      raceDate: raceDt,
+      baseLongRunPoolMiles,
+      peakLongRunPoolMiles,
+      taperLongRunPoolMiles,
+    });
+    const longestSaturdayMiles =
+      "longestSaturdayMiles" in body
+        ? numField(body.longestSaturdayMiles, core.longestSaturdayMiles)
+        : core.longestSaturdayMiles;
 
     const row = await prisma.athlete_presets.create({
       data: {
@@ -202,11 +235,20 @@ export async function POST(request: NextRequest) {
             : fitnessPhase === "PEAK"
               ? "Sharpen toward race — already built up"
               : "Build base toward race",
-        baseMiles,
-        peakMiles,
-        taperMiles,
+        baseLongRunPoolMiles,
+        peakLongRunPoolMiles,
+        taperLongRunPoolMiles,
         minWeeklyMiles,
         maxWeeklyMiles,
+        longestSaturdayMiles,
+        trainingStartDate: planStart,
+        raceDateSnapshot: raceDt,
+        peakLongRunDate: calendar.peakLongRunDate
+          ? new Date(`${calendar.peakLongRunDate}T12:00:00.000Z`)
+          : null,
+        taperStartDate: calendar.taperStartDate
+          ? new Date(`${calendar.taperStartDate}T12:00:00.000Z`)
+          : null,
         longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
         tempoIdealDow: sourcePreset.tempoIdealDow,
         intervalIdealDow: sourcePreset.intervalIdealDow,
@@ -217,7 +259,16 @@ export async function POST(request: NextRequest) {
         ageYearsSnapshot: ageYearsFromBirthday(athleteRow.birthday),
         genderSnapshot: athleteRow.gender?.trim() || null,
         sourcePresetId,
-        coachPlanOverview: { cupsConfirmed: true } as Prisma.InputJsonValue,
+        coachPlanOverview: mergeCoachPlanOverview(
+          null,
+          coachOverviewFromCoreInfer({
+            weSeeYou: core.weSeeYou,
+            barriers: core.barriers,
+            progressionAggressiveness: core.progressionAggressiveness,
+            calendar,
+            cupsConfirmed: true,
+          })
+        ),
       },
     });
 

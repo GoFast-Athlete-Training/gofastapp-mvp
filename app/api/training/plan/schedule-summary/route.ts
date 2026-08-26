@@ -17,9 +17,9 @@ type CyclePoolData = {
   nCycles: number;
   longRunCycleWeeks: number;
   poolMilesByCycle: number[];
-  baseMiles: number;
-  peakMiles: number;
-  taperMiles: number;
+  baseLongRunPoolMiles: number;
+  peakLongRunPoolMiles: number;
+  taperLongRunPoolMiles: number;
   positionCounts: { longRun: number; intervals: number; tempo: number };
 } | null;
 

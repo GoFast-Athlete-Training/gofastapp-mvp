@@ -27,9 +27,9 @@ type PresetCheckResponse = {
   longRunCycleWeeks: number | null;
   minWeeklyMiles: number | null;
   maxWeeklyMiles: number | null;
-  baseMiles: number | null;
-  peakMiles: number | null;
-  taperMiles: number | null;
+  baseLongRunPoolMiles: number | null;
+  peakLongRunPoolMiles: number | null;
+  taperLongRunPoolMiles: number | null;
   tempoIdealDow: number | null;
   intervalIdealDow: number | null;
   longRunDefaultDow: number | null;
@@ -343,8 +343,8 @@ export default function TrainingGenerateTestPage() {
             <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
               <p className="font-semibold text-gray-900">Volume & long-run cycle</p>
               <p className="mt-2 text-gray-800">
-                Base {result.baseMiles ?? "—"} mi → Peak {result.peakMiles ?? "—"} mi → Taper{" "}
-                {result.taperMiles ?? "—"} mi · long-run block {result.longRunCycleWeeks ?? 4} weeks (
+                Base {result.baseLongRunPoolMiles ?? "—"} mi → Peak {result.peakLongRunPoolMiles ?? "—"} mi → Taper{" "}
+                {result.taperLongRunPoolMiles ?? "—"} mi · long-run block {result.longRunCycleWeeks ?? 4} weeks (
                 {result.longRunCycleWeeks ?? 4} Saturday long runs per block)
               </p>
               <p className="mt-1 text-gray-700">

@@ -133,9 +133,9 @@ export async function PATCH(
     const volKeys = [
       "minWeeklyMiles",
       "maxWeeklyMiles",
-      "baseMiles",
-      "peakMiles",
-      "taperMiles",
+      "baseLongRunPoolMiles",
+      "peakLongRunPoolMiles",
+      "taperLongRunPoolMiles",
     ] as const;
     const scalarData: Record<string, unknown> = {};
     const bodyRec = body as Record<string, unknown>;

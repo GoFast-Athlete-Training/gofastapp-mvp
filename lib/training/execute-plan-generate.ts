@@ -240,53 +240,53 @@ export async function executePlanGenerate(params: {
     }
   }
 
-  const vb = Number(vol.baseMiles);
-  const vp = Number(vol.peakMiles);
-  const vt = Number(vol.taperMiles);
+  const vb = Number(vol.baseLongRunPoolMiles);
+  const vp = Number(vol.peakLongRunPoolMiles);
+  const vt = Number(vol.taperLongRunPoolMiles);
   if (!Number.isFinite(vb) || vb <= 0) {
     throw new Error(
-      `Training preset "${presetLabel}" has invalid baseMiles. Fix this preset in GoFast Company.`
+      `Training preset "${presetLabel}" has invalid baseLongRunPoolMiles. Fix this preset in GoFast Company.`
     );
   }
   if (!Number.isFinite(vp) || vp <= 0) {
     throw new Error(
-      `Training preset "${presetLabel}" has invalid peakMiles. Fix this preset in GoFast Company.`
+      `Training preset "${presetLabel}" has invalid peakLongRunPoolMiles. Fix this preset in GoFast Company.`
     );
   }
   if (!Number.isFinite(vt) || vt <= 0) {
     throw new Error(
-      `Training preset "${presetLabel}" has invalid taperMiles. Fix this preset in GoFast Company.`
+      `Training preset "${presetLabel}" has invalid taperLongRunPoolMiles. Fix this preset in GoFast Company.`
     );
   }
-  const baseMiles = vb;
-  const peakMiles = Math.max(baseMiles, vp);
-  const taperMiles = vt;
+  const baseLongRunPoolMiles = vb;
+  const peakLongRunPoolMiles = Math.max(baseLongRunPoolMiles, vp);
+  const taperLongRunPoolMiles = vt;
 
   applyLongRunSchedule({
     planSchedule: schedule,
     totalWeeks: weekCount,
     longRunCycleWeeks: cLen,
-    baseMiles,
-    peakMiles,
-    taperMiles,
+    baseLongRunPoolMiles,
+    peakLongRunPoolMiles,
+    taperLongRunPoolMiles,
     longRunPositions,
   });
 
   const cupResult = longRunCupSetter({
     totalWeeks: weekCount,
     longRunCycleWeeks: cLen,
-    baseMiles,
-    peakMiles,
-    taperMiles,
+    baseLongRunPoolMiles,
+    peakLongRunPoolMiles,
+    taperLongRunPoolMiles,
   });
 
   const cyclePoolData = {
     nCycles: cupResult.nCycles,
     longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
     poolMilesByCycle: cupResult.poolMilesByCycle,
-    baseMiles,
-    peakMiles,
-    taperMiles,
+    baseLongRunPoolMiles,
+    peakLongRunPoolMiles,
+    taperLongRunPoolMiles,
     positionCounts: {
       longRun: longRunPositions.length,
       intervals: intervalsPositions.length,

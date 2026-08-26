@@ -88,7 +88,7 @@ type PresetForWizard = {
   targetDistanceLabel: string | null;
   minWeeklyMiles: number;
   maxWeeklyMiles: number | null;
-  baseMiles: number;
+  baseLongRunPoolMiles: number;
 };
 
 function parseFiveKPaceToParts(pace: string | null | undefined): { min: string; sec: string } {
@@ -385,17 +385,17 @@ export default function TrainingSetupClient() {
                     : null;
                 const minWeeklyMilesRaw = Number(r.minWeeklyMiles);
                 const maxRaw = r.maxWeeklyMiles;
-                const baseRaw = Number(r.baseMiles);
+                const baseRaw = Number(r.baseLongRunPoolMiles);
                 let minWeeklyMiles = 40;
                 let maxWeeklyMiles: number | null = null;
-                let baseMiles = 40;
+                let baseLongRunPoolMiles = 40;
                 if (Number.isFinite(minWeeklyMilesRaw) && minWeeklyMilesRaw >= 1) {
                   minWeeklyMiles = Math.round(minWeeklyMilesRaw);
                 }
                 if (maxRaw != null && Number.isFinite(Number(maxRaw)) && Number(maxRaw) >= minWeeklyMiles) {
                   maxWeeklyMiles = Math.round(Number(maxRaw));
                 }
-                if (Number.isFinite(baseRaw) && baseRaw > 0) baseMiles = baseRaw;
+                if (Number.isFinite(baseRaw) && baseRaw > 0) baseLongRunPoolMiles = baseRaw;
                 return {
                   id,
                   slug,
@@ -405,7 +405,7 @@ export default function TrainingSetupClient() {
                   targetDistanceLabel,
                   minWeeklyMiles,
                   maxWeeklyMiles,
-                  baseMiles,
+                  baseLongRunPoolMiles,
                 };
               })
               .filter((x): x is PresetForWizard => x != null);
@@ -834,13 +834,13 @@ export default function TrainingSetupClient() {
     });
 
     const weeklyN = baselineWeeklyMileage.trim() === "" ? NaN : Number(baselineWeeklyMileage);
-    const baseMilesPreset = selectedPreset?.baseMiles;
+    const baseLongRunPoolMilesPreset = selectedPreset?.baseLongRunPoolMiles;
     const rampBanner =
       selectedPreset != null &&
       Number.isFinite(weeklyN) &&
       weeklyN > 0 &&
-      Number.isFinite(baseMilesPreset) ? (
-        weeklyN < (baseMilesPreset as number) * 0.75 ? (
+      Number.isFinite(baseLongRunPoolMilesPreset) ? (
+        weeklyN < (baseLongRunPoolMilesPreset as number) * 0.75 ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
             <p className="font-medium text-amber-950">We&apos;ll build you up</p>
             <p className="mt-1 text-amber-900/90">
@@ -885,6 +885,9 @@ export default function TrainingSetupClient() {
     const baselinePresetTitle =
       selectedPreset?.title ?? (selectedAthletePresetId ? "Your preset" : "");
 
+    const inAthletePresetBuildFlow =
+      stepChoosePreset && presetPickMode === "custom";
+
     async function getTokenForIngest() {
       const u = auth.currentUser;
       if (!u) throw new Error("Sign in required");
@@ -895,13 +898,28 @@ export default function TrainingSetupClient() {
       <AthleteAppShell>
         <div className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6">
           <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-sm sm:p-8">
-            <h1 className="mb-2 text-2xl font-semibold tracking-tight">Plan setup</h1>
-            <p className="mb-4 text-sm text-gray-600">
-              Goal:{" "}
-              <span className="font-medium text-gray-900">{rr.name}</span> —{" "}
-              {formatRaceWhen(rr.raceDate)}
-              {goalDistanceLine ? ` · ${goalDistanceLine}` : ""}.
-            </p>
+            {inAthletePresetBuildFlow ? (
+              <>
+                <h1 className="mb-2 text-2xl font-semibold tracking-tight">Create your preset</h1>
+                <p className="mb-4 text-sm text-gray-600">
+                  For{" "}
+                  <span className="font-medium text-gray-900">{rr.name}</span> —{" "}
+                  {formatRaceWhen(rr.raceDate)}
+                  {goalDistanceLine ? ` · ${goalDistanceLine}` : ""}. Build your training blueprint
+                  here — you&apos;ll attach it to a plan after.
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="mb-2 text-2xl font-semibold tracking-tight">Plan setup</h1>
+                <p className="mb-4 text-sm text-gray-600">
+                  Goal:{" "}
+                  <span className="font-medium text-gray-900">{rr.name}</span> —{" "}
+                  {formatRaceWhen(rr.raceDate)}
+                  {goalDistanceLine ? ` · ${goalDistanceLine}` : ""}.
+                </p>
+              </>
+            )}
 
             {needsGoalTimeStep ? (
               <div className="space-y-4">
@@ -1032,8 +1050,8 @@ export default function TrainingSetupClient() {
                       >
                         <p className="font-semibold text-gray-900">Create my own preset</p>
                         <p className="mt-1 text-sm text-gray-600">
-                          Train how you want to train. Tell the AI plan generator your history and
-                          your goal, and it will tailor your daily run cycle to you.
+                          Train how you want to train. Tell us your history and goal — we&apos;ll
+                          size your long-run pool and weekly blueprint.
                         </p>
                       </button>
                     </div>
@@ -1099,12 +1117,13 @@ export default function TrainingSetupClient() {
                                       <div>
                                         <p className="font-medium text-gray-900">{ap.title}</p>
                                         <p className="text-xs text-gray-600">
-                                          {ap.buildStepLabel}
+                                          {ap.buildStepLabel ??
+                                            `Stopped at: ${ap.buildStep}`}
                                           {" · "}
                                           {new Date(ap.updatedAt).toLocaleDateString()}
                                         </p>
                                       </div>
-                                      <div className="flex gap-2">
+                                      <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
                                         <button
                                           type="button"
                                           onClick={() => setCustomBuilderPresetId(ap.id)}
@@ -1150,7 +1169,7 @@ export default function TrainingSetupClient() {
                                               setDeletingPresetId(null);
                                             }
                                           })()}
-                                          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                                          className="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-60"
                                         >
                                           {deletingPresetId === ap.id ? "Deleting…" : "Delete"}
                                         </button>
@@ -1177,12 +1196,13 @@ export default function TrainingSetupClient() {
                                       <div>
                                         <p className="font-medium text-gray-900">{ap.title}</p>
                                         <p className="text-xs text-gray-600">
-                                          {ap.buildStepLabel}
+                                          {ap.buildStepLabel ??
+                                            `Stopped at: ${ap.buildStep}`}
                                           {" · "}
                                           {new Date(ap.updatedAt).toLocaleDateString()}
                                         </p>
                                       </div>
-                                      <div className="flex gap-2">
+                                      <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
                                         <button
                                           type="button"
                                           onClick={() => {
@@ -1232,7 +1252,7 @@ export default function TrainingSetupClient() {
                                               setDeletingPresetId(null);
                                             }
                                           })()}
-                                          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                                          className="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-60"
                                         >
                                           {deletingPresetId === ap.id ? "Deleting…" : "Delete"}
                                         </button>

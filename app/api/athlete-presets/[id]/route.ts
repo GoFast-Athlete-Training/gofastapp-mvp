@@ -17,6 +17,11 @@ import {
   parsePaceProfile,
 } from "@/lib/training/preset-strategy";
 import { deleteAthletePresetForAthlete } from "@/lib/training/delete-athlete-preset";
+import {
+  coachOverviewFromCoreInfer,
+  mergeCoachPlanOverview,
+} from "@/lib/training/athlete-preset-coach-overview";
+import { computeCoreVolumeCalendarPreview } from "@/lib/training/core-volume-compute";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -85,14 +90,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             : existing.objectiveOfPlan;
     }
 
-    if (body.step === "core" || "baseMiles" in body) {
+    if (body.step === "core" || "baseLongRunPoolMiles" in body) {
       const num = (v: unknown, fallback: number) => {
         const n = Number(v);
         return Number.isFinite(n) ? n : fallback;
       };
-      if ("baseMiles" in body) data.baseMiles = num(body.baseMiles, existing.baseMiles);
-      if ("peakMiles" in body) data.peakMiles = num(body.peakMiles, existing.peakMiles);
-      if ("taperMiles" in body) data.taperMiles = num(body.taperMiles, existing.taperMiles);
+      if ("baseLongRunPoolMiles" in body) data.baseLongRunPoolMiles = num(body.baseLongRunPoolMiles, existing.baseLongRunPoolMiles);
+      if ("peakLongRunPoolMiles" in body) data.peakLongRunPoolMiles = num(body.peakLongRunPoolMiles, existing.peakLongRunPoolMiles);
+      if ("taperLongRunPoolMiles" in body) data.taperLongRunPoolMiles = num(body.taperLongRunPoolMiles, existing.taperLongRunPoolMiles);
       if ("minWeeklyMiles" in body) {
         data.minWeeklyMiles = Math.max(1, Math.round(num(body.minWeeklyMiles, existing.minWeeklyMiles)));
       }
@@ -104,7 +109,55 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             : Math.max(1, Math.round(num(raw, existing.maxWeeklyMiles ?? 0)));
       }
       if (body.step === "core" && body.action === "confirmCups") {
-        data.coachPlanOverview = { cupsConfirmed: true } as Prisma.InputJsonValue;
+        const base = num(body.baseLongRunPoolMiles, existing.baseLongRunPoolMiles);
+        const peak = num(body.peakLongRunPoolMiles, existing.peakLongRunPoolMiles);
+        const taper = num(body.taperLongRunPoolMiles, existing.taperLongRunPoolMiles);
+        if (existing.trainingStartDate && existing.raceDateSnapshot) {
+          const calendar = computeCoreVolumeCalendarPreview({
+            planStartDate: existing.trainingStartDate,
+            raceDate: existing.raceDateSnapshot,
+            baseLongRunPoolMiles: base,
+            peakLongRunPoolMiles: peak,
+            taperLongRunPoolMiles: taper,
+          });
+          data.peakLongRunDate = calendar.peakLongRunDate
+            ? new Date(`${calendar.peakLongRunDate}T12:00:00.000Z`)
+            : null;
+          data.taperStartDate = calendar.taperStartDate
+            ? new Date(`${calendar.taperStartDate}T12:00:00.000Z`)
+            : null;
+          const overview = existing.coachPlanOverview;
+          const weSeeYou =
+            overview != null &&
+            typeof overview === "object" &&
+            !Array.isArray(overview) &&
+            typeof (overview as Record<string, unknown>).weSeeYou === "string"
+              ? String((overview as Record<string, unknown>).weSeeYou)
+              : "";
+          const barriers =
+            overview != null &&
+            typeof overview === "object" &&
+            !Array.isArray(overview) &&
+            Array.isArray((overview as Record<string, unknown>).barriers)
+              ? ((overview as Record<string, unknown>).barriers as string[])
+              : [];
+          const progressionAggressiveness =
+            existing.progressionAggressiveness ?? "MODERATE";
+          data.coachPlanOverview = mergeCoachPlanOverview(
+            existing.coachPlanOverview,
+            coachOverviewFromCoreInfer({
+              weSeeYou,
+              barriers,
+              progressionAggressiveness,
+              calendar,
+              cupsConfirmed: true,
+            })
+          );
+        } else {
+          data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
+            cupsConfirmed: true,
+          });
+        }
       }
     }
 

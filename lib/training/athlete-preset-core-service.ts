@@ -1,12 +1,13 @@
 /**
- * First OpenAI prompt for athlete Create my own — infers cups + ambition from free text.
+ * First OpenAI prompt for athlete Create my own — infers long-run pools + weekly range from free text.
  */
 
 import type { AthletePresetFitnessPhase, ProgressionAggressiveness } from "@prisma/client";
 import {
   computeCoreVolumeCalendarPreview,
-  normalizeCoreVolumeCups,
+  normalizeLongRunPools,
 } from "@/lib/training/core-volume-compute";
+import { clampPeakLongRunPoolToBand } from "@/lib/training/long-run-pool-fields";
 
 export type AthletePresetCoreInferInput = {
   fitnessPhase: AthletePresetFitnessPhase;
@@ -27,13 +28,13 @@ export type AthletePresetCoreInferResult = {
   weSeeYou: string;
   barriers: string[];
   progressionAggressiveness: ProgressionAggressiveness;
-  peakLrPoolMax: number;
-  baseLrPool: number;
-  taperLrPool: number;
+  peakLongRunPoolMiles: number;
+  baseLongRunPoolMiles: number;
+  taperLongRunPoolMiles: number;
   longestSaturdayMiles: number;
   minWeeklyMiles: number;
   maxWeeklyMiles: number | null;
-  cups: { baseMiles: number; peakMiles: number; taperMiles: number };
+  cups: { baseLongRunPoolMiles: number; peakLongRunPoolMiles: number; taperLongRunPoolMiles: number };
   calendar: ReturnType<typeof computeCoreVolumeCalendarPreview>;
 };
 
@@ -73,34 +74,61 @@ function extractJsonObject(text: string): unknown {
   return JSON.parse(body.slice(start, end + 1));
 }
 
+function inferElitePeakPool(input: AthletePresetCoreInferInput): boolean {
+  const lr = input.longRunCapabilityMiles ?? 0;
+  const weekly = input.weeklyMileage;
+  if (input.fitnessPhase === "PEAK" && (weekly >= 55 || lr >= 18)) return true;
+  if (lr >= 20 || weekly >= 60) return true;
+  const history = input.trainingHistory.toLowerCase();
+  if (/\b(elite|sub-?3|boston|qualif|advanced|high volume)\b/.test(history)) return true;
+  return false;
+}
+
+function scienceWeeklyRange(weekly: number, aggressiveness: ProgressionAggressiveness) {
+  const floor = Math.max(20, Math.round(weekly * 0.85));
+  const slack = aggressiveness === "AMBITIOUS" ? 8 : aggressiveness === "CONSERVATIVE" ? 3 : 5;
+  const max = Math.round(weekly + slack);
+  return { minWeeklyMiles: floor, maxWeeklyMiles: max };
+}
+
 function fallbackCoreInfer(input: AthletePresetCoreInferInput): AthletePresetCoreInferResult {
   const weekly = input.weeklyMileage;
-  const peak =
-    input.fitnessPhase === "PEAK"
-      ? Math.max(44, Math.min(75, weekly + 10))
-      : Math.max(40, Math.min(65, Math.round(weekly * 1.1)));
-  const base = Math.max(30, Math.round(peak * 0.65));
-  const taper = Math.max(25, Math.round(peak * 0.85));
-  const cups = normalizeCoreVolumeCups({
-    baseLrPool: base,
-    peakLrPoolMax: peak,
-    taperLrPool: taper,
+  const elite = inferElitePeakPool(input);
+  const aggressiveness: ProgressionAggressiveness =
+    input.fitnessPhase === "PEAK" ? "MODERATE" : "CONSERVATIVE";
+  const peakTarget = elite ? 65 : 55;
+  const peak = clampPeakLongRunPoolToBand(peakTarget, elite);
+  const cups = normalizeLongRunPools({
+    baseLongRunPoolMiles: Math.max(30, Math.round(peak * 0.65)),
+    peakLongRunPoolMiles: peak,
+    taperLongRunPoolMiles: Math.max(25, Math.round(peak * 0.85)),
   });
   const calendar = computeCoreVolumeCalendarPreview({
     planStartDate: new Date(input.planStartDate),
     raceDate: new Date(input.raceDate),
     ...cups,
   });
+  const lrCap = input.longRunCapabilityMiles;
+  const longestSaturdayMiles =
+    lrCap != null && lrCap > 0
+      ? lrCap
+      : Math.round(cups.peakLongRunPoolMiles * 0.28 * 10) / 10;
+  const weeklyRange = scienceWeeklyRange(weekly, aggressiveness);
+  const peakSat =
+    calendar.peakPoolKey.length > 0
+      ? Math.max(...calendar.peakPoolKey.map((s) => s.miles))
+      : longestSaturdayMiles;
+
   return {
-    weSeeYou: `You're running about ${weekly} miles per week heading into ${input.raceName}. We'll build toward a ${cups.peakMiles}-mile long-run block with a peak Saturday around week ${calendar.peakWeekNumber ?? "race"}.`,
+    weSeeYou: `You're running about ${weekly} miles per week heading into ${input.raceName}. We'll build a ${cups.peakLongRunPoolMiles}-mile peak long-run pool (four Saturdays) with your biggest Saturday around ${peakSat} mi.`,
     barriers: [],
-    progressionAggressiveness: "MODERATE",
-    peakLrPoolMax: cups.peakMiles,
-    baseLrPool: cups.baseMiles,
-    taperLrPool: cups.taperMiles,
-    longestSaturdayMiles: Math.round(cups.peakMiles * 0.3 * 10) / 10,
-    minWeeklyMiles: Math.max(25, base),
-    maxWeeklyMiles: peak,
+    progressionAggressiveness: aggressiveness,
+    peakLongRunPoolMiles: cups.peakLongRunPoolMiles,
+    baseLongRunPoolMiles: cups.baseLongRunPoolMiles,
+    taperLongRunPoolMiles: cups.taperLongRunPoolMiles,
+    longestSaturdayMiles,
+    minWeeklyMiles: weeklyRange.minWeeklyMiles,
+    maxWeeklyMiles: weeklyRange.maxWeeklyMiles,
     cups,
     calendar,
   };
@@ -114,9 +142,22 @@ export async function inferAthletePresetCore(
     return fallbackCoreInfer(input);
   }
 
-  const systemPrompt = `You are inferring a standard peak long-run pool and weekly range a coach would defend for one athlete.
+  const systemPrompt = `You are inferring a standard peak long-run POOL and weekly range a coach would defend for one athlete.
 
-Infer ambition from their free text (PR / crush / aggressive vs chill / just finish). Land cups that match that ambition while respecting barriers (weekly mileage vs longest Saturday, weeks left, speed vs endurance).
+CRITICAL: peakLongRunPoolMiles is the SUM of four Saturday long runs in the peak 4-week block — NOT weekly mileage.
+Example marathon peak pool ~70 mi might be four Saturdays: 19.6 + 19.6 + 21 + 9.8.
+
+Peak pool bands (peakLongRunPoolMiles only):
+- NORMAL ambition: 50–60 total pool miles
+- ELITE ambition (high volume, sub-3 goals, 18+ mi long runs): 60–70 total pool miles
+
+baseLongRunPoolMiles and taperLongRunPoolMiles are smaller 4-Saturday pool totals for build and taper blocks.
+
+Weekly fields (minWeeklyMiles, maxWeeklyMiles) are separate — fitness floor + small slack (~3–8 mi above current weekly). Never set maxWeeklyMiles equal to peakLongRunPoolMiles.
+
+longestSaturdayMiles = biggest single Saturday in the peak block (not the pool sum).
+
+Infer ambition from free text (PR / crush / aggressive vs chill / just finish). Respect barriers: weekly vs longest Saturday, weeks left, speed vs endurance.
 
 Rules:
 - Do NOT pick cycle length or block count.
@@ -128,9 +169,9 @@ Rules:
   "weSeeYou": "one breath: what we heard + ambition + limiter + Saturday peak",
   "barriers": ["string"],
   "progressionAggressiveness": "CONSERVATIVE" | "MODERATE" | "AMBITIOUS",
-  "peakLrPoolMax": number,
-  "baseLrPool": number,
-  "taperLrPool": number,
+  "peakLongRunPoolMiles": number,
+  "baseLongRunPoolMiles": number,
+  "taperLongRunPoolMiles": number,
   "longestSaturdayMiles": number,
   "minWeeklyMiles": number,
   "maxWeeklyMiles": number | null
@@ -179,11 +220,19 @@ Rules:
     };
     const content = data.choices?.[0]?.message?.content ?? "";
     const parsed = extractJsonObject(content) as Record<string, unknown>;
+    const aggressiveness = parseAggressiveness(parsed.progressionAggressiveness);
+    const elite = inferElitePeakPool(input);
 
-    const cups = normalizeCoreVolumeCups({
-      baseLrPool: parsed.baseLrPool as number,
-      peakLrPoolMax: parsed.peakLrPoolMax as number,
-      taperLrPool: parsed.taperLrPool as number,
+    let peakRaw = Number(parsed.peakLongRunPoolMiles);
+    if (!Number.isFinite(peakRaw) || peakRaw <= 0) {
+      peakRaw = elite ? 65 : 55;
+    }
+    peakRaw = clampPeakLongRunPoolToBand(peakRaw, elite);
+
+    const cups = normalizeLongRunPools({
+      baseLongRunPoolMiles: parsed.baseLongRunPoolMiles as number,
+      peakLongRunPoolMiles: peakRaw,
+      taperLongRunPoolMiles: parsed.taperLongRunPoolMiles as number,
     });
 
     const calendar = computeCoreVolumeCalendarPreview({
@@ -192,9 +241,17 @@ Rules:
       ...cups,
     });
 
+    const fallbackWeekly = scienceWeeklyRange(input.weeklyMileage, aggressiveness);
     const maxRaw = parsed.maxWeeklyMiles;
     const maxWeeklyMiles =
-      maxRaw === null ? null : clampInt(maxRaw, cups.baseMiles, 100, cups.peakMiles);
+      maxRaw === null
+        ? fallbackWeekly.maxWeeklyMiles
+        : clampInt(maxRaw, fallbackWeekly.minWeeklyMiles, 100, fallbackWeekly.maxWeeklyMiles);
+
+    const peakSatFromKey =
+      calendar.peakPoolKey.length > 0
+        ? Math.max(...calendar.peakPoolKey.map((s) => s.miles))
+        : cups.peakLongRunPoolMiles * 0.28;
 
     return {
       weSeeYou:
@@ -204,12 +261,22 @@ Rules:
       barriers: Array.isArray(parsed.barriers)
         ? parsed.barriers.filter((b): b is string => typeof b === "string").slice(0, 6)
         : [],
-      progressionAggressiveness: parseAggressiveness(parsed.progressionAggressiveness),
-      peakLrPoolMax: cups.peakMiles,
-      baseLrPool: cups.baseMiles,
-      taperLrPool: cups.taperMiles,
-      longestSaturdayMiles: clampFloat(parsed.longestSaturdayMiles, 6, 30, cups.peakMiles * 0.3),
-      minWeeklyMiles: clampInt(parsed.minWeeklyMiles, 15, 90, Math.max(25, cups.baseMiles)),
+      progressionAggressiveness: aggressiveness,
+      peakLongRunPoolMiles: cups.peakLongRunPoolMiles,
+      baseLongRunPoolMiles: cups.baseLongRunPoolMiles,
+      taperLongRunPoolMiles: cups.taperLongRunPoolMiles,
+      longestSaturdayMiles: clampFloat(
+        parsed.longestSaturdayMiles,
+        6,
+        30,
+        input.longRunCapabilityMiles ?? peakSatFromKey
+      ),
+      minWeeklyMiles: clampInt(
+        parsed.minWeeklyMiles,
+        15,
+        90,
+        fallbackWeekly.minWeeklyMiles
+      ),
       maxWeeklyMiles,
       cups,
       calendar,
@@ -219,3 +286,6 @@ Rules:
     return fallbackCoreInfer(input);
   }
 }
+
+/** @deprecated use normalizeLongRunPools */
+export const normalizeCoreVolumeCups = normalizeLongRunPools;

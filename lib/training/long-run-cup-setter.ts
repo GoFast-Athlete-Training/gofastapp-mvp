@@ -1,10 +1,5 @@
 /**
- * Derives per–macro-cycle long-run POOL totals (preset long-run pool anchors)
- * spanning the athlete's totalWeeks × longRunCycleWeeks layout.
- *
- * Geometric cup: peak cycle index derives from total cycles N (~65% through), not a
- * fixed second-to-last slot. Ramp base→peak compounds with one coefficient; ramp
- * peak→taper compounds with another — gradual downshift instead of a cliff before taper.
+ * Derives per–macro-cycle long-run POOL totals spanning totalWeeks × longRunCycleWeeks.
  */
 
 import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
@@ -18,40 +13,32 @@ function round1(n: number): number {
 export type LongRunCupSetterInput = {
   totalWeeks: number;
   longRunCycleWeeks?: number;
-  /** LR pool aggregate for first / base macro block (miles). */
-  baseMiles: number;
-  /** LR anchor for peak mileage (mile pool target at the geometric peak cycle). */
-  peakMiles: number;
-  /** LR pool aggregate target for taper (last macro cycle miles). */
-  taperMiles: number;
+  baseLongRunPoolMiles: number;
+  peakLongRunPoolMiles: number;
+  taperLongRunPoolMiles: number;
 };
 
 export type LongRunCupSetterResult = {
   nCycles: number;
-  /** LR pool totals per macro cycle index 0..N−1. */
   poolMilesByCycle: number[];
 };
 
-/**
- * Places base → geometric build → geometric step-down → taper across
- * `N = ⌈totalWeeks / cycleLen⌉` cycles.
- */
 export function longRunCupSetter(input: LongRunCupSetterInput): LongRunCupSetterResult {
   const len = Math.max(1, Math.floor(input.longRunCycleWeeks ?? LONG_RUN_BLOCK_WEEKS));
   const w = Math.max(1, Math.floor(input.totalWeeks));
   const N = Math.max(1, Math.ceil(w / len));
 
-  let base = Math.max(0.1, Number(input.baseMiles));
+  let base = Math.max(0.1, Number(input.baseLongRunPoolMiles));
   if (!Number.isFinite(base)) base = 1;
 
-  let peak = Number(input.peakMiles);
+  let peak = Number(input.peakLongRunPoolMiles);
   if (!Number.isFinite(peak) || peak < base) {
     peak = Math.max(base, base * 1.15);
   } else {
     peak = Math.max(base, peak);
   }
 
-  let taperNum = Number(input.taperMiles);
+  let taperNum = Number(input.taperLongRunPoolMiles);
   if (!Number.isFinite(taperNum) || taperNum < 0) {
     taperNum = peak * 0.85;
   }
@@ -65,7 +52,6 @@ export function longRunCupSetter(input: LongRunCupSetterInput): LongRunCupSetter
   }
 
   const peakIdx = Math.max(1, Math.min(N - 2, Math.round((N - 1) * 0.65)));
-
   const upCoef = Math.pow(peak / base, 1 / peakIdx);
   const downSteps = N - 1 - peakIdx;
   const downCoef = Math.pow(taper / peak, 1 / downSteps);

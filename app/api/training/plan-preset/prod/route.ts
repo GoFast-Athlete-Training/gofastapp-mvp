@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       targetDistanceLabel: true,
       minWeeklyMiles: true,
       maxWeeklyMiles: true,
-      baseMiles: true,
+      baseLongRunPoolMiles: true,
     },
   });
 

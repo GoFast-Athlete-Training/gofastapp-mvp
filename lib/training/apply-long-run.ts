@@ -16,9 +16,9 @@ export type ApplyLongRunInput = {
   planSchedule: PlanWeekSchedule[];
   totalWeeks: number;
   longRunCycleWeeks?: number;
-  baseMiles: number;
-  peakMiles: number;
-  taperMiles: number;
+  baseLongRunPoolMiles: number;
+  peakLongRunPoolMiles: number;
+  taperLongRunPoolMiles: number;
   /** Sum of preset distributionWeights need not equal 1; we normalize inside the macro block */
   longRunPositions: readonly RunTypePosition[];
 };
@@ -70,18 +70,18 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     planSchedule,
     totalWeeks,
     longRunCycleWeeks: cycleWeeksIn,
-    baseMiles,
-    peakMiles,
-    taperMiles,
+    baseLongRunPoolMiles,
+    peakLongRunPoolMiles,
+    taperLongRunPoolMiles,
     longRunPositions,
   } = input;
   const len = Math.max(1, Math.floor(cycleWeeksIn ?? LONG_RUN_BLOCK_WEEKS));
   const { poolMilesByCycle, nCycles } = longRunCupSetter({
     totalWeeks,
     longRunCycleWeeks: len,
-    baseMiles,
-    peakMiles,
-    taperMiles,
+    baseLongRunPoolMiles,
+    peakLongRunPoolMiles,
+    taperLongRunPoolMiles,
   });
 
   for (const week of planSchedule) {

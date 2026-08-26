@@ -7,9 +7,9 @@ import { runTypeConfigPositionsToInputs, type RunTypeConfigInput } from "@/lib/t
 
 export interface PlanGenConfig {
   minWeeklyMiles?: number | null;
-  peakMiles?: number | null;
-  baseMiles?: number | null;
-  taperMiles?: number | null;
+  peakLongRunPoolMiles?: number | null;
+  baseLongRunPoolMiles?: number | null;
+  taperLongRunPoolMiles?: number | null;
   maxWeeklyMiles?: number | null;
   tempoIdealDow?: number | null;
   intervalIdealDow?: number | null;
@@ -21,9 +21,9 @@ export function presetToPlanGenConfig(
     training_plan_preset,
     | "minWeeklyMiles"
     | "maxWeeklyMiles"
-    | "baseMiles"
-    | "peakMiles"
-    | "taperMiles"
+    | "baseLongRunPoolMiles"
+    | "peakLongRunPoolMiles"
+    | "taperLongRunPoolMiles"
     | "tempoIdealDow"
     | "intervalIdealDow"
     | "longRunDefaultDow"
@@ -31,9 +31,9 @@ export function presetToPlanGenConfig(
 ): PlanGenConfig {
   return {
     minWeeklyMiles: preset.minWeeklyMiles,
-    baseMiles: preset.baseMiles,
-    peakMiles: preset.peakMiles,
-    taperMiles: preset.taperMiles,
+    baseLongRunPoolMiles: preset.baseLongRunPoolMiles,
+    peakLongRunPoolMiles: preset.peakLongRunPoolMiles,
+    taperLongRunPoolMiles: preset.taperLongRunPoolMiles,
     maxWeeklyMiles: preset.maxWeeklyMiles,
     tempoIdealDow: preset.tempoIdealDow,
     intervalIdealDow: preset.intervalIdealDow,

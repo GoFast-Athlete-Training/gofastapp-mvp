@@ -27,9 +27,9 @@ export type ResolvedPlanBlueprint = {
     training_plan_preset,
     | "minWeeklyMiles"
     | "maxWeeklyMiles"
-    | "baseMiles"
-    | "peakMiles"
-    | "taperMiles"
+    | "baseLongRunPoolMiles"
+    | "peakLongRunPoolMiles"
+    | "taperLongRunPoolMiles"
     | "tempoIdealDow"
     | "intervalIdealDow"
     | "longRunDefaultDow"
@@ -67,9 +67,9 @@ export async function loadPlanBlueprintForGenerate(params: {
     const volumePreset = {
       minWeeklyMiles: athletePreset.minWeeklyMiles,
       maxWeeklyMiles: athletePreset.maxWeeklyMiles,
-      baseMiles: athletePreset.baseMiles,
-      peakMiles: athletePreset.peakMiles,
-      taperMiles: athletePreset.taperMiles,
+      baseLongRunPoolMiles: athletePreset.baseLongRunPoolMiles,
+      peakLongRunPoolMiles: athletePreset.peakLongRunPoolMiles,
+      taperLongRunPoolMiles: athletePreset.taperLongRunPoolMiles,
       tempoIdealDow: athletePreset.tempoIdealDow,
       intervalIdealDow: athletePreset.intervalIdealDow,
       longRunDefaultDow: athletePreset.longRunDefaultDow,

@@ -255,6 +255,25 @@ export async function PUT(
           ? null
           : Number(body.weeklyMileage);
     }
+    if (has('longRunCapabilityMiles')) {
+      const raw = body.longRunCapabilityMiles;
+      if (raw == null || raw === '') {
+        data.longRunCapabilityMiles = null;
+      } else {
+        const n = Number(raw);
+        if (!Number.isFinite(n) || n < 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Invalid longRunCapabilityMiles',
+              message: 'Longest recent long run must be a positive number',
+            },
+            { status: 400 }
+          );
+        }
+        data.longRunCapabilityMiles = Math.round(n * 10) / 10;
+      }
+    }
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json(

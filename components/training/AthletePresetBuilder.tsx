@@ -22,9 +22,9 @@ type AthletePresetApi = AthletePresetIngestResult & {
   trainingHistory: string | null;
   minWeeklyMiles: number;
   maxWeeklyMiles: number | null;
-  baseMiles: number;
-  peakMiles: number;
-  taperMiles: number;
+  baseLongRunPoolMiles: number;
+  peakLongRunPoolMiles: number;
+  taperLongRunPoolMiles: number;
   workoutStructure: unknown;
   coachPlanOverview: unknown;
   paceProfile: unknown;
@@ -34,6 +34,7 @@ type CorePreview = {
   weSeeYou: string;
   barriers: string[];
   progressionAggressiveness: string;
+  longestSaturdayMiles?: number;
   calendar: {
     totalWeeks: number;
     totalCycles: number;
@@ -41,7 +42,13 @@ type CorePreview = {
     peakWeekNumber: number | null;
     taperStartWeekNumber: number;
     longRunCycleWeeks: number;
+    peakLongRunDate?: string | null;
+    taperStartDate?: string | null;
+    peakPoolKey?: { weekNumber: number; date: string; miles: number }[];
   };
+  peakPoolKey?: { weekNumber: number; date: string; miles: number }[];
+  peakLongRunDate?: string | null;
+  taperStartDate?: string | null;
 };
 
 type AthletePresetBuilderProps = {
@@ -57,7 +64,7 @@ type AthletePresetBuilderProps = {
   onCancel: () => void;
 };
 
-type BuilderStep = "intro" | "core-confirm" | "workouts" | "rotations" | "pace";
+type BuilderStep = "intro" | "core-results" | "workouts" | "rotations" | "pace";
 
 export function AthletePresetBuilder({
   getToken,
@@ -81,15 +88,17 @@ export function AthletePresetBuilder({
   const [profilePrefill, setProfilePrefill] = useState("");
   const [fitnessPhase, setFitnessPhase] = useState<"PEAK" | "BASE">("PEAK");
   const [weeklyMileage, setWeeklyMileage] = useState("");
+  const [longRunCapabilityMiles, setLongRunCapabilityMiles] = useState("");
   const [birthdayInput, setBirthdayInput] = useState("");
   const [ageYears, setAgeYears] = useState<number | null>(null);
   const [gender, setGender] = useState<string | null>(null);
   const [needsBirthday, setNeedsBirthday] = useState(false);
-  const [baseMiles, setBaseMiles] = useState("");
-  const [peakMiles, setPeakMiles] = useState("");
-  const [taperMiles, setTaperMiles] = useState("");
+  const [baseLongRunPoolMiles, setBaseMiles] = useState("");
+  const [peakLongRunPoolMiles, setPeakMiles] = useState("");
+  const [taperLongRunPoolMiles, setTaperMiles] = useState("");
   const [minWeeklyMiles, setMinWeeklyMiles] = useState("");
   const [corePreview, setCorePreview] = useState<CorePreview | null>(null);
+  const [showPoolAdjust, setShowPoolAdjust] = useState(false);
   const [workoutSummary, setWorkoutSummary] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,12 +109,43 @@ export function AthletePresetBuilder({
     setDescription(ap.description ?? "");
     setTrainingHistory(ap.trainingHistory ?? "");
     setFitnessPhase(ap.fitnessPhase);
-    setBaseMiles(String(ap.baseMiles));
-    setPeakMiles(String(ap.peakMiles));
-    setTaperMiles(String(ap.taperMiles));
+    setBaseMiles(String(ap.baseLongRunPoolMiles));
+    setPeakMiles(String(ap.peakLongRunPoolMiles));
+    setTaperMiles(String(ap.taperLongRunPoolMiles));
     setMinWeeklyMiles(String(ap.minWeeklyMiles));
-    if (ap.buildStep === "core") setStep("core-confirm");
-    else if (ap.buildStep === "workouts") setStep("workouts");
+    if (ap.buildStep === "core") {
+      const overview = ap.coachPlanOverview as Record<string, unknown> | null;
+      if (overview?.weSeeYou && typeof overview.weSeeYou === "string") {
+        setCorePreview({
+          weSeeYou: overview.weSeeYou,
+          barriers: Array.isArray(overview.barriers)
+            ? overview.barriers.filter((b): b is string => typeof b === "string")
+            : [],
+          progressionAggressiveness:
+            typeof overview.progressionAggressiveness === "string"
+              ? overview.progressionAggressiveness
+              : "MODERATE",
+          peakPoolKey: Array.isArray(overview.peakPoolKey)
+            ? (overview.peakPoolKey as CorePreview["peakPoolKey"])
+            : [],
+          peakLongRunDate:
+            typeof overview.peakLongRunDate === "string" ? overview.peakLongRunDate : null,
+          taperStartDate:
+            typeof overview.taperStartDate === "string" ? overview.taperStartDate : null,
+          calendar: {
+            totalWeeks: Number(overview.totalWeeks) || 0,
+            totalCycles: 0,
+            poolMilesByCycle: Array.isArray(overview.poolMilesByCycle)
+              ? overview.poolMilesByCycle.map(Number)
+              : [],
+            peakWeekNumber: null,
+            taperStartWeekNumber: 0,
+            longRunCycleWeeks: 4,
+          },
+        });
+      }
+      setStep("core-results");
+    } else if (ap.buildStep === "workouts") setStep("workouts");
     else if (ap.buildStep === "rotations") setStep("rotations");
     else if (ap.buildStep === "pace") setStep("pace");
     else if (ap.isComplete) onComplete({ id: ap.id, title: ap.title });
@@ -140,6 +180,12 @@ export function AthletePresetBuilder({
         setGender(a?.gender?.trim() || null);
         setNeedsBirthday(age == null);
         if (a?.birthday) setBirthdayInput(a.birthday.slice(0, 10));
+        if (a?.weeklyMileage != null && Number.isFinite(a.weeklyMileage)) {
+          setWeeklyMileage(String(Math.round(a.weeklyMileage)));
+        }
+        if (a?.longRunCapabilityMiles != null && Number.isFinite(a.longRunCapabilityMiles)) {
+          setLongRunCapabilityMiles(String(a.longRunCapabilityMiles));
+        }
 
         const parts: string[] = [];
         if (a?.weeklyMileage != null && Number.isFinite(a.weeklyMileage)) {
@@ -173,9 +219,13 @@ export function AthletePresetBuilder({
   function addMyDetails() {
     if (!profilePrefill.trim()) return;
     setTrainingHistory((prev) => (prev.trim() ? prev : profilePrefill));
-    const match = profilePrefill.match(/about (\d+) miles per week/);
-    if (match && !weeklyMileage) {
-      setWeeklyMileage(match[1]!);
+    const weeklyMatch = profilePrefill.match(/about (\d+) miles per week/);
+    if (weeklyMatch && !weeklyMileage) {
+      setWeeklyMileage(weeklyMatch[1]!);
+    }
+    const lrMatch = profilePrefill.match(/Longest recent long run about ([\d.]+) miles/);
+    if (lrMatch && !longRunCapabilityMiles) {
+      setLongRunCapabilityMiles(lrMatch[1]!);
     }
   }
 
@@ -192,6 +242,22 @@ export function AthletePresetBuilder({
     }
     setAgeYears(ageYearsFromBirthday(new Date(birthdayInput)));
     setNeedsBirthday(false);
+  }
+
+  async function ensureLongRunCapabilitySaved(token: string): Promise<void> {
+    const raw = longRunCapabilityMiles.trim();
+    if (!raw || !athleteId) return;
+    const miles = Number(raw);
+    if (!Number.isFinite(miles) || miles <= 0) return;
+    const res = await fetch(`/api/athlete/${athleteId}/profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...athleteBearerFetchHeaders(token) },
+      body: JSON.stringify({ longRunCapabilityMiles: Math.round(miles * 10) / 10 }),
+    });
+    if (!res.ok) {
+      const data = (await res.json()) as { error?: string; message?: string };
+      throw new Error(data.message ?? data.error ?? "Could not save longest long run");
+    }
   }
 
   async function ensureWeeklyMileageSaved(token: string, miles: number): Promise<void> {
@@ -231,7 +297,7 @@ export function AthletePresetBuilder({
       return;
     }
     if (presetId) {
-      setStep("core-confirm");
+      setStep("core-results");
       return;
     }
 
@@ -241,6 +307,12 @@ export function AthletePresetBuilder({
       const token = await getToken();
       await ensureBirthdaySaved(token);
       await ensureWeeklyMileageSaved(token, Math.round(miles));
+      await ensureLongRunCapabilitySaved(token);
+
+      const lrBody =
+        longRunCapabilityMiles.trim() && Number(longRunCapabilityMiles) > 0
+          ? { longRunCapabilityMiles: Number(longRunCapabilityMiles) }
+          : {};
 
       const res = await fetch("/api/athlete-presets", {
         method: "POST",
@@ -254,6 +326,7 @@ export function AthletePresetBuilder({
           sourcePresetId,
           targetDistanceMeters: raceDistanceMeters,
           weeklyMileage: Math.round(miles),
+          ...lrBody,
           raceName,
           raceDate,
           planStartDate,
@@ -263,9 +336,9 @@ export function AthletePresetBuilder({
       const data = (await res.json()) as {
         corePreview?: CorePreview;
         suggestedCups?: {
-          baseMiles: number;
-          peakMiles: number;
-          taperMiles: number;
+          baseLongRunPoolMiles: number;
+          peakLongRunPoolMiles: number;
+          taperLongRunPoolMiles: number;
           minWeeklyMiles: number;
           maxWeeklyMiles: number | null;
         };
@@ -275,12 +348,13 @@ export function AthletePresetBuilder({
         setError(data.error ?? "Could not analyze your training");
         return;
       }
-      setBaseMiles(String(data.suggestedCups.baseMiles));
-      setPeakMiles(String(data.suggestedCups.peakMiles));
-      setTaperMiles(String(data.suggestedCups.taperMiles));
+      setBaseMiles(String(data.suggestedCups.baseLongRunPoolMiles));
+      setPeakMiles(String(data.suggestedCups.peakLongRunPoolMiles));
+      setTaperMiles(String(data.suggestedCups.taperLongRunPoolMiles));
       setMinWeeklyMiles(String(data.suggestedCups.minWeeklyMiles));
       if (data.corePreview) setCorePreview(data.corePreview);
-      setStep("core-confirm");
+      setShowPoolAdjust(false);
+      setStep("core-results");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not analyze your training");
     } finally {
@@ -315,9 +389,9 @@ export function AthletePresetBuilder({
     try {
       const token = await getToken();
       const cupPayload = {
-        baseMiles: Number(baseMiles),
-        peakMiles: Number(peakMiles),
-        taperMiles: Number(taperMiles),
+        baseLongRunPoolMiles: Number(baseLongRunPoolMiles),
+        peakLongRunPoolMiles: Number(peakLongRunPoolMiles),
+        taperLongRunPoolMiles: Number(taperLongRunPoolMiles),
         minWeeklyMiles: Number(minWeeklyMiles),
       };
 
@@ -414,13 +488,14 @@ export function AthletePresetBuilder({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
-        <p className="font-medium text-gray-900">Create my own preset</p>
-        <p className="mt-1 text-gray-700">
-          Train how you want to train. Tell the AI plan generator your history and your goal, and
-          it will tailor your daily run cycle to you.
-        </p>
-      </div>
+      {step === "intro" && !loadingProfile ? (
+        <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
+          <p className="text-gray-700">
+            Tell us your history and goal race context — we&apos;ll infer your peak long-run pool and
+            weekly range.
+          </p>
+        </div>
+      ) : null}
 
       {loadingProfile ? (
         <p className="text-sm text-gray-600">Loading…</p>
@@ -497,6 +572,22 @@ export function AthletePresetBuilder({
               onChange={(e) => setWeeklyMileage(e.target.value)}
             />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-800">
+              Longest recent long run (mi)
+            </label>
+            <input
+              type="number"
+              min={0}
+              step={0.1}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"
+              value={longRunCapabilityMiles}
+              onChange={(e) => setLongRunCapabilityMiles(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Your current longest Saturday — we ramp the long-run pool from here.
+            </p>
+          </div>
           {needsBirthday ? (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-800">Birthday</label>
@@ -520,66 +611,116 @@ export function AthletePresetBuilder({
               onClick={() => void runCoreInfer()}
               className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
             >
-              {saving ? "Analyzing…" : "Continue"}
+              {saving ? "Analyzing your training…" : "Continue"}
             </button>
             <button type="button" onClick={onCancel} className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800">
               ← Back
             </button>
           </div>
+          {saving ? (
+            <p className="text-sm text-gray-600">
+              Hold on — we&apos;re sizing your peak long-run pool from your history…
+            </p>
+          ) : null}
         </>
-      ) : step === "core-confirm" ? (
+      ) : step === "core-results" ? (
         <>
           {corePreview ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm text-gray-800">
-              <p className="font-medium text-gray-900">{corePreview.weSeeYou}</p>
-              {corePreview.barriers.length > 0 ? (
-                <ul className="mt-2 list-disc pl-5 text-gray-700">
-                  {corePreview.barriers.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
+            <div className="space-y-4">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm text-gray-800">
+                <p className="font-medium text-gray-900">{corePreview.weSeeYou}</p>
+                {corePreview.barriers.length > 0 ? (
+                  <ul className="mt-2 list-disc pl-5 text-gray-700">
+                    {corePreview.barriers.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+
+              <div className="rounded-xl border border-sky-200 bg-white p-4">
+                <p className="text-sm font-semibold text-gray-900">Peak long-run pool</p>
+                <p className="mt-1 text-2xl font-bold text-orange-600">
+                  {peakLongRunPoolMiles || corePreview.calendar.poolMilesByCycle.slice(-2, -1)[0] || "—"}{" "}
+                  <span className="text-base font-medium text-gray-600">mi total</span>
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Sum of four Saturday long runs in your peak block — not weekly mileage.
+                </p>
+
+                {(corePreview.peakPoolKey ?? corePreview.calendar.peakPoolKey)?.length ? (
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Pool key — 4 Saturdays
+                    </p>
+                    <ul className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200">
+                      {(corePreview.peakPoolKey ?? corePreview.calendar.peakPoolKey)!.map((row) => (
+                        <li
+                          key={row.date}
+                          className="flex items-center justify-between px-3 py-2 text-sm"
+                        >
+                          <span className="text-gray-700">
+                            {row.date}
+                            <span className="ml-2 text-gray-400">wk {row.weekNumber}</span>
+                          </span>
+                          <span className="font-semibold text-gray-900">{row.miles} mi</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {(corePreview.peakLongRunDate ?? corePreview.calendar.peakLongRunDate) ? (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Peak Saturday{" "}
+                        {corePreview.peakLongRunDate ?? corePreview.calendar.peakLongRunDate}
+                        {(corePreview.taperStartDate ?? corePreview.calendar.taperStartDate)
+                          ? ` · Taper starts ${corePreview.taperStartDate ?? corePreview.calendar.taperStartDate}`
+                          : ""}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowPoolAdjust((v) => !v)}
+                className="text-sm font-semibold text-orange-600 hover:text-orange-800"
+              >
+                {showPoolAdjust ? "Hide pool adjust" : "Adjust pool totals"}
+              </button>
+
+              {showPoolAdjust ? (
+                <div className="grid grid-cols-2 gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-700">Base pool</label>
+                    <input
+                      type="number"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
+                      value={baseLongRunPoolMiles}
+                      onChange={(e) => setBaseMiles(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-700">Peak pool</label>
+                    <input
+                      type="number"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
+                      value={peakLongRunPoolMiles}
+                      onChange={(e) => setPeakMiles(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-700">Taper pool</label>
+                    <input
+                      type="number"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
+                      value={taperLongRunPoolMiles}
+                      onChange={(e) => setTaperMiles(e.target.value)}
+                    />
+                  </div>
+                </div>
               ) : null}
             </div>
           ) : null}
-          <p className="text-sm font-medium text-gray-900">Your core mileage targets — change any?</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Base miles</label>
-              <input
-                type="number"
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
-                value={baseMiles}
-                onChange={(e) => setBaseMiles(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Peak miles</label>
-              <input
-                type="number"
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
-                value={peakMiles}
-                onChange={(e) => setPeakMiles(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Taper miles</label>
-              <input
-                type="number"
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
-                value={taperMiles}
-                onChange={(e) => setTaperMiles(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Min weekly</label>
-              <input
-                type="number"
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
-                value={minWeeklyMiles}
-                onChange={(e) => setMinWeeklyMiles(e.target.value)}
-              />
-            </div>
-          </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -587,7 +728,7 @@ export function AthletePresetBuilder({
               onClick={() => void saveCoreAndContinue()}
               className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
             >
-              {saving ? "Saving…" : "Confirm cups & continue"}
+              {saving ? "Saving…" : "Looks good — continue"}
             </button>
             <button type="button" onClick={onCancel} className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800">
               Save & exit

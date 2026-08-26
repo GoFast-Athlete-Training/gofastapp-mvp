@@ -52,17 +52,17 @@ export async function GET(
     if (
       preset &&
       item.positions.length > 0 &&
-      preset.baseMiles != null &&
-      preset.peakMiles != null &&
-      preset.taperMiles != null
+      preset.baseLongRunPoolMiles != null &&
+      preset.peakLongRunPoolMiles != null &&
+      preset.taperLongRunPoolMiles != null
     ) {
       const v = preset;
       const { poolMilesByCycle, nCycles } = generateCyclePoolTotals({
         totalWeeks,
         longRunCycleWeeks: v.longRunCycleWeeks,
-        baseMiles: v.baseMiles,
-        peakMiles: v.peakMiles,
-        taperMiles: v.taperMiles,
+        baseLongRunPoolMiles: v.baseLongRunPoolMiles,
+        peakLongRunPoolMiles: v.peakLongRunPoolMiles,
+        taperLongRunPoolMiles: v.taperLongRunPoolMiles,
       });
       const posRows = item.positions.map((p) => ({
         cyclePosition: p.cyclePosition,
