@@ -50,3 +50,14 @@ export function clampPeakLongRunPoolToBand(
   const max = elite ? 70 : 60;
   return clampPeakLongRunPoolMiles(Math.max(min, Math.min(max, value)));
 }
+
+/** Athlete-facing foundation key — peak pool total only, not per-Saturday split. */
+export function peakLongRunPoolFoundationKey(
+  peakPoolMiles: number
+): string | null {
+  const p = Number(peakPoolMiles);
+  if (!Number.isFinite(p) || p <= 0) return null;
+  if (p >= 60) return "Ready to PR — you're in good shape";
+  if (p >= 50) return "Good / strong — you're in good shape";
+  return null;
+}

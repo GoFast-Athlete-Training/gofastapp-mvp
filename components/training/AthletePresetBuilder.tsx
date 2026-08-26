@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { ageYearsFromBirthday } from "@/lib/training/athlete-preset-volume";
-import { weeklyVolumeKeyForDistance } from "@/lib/training/weekly-volume-key";
+import {
+  foundationWeeklyBandMeaning,
+  weeklyVolumeKeyForDistance,
+} from "@/lib/training/weekly-volume-key";
+import { peakLongRunPoolFoundationKey } from "@/lib/training/long-run-pool-fields";
 import {
   DEFAULT_ATHLETE_PACE_ADJUSTER,
   type AthletePaceAdjuster,
@@ -687,12 +691,17 @@ export function AthletePresetBuilder({
     }
   }
 
-  const peakPoolRows = corePreview?.peakPoolKey ?? corePreview?.calendar.peakPoolKey ?? [];
   const peakDate =
     corePreview?.peakLongRunDate ?? corePreview?.calendar.peakLongRunDate ?? null;
   const taperDate =
     corePreview?.taperStartDate ?? corePreview?.calendar.taperStartDate ?? null;
   const weeklyBand = corePreview?.weeklyVolumeBand;
+  const peakPoolKeyLine = peakLongRunPoolMiles
+    ? peakLongRunPoolFoundationKey(Number(peakLongRunPoolMiles))
+    : null;
+  const weeklyKeyLine = weeklyBand
+    ? foundationWeeklyBandMeaning(weeklyBand)
+    : null;
 
   return (
     <div className="space-y-4">
@@ -977,9 +986,12 @@ export function AthletePresetBuilder({
                   {minWeeklyMiles || corePreview?.minWeeklyMiles || "—"}–
                   {maxWeeklyMiles ?? corePreview?.maxWeeklyMiles ?? "—"} mi
                 </p>
-                {weeklyBand ? (
-                  <p className="mt-1 text-xs text-gray-500">
-                    {weeklyVolumeKeyForDistance(null)[weeklyBand].athleteLabel}
+                {weeklyKeyLine ? (
+                  <p className="mt-1 text-xs text-gray-600">{weeklyKeyLine}</p>
+                ) : weeklyBand ? (
+                  <p className="mt-1 text-xs text-gray-600">
+                    {weeklyVolumeKeyForDistance(raceDistanceLabel)[weeklyBand]
+                      .athleteLabel}
                   </p>
                 ) : null}
               </div>
@@ -990,7 +1002,14 @@ export function AthletePresetBuilder({
                 <p className="mt-1 text-lg font-bold text-orange-600">
                   {peakLongRunPoolMiles || "—"} mi
                 </p>
-                <p className="mt-1 text-xs text-gray-500">Sum of 4 Saturdays in your peak block</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Sum of 4 Saturdays in your peak block — not weekly mileage
+                </p>
+                {peakPoolKeyLine ? (
+                  <p className="mt-1 text-xs font-medium text-orange-800">
+                    {peakPoolKeyLine}
+                  </p>
+                ) : null}
               </div>
               <div className="rounded-xl border border-gray-200 bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Peak date</p>
@@ -1001,28 +1020,6 @@ export function AthletePresetBuilder({
                 <p className="mt-1 text-lg font-bold text-gray-900">{taperDate ?? "—"}</p>
               </div>
             </div>
-
-            {peakPoolRows.length ? (
-              <div className="rounded-xl border border-sky-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Pool key — 4 Saturdays
-                </p>
-                <ul className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200">
-                  {peakPoolRows.map((row) => (
-                    <li
-                      key={row.date}
-                      className="flex items-center justify-between px-3 py-2 text-sm"
-                    >
-                      <span className="text-gray-700">
-                        {row.date}
-                        <span className="ml-2 text-gray-400">wk {row.weekNumber}</span>
-                      </span>
-                      <span className="font-semibold text-gray-900">{row.miles} mi</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
 
             <button
               type="button"

@@ -102,6 +102,17 @@ export function weeklyVolumeBandFromAggressiveness(
   return "RACE";
 }
 
+/** Athlete-facing band meaning for foundation min–max card (no coach jargon). */
+export function foundationWeeklyBandMeaning(band: WeeklyVolumeBand): string {
+  if (band === "FINISH") {
+    return "Just finish / fun week — you're in the right range for this goal";
+  }
+  if (band === "RACE") {
+    return "Solid week — good shape for a strong race";
+  }
+  return "Ready to go for it — you're in the right range";
+}
+
 export function inferWeeklyVolumeBandFromGoal(input: {
   trainingHistory: string;
   goalTime: string | null;
