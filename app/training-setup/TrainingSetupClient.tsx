@@ -268,6 +268,7 @@ export default function TrainingSetupClient() {
     }[]
   >([]);
   const [loadingAthletePresets, setLoadingAthletePresets] = useState(false);
+  const [athletePresetsLoadError, setAthletePresetsLoadError] = useState<string | null>(null);
   const [deletingPresetId, setDeletingPresetId] = useState<string | null>(null);
   /** undefined = preset list; null = new builder; string = resume id */
   const [customBuilderPresetId, setCustomBuilderPresetId] = useState<string | null | undefined>(
@@ -549,6 +550,7 @@ export default function TrainingSetupClient() {
 
   const loadAthletePresets = useCallback(async () => {
     setLoadingAthletePresets(true);
+    setAthletePresetsLoadError(null);
     try {
       const u = auth.currentUser;
       if (!u) return;
@@ -565,12 +567,17 @@ export default function TrainingSetupClient() {
           buildStepLabel: string;
           updatedAt: string;
         }[];
+        error?: string;
       };
       if (res.ok && data.athletePresets) {
         setSavedAthletePresets(data.athletePresets);
+      } else {
+        setSavedAthletePresets([]);
+        setAthletePresetsLoadError(data.error ?? "Could not load your saved presets.");
       }
     } catch {
-      /* list optional */
+      setSavedAthletePresets([]);
+      setAthletePresetsLoadError("Could not load your saved presets.");
     } finally {
       setLoadingAthletePresets(false);
     }
@@ -1083,15 +1090,23 @@ export default function TrainingSetupClient() {
                   ) : (
                     <div className="space-y-4">
                       <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
-                        <p className="font-medium text-gray-900">Your presets</p>
-                        <p className="mt-1 text-gray-700">
-                          Pick up where you left off, delete drafts you don&apos;t need, or create
-                          a new blueprint.
+                        <p className="font-medium text-gray-900">What is a preset?</p>
+                        <p className="mt-2 leading-relaxed text-gray-700">
+                          A preset is <span className="font-medium text-gray-900">your</span>{" "}
+                          training blueprint — long-run pool, weekly workout mix, rotations, and pace
+                          keys — saved under your account. When you finish plan setup, you attach one
+                          preset to a race plan. It is not the same as a GoFast coach catalog level
+                          (those live under &ldquo;Use a GoFast preset&rdquo;).
+                        </p>
+                        <p className="mt-2 leading-relaxed text-gray-700">
+                          Presets only appear here after you save one (including &ldquo;Save &
+                          exit&rdquo; mid-build). Analysis on the first screen is a preview until
+                          you confirm.
                         </p>
                         <button
                           type="button"
                           onClick={() => setPresetPickMode("choose")}
-                          className="mt-2 text-sm font-medium text-orange-600 hover:text-orange-800"
+                          className="mt-3 text-sm font-medium text-orange-600 hover:text-orange-800"
                         >
                           ← Back
                         </button>
@@ -1099,8 +1114,15 @@ export default function TrainingSetupClient() {
 
                       {loadingAthletePresets ? (
                         <p className="text-sm text-gray-600">Loading your presets…</p>
+                      ) : athletePresetsLoadError ? (
+                        <p className="text-sm text-red-700">{athletePresetsLoadError}</p>
                       ) : (
                         <>
+                          {savedAthletePresets.length > 0 ? (
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Your saved presets
+                            </p>
+                          ) : null}
                           {savedAthletePresets.some((ap) => !ap.isComplete) ? (
                             <div className="space-y-2">
                               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -1264,7 +1286,14 @@ export default function TrainingSetupClient() {
                           ) : null}
 
                           {savedAthletePresets.length === 0 ? (
-                            <p className="text-sm text-gray-600">No saved presets yet.</p>
+                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                              <p className="font-medium text-gray-900">No saved presets yet</p>
+                              <p className="mt-1">
+                                Nothing saved for this account. If you started one earlier but only
+                                saw the analysis screen, it may not have been saved — create a new
+                                preset below.
+                              </p>
+                            </div>
                           ) : null}
                         </>
                       )}
