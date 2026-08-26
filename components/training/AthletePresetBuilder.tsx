@@ -105,6 +105,7 @@ export function AthletePresetBuilder({
     setTaperMiles(String(ap.taperMiles));
     setMinWeeklyMiles(String(ap.minWeeklyMiles));
     if (ap.buildStep === "core") setStep("core-confirm");
+    else if (ap.buildStep === "workouts") setStep("workouts");
     else if (ap.buildStep === "rotations") setStep("rotations");
     else if (ap.buildStep === "pace") setStep("pace");
     else if (ap.isComplete) onComplete({ id: ap.id, title: ap.title });
@@ -216,6 +217,10 @@ export function AthletePresetBuilder({
       setError("Name your preset.");
       return;
     }
+    if (!trainingHistory.trim()) {
+      setError("Add your training history or tap Add my details.");
+      return;
+    }
     const miles = Number(weeklyMileage);
     if (!Number.isFinite(miles) || miles < 1) {
       setError("Weekly mileage is required.");
@@ -223,6 +228,10 @@ export function AthletePresetBuilder({
     }
     if (needsBirthday && !birthdayInput.trim()) {
       setError("Add your birthday so we can size your training.");
+      return;
+    }
+    if (presetId) {
+      setStep("core-confirm");
       return;
     }
 
@@ -237,6 +246,7 @@ export function AthletePresetBuilder({
         method: "POST",
         headers: { "Content-Type": "application/json", ...athleteBearerFetchHeaders(token) },
         body: JSON.stringify({
+          previewOnly: true,
           title: title.trim(),
           description: description.trim() || null,
           fitnessPhase,
@@ -251,23 +261,28 @@ export function AthletePresetBuilder({
         }),
       });
       const data = (await res.json()) as {
-        athletePreset?: AthletePresetApi;
         corePreview?: CorePreview;
+        suggestedCups?: {
+          baseMiles: number;
+          peakMiles: number;
+          taperMiles: number;
+          minWeeklyMiles: number;
+          maxWeeklyMiles: number | null;
+        };
         error?: string;
       };
-      if (!res.ok || !data.athletePreset?.id) {
-        setError(data.error ?? "Could not save your preset");
+      if (!res.ok || !data.suggestedCups) {
+        setError(data.error ?? "Could not analyze your training");
         return;
       }
-      setPresetId(data.athletePreset.id);
-      setBaseMiles(String(data.athletePreset.baseMiles));
-      setPeakMiles(String(data.athletePreset.peakMiles));
-      setTaperMiles(String(data.athletePreset.taperMiles));
-      setMinWeeklyMiles(String(data.athletePreset.minWeeklyMiles));
+      setBaseMiles(String(data.suggestedCups.baseMiles));
+      setPeakMiles(String(data.suggestedCups.peakMiles));
+      setTaperMiles(String(data.suggestedCups.taperMiles));
+      setMinWeeklyMiles(String(data.suggestedCups.minWeeklyMiles));
       if (data.corePreview) setCorePreview(data.corePreview);
       setStep("core-confirm");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save your preset");
+      setError(e instanceof Error ? e.message : "Could not analyze your training");
     } finally {
       setSaving(false);
     }
@@ -289,16 +304,56 @@ export function AthletePresetBuilder({
   }
 
   async function saveCoreAndContinue() {
+    const sourcePresetId = templatePresets[0]?.id;
+    if (!sourcePresetId) {
+      setError("No GoFast rotation template for this race distance.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
-      await patchPreset({
-        step: "core",
+      const token = await getToken();
+      const cupPayload = {
         baseMiles: Number(baseMiles),
         peakMiles: Number(peakMiles),
         taperMiles: Number(taperMiles),
         minWeeklyMiles: Number(minWeeklyMiles),
-      });
+      };
+
+      if (presetId) {
+        await patchPreset({
+          step: "core",
+          action: "confirmCups",
+          ...cupPayload,
+        });
+      } else {
+        const miles = Number(weeklyMileage);
+        const res = await fetch("/api/athlete-presets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...athleteBearerFetchHeaders(token) },
+          body: JSON.stringify({
+            title: title.trim(),
+            description: description.trim() || null,
+            fitnessPhase,
+            trainingHistory: trainingHistory.trim(),
+            sourcePresetId,
+            targetDistanceMeters: raceDistanceMeters,
+            weeklyMileage: Math.round(miles),
+            raceName,
+            raceDate,
+            planStartDate,
+            goalTime,
+            ...cupPayload,
+          }),
+        });
+        const data = (await res.json()) as { athletePreset?: AthletePresetApi; error?: string };
+        if (!res.ok || !data.athletePreset?.id) {
+          setError(data.error ?? "Could not save your preset");
+          return;
+        }
+        setPresetId(data.athletePreset.id);
+      }
       setStep("workouts");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save cups");

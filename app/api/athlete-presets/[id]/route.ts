@@ -16,6 +16,7 @@ import {
   defaultPaceProfileForCapability,
   parsePaceProfile,
 } from "@/lib/training/preset-strategy";
+import { deleteAthletePresetForAthlete } from "@/lib/training/delete-athlete-preset";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -101,6 +102,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           raw == null || raw === ""
             ? null
             : Math.max(1, Math.round(num(raw, existing.maxWeeklyMiles ?? 0)));
+      }
+      if (body.step === "core" && body.action === "confirmCups") {
+        data.coachPlanOverview = { cupsConfirmed: true } as Prisma.InputJsonValue;
       }
     }
 
@@ -199,6 +203,37 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     console.error("PATCH /api/athlete-presets/[id]", e);
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Failed to update athlete preset" },
+      { status: 500 }
+    );
+  }
+}
+
+/** DELETE /api/athlete-presets/[id] — remove draft (blocked if linked to a plan) */
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  try {
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const { id } = await params;
+    const result = await deleteAthletePresetForAthlete({
+      athleteId: auth.athlete.id,
+      presetId: id,
+    });
+    if (result.deleted === false) {
+      if (result.reason === "not_found") {
+        return NextResponse.json({ error: "Athlete preset not found" }, { status: 404 });
+      }
+      return NextResponse.json(
+        { error: "This preset is linked to a training plan and cannot be deleted." },
+        { status: 422 }
+      );
+    }
+    return NextResponse.json({ success: true });
+  } catch (e: unknown) {
+    console.error("DELETE /api/athlete-presets/[id]", e);
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Failed to delete athlete preset" },
       { status: 500 }
     );
   }

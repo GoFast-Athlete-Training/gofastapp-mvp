@@ -258,8 +258,17 @@ export default function TrainingSetupClient() {
   const [presetPickMode, setPresetPickMode] = useState<"choose" | "catalog" | "custom">("choose");
   const [selectedAthletePresetId, setSelectedAthletePresetId] = useState<string | null>(null);
   const [savedAthletePresets, setSavedAthletePresets] = useState<
-    { id: string; title: string; isComplete: boolean; buildStep: string }[]
+    {
+      id: string;
+      title: string;
+      isComplete: boolean;
+      buildStep: string;
+      buildStepLabel: string;
+      updatedAt: string;
+    }[]
   >([]);
+  const [loadingAthletePresets, setLoadingAthletePresets] = useState(false);
+  const [deletingPresetId, setDeletingPresetId] = useState<string | null>(null);
   /** undefined = preset list; null = new builder; string = resume id */
   const [customBuilderPresetId, setCustomBuilderPresetId] = useState<string | null | undefined>(
     undefined
@@ -538,32 +547,42 @@ export default function TrainingSetupClient() {
     setPlanName(suggestPlanName(wizardGoal.athlete_race.name, athleteFirstName));
   }, [wizardGoal?.id, wizardGoal?.athlete_race?.name, athleteFirstName, planNameTouched]);
 
+  const loadAthletePresets = useCallback(async () => {
+    setLoadingAthletePresets(true);
+    try {
+      const u = auth.currentUser;
+      if (!u) return;
+      const token = await u.getIdToken();
+      const res = await fetch("/api/athlete-presets", {
+        headers: athleteBearerFetchHeaders(token),
+      });
+      const data = (await res.json()) as {
+        athletePresets?: {
+          id: string;
+          title: string;
+          isComplete: boolean;
+          buildStep: string;
+          buildStepLabel: string;
+          updatedAt: string;
+        }[];
+      };
+      if (res.ok && data.athletePresets) {
+        setSavedAthletePresets(data.athletePresets);
+      }
+    } catch {
+      /* list optional */
+    } finally {
+      setLoadingAthletePresets(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (presetPickMode !== "custom") {
       setCustomBuilderPresetId(undefined);
       return;
     }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const token = await getToken();
-        const res = await fetch("/api/athlete-presets", {
-          headers: athleteBearerFetchHeaders(token),
-        });
-        const data = (await res.json()) as {
-          athletePresets?: { id: string; title: string; isComplete: boolean; buildStep: string }[];
-        };
-        if (!cancelled && res.ok && data.athletePresets) {
-          setSavedAthletePresets(data.athletePresets);
-        }
-      } catch {
-        /* list optional */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [presetPickMode]);
+    void loadAthletePresets();
+  }, [presetPickMode, loadAthletePresets, customBuilderPresetId]);
 
   function beginWizardForGoal(g: GoalRow) {
     setWizardGoal(g);
@@ -1038,15 +1057,18 @@ export default function TrainingSetupClient() {
                         setPlanName(ap.title);
                       }
                     }}
-                    onCancel={() => setCustomBuilderPresetId(undefined)}
+                    onCancel={() => {
+                      setCustomBuilderPresetId(undefined);
+                      void loadAthletePresets();
+                    }}
                   />
                   ) : (
                     <div className="space-y-4">
                       <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
                         <p className="font-medium text-gray-900">Your presets</p>
                         <p className="mt-1 text-gray-700">
-                          Resume a saved blueprint or create a new one. Finished presets can be
-                          picked when you generate your plan.
+                          Pick up where you left off, delete drafts you don&apos;t need, or create
+                          a new blueprint.
                         </p>
                         <button
                           type="button"
@@ -1056,48 +1078,177 @@ export default function TrainingSetupClient() {
                           ← Back
                         </button>
                       </div>
-                      {savedAthletePresets.length > 0 ? (
-                        <ul className="space-y-2">
-                          {savedAthletePresets.map((ap) => (
-                            <li
-                              key={ap.id}
-                              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3"
-                            >
-                              <div>
-                                <p className="font-medium text-gray-900">{ap.title}</p>
-                                <p className="text-xs text-gray-600">
-                                  {ap.isComplete ? "Ready to use" : `In progress — ${ap.buildStep}`}
-                                </p>
-                              </div>
-                              <div className="flex gap-2">
-                                {ap.isComplete ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedAthletePresetId(ap.id);
-                                      setSelectedPreset(null);
-                                      if (!planNameTouched) setPlanName(ap.title);
-                                    }}
-                                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
-                                  >
-                                    Use preset
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => setCustomBuilderPresetId(ap.id)}
-                                    className="rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
-                                  >
-                                    Resume
-                                  </button>
-                                )}
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
+
+                      {loadingAthletePresets ? (
+                        <p className="text-sm text-gray-600">Loading your presets…</p>
                       ) : (
-                        <p className="text-sm text-gray-600">No saved presets yet.</p>
+                        <>
+                          {savedAthletePresets.some((ap) => !ap.isComplete) ? (
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                In progress
+                              </p>
+                              <ul className="space-y-2">
+                                {savedAthletePresets
+                                  .filter((ap) => !ap.isComplete)
+                                  .map((ap) => (
+                                    <li
+                                      key={ap.id}
+                                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50/50 p-3"
+                                    >
+                                      <div>
+                                        <p className="font-medium text-gray-900">{ap.title}</p>
+                                        <p className="text-xs text-gray-600">
+                                          {ap.buildStepLabel}
+                                          {" · "}
+                                          {new Date(ap.updatedAt).toLocaleDateString()}
+                                        </p>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => setCustomBuilderPresetId(ap.id)}
+                                          className="rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
+                                        >
+                                          Resume
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={deletingPresetId === ap.id}
+                                          onClick={() => void (async () => {
+                                            if (
+                                              !window.confirm(
+                                                `Delete "${ap.title}"? This cannot be undone.`
+                                              )
+                                            ) {
+                                              return;
+                                            }
+                                            setDeletingPresetId(ap.id);
+                                            try {
+                                              const token = await getTokenForIngest();
+                                              const res = await fetch(
+                                                `/api/athlete-presets/${ap.id}`,
+                                                {
+                                                  method: "DELETE",
+                                                  headers: athleteBearerFetchHeaders(token),
+                                                }
+                                              );
+                                              if (!res.ok) {
+                                                const data = (await res.json()) as {
+                                                  error?: string;
+                                                };
+                                                window.alert(
+                                                  data.error ?? "Could not delete preset"
+                                                );
+                                                return;
+                                              }
+                                              if (selectedAthletePresetId === ap.id) {
+                                                setSelectedAthletePresetId(null);
+                                              }
+                                              await loadAthletePresets();
+                                            } finally {
+                                              setDeletingPresetId(null);
+                                            }
+                                          })()}
+                                          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                                        >
+                                          {deletingPresetId === ap.id ? "Deleting…" : "Delete"}
+                                        </button>
+                                      </div>
+                                    </li>
+                                  ))}
+                              </ul>
+                            </div>
+                          ) : null}
+
+                          {savedAthletePresets.some((ap) => ap.isComplete) ? (
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Ready to use
+                              </p>
+                              <ul className="space-y-2">
+                                {savedAthletePresets
+                                  .filter((ap) => ap.isComplete)
+                                  .map((ap) => (
+                                    <li
+                                      key={ap.id}
+                                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3"
+                                    >
+                                      <div>
+                                        <p className="font-medium text-gray-900">{ap.title}</p>
+                                        <p className="text-xs text-gray-600">
+                                          {ap.buildStepLabel}
+                                          {" · "}
+                                          {new Date(ap.updatedAt).toLocaleDateString()}
+                                        </p>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedAthletePresetId(ap.id);
+                                            setSelectedPreset(null);
+                                            if (!planNameTouched) setPlanName(ap.title);
+                                          }}
+                                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                                        >
+                                          Use preset
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={deletingPresetId === ap.id}
+                                          onClick={() => void (async () => {
+                                            if (
+                                              !window.confirm(
+                                                `Delete "${ap.title}"? This cannot be undone.`
+                                              )
+                                            ) {
+                                              return;
+                                            }
+                                            setDeletingPresetId(ap.id);
+                                            try {
+                                              const token = await getTokenForIngest();
+                                              const res = await fetch(
+                                                `/api/athlete-presets/${ap.id}`,
+                                                {
+                                                  method: "DELETE",
+                                                  headers: athleteBearerFetchHeaders(token),
+                                                }
+                                              );
+                                              if (!res.ok) {
+                                                const data = (await res.json()) as {
+                                                  error?: string;
+                                                };
+                                                window.alert(
+                                                  data.error ?? "Could not delete preset"
+                                                );
+                                                return;
+                                              }
+                                              if (selectedAthletePresetId === ap.id) {
+                                                setSelectedAthletePresetId(null);
+                                              }
+                                              await loadAthletePresets();
+                                            } finally {
+                                              setDeletingPresetId(null);
+                                            }
+                                          })()}
+                                          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                                        >
+                                          {deletingPresetId === ap.id ? "Deleting…" : "Delete"}
+                                        </button>
+                                      </div>
+                                    </li>
+                                  ))}
+                              </ul>
+                            </div>
+                          ) : null}
+
+                          {savedAthletePresets.length === 0 ? (
+                            <p className="text-sm text-gray-600">No saved presets yet.</p>
+                          ) : null}
+                        </>
                       )}
+
                       <button
                         type="button"
                         onClick={() => setCustomBuilderPresetId(null)}
