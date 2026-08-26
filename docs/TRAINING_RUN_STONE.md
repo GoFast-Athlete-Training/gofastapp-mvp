@@ -124,3 +124,5 @@ executed workout                                   Garmin spawn, same-id with th
 ```
 
 Three objects. Do not hang actuals and feed off `city_runs.workoutId` long term. Long rabbit hole — stub only.
+
+**Studio today (2026):** GoFast With Me **Host a public run** still writes a single `city_runs` row via `POST /api/cityrun/from-workout` — RSVPs on `city_run_rsvps.runId`, post-run on the same id. No pre/executed split until this stub is implemented.

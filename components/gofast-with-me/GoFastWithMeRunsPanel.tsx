@@ -10,9 +10,11 @@ import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-rou
 type Props = {
   athleteId: string;
   publicSlug: string;
+  /** Compact block for Runs & Training — no page header or plan footer. */
+  embedded?: boolean;
 };
 
-export default function GoFastWithMeRunsPanel({ athleteId, publicSlug }: Props) {
+export default function GoFastWithMeRunsPanel({ athleteId, publicSlug, embedded = false }: Props) {
   const [hub, setHub] = useState<ContainerHubPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,14 +46,16 @@ export default function GoFastWithMeRunsPanel({ athleteId, publicSlug }: Props) 
   const runs = hub?.upcomingRuns ?? [];
 
   return (
-    <section id="runs" className="space-y-8">
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">Runs</h2>
-        <p className="text-sm text-gray-600 mt-1">
-          Host joinable runs for your audience. Followers RSVP through GoRun — no separate RSVP
-          system in the container.
-        </p>
-      </div>
+    <section id="runs" className={embedded ? 'space-y-4' : 'space-y-8'}>
+      {!embedded ? (
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Runs</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Host joinable runs for your audience. Followers RSVP through GoRun — no separate RSVP
+            system in the container.
+          </p>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -129,6 +133,7 @@ export default function GoFastWithMeRunsPanel({ athleteId, publicSlug }: Props) 
         )}
       </div>
 
+      {!embedded ? (
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
         <div className="flex items-start gap-2">
           <Calendar className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />
@@ -141,12 +146,13 @@ export default function GoFastWithMeRunsPanel({ athleteId, publicSlug }: Props) 
           </div>
         </div>
         <Link
-          href="/gofast-with-others"
+          href="/training-setup"
           className="inline-flex rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-100"
         >
-          Open My Workouts in studio
+          Open My Training
         </Link>
       </div>
+      ) : null}
     </section>
   );
 }

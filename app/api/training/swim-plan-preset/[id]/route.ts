@@ -141,7 +141,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       athletePersonaDedication:
         parsed.data.athletePersonaDedication ?? existing.athletePersonaDedication,
       coachPlanOverview: parsed.data.coachPlanOverview ?? existing.coachPlanOverview,
-      paceProfile: parsed.data.paceProfile ?? existing.paceProfile,
       slug: existing.slug,
     };
 

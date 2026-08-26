@@ -111,7 +111,7 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
 
   const createAndFeature = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createDraft.name.trim() || saving) return;
+    if (!createDraft.name.trim() || !createDraft.stravaUrl.trim() || saving) return;
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -203,12 +203,12 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
   const publishedCount = runRoutes.filter((r) => r.visibility === 'published').length;
 
   return (
-    <section id="myrunroutes" className="space-y-4 pt-6 border-t border-gray-200">
+    <section id="myrunroutes" className="space-y-4 pb-8 max-w-3xl">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">myRunRoutes</h3>
-        <p className="text-xs text-gray-600 mt-1">
-          Share routes you love — your own Strava routes or favorites from the city catalog. Same route can
-          appear on many athletes&apos; pages.
+        <h2 className="text-lg font-bold text-gray-900">Routes</h2>
+        <p className="text-sm text-gray-600 mt-1">
+          Share routes you love — Strava link plus map so followers can see the path. Same catalog
+          route can appear on many athletes&apos; pages.
         </p>
       </div>
 
@@ -256,6 +256,41 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
               onChange={(e) => setCreateDraft((p) => ({ ...p, stravaUrl: e.target.value }))}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               placeholder="https://www.strava.com/routes/…"
+              required
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="text-xs font-semibold text-gray-700">Strava map URL (optional)</span>
+            <input
+              value={createDraft.stravaMapUrl}
+              onChange={(e) => setCreateDraft((p) => ({ ...p, stravaMapUrl: e.target.value }))}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="Embed or share map link"
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="text-xs font-semibold text-gray-700">Map image URL (optional)</span>
+            <input
+              value={createDraft.mapImageUrl}
+              onChange={(e) => setCreateDraft((p) => ({ ...p, mapImageUrl: e.target.value }))}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="https://… route preview image"
+            />
+            {createDraft.mapImageUrl.trim() ? (
+              <img
+                src={createDraft.mapImageUrl.trim()}
+                alt=""
+                className="mt-2 max-h-36 w-full rounded-lg object-cover"
+              />
+            ) : null}
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-gray-700">Neighborhood (optional)</span>
+            <input
+              value={createDraft.routeNeighborhood}
+              onChange={(e) => setCreateDraft((p) => ({ ...p, routeNeighborhood: e.target.value }))}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="Hains Point"
             />
           </label>
           <label className="block">
@@ -300,7 +335,7 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
           </label>
           <button
             type="submit"
-            disabled={saving || !createDraft.name.trim()}
+            disabled={saving || !createDraft.name.trim() || !createDraft.stravaUrl.trim()}
             className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
           >
             {saving ? 'Saving…' : createDraft.isPublished ? 'Publish route' : 'Save draft'}

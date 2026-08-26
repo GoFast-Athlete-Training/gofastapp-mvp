@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import api from "@/lib/api";
@@ -20,7 +20,8 @@ import GoFastWithMeChatterPanel from "@/components/gofast-with-me/GoFastWithMeCh
 import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
 import GoFastWithMePayoutsPanel from "@/components/gofast-with-me/GoFastWithMePayoutsPanel";
 import GoFastWithMeWorkoutsPanel from "@/components/gofast-with-me/GoFastWithMeWorkoutsPanel";
-import GoFastWithMeCmsContentSection from "@/components/gofast-with-me/GoFastWithMeContentPanel";
+import GoFastWithMeTipsPanel from "@/components/gofast-with-me/GoFastWithMeTipsPanel";
+import GoFastWithMeRoutesPanel from "@/components/gofast-with-me/GoFastWithMeRoutesPanel";
 import GoFastWithMeDashboardHome, {
   type DashboardMetrics,
 } from "@/components/gofast-with-me/GoFastWithMeDashboardHome";
@@ -76,6 +77,7 @@ function ownerRowToLanding(row: OwnerGwmRow | null): GoFastWithMeLandingValues {
 
 export default function GoFastWithOthersDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [gofastHandle, setGofastHandle] = useState<string | null>(null);
   const [firstName, setFirstName] = useState<string | null>(null);
@@ -135,6 +137,13 @@ export default function GoFastWithOthersDashboard() {
   useEffect(() => {
     setIntroDismissed(readStudioIntroDismissed());
   }, []);
+
+  useEffect(() => {
+    const view = searchParams.get('view');
+    if (view === 'payouts') {
+      setActiveView('payouts');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -417,6 +426,7 @@ export default function GoFastWithOthersDashboard() {
       case "workouts":
         return (
           <GoFastWithMeWorkoutsPanel
+            athleteId={athleteId}
             publicSlug={publicSlug}
             firstName={firstName}
             plan={shareHubStatus?.plan ?? null}
@@ -425,14 +435,10 @@ export default function GoFastWithOthersDashboard() {
           />
         );
       case "content":
-        return (
-          <GoFastWithMeCmsContentSection
-            athleteId={athleteId}
-            liveUrl={liveUrl}
-            initialFocus={contentFocus ?? 'tip'}
-            onOpenWorkouts={() => openWorkspace("workouts")}
-            onOpenCommunity={() => openWorkspace("community")}
-          />
+        return contentFocus === 'route' ? (
+          <GoFastWithMeRoutesPanel athleteId={athleteId} />
+        ) : (
+          <GoFastWithMeTipsPanel athleteId={athleteId} liveUrl={liveUrl} />
         );
       default:
         return null;

@@ -105,14 +105,20 @@ export function weeklyVolumeBandFromAggressiveness(
 export function inferWeeklyVolumeBandFromGoal(input: {
   trainingHistory: string;
   goalTime: string | null;
+  racingForFun?: boolean;
 }): WeeklyVolumeBand | null {
+  if (input.racingForFun) return "FINISH";
   const blob = `${input.trainingHistory} ${input.goalTime ?? ""}`.toLowerCase();
   if (
     /\b(sub-?\s*3|sub3|boston|bq\b|qualif|crush|really go for|elite)\b/.test(blob)
   ) {
     return "ELITE";
   }
-  if (/\b(just finish|just want to finish|complete|survive|first marathon)\b/.test(blob)) {
+  if (
+    /\b(just finish|just want to finish|complete|survive|first marathon|racing for fun|just racing)\b/.test(
+      blob
+    )
+  ) {
     return "FINISH";
   }
   return null;
@@ -124,12 +130,14 @@ export function resolveWeeklyVolumeKey(input: {
   progressionAggressiveness: "CONSERVATIVE" | "MODERATE" | "AMBITIOUS";
   trainingHistory?: string;
   goalTime?: string | null;
+  racingForFun?: boolean;
 }): WeeklyVolumeKeyRow {
   const key = weeklyVolumeKeyForDistance(input.raceDistanceLabel);
   const fromModel = parseWeeklyVolumeBand(input.weeklyVolumeBand);
   const fromGoal = inferWeeklyVolumeBandFromGoal({
     trainingHistory: input.trainingHistory ?? "",
     goalTime: input.goalTime ?? null,
+    racingForFun: input.racingForFun,
   });
   const band =
     fromModel ?? fromGoal ?? weeklyVolumeBandFromAggressiveness(input.progressionAggressiveness);

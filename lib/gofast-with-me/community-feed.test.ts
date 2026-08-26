@@ -29,6 +29,8 @@ test('composeCommunityFeed merges and sorts reverse-chronologically', () => {
         mediaType: null,
         sortOrder: 0,
         visibility: 'published',
+        showOnLanding: true,
+        showOnFeed: true,
         publishedAt: '2026-08-15T10:00:00.000Z',
         createdAt: '2026-08-01T10:00:00.000Z',
         updatedAt: '2026-08-15T10:00:00.000Z',

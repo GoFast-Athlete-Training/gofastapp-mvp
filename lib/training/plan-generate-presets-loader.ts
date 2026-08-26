@@ -93,7 +93,6 @@ export type LoadedAthletePresetInclude = NonNullable<
 /** Rotation configs + strategy JSON fields — shared shape for catalog and athlete blueprints. */
 export type RotationBlueprintSource = LoadedPresetInclude & {
   coachPlanOverview?: unknown;
-  paceProfile?: unknown;
   easyRunConfig?: unknown;
   workoutStructure?: unknown;
   slug?: string;

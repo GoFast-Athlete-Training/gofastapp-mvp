@@ -117,11 +117,9 @@ export function attachEntityFields<T extends Record<string, unknown>>(
 ): T & {
   persona?: PlanPersonaApi | null;
   goal?: PlanGoalApi | null;
-  paceOffsetProfile: unknown;
 } {
   return {
     ...preset,
-    paceOffsetProfile: preset.paceProfile ?? null,
     persona: entities.persona ? serializePlanPersona(entities.persona) : null,
     goal: entities.goal ? serializePlanGoal(entities.goal) : null,
   };

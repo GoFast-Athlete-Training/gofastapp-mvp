@@ -1,29 +1,5 @@
 import { Prisma } from "@prisma/client";
 
-/** Canonical pace keys catalogue structures may reference. */
-export const CANONICAL_PACE_KEYS = [
-  "relaxed",
-  "easy",
-  "steady",
-  "moderate",
-  "threshold",
-  "fiveKPace",
-  "tenKPace",
-  "marathonPace",
-  "recoveryJog",
-] as const;
-
-export type CanonicalPaceKey = (typeof CANONICAL_PACE_KEYS)[number];
-
-export type PaceProfileAnchor = "current5k" | "current10k" | "goalRacePace";
-
-export type PaceProfileEntry = {
-  anchor: PaceProfileAnchor;
-  offsetSecPerMile: number;
-};
-
-export type PaceProfile = Partial<Record<CanonicalPaceKey | string, PaceProfileEntry>>;
-
 export type WeeklyWorkoutComposition = {
   easy: number;
   tempo: number;
@@ -58,7 +34,6 @@ export type PresetStrategyFields = {
   athletePersonaGoal?: string | null;
   athletePersonaDedication?: "LOW" | "MODERATE" | "HIGH" | "ELITE" | null;
   coachPlanOverview?: CoachPlanOverview | null;
-  paceProfile?: PaceProfile | null;
 };
 
 const PERSONA_CAPABILITIES = new Set([
@@ -70,8 +45,6 @@ const PERSONA_CAPABILITIES = new Set([
 ]);
 
 const PERSONA_DEDICATIONS = new Set(["LOW", "MODERATE", "HIGH", "ELITE"]);
-
-const PACE_ANCHORS = new Set(["current5k", "current10k", "goalRacePace"]);
 
 function strOrNull(v: unknown): string | null {
   if (v == null) return null;
@@ -163,44 +136,6 @@ export function parseCoachPlanOverview(raw: unknown): CoachPlanOverview | null {
   };
 }
 
-export function parsePaceProfile(raw: unknown): PaceProfile | null {
-  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
-  const o = raw as Record<string, unknown>;
-  const out: PaceProfile = {};
-  for (const [key, val] of Object.entries(o)) {
-    if (val == null || typeof val !== "object" || Array.isArray(val)) continue;
-    const entry = val as Record<string, unknown>;
-    const anchorRaw = typeof entry.anchor === "string" ? entry.anchor.trim() : "";
-    if (!PACE_ANCHORS.has(anchorRaw)) continue;
-    const off = Number(entry.offsetSecPerMile);
-    if (!Number.isFinite(off)) continue;
-    out[key] = {
-      anchor: anchorRaw as PaceProfileAnchor,
-      offsetSecPerMile: Math.round(off),
-    };
-  }
-  return Object.keys(out).length ? out : null;
-}
-
-/** Default pace profile for beginner / 5K-fitness anchored presets. */
-export function defaultPaceProfileForCapability(
-  capability: PresetStrategyFields["athletePersonaCapability"]
-): PaceProfile {
-  const easyOffset = capability === "NON_RUNNER" || capability === "BEGINNER" ? 150 : 120;
-  const steadyOffset = capability === "NON_RUNNER" || capability === "BEGINNER" ? 120 : 90;
-  return {
-    relaxed: { anchor: "current5k", offsetSecPerMile: easyOffset + 30 },
-    easy: { anchor: "current5k", offsetSecPerMile: easyOffset },
-    steady: { anchor: "current5k", offsetSecPerMile: steadyOffset },
-    moderate: { anchor: "current5k", offsetSecPerMile: 60 },
-    threshold: { anchor: "current5k", offsetSecPerMile: 20 },
-    fiveKPace: { anchor: "current5k", offsetSecPerMile: 0 },
-    tenKPace: { anchor: "current10k", offsetSecPerMile: 0 },
-    marathonPace: { anchor: "goalRacePace", offsetSecPerMile: 0 },
-    recoveryJog: { anchor: "current5k", offsetSecPerMile: easyOffset + 30 },
-  };
-}
-
 export function parsePresetStrategyFromBody(
   body: Record<string, unknown>
 ): { ok: true; value: Partial<PresetStrategyFields> } | { ok: false; error: string } {
@@ -212,7 +147,6 @@ export function parsePresetStrategyFromBody(
     "athletePersonaGoal",
     "athletePersonaDedication",
     "coachPlanOverview",
-    "paceProfile",
   ] as const;
 
   const present = keys.some((k) => k in body);
@@ -262,16 +196,6 @@ export function parsePresetStrategyFromBody(
     }
   }
 
-  if ("paceProfile" in body) {
-    if (body.paceProfile === null) {
-      value.paceProfile = null;
-    } else {
-      const parsed = parsePaceProfile(body.paceProfile);
-      if (!parsed) return { ok: false, error: "paceProfile must be a valid pace key map or null" };
-      value.paceProfile = parsed;
-    }
-  }
-
   return { ok: true, value };
 }
 
@@ -284,7 +208,6 @@ export function presetStrategyToPrismaJson(
   athletePersonaGoal?: string | null;
   athletePersonaDedication?: PresetStrategyFields["athletePersonaDedication"];
   coachPlanOverview?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
-  paceProfile?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
 } {
   const out: ReturnType<typeof presetStrategyToPrismaJson> = {};
   if ("coachIntent" in fields) out.coachIntent = fields.coachIntent ?? null;
@@ -302,13 +225,5 @@ export function presetStrategyToPrismaJson(
         ? Prisma.JsonNull
         : (fields.coachPlanOverview as Prisma.InputJsonValue);
   }
-  if ("paceProfile" in fields) {
-    out.paceProfile =
-      fields.paceProfile == null ? Prisma.JsonNull : (fields.paceProfile as Prisma.InputJsonValue);
-  }
   return out;
-}
-
-export function isCanonicalPaceKey(key: string): key is CanonicalPaceKey {
-  return (CANONICAL_PACE_KEYS as readonly string[]).includes(key);
 }

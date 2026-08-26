@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 
 export type AthleteTipVisibility = 'draft' | 'published';
 export type AthleteTipMediaType = 'image' | 'video';
+export type AthleteTipSurface = 'landing' | 'feed';
 
 export type AthleteTipPayload = {
   id: string;
@@ -11,6 +12,8 @@ export type AthleteTipPayload = {
   mediaType: AthleteTipMediaType | null;
   sortOrder: number;
   visibility: AthleteTipVisibility;
+  showOnLanding: boolean;
+  showOnFeed: boolean;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -24,6 +27,8 @@ type AthleteTipRow = {
   mediaType: string | null;
   sortOrder: number;
   isPublished: boolean;
+  showOnLanding: boolean;
+  showOnFeed: boolean;
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -45,6 +50,8 @@ export function mapAthleteTip(row: AthleteTipRow): AthleteTipPayload {
     mediaType: mediaUrl ? mediaType : null,
     sortOrder: row.sortOrder,
     visibility: row.isPublished ? 'published' : 'draft',
+    showOnLanding: row.showOnLanding,
+    showOnFeed: row.showOnFeed,
     publishedAt: row.publishedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -61,10 +68,16 @@ export async function listAthleteTipsForOwner(athleteId: string): Promise<Athlet
 
 export async function listPublishedAthleteTips(
   athleteId: string,
-  limit = 6
+  limit = 6,
+  surface?: AthleteTipSurface
 ): Promise<AthleteTipPayload[]> {
   const rows = await prisma.athlete_tips.findMany({
-    where: { athleteId, isPublished: true },
+    where: {
+      athleteId,
+      isPublished: true,
+      ...(surface === 'landing' ? { showOnLanding: true } : {}),
+      ...(surface === 'feed' ? { showOnFeed: true } : {}),
+    },
     orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }, { updatedAt: 'desc' }],
     take: limit,
   });
@@ -77,6 +90,8 @@ export function normalizeTipInput(input: unknown): {
   mediaUrl: string | null;
   mediaType: AthleteTipMediaType | null;
   sortOrder: number;
+  showOnLanding: boolean;
+  showOnFeed: boolean;
   isPublished: boolean;
 } {
   const value = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
@@ -84,7 +99,12 @@ export function normalizeTipInput(input: unknown): {
   const body = String(value.body ?? '').trim();
   const sortOrderRaw = Number(value.sortOrder ?? 0);
   const sortOrder = Number.isFinite(sortOrderRaw) ? Math.trunc(sortOrderRaw) : 0;
-  const isPublished = Boolean(value.isPublished ?? value.visibility === 'published');
+
+  const legacyPublished = Boolean(value.isPublished ?? value.visibility === 'published');
+  const showOnLanding =
+    value.showOnLanding !== undefined ? Boolean(value.showOnLanding) : legacyPublished;
+  const showOnFeed = value.showOnFeed !== undefined ? Boolean(value.showOnFeed) : legacyPublished;
+  const isPublished = showOnLanding || showOnFeed;
 
   const mediaUrlRaw =
     value.mediaUrl === null || value.mediaUrl === undefined
@@ -102,5 +122,5 @@ export function normalizeTipInput(input: unknown): {
     mediaType = 'image';
   }
 
-  return { title, body, mediaUrl, mediaType, sortOrder, isPublished };
+  return { title, body, mediaUrl, mediaType, sortOrder, showOnLanding, showOnFeed, isPublished };
 }

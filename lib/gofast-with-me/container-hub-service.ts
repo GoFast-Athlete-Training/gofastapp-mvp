@@ -329,7 +329,7 @@ export async function loadAthleteCommunityForHost(
       take: options?.messageLimit ?? 40,
       include: containerMessageInclude,
     }),
-    listPublishedAthleteTips(host.id, 6),
+    listPublishedAthleteTips(host.id, 6, 'feed'),
     listPublishedAthleteRunRoutes(host.id, 6),
     listPublicInstagramMedia(host.id, 5),
     listPublishedActivityPosts(host.id, 20),

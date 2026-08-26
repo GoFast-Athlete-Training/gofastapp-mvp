@@ -110,7 +110,7 @@ function isValidSegmentPaceDistParsed(v: unknown): boolean {
 
 /**
  * Accepts `segmentPaceDist` (preferred), or legacy `segmentPatternJson` / `workSegmentsJson` on API bodies.
- * Segment rows may use `paceKey` (resolved via preset paceProfile at materialization) or legacy `paceOffsetSecPerMile`.
+ * Segment rows use paceOffsetSecPerMile (sec/mi vs 5K anchor at materialization).
  */
 function parseSegmentPaceDist(
   body: Record<string, unknown>

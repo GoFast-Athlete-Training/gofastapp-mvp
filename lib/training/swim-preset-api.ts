@@ -215,7 +215,6 @@ export function swimPresetWriteToPrismaCreate(
     athletePersonaGoal: strategyJson.athletePersonaGoal,
     athletePersonaDedication: strategyJson.athletePersonaDedication,
     coachPlanOverview: strategyJson.coachPlanOverview,
-    paceProfile: strategyJson.paceProfile,
     persona: parsed.personaId ? { connect: { id: parsed.personaId } } : undefined,
     goal: parsed.goalId ? { connect: { id: parsed.goalId } } : undefined,
     enduranceConfig: parsed.enduranceConfigId

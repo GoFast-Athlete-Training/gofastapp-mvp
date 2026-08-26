@@ -866,15 +866,17 @@ export default function TrainingSetupClient() {
         )
       ) : null;
 
-    const needsGoalTimeStep = !goalTimeReady(wizardGoal);
+    const hasBlueprintSelected =
+      selectedPreset != null || selectedAthletePresetId != null;
+
+    const needsGoalTimeStep =
+      !goalTimeReady(wizardGoal) &&
+      !(presetPickMode === "custom" && !hasBlueprintSelected);
 
     const showChangeRaceFork =
       Boolean(activePlanForOtherRace) &&
       changeRaceForkChoice === null &&
       !needsGoalTimeStep;
-
-    const hasBlueprintSelected =
-      selectedPreset != null || selectedAthletePresetId != null;
 
     const stepChoosePreset =
       !showChangeRaceFork &&
@@ -1069,11 +1071,15 @@ export default function TrainingSetupClient() {
                     getToken={getTokenForIngest}
                     templatePresets={presetsForWizardGoal}
                     resumePresetId={customBuilderPresetId}
+                    athleteRaceId={wizardGoal.athleteRaceId ?? wizardGoal.id}
+                    goalRecordId={wizardGoal.id}
                     raceDistanceMeters={rr.distanceMeters ?? null}
+                    raceDistanceLabel={rr.distanceLabel ?? goalDistanceLine}
                     raceName={rr.name}
                     raceDate={rr.raceDate}
                     planStartDate={startDate || new Date().toISOString()}
                     goalTime={wizardGoal.goalTime}
+                    onGoalTimeSaved={handleInitiateGoalSaved}
                     onComplete={(ap) => {
                       setSelectedAthletePresetId(ap.id);
                       setSelectedPreset(null);

@@ -8,6 +8,7 @@ import {
   DEFAULT_ATHLETE_PACE_ADJUSTER,
   type AthletePaceAdjuster,
 } from "@/lib/training/athlete-pace-adjuster";
+import { InlineGoalForm, type InlineGoalRow } from "@/components/races/InlineGoalForm";
 
 export type PresetForWizardLite = {
   id: string;
@@ -77,15 +78,32 @@ type CorePreview = {
   taperStartDate?: string | null;
 };
 
+type GoalIntentMode = "unset" | "time" | "fun";
+
+function formatRaceWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 type AthletePresetBuilderProps = {
   getToken: () => Promise<string>;
   templatePresets: PresetForWizardLite[];
   resumePresetId?: string | null;
+  athleteRaceId: string;
+  goalRecordId: string | null;
   raceDistanceMeters: number | null;
+  raceDistanceLabel: string | null;
   raceName: string;
   raceDate: string;
   planStartDate: string;
   goalTime: string | null;
+  onGoalTimeSaved?: (updated: InlineGoalRow) => void;
   onComplete: (preset: AthletePresetIngestResult) => void;
   onCancel: () => void;
 };
@@ -123,11 +141,15 @@ export function AthletePresetBuilder({
   getToken,
   templatePresets,
   resumePresetId,
+  athleteRaceId,
+  goalRecordId,
   raceDistanceMeters,
+  raceDistanceLabel,
   raceName,
   raceDate,
   planStartDate,
-  goalTime,
+  goalTime: goalTimeProp,
+  onGoalTimeSaved,
   onComplete,
   onCancel,
 }: AthletePresetBuilderProps) {
@@ -159,6 +181,45 @@ export function AthletePresetBuilder({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [effectiveGoalTime, setEffectiveGoalTime] = useState<string | null>(
+    goalTimeProp?.trim() || null
+  );
+  const [goalIntentMode, setGoalIntentMode] = useState<GoalIntentMode>(() =>
+    goalTimeProp?.trim() ? "time" : "unset"
+  );
+  const [goalIntentConfirmed, setGoalIntentConfirmed] = useState(false);
+
+  useEffect(() => {
+    const t = goalTimeProp?.trim() || null;
+    setEffectiveGoalTime(t);
+    if (t) {
+      setGoalIntentMode("time");
+      setGoalIntentConfirmed(false);
+    }
+  }, [goalTimeProp]);
+
+  function selectGoalTimeMode() {
+    setGoalIntentMode("time");
+    setGoalIntentConfirmed(false);
+    setError(null);
+  }
+
+  function selectRacingForFunMode() {
+    setGoalIntentMode("fun");
+    setGoalIntentConfirmed(false);
+    setError(null);
+  }
+
+  function handleGoalSaved(updated: InlineGoalRow) {
+    const gt = updated.goalTime?.trim() || null;
+    setEffectiveGoalTime(gt);
+    setGoalIntentMode("time");
+    setGoalIntentConfirmed(false);
+    onGoalTimeSaved?.(updated);
+  }
+
+  const racingForFun = goalIntentMode === "fun" && goalIntentConfirmed;
+  const inferGoalTime = racingForFun ? null : effectiveGoalTime;
 
   const hydrateFromPreset = useCallback(
     (ap: AthletePresetApi) => {
@@ -371,6 +432,14 @@ export function AthletePresetBuilder({
       setError("Longest recent long run is required.");
       return;
     }
+    if (!goalIntentConfirmed) {
+      setError("Confirm your race goal — finish time or just racing for fun — before continuing.");
+      return;
+    }
+    if (goalIntentMode === "time" && !effectiveGoalTime) {
+      setError("Set a finish goal time, or choose just racing for fun.");
+      return;
+    }
     if (presetId && corePreview) {
       setStep("foundation");
       return;
@@ -398,7 +467,8 @@ export function AthletePresetBuilder({
           raceName,
           raceDate,
           planStartDate,
-          goalTime,
+          goalTime: inferGoalTime,
+          racingForFun,
         }),
       });
       const data = (await res.json()) as {
@@ -486,7 +556,8 @@ export function AthletePresetBuilder({
             raceName,
             raceDate,
             planStartDate,
-            goalTime,
+            goalTime: inferGoalTime,
+            racingForFun,
             ...cupPayload,
           }),
         });
@@ -629,8 +700,8 @@ export function AthletePresetBuilder({
         <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
           <p className="font-medium text-gray-900">Create your preset</p>
           <p className="mt-1 text-gray-700">
-            Tell us your history and goal race — we&apos;ll infer your foundation, then lock in four
-            run types.
+            Tell us your history and race goal — we&apos;ll infer your weekly range and long-run
+            pool, then lock in four run types.
           </p>
         </div>
       ) : null}
@@ -639,6 +710,134 @@ export function AthletePresetBuilder({
         <p className="text-sm text-gray-600">Loading…</p>
       ) : step === "intro" ? (
         <>
+          <div className="rounded-xl border border-orange-200 bg-orange-50/60 p-4">
+            <p className="text-sm font-medium text-gray-900">Your race goal</p>
+            <p className="mt-1 text-sm text-gray-700">
+              <span className="font-medium text-gray-900">{raceName}</span> —{" "}
+              {formatRaceWhen(raceDate)}
+              {raceDistanceLabel ? ` · ${raceDistanceLabel}` : ""}
+            </p>
+            <p className="mt-2 text-xs text-gray-600">
+              This drives your weekly min–max mileage band — confirm before we analyze your training.
+            </p>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={selectGoalTimeMode}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                  goalIntentMode === "time"
+                    ? "bg-orange-600 text-white"
+                    : "border border-gray-300 bg-white text-gray-800"
+                }`}
+              >
+                I have a finish goal
+              </button>
+              <button
+                type="button"
+                onClick={selectRacingForFunMode}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                  goalIntentMode === "fun"
+                    ? "bg-orange-600 text-white"
+                    : "border border-gray-300 bg-white text-gray-800"
+                }`}
+              >
+                Just racing for fun
+              </button>
+            </div>
+
+            {goalIntentMode === "time" ? (
+              <div className="mt-4 space-y-3">
+                {effectiveGoalTime && goalIntentConfirmed ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full border border-orange-200 bg-white px-3 py-1 text-sm font-mono font-semibold text-gray-900">
+                      Goal {effectiveGoalTime}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setGoalIntentConfirmed(false)}
+                      className="text-sm font-semibold text-orange-700 hover:underline"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : effectiveGoalTime ? (
+                  <div className="space-y-2">
+                    <span className="inline-flex items-center rounded-full border border-orange-200 bg-white px-3 py-1 text-sm font-mono font-semibold text-gray-900">
+                      Goal {effectiveGoalTime}
+                    </span>
+                    <p className="text-sm text-gray-700">Is this the finish time we should plan around?</p>
+                    <button
+                      type="button"
+                      onClick={() => setGoalIntentConfirmed(true)}
+                      className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                    >
+                      Yes — that&apos;s my goal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEffectiveGoalTime(null)}
+                      className="ml-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+                    >
+                      Update time
+                    </button>
+                  </div>
+                ) : (
+                  <InlineGoalForm
+                    race={{
+                      athleteRaceId,
+                      name: raceName,
+                      raceDate,
+                      distanceLabel: raceDistanceLabel,
+                      distanceMeters: raceDistanceMeters,
+                    }}
+                    goal={
+                      goalRecordId
+                        ? {
+                            id: goalRecordId,
+                            goalTime: effectiveGoalTime,
+                            athleteRaceId,
+                          }
+                        : null
+                    }
+                    onSaved={handleGoalSaved}
+                  />
+                )}
+              </div>
+            ) : null}
+
+            {goalIntentMode === "fun" ? (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm text-gray-700">
+                  No clock pressure — we&apos;ll size a finish-focused weekly band and long-run pool
+                  from your history.
+                </p>
+                {goalIntentConfirmed ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-900">
+                      Just racing for fun
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setGoalIntentConfirmed(false)}
+                      className="text-sm font-semibold text-orange-700 hover:underline"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setGoalIntentConfirmed(true)}
+                    className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                  >
+                    Yes — just racing for fun
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-800">Name your preset</label>
             <input
@@ -730,7 +929,7 @@ export function AthletePresetBuilder({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || !goalIntentConfirmed}
               onClick={() => void runCoreInfer()}
               className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
             >

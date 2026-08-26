@@ -9,23 +9,30 @@ export type StudioBuildSection = 'community' | 'workouts' | 'content';
 /** Left-nav editor workspaces (My Story + build + manage). */
 export type StudioSection = 'page' | StudioBuildSection | StudioManageSection;
 
-/** Top viewer chrome — Landing, Community, Earnings. */
-export type StudioChromeView = 'landingView' | 'communityHome' | 'payouts';
+/** Preview surfaces — last in left nav under View. */
+export type StudioChromeView = 'landingView' | 'communityHome';
+
+/** Earnings panel — TopNav only, not a viewer. */
+export type StudioPayoutsView = 'payouts';
 
 /** All routable studio views. */
-export type StudioView = StudioChromeView | StudioSection;
+export type StudioView = StudioChromeView | StudioPayoutsView | StudioSection;
 
 /** Scroll target inside Tips & routes workspace. */
 export type ContentEditorFocus = 'tip' | 'route';
 
 export const STUDIO_MY_STORY_LABEL = 'My Story';
 
-export const STUDIO_CHROME_VIEWS: StudioChromeView[] = ['landingView', 'communityHome', 'payouts'];
+export const STUDIO_CHROME_VIEWS: StudioChromeView[] = ['landingView', 'communityHome'];
+
+export const STUDIO_VIEW_NAV_ORDER: Array<{ view: StudioChromeView; label: string }> = [
+  { view: 'landingView', label: 'Landing' },
+  { view: 'communityHome', label: 'Community' },
+];
 
 export const STUDIO_CHROME_LABELS: Record<StudioChromeView, string> = {
   landingView: 'Landing',
   communityHome: 'Community',
-  payouts: 'Earnings',
 };
 
 export const STUDIO_LANDING_LABEL = 'Landing';
@@ -38,7 +45,7 @@ export const STUDIO_CENTRAL_LABEL = STUDIO_COMMUNITY_LABEL;
 export const STUDIO_NAV_LABELS: Record<StudioSection, string> = {
   page: STUDIO_MY_STORY_LABEL,
   community: 'Daily log',
-  workouts: 'Runs',
+  workouts: 'Runs & Training',
   content: 'Tips',
   announcements: 'Announcements',
   chatter: 'Chatter',
@@ -53,7 +60,7 @@ export const STUDIO_BUILD_NAV_ORDER: Array<{
   { section: 'community', label: 'Daily log' },
   { section: 'content', label: 'Tips', focus: 'tip' },
   { section: 'content', label: 'Routes', focus: 'route' },
-  { section: 'workouts', label: 'Runs' },
+  { section: 'workouts', label: 'Runs & Training' },
 ];
 
 export const STUDIO_MANAGE_NAV_ORDER: Array<{ section: StudioManageSection; label: string }> = [
@@ -69,7 +76,7 @@ export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
 export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
   page: 'Photo, welcome, and about — your public who-am-I page',
   community: 'How you feel today — posts spill into the member feed',
-  workouts: 'Runs and training — public plan, GoRun With Me, and workout sharing',
+  workouts: 'Host a joinable run first — plan sharing is optional',
   content: 'Durable tips — nutrition, training thoughts, and what followers revisit',
   announcements: 'Journey updates followers see in your community feed',
   chatter: 'Follower conversation — review and moderate from studio',
@@ -93,7 +100,7 @@ export const STUDIO_BIN_ORDER: StudioSection[] = [
 ];
 
 export function isStudioChromeView(view: StudioView): view is StudioChromeView {
-  return view === 'landingView' || view === 'communityHome' || view === 'payouts';
+  return view === 'landingView' || view === 'communityHome';
 }
 
 export function isStudioManageSection(section: StudioSection): section is StudioManageSection {

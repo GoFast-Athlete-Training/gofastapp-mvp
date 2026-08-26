@@ -31,12 +31,10 @@ function resolveAnchorSecPerMile(
 
 /**
  * Resolve catalogue segment pace: anchor + catalogue offset + per-type athlete adjuster.
- * paceKey is ignored (legacy catalogue rows may still carry it).
  */
 export function resolveCataloguePaceSecPerMile(params: {
   paceKey?: string | null;
   legacyOffsetSecPerMile?: number | null;
-  /** MP-sim blocks use goal race pace + offset instead of 5K. */
   mpAnchorSecPerMile?: number | null;
   ctx: PaceResolutionContext;
 }): number | null {
@@ -68,19 +66,6 @@ export function buildPaceResolutionContext(params: {
     typeAdjusterSecPerMile: adjusterForWorkoutType(params.workoutType, adjuster),
     workoutType: params.workoutType,
   };
-}
-
-/** @deprecated preset paceProfile removed — use athlete pace adjuster columns. */
-export function effectivePaceProfileForPreset(_params: {
-  paceProfile: unknown;
-  athletePersonaCapability?: string | null;
-}): never {
-  throw new Error("paceProfile is removed — use athlete pace adjuster + catalogue offsets");
-}
-
-/** @deprecated */
-export function parsePaceProfileFromJson(_raw: unknown): null {
-  return null;
 }
 
 export { resolveAnchorSecPerMile };

@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Layout, Users, Wallet, X, type LucideIcon } from 'lucide-react';
+import { Layout, Users, X, type LucideIcon } from 'lucide-react';
 import {
   STUDIO_CHROME_LABELS,
-  STUDIO_CHROME_VIEWS,
+  STUDIO_VIEW_NAV_ORDER,
   STUDIO_COMMUNITY_LABEL,
   STUDIO_LANDING_LABEL,
   type StudioChromeView,
@@ -18,7 +18,6 @@ import {
 const CHROME_ICONS: Record<StudioChromeView, LucideIcon> = {
   landingView: Layout,
   communityHome: Users,
-  payouts: Wallet,
 };
 
 type Props = {
@@ -66,27 +65,30 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
         <p className="text-xs text-violet-700">Loading tutorial…</p>
       ) : (
         <ul className="space-y-2">
-          {STUDIO_CHROME_VIEWS.map((view) => {
-            const Icon = CHROME_ICONS[view];
+          <TutorialRow
+            icon={Users}
+            label="Build first"
+            description="My Story, daily log, tips, routes, and runs — create content on the left."
+          />
+          {STUDIO_VIEW_NAV_ORDER.map((item) => {
+            const Icon = CHROME_ICONS[item.view];
             const description =
-              view === 'landingView'
-                ? `${STUDIO_LANDING_LABEL} — who you are plus optional highlights.`
-                : view === 'communityHome'
-                  ? `${STUDIO_COMMUNITY_LABEL} — follower feed, invite link, and preview.`
-                  : 'Stripe Connect and sponsorship earnings.';
+              item.view === 'landingView'
+                ? `${STUDIO_LANDING_LABEL} — preview who you are plus optional highlights.`
+                : `${STUDIO_COMMUNITY_LABEL} — invite, followers, and preview the member feed.`;
             return (
               <TutorialRow
-                key={view}
+                key={item.view}
                 icon={Icon}
-                label={STUDIO_CHROME_LABELS[view]}
+                label={STUDIO_CHROME_LABELS[item.view]}
                 description={description}
               />
             );
           })}
           <TutorialRow
             icon={Users}
-            label="Build & manage"
-            description="Daily log, tips, routes, and runs on the left — announcements, chatter, and members under Manage."
+            label="Earnings"
+            description="Stripe Connect and sponsorship payouts — in the top app nav, not a viewer."
           />
         </ul>
       )}

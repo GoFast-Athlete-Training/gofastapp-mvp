@@ -3,7 +3,7 @@
  * Implementation deferred to phase-2; this module defines the canonical input/output shape.
  */
 
-import type { swim_plan_preset, swim_workout_catalogue } from "@prisma/client";
+import type { swim_workout_catalogue } from "@prisma/client";
 import type { SwimPlanDaySchedule } from "@/lib/training/swim-plan-schedule-schema";
 import type { ResolvedSwimPaceTargets } from "@/lib/training/swim-pace-resolver";
 import { resolveSwimPaceTargets } from "@/lib/training/swim-pace-resolver";
@@ -47,7 +47,6 @@ export type SwimMaterializerWorkoutDraft = {
 };
 
 export type SwimMaterializeDayInput = {
-  preset: Pick<swim_plan_preset, "paceProfile">;
   day: SwimPlanDaySchedule;
   catalogue: swim_workout_catalogue;
   athlete: SwimMaterializerAthleteContext;
@@ -61,15 +60,9 @@ export type SwimMaterializeDayInput = {
 export function buildSwimWorkoutDraftFromScheduleDay(
   input: SwimMaterializeDayInput
 ): SwimMaterializerWorkoutDraft {
-  const paceProfile =
-    input.preset.paceProfile && typeof input.preset.paceProfile === "object"
-      ? (input.preset.paceProfile as Record<string, unknown>)
-      : null;
-
   const paceTargets: ResolvedSwimPaceTargets = resolveSwimPaceTargets({
     fourHunMSwPace: input.athlete.fourHunMSwPace,
     workoutType: input.catalogue.workoutType,
-    paceProfile: paceProfile as Parameters<typeof resolveSwimPaceTargets>[0]["paceProfile"],
     catalogueOffsetSecPer100m: input.catalogue.paceOffsetSecPer100m,
   });
 

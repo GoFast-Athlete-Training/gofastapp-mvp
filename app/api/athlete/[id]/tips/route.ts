@@ -94,6 +94,8 @@ export async function POST(
         mediaType: input.mediaType,
         sortOrder: input.sortOrder,
         isPublished: input.isPublished,
+        showOnLanding: input.showOnLanding,
+        showOnFeed: input.showOnFeed,
         publishedAt: input.isPublished ? new Date() : null,
       },
     });

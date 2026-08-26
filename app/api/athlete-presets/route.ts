@@ -163,6 +163,7 @@ export async function POST(request: NextRequest) {
       planStartDate,
       goalTime: typeof body.goalTime === "string" ? body.goalTime.trim() || null : null,
       raceDistanceLabel: sourcePreset.targetDistanceLabel,
+      racingForFun: body.racingForFun === true,
     });
 
     const corePreview = {

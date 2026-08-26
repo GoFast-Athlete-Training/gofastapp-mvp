@@ -22,15 +22,6 @@ export const SWIM_PACE_OFFSETS_BY_TYPE: Record<SwimWorkoutTypeKey, SwimPaceOffse
   LongSwim: { low: 8, high: 18 },
 };
 
-export type SwimPaceProfileEntry = {
-  offsetSecPer100mLow: number;
-  offsetSecPer100mHigh: number;
-};
-
-export type SwimPaceProfile = Partial<
-  Record<SwimWorkoutTypeKey | string, SwimPaceProfileEntry>
->;
-
 export type ResolvedSwimPaceTargets = {
   paceSecPer100mLow: number;
   paceSecPer100mHigh: number;
@@ -57,7 +48,6 @@ export function formatSwimPaceNote(secPer100m: number): string {
 export function resolveSwimPaceTargets(params: {
   fourHunMSwPace: number;
   workoutType: SwimWorkoutType;
-  paceProfile?: SwimPaceProfile | null;
   catalogueOffsetSecPer100m?: number | null;
 }): ResolvedSwimPaceTargets {
   const anchor = Math.round(params.fourHunMSwPace);
@@ -65,14 +55,10 @@ export function resolveSwimPaceTargets(params: {
     throw new Error("fourHunMSwPace must be a positive number (seconds per 100m)");
   }
 
-  const profileEntry = params.paceProfile?.[params.workoutType];
   let lowOffset: number;
   let highOffset: number;
 
-  if (profileEntry) {
-    lowOffset = profileEntry.offsetSecPer100mLow;
-    highOffset = profileEntry.offsetSecPer100mHigh;
-  } else if (params.catalogueOffsetSecPer100m != null) {
+  if (params.catalogueOffsetSecPer100m != null) {
     lowOffset = params.catalogueOffsetSecPer100m;
     highOffset = params.catalogueOffsetSecPer100m;
   } else {
@@ -84,7 +70,6 @@ export function resolveSwimPaceTargets(params: {
 
   const paceSecPer100mLow = anchor + Math.min(lowOffset, highOffset);
   const paceSecPer100mHigh = anchor + Math.max(lowOffset, highOffset);
-  const mid = Math.round((paceSecPer100mLow + paceSecPer100mHigh) / 2);
 
   return {
     paceSecPer100mLow,

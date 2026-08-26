@@ -77,6 +77,8 @@ export async function PUT(
         mediaType: input.mediaType,
         sortOrder: input.sortOrder,
         isPublished: input.isPublished,
+        showOnLanding: input.showOnLanding,
+        showOnFeed: input.showOnFeed,
         publishedAt:
           input.isPublished && !existing.publishedAt
             ? new Date()

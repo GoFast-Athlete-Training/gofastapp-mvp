@@ -5,14 +5,10 @@ import { ArrowLeft } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
 import {
   STUDIO_BUILD_NAV_ORDER,
-  STUDIO_CHROME_LABELS,
-  STUDIO_CHROME_VIEWS,
   STUDIO_MANAGE_NAV_ORDER,
   STUDIO_MY_STORY_LABEL,
-  chromeViewForEditor,
-  isStudioChromeView,
+  STUDIO_VIEW_NAV_ORDER,
   type ContentEditorFocus,
-  type StudioChromeView,
   type StudioSection,
   type StudioView,
 } from '@/components/gofast-with-me/studio-sections';
@@ -43,10 +39,6 @@ export default function GoFastWithMeStudioAppShell({
   landingNeedsAction,
   children,
 }: Props) {
-  const highlightedChrome: StudioChromeView = isStudioChromeView(activeView)
-    ? activeView
-    : chromeViewForEditor(activeView);
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
@@ -55,7 +47,7 @@ export default function GoFastWithMeStudioAppShell({
           <div className="min-w-0">
             <p className="text-lg font-bold text-gray-900">My Community</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              Build on the left — preview Landing and Community up top.
+              Build first — preview Landing and Community under View.
             </p>
           </div>
           <Link
@@ -82,7 +74,7 @@ export default function GoFastWithMeStudioAppShell({
 
             <div>
               <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                Build content
+                Build
               </p>
               <div className="space-y-0.5">
                 {STUDIO_BUILD_NAV_ORDER.map((item) => (
@@ -113,48 +105,31 @@ export default function GoFastWithMeStudioAppShell({
                 ))}
               </div>
             </div>
+
+            <div>
+              <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                View
+              </p>
+              <div className="space-y-0.5">
+                {STUDIO_VIEW_NAV_ORDER.map((item) => (
+                  <SidebarButton
+                    key={item.view}
+                    label={item.label}
+                    active={activeView === item.view}
+                    onClick={() => onViewChange(item.view)}
+                    badge={item.view === 'landingView' && landingNeedsAction ? 'action' : undefined}
+                  />
+                ))}
+              </div>
+            </div>
           </nav>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b border-gray-200 bg-white">
-            <nav
-              className="mx-auto flex max-w-6xl gap-8 px-4 sm:px-6"
-              aria-label="Studio viewers"
-            >
-              {STUDIO_CHROME_VIEWS.map((view) => {
-                const active = highlightedChrome === view;
-                return (
-                  <button
-                    key={view}
-                    type="button"
-                    onClick={() => onViewChange(view)}
-                    className={`relative py-4 text-base font-semibold transition-colors ${
-                      active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      {STUDIO_CHROME_LABELS[view]}
-                      {view === 'landingView' && landingNeedsAction ? (
-                        <span
-                          className="h-2 w-2 rounded-full bg-amber-500 shrink-0"
-                          aria-label="My Story incomplete"
-                        />
-                      ) : null}
-                    </span>
-                    {active ? (
-                      <span className="absolute inset-x-0 bottom-0 h-0.5 bg-orange-500 rounded-full" />
-                    ) : null}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
           <div className="border-b border-gray-200 bg-white lg:hidden">
             <nav
               className="flex gap-1 overflow-x-auto px-4 py-2 scrollbar-hide"
-              aria-label="Studio build and manage"
+              aria-label="Studio navigation"
             >
               <MobileNavPill
                 label={STUDIO_MY_STORY_LABEL}
@@ -178,6 +153,15 @@ export default function GoFastWithMeStudioAppShell({
                   label={item.label}
                   active={activeView === item.section}
                   onClick={() => onViewChange(item.section)}
+                />
+              ))}
+              {STUDIO_VIEW_NAV_ORDER.map((item) => (
+                <MobileNavPill
+                  key={`m-${item.view}`}
+                  label={item.label}
+                  active={activeView === item.view}
+                  onClick={() => onViewChange(item.view)}
+                  badge={item.view === 'landingView' && landingNeedsAction}
                 />
               ))}
             </nav>

@@ -29,6 +29,8 @@ export type AthletePresetCoreInferInput = {
   planStartDate: string;
   goalTime: string | null;
   raceDistanceLabel: string | null;
+  /** Athlete chose finish-for-fun — sizes weekly band to FINISH without a target time. */
+  racingForFun?: boolean;
 };
 
 export type AthletePresetCoreInferResult = {
@@ -88,10 +90,11 @@ function resolveVolume(input: AthletePresetCoreInferInput, parsed?: Record<strin
   const aggressiveness = parseAggressiveness(parsed?.progressionAggressiveness);
   const row = resolveWeeklyVolumeKey({
     raceDistanceLabel: input.raceDistanceLabel,
-    weeklyVolumeBand: parsed?.weeklyVolumeBand,
+    weeklyVolumeBand: input.racingForFun ? "FINISH" : parsed?.weeklyVolumeBand,
     progressionAggressiveness: aggressiveness,
     trainingHistory: input.trainingHistory,
     goalTime: input.goalTime,
+    racingForFun: input.racingForFun,
   });
   const weekly = clampWeeklyRangeToKey(row, parsed?.minWeeklyMiles, parsed?.maxWeeklyMiles);
   return { aggressiveness, row, weekly };
