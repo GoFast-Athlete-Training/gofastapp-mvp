@@ -5,14 +5,21 @@ import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { ageYearsFromBirthday } from "@/lib/training/athlete-preset-volume";
 import {
   foundationWeeklyBandMeaning,
-  weeklyVolumeKeyForDistance,
+  foundationWeeklyComparisonRows,
 } from "@/lib/training/weekly-volume-key";
-import { peakLongRunPoolFoundationKey } from "@/lib/training/long-run-pool-fields";
+import {
+  foundationPeakPoolComparisonRows,
+  peakLongRunPoolFoundationKey,
+} from "@/lib/training/long-run-pool-fields";
+import { QUALITY_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-setup";
 import {
   DEFAULT_ATHLETE_PACE_ADJUSTER,
   type AthletePaceAdjuster,
 } from "@/lib/training/athlete-pace-adjuster";
 import { InlineGoalForm, type InlineGoalRow } from "@/components/races/InlineGoalForm";
+import { FoundationCompareExpander } from "@/components/training/FoundationCompareExpander";
+import { RotationOrderList } from "@/components/training/RotationOrderList";
+import { QualityRotationEditor } from "@/components/training/QualityRotationEditor";
 
 export type PresetForWizardLite = {
   id: string;
@@ -127,18 +134,20 @@ function buildStepToUi(step: AthletePresetApi["buildStep"]): BuilderStep {
   return step;
 }
 
-function catalogueNames(positions: ConfigPosition[] | undefined): string[] {
-  if (!positions?.length) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const p of [...positions].sort((a, b) => a.cyclePosition - b.cyclePosition)) {
-    const name = p.workout_catalogue?.name?.trim();
-    if (name && !seen.has(name)) {
-      seen.add(name);
-      out.push(name);
-    }
-  }
-  return out;
+function weightPercent(weight: number): string {
+  return `${Math.round(weight * 100)}% of cycle miles`;
+}
+
+function catalogueIdsFromPositions(positions: ConfigPosition[] | undefined): string[] {
+  return [...(positions ?? [])]
+    .sort((a, b) => a.cyclePosition - b.cyclePosition)
+    .map((p) => p.catalogueWorkoutId)
+    .filter((id): id is string => Boolean(id));
+}
+
+function qualitySelectionValid(ids: string[]): boolean {
+  if (ids.length !== QUALITY_ROTATION_SLOTS) return false;
+  return new Set(ids).size === ids.length && ids.every((id) => id.trim());
 }
 
 export function AthletePresetBuilder({
@@ -180,6 +189,9 @@ export function AthletePresetBuilder({
   const [showPoolAdjust, setShowPoolAdjust] = useState(false);
   const [presetApi, setPresetApi] = useState<AthletePresetApi | null>(null);
   const [lrOrder, setLrOrder] = useState<ConfigPosition[]>([]);
+  const [easyOrder, setEasyOrder] = useState<ConfigPosition[]>([]);
+  const [tempoCatalogueIds, setTempoCatalogueIds] = useState<string[]>([]);
+  const [intervalCatalogueIds, setIntervalCatalogueIds] = useState<string[]>([]);
   const [paceAdjuster, setPaceAdjuster] = useState<AthletePaceAdjuster>({
     ...DEFAULT_ATHLETE_PACE_ADJUSTER,
   });
@@ -240,6 +252,10 @@ export function AthletePresetBuilder({
       setMaxWeeklyMiles(ap.maxWeeklyMiles);
       const positions = ap.longRunConfig?.positions ?? [];
       setLrOrder([...positions].sort((a, b) => a.cyclePosition - b.cyclePosition));
+      const easyPositions = ap.easyConfig?.positions ?? [];
+      setEasyOrder([...easyPositions].sort((a, b) => a.cyclePosition - b.cyclePosition));
+      setTempoCatalogueIds(catalogueIdsFromPositions(ap.tempoConfig?.positions));
+      setIntervalCatalogueIds(catalogueIdsFromPositions(ap.intervalsConfig?.positions));
 
       if (ap.buildStep === "core") {
         const overview = ap.coachPlanOverview as Record<string, unknown> | null;
@@ -596,6 +612,17 @@ export function AthletePresetBuilder({
           (a, b) => a.cyclePosition - b.cyclePosition
         )
       );
+      setEasyOrder(
+        [...(setupData.athletePreset.easyConfig?.positions ?? [])].sort(
+          (a, b) => a.cyclePosition - b.cyclePosition
+        )
+      );
+      setTempoCatalogueIds(
+        catalogueIdsFromPositions(setupData.athletePreset.tempoConfig?.positions)
+      );
+      setIntervalCatalogueIds(
+        catalogueIdsFromPositions(setupData.athletePreset.intervalsConfig?.positions)
+      );
       setStep("longRun");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save foundation");
@@ -604,12 +631,14 @@ export function AthletePresetBuilder({
     }
   }
 
-  function moveLrPosition(index: number, direction: -1 | 1) {
-    const next = [...lrOrder];
-    const target = index + direction;
-    if (target < 0 || target >= next.length) return;
-    [next[index], next[target]] = [next[target]!, next[index]!];
-    setLrOrder(next);
+  function reorderLr(ids: string[]) {
+    const byId = new Map(lrOrder.map((p) => [p.id, p]));
+    setLrOrder(ids.map((id) => byId.get(id)!).filter(Boolean));
+  }
+
+  function reorderEasy(ids: string[]) {
+    const byId = new Map(easyOrder.map((p) => [p.id, p]));
+    setEasyOrder(ids.map((id) => byId.get(id)!).filter(Boolean));
   }
 
   async function confirmLongRunAndContinue() {
@@ -637,10 +666,18 @@ export function AthletePresetBuilder({
     setSaving(true);
     setError(null);
     try {
-      await patchPreset({ step: "easy", action: "confirm" });
+      const ordered = easyOrder.map((p) => p.id);
+      const ap = await patchPreset({
+        step: "easy",
+        action: ordered.length ? "reorderPositions" : "confirm",
+        ...(ordered.length ? { orderedPositionIds: ordered } : {}),
+      });
+      if (ap.buildStep === "easy") {
+        await patchPreset({ step: "easy", action: "confirm" });
+      }
       setStep("tempo");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not continue");
+      setError(e instanceof Error ? e.message : "Could not save easy order");
     } finally {
       setSaving(false);
     }
@@ -650,10 +687,17 @@ export function AthletePresetBuilder({
     setSaving(true);
     setError(null);
     try {
-      await patchPreset({ step: "tempo", action: "confirm" });
+      if (!qualitySelectionValid(tempoCatalogueIds)) {
+        throw new Error(`Pick ${QUALITY_ROTATION_SLOTS} unique tempo workouts`);
+      }
+      await patchPreset({
+        step: "tempo",
+        action: "saveSelection",
+        orderedCatalogueWorkoutIds: tempoCatalogueIds,
+      });
       setStep("interval");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not continue");
+      setError(e instanceof Error ? e.message : "Could not save tempo rotation");
     } finally {
       setSaving(false);
     }
@@ -663,10 +707,17 @@ export function AthletePresetBuilder({
     setSaving(true);
     setError(null);
     try {
-      await patchPreset({ step: "interval", action: "confirm" });
+      if (!qualitySelectionValid(intervalCatalogueIds)) {
+        throw new Error(`Pick ${QUALITY_ROTATION_SLOTS} unique interval workouts`);
+      }
+      await patchPreset({
+        step: "interval",
+        action: "saveSelection",
+        orderedCatalogueWorkoutIds: intervalCatalogueIds,
+      });
       setStep("adjuster");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not continue");
+      setError(e instanceof Error ? e.message : "Could not save interval rotation");
     } finally {
       setSaving(false);
     }
@@ -702,6 +753,14 @@ export function AthletePresetBuilder({
   const weeklyKeyLine = weeklyBand
     ? foundationWeeklyBandMeaning(weeklyBand)
     : null;
+
+  const weeklyCompareRows = foundationWeeklyComparisonRows({
+    raceDistanceLabel,
+    selectedBand: weeklyBand ?? null,
+  });
+  const peakPoolCompareRows = peakLongRunPoolMiles
+    ? foundationPeakPoolComparisonRows(Number(peakLongRunPoolMiles))
+    : [];
 
   return (
     <div className="space-y-4">
@@ -962,13 +1021,8 @@ export function AthletePresetBuilder({
         <>
           <div className="space-y-4">
             <div className="rounded-xl border border-orange-200 bg-orange-50/60 p-4">
-              <p className="text-lg font-semibold text-gray-900">
-                Here&apos;s the foundation of everything.
-              </p>
-              <p className="mt-2 text-sm text-gray-700">
-                This is <span className="font-medium">not</span> the miles you run this week. This is
-                the band the plan has to hit — volume grows toward that peak pool and those dates.
-              </p>
+              <p className="text-lg font-semibold text-gray-900">Your Core</p>
+              <p className="mt-2 text-sm text-gray-700">We calculated two key metrics.</p>
             </div>
 
             {corePreview?.weSeeYou ? (
@@ -977,45 +1031,52 @@ export function AthletePresetBuilder({
               </div>
             ) : null}
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-3">
               <div className="rounded-xl border border-gray-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Mileage min–max
-                </p>
+                <p className="text-sm font-semibold text-gray-900">Weekly Mileage</p>
                 <p className="mt-1 text-lg font-bold text-gray-900">
                   {minWeeklyMiles || corePreview?.minWeeklyMiles || "—"}–
                   {maxWeeklyMiles ?? corePreview?.maxWeeklyMiles ?? "—"} mi
                 </p>
                 {weeklyKeyLine ? (
                   <p className="mt-1 text-xs text-gray-600">{weeklyKeyLine}</p>
-                ) : weeklyBand ? (
-                  <p className="mt-1 text-xs text-gray-600">
-                    {weeklyVolumeKeyForDistance(raceDistanceLabel)[weeklyBand]
-                      .athleteLabel}
-                  </p>
                 ) : null}
+                <FoundationCompareExpander
+                  label="See how this weekly mileage compares"
+                  rows={weeklyCompareRows}
+                />
               </div>
+
               <div className="rounded-xl border border-gray-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Long-run pool (cycle peak max)
+                <p className="text-sm font-semibold text-gray-900">Long Cycle Pool Peak</p>
+                <p className="mt-2 text-sm text-gray-700">
+                  This is the sum of our 4-cycle long-run system. We work off of a long-long-long-cutback
+                  model.
+                </p>
+                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Cycle pool total
                 </p>
                 <p className="mt-1 text-lg font-bold text-orange-600">
                   {peakLongRunPoolMiles || "—"} mi
                 </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  Sum of 4 Saturdays in your peak block — not weekly mileage
-                </p>
                 {peakPoolKeyLine ? (
-                  <p className="mt-1 text-xs font-medium text-orange-800">
-                    {peakPoolKeyLine}
-                  </p>
+                  <p className="mt-1 text-xs font-medium text-orange-800">{peakPoolKeyLine}</p>
+                ) : null}
+                {peakPoolCompareRows.length ? (
+                  <FoundationCompareExpander
+                    label="See how this peak mileage compares"
+                    rows={peakPoolCompareRows}
+                  />
                 ) : null}
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white p-4">
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Peak date</p>
                 <p className="mt-1 text-lg font-bold text-gray-900">{peakDate ?? "—"}</p>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Taper date</p>
                 <p className="mt-1 text-lg font-bold text-gray-900">{taperDate ?? "—"}</p>
               </div>
@@ -1081,45 +1142,19 @@ export function AthletePresetBuilder({
         </>
       ) : step === "longRun" ? (
         <>
-          <p className="text-sm font-medium text-gray-900">Long run — locked miles, shift Saturday order</p>
+          <p className="text-sm font-medium text-gray-900">Your four-week long-run cycle</p>
           <p className="text-sm text-gray-600">
-            Miles and weights stay fixed. Reorder which Saturday slot comes first in your 4-week cycle.
+            All four sessions stay in your cycle — drag or use Earlier/Later to choose which Saturday
+            slot comes first.
           </p>
-          {lrOrder.length ? (
-            <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
-              {lrOrder.map((pos, idx) => (
-                <li key={pos.id} className="flex items-center justify-between gap-2 px-3 py-3 text-sm">
-                  <div>
-                    <span className="font-medium text-gray-900">Week {idx + 1} slot</span>
-                    <span className="ml-2 text-gray-500">
-                      weight {pos.distributionWeight}
-                      {pos.workout_catalogue?.name ? ` · ${pos.workout_catalogue.name}` : ""}
-                    </span>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      disabled={idx === 0}
-                      onClick={() => moveLrPosition(idx, -1)}
-                      className="rounded border border-gray-300 px-2 py-1 text-xs disabled:opacity-40"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === lrOrder.length - 1}
-                      onClick={() => moveLrPosition(idx, 1)}
-                      className="rounded border border-gray-300 px-2 py-1 text-xs disabled:opacity-40"
-                    >
-                      ↓
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-gray-600">Long-run rotation loaded from your distance template.</p>
-          )}
+          <RotationOrderList
+            items={lrOrder.map((pos) => ({
+              id: pos.id,
+              title: pos.workout_catalogue?.name ?? "Long run",
+              subtitle: weightPercent(pos.distributionWeight),
+            }))}
+            onReorder={reorderLr}
+          />
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -1136,18 +1171,18 @@ export function AthletePresetBuilder({
         </>
       ) : step === "easy" ? (
         <>
-          <p className="text-sm font-medium text-gray-900">Easy — locked</p>
+          <p className="text-sm font-medium text-gray-900">Your easy-run rotation</p>
           <p className="text-sm text-gray-600">
-            Easy fill comes from the GoFast template. Pace uses catalogue offsets plus your adjuster
-            on the last step.
+            Easy workouts come from the GoFast template — reorder which slot comes first in your cycle.
           </p>
-          {catalogueNames(presetApi?.easyConfig?.positions).length ? (
-            <ul className="list-disc pl-5 text-sm text-gray-700">
-              {catalogueNames(presetApi?.easyConfig?.positions).map((n) => (
-                <li key={n}>{n}</li>
-              ))}
-            </ul>
-          ) : null}
+          <RotationOrderList
+            items={easyOrder.map((pos) => ({
+              id: pos.id,
+              title: pos.workout_catalogue?.name ?? "Easy run",
+              subtitle: weightPercent(pos.distributionWeight),
+            }))}
+            onReorder={reorderEasy}
+          />
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -1164,21 +1199,20 @@ export function AthletePresetBuilder({
         </>
       ) : step === "tempo" ? (
         <>
-          <p className="text-sm font-medium text-gray-900">Tempo — catalogue locked</p>
-          <p className="text-sm text-gray-600">These threshold workouts rotate from the universal catalogue.</p>
-          {catalogueNames(presetApi?.tempoConfig?.positions).length ? (
-            <ul className="list-disc pl-5 text-sm text-gray-700">
-              {catalogueNames(presetApi?.tempoConfig?.positions).map((n) => (
-                <li key={n}>{n}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-gray-500">Template tempo rotation</p>
-          )}
+          <p className="text-sm font-medium text-gray-900">Tempo — pick your eight</p>
+          <p className="text-sm text-gray-600">
+            Choose eight threshold workouts from the catalogue and set the order they rotate.
+          </p>
+          <QualityRotationEditor
+            workoutType="Tempo"
+            initialCatalogueIds={tempoCatalogueIds}
+            getToken={getToken}
+            onChange={setTempoCatalogueIds}
+          />
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || !qualitySelectionValid(tempoCatalogueIds)}
               onClick={() => void confirmTempoAndContinue()}
               className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
             >
@@ -1191,21 +1225,20 @@ export function AthletePresetBuilder({
         </>
       ) : step === "interval" ? (
         <>
-          <p className="text-sm font-medium text-gray-900">Interval — catalogue locked</p>
-          <p className="text-sm text-gray-600">These interval workouts rotate from the universal catalogue.</p>
-          {catalogueNames(presetApi?.intervalsConfig?.positions).length ? (
-            <ul className="list-disc pl-5 text-sm text-gray-700">
-              {catalogueNames(presetApi?.intervalsConfig?.positions).map((n) => (
-                <li key={n}>{n}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-gray-500">Template interval rotation</p>
-          )}
+          <p className="text-sm font-medium text-gray-900">Interval — pick your eight</p>
+          <p className="text-sm text-gray-600">
+            Choose eight interval workouts from the catalogue and set the order they rotate.
+          </p>
+          <QualityRotationEditor
+            workoutType="Intervals"
+            initialCatalogueIds={intervalCatalogueIds}
+            getToken={getToken}
+            onChange={setIntervalCatalogueIds}
+          />
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || !qualitySelectionValid(intervalCatalogueIds)}
               onClick={() => void confirmIntervalAndContinue()}
               className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
             >

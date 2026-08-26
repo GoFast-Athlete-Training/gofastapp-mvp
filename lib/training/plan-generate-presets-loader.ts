@@ -4,6 +4,7 @@
 
 import { WorkoutType, Prisma, type training_plan_preset } from "@prisma/client";
 import { runTypeConfigPositionsToInputs, type RunTypeConfigInput } from "@/lib/training/run-type-config-shared";
+import { athletePresetRotationInclude } from "@/lib/training/apply-athlete-rotation-order";
 
 export interface PlanGenConfig {
   minWeeklyMiles?: number | null;
@@ -77,12 +78,7 @@ export type LoadedPresetInclude = NonNullable<
   }>
 >;
 
-export const athletePresetInclude = {
-  longRunConfig: { include: { positions: positionsInclude } },
-  intervalsConfig: { include: { positions: positionsInclude } },
-  tempoConfig: { include: { positions: positionsInclude } },
-  easyConfig: { include: { positions: positionsInclude } },
-} as const;
+export const athletePresetInclude = athletePresetRotationInclude;
 
 export type LoadedAthletePresetInclude = NonNullable<
   Prisma.athlete_presetsGetPayload<{

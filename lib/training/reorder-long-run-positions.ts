@@ -1,8 +1,10 @@
 /**
- * Reorder long_run_config_position cycle positions (1–4) without changing weights or pool sum.
+ * @deprecated Use reorderAthleteLongRunOrder — updates shared catalog positions.
+ * Kept for any legacy callers; uses collision-safe two-phase reorder.
  */
 
 import { prisma } from "@/lib/prisma";
+import { reorderPositionRows } from "@/lib/training/reorder-position-rows";
 
 export async function reorderLongRunConfigPositions(params: {
   longRunConfigId: string;
@@ -16,22 +18,18 @@ export async function reorderLongRunConfigPositions(params: {
   if (positions.length === 0) {
     throw new Error("No long-run positions to reorder");
   }
-  const idSet = new Set(positions.map((p) => p.id));
-  if (params.orderedPositionIds.length !== positions.length) {
-    throw new Error("Reorder must include every position exactly once");
-  }
-  for (const id of params.orderedPositionIds) {
-    if (!idSet.has(id)) {
-      throw new Error("Invalid position id in reorder");
-    }
-  }
-  const now = new Date();
-  await prisma.$transaction(
-    params.orderedPositionIds.map((id, idx) =>
-      prisma.long_run_config_position.update({
-        where: { id },
-        data: { cyclePosition: idx + 1, updatedAt: now },
-      })
-    )
-  );
+
+  await prisma.$transaction(async (tx) => {
+    await reorderPositionRows({
+      rows: positions,
+      orderedIds: params.orderedPositionIds,
+      tempOffset: 100,
+      update: async (id, cyclePosition) => {
+        await tx.long_run_config_position.update({
+          where: { id },
+          data: { cyclePosition, updatedAt: new Date() },
+        });
+      },
+    });
+  });
 }

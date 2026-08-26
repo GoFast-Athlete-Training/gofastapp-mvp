@@ -11,6 +11,7 @@ import {
 import {
   cloneRotationsFromSourcePreset,
   seedWorkoutBlueprintFromSource,
+  setupAthleteRotationsFromSource,
 } from "@/lib/training/clone-preset-configs";
 import { deleteAthletePresetForAthlete } from "@/lib/training/delete-athlete-preset";
 import {
@@ -18,7 +19,12 @@ import {
   mergeCoachPlanOverview,
 } from "@/lib/training/athlete-preset-coach-overview";
 import { computeCoreVolumeCalendarPreview } from "@/lib/training/core-volume-compute";
-import { reorderLongRunConfigPositions } from "@/lib/training/reorder-long-run-positions";
+import {
+  reorderAthleteEasyOrder,
+  reorderAthleteLongRunOrder,
+  saveAthleteIntervalsSelection,
+  saveAthleteTempoSelection,
+} from "@/lib/training/athlete-rotation-setup";
 import {
   adjusterToAthleteColumns,
   DEFAULT_ATHLETE_PACE_ADJUSTER,
@@ -181,7 +187,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         athletePresetId: id,
         sourcePresetId: existing.sourcePresetId,
       });
-      await cloneRotationsFromSourcePreset({
+      await setupAthleteRotationsFromSource({
         athletePresetId: id,
         sourcePresetId: existing.sourcePresetId,
       });
@@ -219,7 +225,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (!existing.sourcePresetId) {
         return NextResponse.json({ error: "sourcePresetId missing" }, { status: 422 });
       }
-      await cloneRotationsFromSourcePreset({
+      await setupAthleteRotationsFromSource({
         athletePresetId: id,
         sourcePresetId: existing.sourcePresetId,
       });
@@ -251,8 +257,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (!existing.longRunConfigId) {
         return NextResponse.json({ error: "long run config missing" }, { status: 422 });
       }
-      await reorderLongRunConfigPositions({
-        longRunConfigId: existing.longRunConfigId,
+      await reorderAthleteLongRunOrder({
+        athletePresetId: id,
         orderedPositionIds: ordered as string[],
       });
       data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
@@ -263,6 +269,48 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.step === "longRun" && body.action === "confirm") {
       data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
         longRunConfirmed: true,
+      });
+    }
+
+    if (body.step === "easy" && body.action === "reorderPositions") {
+      const ordered = body.orderedPositionIds;
+      if (!Array.isArray(ordered) || !ordered.every((x) => typeof x === "string")) {
+        return NextResponse.json({ error: "orderedPositionIds required" }, { status: 400 });
+      }
+      await reorderAthleteEasyOrder({
+        athletePresetId: id,
+        orderedPositionIds: ordered as string[],
+      });
+      data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
+        easyConfirmed: true,
+      });
+    }
+
+    if (body.step === "tempo" && body.action === "saveSelection") {
+      const ordered = body.orderedCatalogueWorkoutIds;
+      if (!Array.isArray(ordered) || !ordered.every((x) => typeof x === "string")) {
+        return NextResponse.json({ error: "orderedCatalogueWorkoutIds required" }, { status: 400 });
+      }
+      await saveAthleteTempoSelection({
+        athletePresetId: id,
+        orderedCatalogueWorkoutIds: ordered as string[],
+      });
+      data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
+        tempoConfirmed: true,
+      });
+    }
+
+    if (body.step === "interval" && body.action === "saveSelection") {
+      const ordered = body.orderedCatalogueWorkoutIds;
+      if (!Array.isArray(ordered) || !ordered.every((x) => typeof x === "string")) {
+        return NextResponse.json({ error: "orderedCatalogueWorkoutIds required" }, { status: 400 });
+      }
+      await saveAthleteIntervalsSelection({
+        athletePresetId: id,
+        orderedCatalogueWorkoutIds: ordered as string[],
+      });
+      data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
+        intervalConfirmed: true,
       });
     }
 

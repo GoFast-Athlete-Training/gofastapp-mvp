@@ -113,6 +113,28 @@ export function foundationWeeklyBandMeaning(band: WeeklyVolumeBand): string {
   return "Ready to go for it — you're in the right range";
 }
 
+export type FoundationWeeklyComparisonRow = {
+  band: WeeklyVolumeBand;
+  rangeLabel: string;
+  meaning: string;
+  isSelected: boolean;
+};
+
+/** Expandable weekly mileage key — distance-aware bands with selected highlight. */
+export function foundationWeeklyComparisonRows(input: {
+  raceDistanceLabel?: string | null;
+  selectedBand?: WeeklyVolumeBand | null;
+}): FoundationWeeklyComparisonRow[] {
+  const key = weeklyVolumeKeyForDistance(input.raceDistanceLabel);
+  const selected = input.selectedBand ?? null;
+  return (["FINISH", "RACE", "ELITE"] as const).map((band) => ({
+    band,
+    rangeLabel: `${key[band].minWeeklyMiles}–${key[band].maxWeeklyMiles} mi`,
+    meaning: foundationWeeklyBandMeaning(band),
+    isSelected: selected === band,
+  }));
+}
+
 export function inferWeeklyVolumeBandFromGoal(input: {
   trainingHistory: string;
   goalTime: string | null;

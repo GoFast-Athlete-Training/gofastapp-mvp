@@ -4,6 +4,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { athletePresetInclude, type LoadedAthletePresetInclude } from "@/lib/training/plan-generate-presets-loader";
+import { resolveAthletePresetRotations } from "@/lib/training/apply-athlete-rotation-order";
 import { builderProgressFromOverview } from "@/lib/training/athlete-preset-builder-progress";
 
 export type AthletePresetBuildStep =
@@ -87,9 +88,21 @@ export function serializeAthletePresetForApi(row: {
   easyConfig?: LoadedAthletePresetInclude["easyConfig"];
   tempoConfig?: LoadedAthletePresetInclude["tempoConfig"];
   intervalsConfig?: LoadedAthletePresetInclude["intervalsConfig"];
+  longRunOrders?: Array<{ cyclePosition: number; longRunConfigPositionId: string }>;
+  easyOrders?: Array<{ cyclePosition: number; easyConfigPositionId: string }>;
+  athleteTempoConfig?: LoadedAthletePresetInclude["athleteTempoConfig"];
+  athleteIntervalsConfig?: LoadedAthletePresetInclude["athleteIntervalsConfig"];
   createdAt: Date;
   updatedAt: Date;
 }) {
+  const resolved = resolveAthletePresetRotations(
+    row as LoadedAthletePresetInclude & {
+      longRunOrders?: Array<{ cyclePosition: number; longRunConfigPositionId: string }>;
+      easyOrders?: Array<{ cyclePosition: number; easyConfigPositionId: string }>;
+      athleteTempoConfig?: LoadedAthletePresetInclude["athleteTempoConfig"];
+      athleteIntervalsConfig?: LoadedAthletePresetInclude["athleteIntervalsConfig"];
+    }
+  );
   const stepRow: AthletePresetRowForStep = {
     workoutStructure: row.workoutStructure,
     coachPlanOverview: row.coachPlanOverview,
@@ -123,10 +136,10 @@ export function serializeAthletePresetForApi(row: {
     easyConfigId: row.easyConfigId,
     tempoConfigId: row.tempoConfigId,
     intervalsConfigId: row.intervalsConfigId,
-    longRunConfig: row.longRunConfig ?? null,
-    easyConfig: row.easyConfig ?? null,
-    tempoConfig: row.tempoConfig ?? null,
-    intervalsConfig: row.intervalsConfig ?? null,
+    longRunConfig: resolved.longRunConfig,
+    easyConfig: resolved.easyConfig,
+    tempoConfig: resolved.tempoConfig,
+    intervalsConfig: resolved.intervalsConfig,
     buildStep,
     buildStepLabel: athletePresetBuildStepLabel(buildStep),
     isComplete: isAthletePresetBlueprintComplete(stepRow),
@@ -144,8 +157,10 @@ export function athletePresetAsRotationSource(
   workoutStructure: Prisma.JsonValue;
   slug: string;
 } {
+  const resolved = resolveAthletePresetRotations(row);
   return {
     ...row,
+    ...resolved,
     slug: `athlete-${row.id}`,
     coachPlanOverview: row.coachPlanOverview ?? null,
     easyRunConfig: row.easyRunConfig ?? null,

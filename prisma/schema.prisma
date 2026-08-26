@@ -1810,10 +1810,110 @@ model athlete_presets {
   sourcePreset     training_plan_preset? @relation("AthletePresetSource", fields: [sourcePresetId], references: [id], onDelete: SetNull)
   promotedPreset   training_plan_preset? @relation("AthletePresetPromoted", fields: [promotedPresetId], references: [id], onDelete: SetNull)
   training_plans   training_plans[]
+  longRunOrders    athlete_preset_long_run_order[]
+  easyOrders       athlete_preset_easy_order[]
+  athleteTempoConfig     athlete_tempo_config?
+  athleteIntervalsConfig athlete_intervals_config?
 
   @@index([athleteId])
   @@index([sourcePresetId])
   @@map("athlete_presets")
+}
+
+/// Athlete-specific order over shared long_run_config_position rows (MVP1: config unchanged).
+model athlete_preset_long_run_order {
+  id                      String @id @default(cuid())
+  athletePresetId         String
+  longRunConfigPositionId String
+  cyclePosition           Int
+
+  athlete_preset           athlete_presets           @relation(fields: [athletePresetId], references: [id], onDelete: Cascade)
+  long_run_config_position long_run_config_position @relation(fields: [longRunConfigPositionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([athletePresetId, longRunConfigPositionId])
+  @@unique([athletePresetId, cyclePosition])
+  @@index([athletePresetId])
+  @@index([longRunConfigPositionId])
+}
+
+/// Athlete-specific order over shared easy_config_position rows.
+model athlete_preset_easy_order {
+  id                   String @id @default(cuid())
+  athletePresetId      String
+  easyConfigPositionId String
+  cyclePosition        Int
+
+  athlete_preset      athlete_presets      @relation(fields: [athletePresetId], references: [id], onDelete: Cascade)
+  easy_config_position easy_config_position @relation(fields: [easyConfigPositionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([athletePresetId, easyConfigPositionId])
+  @@unique([athletePresetId, cyclePosition])
+  @@index([athletePresetId])
+  @@index([easyConfigPositionId])
+}
+
+/// Athlete-owned tempo rotation — eight catalogue workouts.
+model athlete_tempo_config {
+  id              String @id @default(cuid())
+  athletePresetId String @unique
+
+  athlete_preset athlete_presets @relation(fields: [athletePresetId], references: [id], onDelete: Cascade)
+  positions      athlete_tempo_config_position[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model athlete_tempo_config_position {
+  id                   String @id @default(cuid())
+  athleteTempoConfigId String
+  cyclePosition        Int
+  distributionWeight   Float  @default(0.125)
+  catalogueWorkoutId   String?
+
+  athlete_tempo_config athlete_tempo_config @relation(fields: [athleteTempoConfigId], references: [id], onDelete: Cascade)
+  workout_catalogue    workout_catalogue?   @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([athleteTempoConfigId, cyclePosition])
+  @@index([athleteTempoConfigId])
+}
+
+/// Athlete-owned intervals rotation — eight catalogue workouts.
+model athlete_intervals_config {
+  id              String @id @default(cuid())
+  athletePresetId String @unique
+
+  athlete_preset athlete_presets @relation(fields: [athletePresetId], references: [id], onDelete: Cascade)
+  positions      athlete_intervals_config_position[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model athlete_intervals_config_position {
+  id                       String @id @default(cuid())
+  athleteIntervalsConfigId String
+  cyclePosition            Int
+  distributionWeight       Float  @default(0.125)
+  catalogueWorkoutId       String?
+
+  athlete_intervals_config athlete_intervals_config @relation(fields: [athleteIntervalsConfigId], references: [id], onDelete: Cascade)
+  workout_catalogue          workout_catalogue?       @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([athleteIntervalsConfigId, cyclePosition])
+  @@index([athleteIntervalsConfigId])
 }
 
 /// Standalone swim training preset — separate from run `training_plan_preset`; future triathlon presets compose swim/bike/run.
@@ -1974,6 +2074,8 @@ model long_run_config_position {
 
   @@unique([longRunConfigId, cyclePosition])
   @@index([longRunConfigId])
+
+  athlete_preset_long_run_orders athlete_preset_long_run_order[]
 }
 
 /// Intervals rotation only (cycle math / variance); not used for long-run pool miles.
@@ -2070,6 +2172,8 @@ model easy_config_position {
 
   @@unique([easyConfigId, cyclePosition])
   @@index([easyConfigId])
+
+  athlete_preset_easy_orders athlete_preset_easy_order[]
 }
 
 model training_plans {
@@ -2275,6 +2379,8 @@ model workout_catalogue {
   intervals_config_positions  intervals_config_position[]
   tempo_config_positions      tempo_config_position[]
   easy_config_positions       easy_config_position[]
+  athlete_tempo_config_positions     athlete_tempo_config_position[]
+  athlete_intervals_config_positions athlete_intervals_config_position[]
 
   @@unique([name, workoutType])
   @@index([workoutType])
