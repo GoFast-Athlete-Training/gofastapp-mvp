@@ -25,9 +25,11 @@ export const STUDIO_MY_STORY_LABEL = 'My Story';
 
 export const STUDIO_CHROME_VIEWS: StudioChromeView[] = ['landingView', 'communityHome'];
 
-export const STUDIO_VIEW_NAV_ORDER: Array<{ view: StudioChromeView; label: string }> = [
-  { view: 'landingView', label: 'Landing' },
-  { view: 'communityHome', label: 'Community' },
+export const STUDIO_VIEW_SECTION_HINT = 'Preview only — not where you build or manage.';
+
+export const STUDIO_VIEW_NAV_ORDER: Array<{ view: StudioChromeView; label: string; hint: string }> = [
+  { view: 'landingView', label: 'Landing', hint: 'Public page preview' },
+  { view: 'communityHome', label: 'Community', hint: 'Follower feed preview' },
 ];
 
 export const STUDIO_CHROME_LABELS: Record<StudioChromeView, string> = {

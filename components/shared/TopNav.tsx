@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -86,13 +86,15 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
               <Calendar className="h-5 w-5" />
             </Link>
 
-            <Link
-              href="/gofast-with-others?view=payouts"
-              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
-              title="Earnings"
+            <Suspense
+              fallback={
+                <span className="p-2 text-gray-600 rounded-lg" aria-hidden>
+                  <Wallet className="h-5 w-5" />
+                </span>
+              }
             >
-              <Wallet className="h-5 w-5" />
-            </Link>
+              <TopNavEarningsLink />
+            </Suspense>
 
             {/* Settings Icon */}
             <Link
@@ -137,6 +139,28 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
         </div>
       </div>
     </header>
+  );
+}
+
+function TopNavEarningsLink() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const active =
+    pathname === '/gofast-with-others' && searchParams.get('view') === 'payouts';
+
+  return (
+    <Link
+      href="/gofast-with-others?view=payouts"
+      className={`p-2 rounded-lg transition ${
+        active
+          ? 'bg-gray-100 text-gray-900'
+          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+      }`}
+      title="Earnings"
+      aria-current={active ? 'page' : undefined}
+    >
+      <Wallet className="h-5 w-5" />
+    </Link>
   );
 }
 

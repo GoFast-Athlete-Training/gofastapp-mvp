@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Eye, type LucideIcon } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
 import {
   STUDIO_BUILD_NAV_ORDER,
   STUDIO_MANAGE_NAV_ORDER,
   STUDIO_MY_STORY_LABEL,
   STUDIO_VIEW_NAV_ORDER,
+  STUDIO_VIEW_SECTION_HINT,
   type ContentEditorFocus,
   type StudioSection,
   type StudioView,
@@ -107,14 +108,19 @@ export default function GoFastWithMeStudioAppShell({
             </div>
 
             <div>
-              <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              <p className="px-2 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
                 View
+              </p>
+              <p className="px-2 pb-1.5 text-[10px] leading-snug text-gray-400">
+                {STUDIO_VIEW_SECTION_HINT}
               </p>
               <div className="space-y-0.5">
                 {STUDIO_VIEW_NAV_ORDER.map((item) => (
                   <SidebarButton
                     key={item.view}
                     label={item.label}
+                    hint={item.hint}
+                    icon={Eye}
                     active={activeView === item.view}
                     onClick={() => onViewChange(item.view)}
                     badge={item.view === 'landingView' && landingNeedsAction ? 'action' : undefined}
@@ -158,7 +164,7 @@ export default function GoFastWithMeStudioAppShell({
               {STUDIO_VIEW_NAV_ORDER.map((item) => (
                 <MobileNavPill
                   key={`m-${item.view}`}
-                  label={item.label}
+                  label={`Preview ${item.label}`}
                   active={activeView === item.view}
                   onClick={() => onViewChange(item.view)}
                   badge={item.view === 'landingView' && landingNeedsAction}
@@ -201,11 +207,15 @@ function MobileNavPill({
 
 function SidebarButton({
   label,
+  hint,
+  icon: Icon,
   active,
   onClick,
   badge,
 }: {
   label: string;
+  hint?: string;
+  icon?: LucideIcon;
   active: boolean;
   onClick: () => void;
   badge?: 'action';
@@ -214,15 +224,19 @@ function SidebarButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium transition-colors ${
+      className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium transition-colors ${
         active
           ? 'bg-orange-50 text-orange-900'
           : 'text-gray-700 hover:bg-gray-100'
       }`}
     >
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {Icon ? <Icon className="h-4 w-4 shrink-0 mt-0.5 opacity-70" aria-hidden /> : null}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">{label}</span>
+        {hint ? <span className="block truncate text-[10px] font-normal text-gray-500">{hint}</span> : null}
+      </span>
       {badge === 'action' ? (
-        <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden />
+        <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500 mt-1.5" aria-hidden />
       ) : null}
     </button>
   );

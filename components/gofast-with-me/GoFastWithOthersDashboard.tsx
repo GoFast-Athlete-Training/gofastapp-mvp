@@ -28,6 +28,7 @@ import GoFastWithMeDashboardHome, {
 import GoFastWithMeStudioAppShell from "@/components/gofast-with-me/GoFastWithMeStudioAppShell";
 import GoFastWithMeStudioExplainer from "@/components/gofast-with-me/GoFastWithMeStudioExplainer";
 import GoFastWithMeProgramGate from "@/components/gofast-with-me/GoFastWithMeProgramGate";
+import TopNav from "@/components/shared/TopNav";
 import {
   dismissStudioIntro,
   readStudioIntroDismissed,
@@ -119,8 +120,11 @@ export default function GoFastWithOthersDashboard() {
       } else {
         setContentFocus(null);
       }
+      if (searchParams.get('view') === 'payouts' && view !== 'payouts') {
+        router.replace('/gofast-with-others');
+      }
     },
-    []
+    [router, searchParams]
   );
 
   const refreshShareHubStatus = useCallback(async () => {
@@ -196,7 +200,12 @@ export default function GoFastWithOthersDashboard() {
 
         const landing = ownerRowToLanding(gwm);
         if (!cancelled) {
-          setActiveView(isWelcomeContentComplete(landing) ? "communityHome" : "page");
+          const openPayouts = searchParams.get('view') === 'payouts';
+          if (openPayouts) {
+            setActiveView('payouts');
+          } else {
+            setActiveView(isWelcomeContentComplete(landing) ? "communityHome" : "page");
+          }
           setLoading(false);
         }
       } catch {
@@ -210,7 +219,7 @@ export default function GoFastWithOthersDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, searchParams]);
 
   const handleDismissStudioIntro = useCallback(() => {
     dismissStudioIntro();
@@ -238,8 +247,30 @@ export default function GoFastWithOthersDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <TopNav />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+        </div>
+      </div>
+    );
+  }
+
+  if (activeView === 'payouts' && athleteId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <TopNav />
+        <main className="flex-1 px-4 sm:px-6 py-6">
+          <div className="max-w-3xl mx-auto space-y-4">
+            <Link
+              href="/gofast-with-others"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900"
+            >
+              ← Back to My Community
+            </Link>
+            <GoFastWithMePayoutsPanel />
+          </div>
+        </main>
       </div>
     );
   }
@@ -393,7 +424,7 @@ export default function GoFastWithOthersDashboard() {
     }
 
     if (activeView === "payouts") {
-      return <GoFastWithMePayoutsPanel />;
+      return null;
     }
 
     switch (activeView) {

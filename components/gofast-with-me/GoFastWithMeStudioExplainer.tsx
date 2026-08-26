@@ -48,7 +48,8 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-violet-800">Tutorial</p>
           <p className="mt-1 text-sm text-violet-950 leading-relaxed">
-            {STUDIO_TUTORIAL_FALLBACK.summary}
+            {STUDIO_TUTORIAL_FALLBACK.summary} Earnings live in the top app bar with Home and
+            Settings — not under View.
           </p>
         </div>
         <button
@@ -74,22 +75,17 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
             const Icon = CHROME_ICONS[item.view];
             const description =
               item.view === 'landingView'
-                ? `${STUDIO_LANDING_LABEL} — preview who you are plus optional highlights.`
-                : `${STUDIO_COMMUNITY_LABEL} — invite, followers, and preview the member feed.`;
+                ? `${STUDIO_LANDING_LABEL} — ${item.hint}. Edit in My Story and Build.`
+                : `${STUDIO_COMMUNITY_LABEL} — ${item.hint}. Invite and moderate from Manage.`;
             return (
               <TutorialRow
                 key={item.view}
                 icon={Icon}
-                label={STUDIO_CHROME_LABELS[item.view]}
+                label={`Preview: ${STUDIO_CHROME_LABELS[item.view]}`}
                 description={description}
               />
             );
           })}
-          <TutorialRow
-            icon={Users}
-            label="Earnings"
-            description="Stripe Connect and sponsorship payouts — in the top app nav, not a viewer."
-          />
         </ul>
       )}
 
