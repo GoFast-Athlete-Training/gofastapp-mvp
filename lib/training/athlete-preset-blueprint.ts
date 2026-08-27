@@ -49,7 +49,6 @@ export function athletePresetBuildStep(row: AthletePresetRowForStep): AthletePre
   if (!progress.cupsConfirmed) return "core";
   if (!row.workoutStructure || !row.longRunConfigId || !row.easyConfigId) return "longRun";
   if (!progress.longRunConfirmed) return "longRun";
-  if (!progress.easyConfirmed) return "easy";
   if (!progress.tempoConfirmed) return "tempo";
   if (!progress.intervalConfirmed) return "interval";
   if (!progress.adjusterConfirmed) return "adjuster";

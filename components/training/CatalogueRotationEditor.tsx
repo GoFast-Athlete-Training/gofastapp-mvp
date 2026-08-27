@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { RotationOrderList } from "@/components/training/RotationOrderList";
 import { CATALOGUE_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
+import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 
 export type CatalogueOption = {
   id: string;
@@ -31,31 +32,42 @@ export function CatalogueRotationEditor({
   const [catalogue, setCatalogue] = useState<CatalogueOption[]>([]);
   const [slots, setSlots] = useState<SlotRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
       setLoading(true);
+      setLoadError(null);
       try {
         const token = await getToken();
         const res = await fetch(
           `/api/workouts/catalogue-browse?workoutType=${encodeURIComponent(workoutType)}`,
-          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+          { headers: token ? athleteBearerFetchHeaders(token) : {} }
         );
-        const data = (await res.json()) as { items?: CatalogueOption[] };
+        const data = (await res.json()) as { items?: CatalogueOption[]; error?: string };
+        if (!res.ok) {
+          throw new Error(data.error ?? "Could not load catalogue");
+        }
         const items = data.items ?? [];
         setCatalogue(items);
         const byId = new Map(items.map((i) => [i.id, i.name]));
-        const seed = initialCatalogueIds.slice(0, CATALOGUE_ROTATION_SLOTS);
-        while (seed.length < CATALOGUE_ROTATION_SLOTS) {
-          seed.push(seed[seed.length - 1] ?? items[0]?.id ?? "");
+        const seed = initialCatalogueIds.filter(Boolean);
+        const slotCount = Math.max(seed.length, CATALOGUE_ROTATION_SLOTS);
+        const ids = seed.slice(0, slotCount);
+        while (ids.length < slotCount) {
+          ids.push(ids[ids.length - 1] ?? items[0]?.id ?? "");
         }
         setSlots(
-          seed.map((catalogueWorkoutId, idx) => ({
+          ids.map((catalogueWorkoutId, idx) => ({
             id: `slot-${idx}`,
             catalogueWorkoutId,
             name: byId.get(catalogueWorkoutId) ?? "Select workout",
           }))
         );
+      } catch (e) {
+        setCatalogue([]);
+        setSlots([]);
+        setLoadError(e instanceof Error ? e.message : "Could not load catalogue");
       } finally {
         setLoading(false);
       }
@@ -90,6 +102,10 @@ export function CatalogueRotationEditor({
 
   if (loading) {
     return <p className="text-sm text-gray-600">Loading catalogue…</p>;
+  }
+
+  if (loadError) {
+    return <p className="text-sm text-red-700">{loadError}</p>;
   }
 
   const rotationItems = slots.map((s) => ({

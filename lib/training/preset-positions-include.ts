@@ -6,6 +6,7 @@
 export const catalogueSelectForGeneration = {
   id: true,
   name: true,
+  description: true,
   workoutType: true,
   slug: true,
   paceAnchor: true,

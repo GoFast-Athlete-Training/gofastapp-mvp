@@ -8,8 +8,6 @@ import { newEntityId } from "@/lib/training/new-entity-id";
 import { reorderPositionRows } from "@/lib/training/reorder-position-rows";
 import { trainingPlanPresetInclude } from "@/lib/training/plan-generate-presets-loader";
 
-import { CATALOGUE_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
-
 type ConfigPositionRow = {
   id: string;
   cyclePosition: number;
@@ -116,24 +114,22 @@ async function remapCloneOrderToSource(params: {
   });
 }
 
-async function ensureAthleteLaneConfig(params: {
+async function upsertAthleteLaneConfig(params: {
   athletePresetId: string;
   kind: "tempo" | "intervals";
   seedCatalogueIds: string[];
 }): Promise<void> {
-  const slots = CATALOGUE_ROTATION_SLOTS;
-  const catalogueIds = params.seedCatalogueIds.slice(0, slots);
-  while (catalogueIds.length < slots) {
-    catalogueIds.push(catalogueIds[catalogueIds.length - 1] ?? catalogueIds[0] ?? "");
-  }
+  const catalogueIds = params.seedCatalogueIds.filter((id) => Boolean(id?.trim()));
+  if (catalogueIds.length === 0) return;
+
+  const slots = catalogueIds.length;
+  const now = new Date();
 
   if (params.kind === "tempo") {
     let config = await prisma.athlete_tempo_config.findUnique({
       where: { athletePresetId: params.athletePresetId },
-      include: { positions: true },
     });
     if (!config) {
-      const now = new Date();
       const configId = newEntityId();
       await prisma.athlete_tempo_config.create({
         data: {
@@ -145,22 +141,41 @@ async function ensureAthleteLaneConfig(params: {
               id: newEntityId(),
               cyclePosition: idx + 1,
               distributionWeight: defaultWeight(slots, idx),
-              catalogueWorkoutId: catalogueWorkoutId || null,
+              catalogueWorkoutId,
               updatedAt: now,
             })),
           },
         },
       });
+      return;
     }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.athlete_tempo_config_position.deleteMany({
+        where: { athleteTempoConfigId: config!.id },
+      });
+      await tx.athlete_tempo_config_position.createMany({
+        data: catalogueIds.map((catalogueWorkoutId, idx) => ({
+          id: newEntityId(),
+          athleteTempoConfigId: config!.id,
+          cyclePosition: idx + 1,
+          distributionWeight: defaultWeight(slots, idx),
+          catalogueWorkoutId,
+          updatedAt: now,
+        })),
+      });
+      await tx.athlete_tempo_config.update({
+        where: { id: config!.id },
+        data: { updatedAt: now },
+      });
+    });
     return;
   }
 
   let config = await prisma.athlete_intervals_config.findUnique({
     where: { athletePresetId: params.athletePresetId },
-    include: { positions: true },
   });
   if (!config) {
-    const now = new Date();
     const configId = newEntityId();
     await prisma.athlete_intervals_config.create({
       data: {
@@ -172,13 +187,34 @@ async function ensureAthleteLaneConfig(params: {
             id: newEntityId(),
             cyclePosition: idx + 1,
             distributionWeight: defaultWeight(slots, idx),
-            catalogueWorkoutId: catalogueWorkoutId || null,
+            catalogueWorkoutId,
             updatedAt: now,
           })),
         },
       },
     });
+    return;
   }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.athlete_intervals_config_position.deleteMany({
+      where: { athleteIntervalsConfigId: config!.id },
+    });
+    await tx.athlete_intervals_config_position.createMany({
+      data: catalogueIds.map((catalogueWorkoutId, idx) => ({
+        id: newEntityId(),
+        athleteIntervalsConfigId: config!.id,
+        cyclePosition: idx + 1,
+        distributionWeight: defaultWeight(slots, idx),
+        catalogueWorkoutId,
+        updatedAt: now,
+      })),
+    });
+    await tx.athlete_intervals_config.update({
+      where: { id: config!.id },
+      data: { updatedAt: now },
+    });
+  });
 }
 
 function catalogueIdsFromPositions(positions: ConfigPositionRow[]): string[] {
@@ -254,21 +290,15 @@ export async function setupAthleteRotationsFromSource(params: {
     });
   }
 
-  const tempoSeed =
-    athlete.tempoConfig?.positions?.length
-      ? catalogueIdsFromPositions(athlete.tempoConfig.positions)
-      : catalogueIdsFromPositions(source.tempoConfig?.positions ?? []);
-  const intervalSeed =
-    athlete.intervalsConfig?.positions?.length
-      ? catalogueIdsFromPositions(athlete.intervalsConfig.positions)
-      : catalogueIdsFromPositions(source.intervalsConfig?.positions ?? []);
+  const tempoSeed = catalogueIdsFromPositions(source.tempoConfig?.positions ?? []);
+  const intervalSeed = catalogueIdsFromPositions(source.intervalsConfig?.positions ?? []);
 
-  await ensureAthleteLaneConfig({
+  await upsertAthleteLaneConfig({
     athletePresetId: params.athletePresetId,
     kind: "tempo",
     seedCatalogueIds: tempoSeed,
   });
-  await ensureAthleteLaneConfig({
+  await upsertAthleteLaneConfig({
     athletePresetId: params.athletePresetId,
     kind: "intervals",
     seedCatalogueIds: intervalSeed,
@@ -473,8 +503,8 @@ export async function reorderAthleteEasyOrder(params: {
 }
 
 function validateRotationSelection(catalogueWorkoutIds: string[]): void {
-  if (catalogueWorkoutIds.length !== CATALOGUE_ROTATION_SLOTS) {
-    throw new Error(`Exactly ${CATALOGUE_ROTATION_SLOTS} workouts required`);
+  if (catalogueWorkoutIds.length === 0) {
+    throw new Error("At least one catalogue workout is required");
   }
   const unique = new Set(catalogueWorkoutIds);
   if (unique.size !== catalogueWorkoutIds.length) {
@@ -500,7 +530,7 @@ export async function saveAthleteTempoSelection(params: {
   }
 
   const now = new Date();
-  const slots = CATALOGUE_ROTATION_SLOTS;
+  const slots = params.orderedCatalogueWorkoutIds.length;
   await prisma.$transaction(async (tx) => {
     await tx.athlete_tempo_config_position.deleteMany({
       where: { athleteTempoConfigId: config.id },
@@ -537,7 +567,7 @@ export async function saveAthleteIntervalsSelection(params: {
   }
 
   const now = new Date();
-  const slots = CATALOGUE_ROTATION_SLOTS;
+  const slots = params.orderedCatalogueWorkoutIds.length;
   await prisma.$transaction(async (tx) => {
     await tx.athlete_intervals_config_position.deleteMany({
       where: { athleteIntervalsConfigId: config.id },
