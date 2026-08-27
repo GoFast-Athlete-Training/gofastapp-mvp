@@ -1440,6 +1440,8 @@ model city_runs {
   locationId          String?              // FK to run_locations (auto-seeded or manually linked)
   routeId             String?              // Optional saved route (reference path + media)
   workoutId           String?              // Optional structured workout for join-my-workout
+  /// Club session prescribe template (athleteId null on linked planned_workouts row).
+  plannedWorkoutId    String?              @unique
   /// Product behavior unlock: CLUB enables check-in, look-back, reminders.
   cityRunType         CityRunType          @default(OTHER)
   city_run_rsvps      city_run_rsvps[]
@@ -1456,7 +1458,8 @@ model city_runs {
   location            run_locations?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
   route               routes?              @relation(fields: [routeId], references: [id], onDelete: SetNull)
   workout             workouts?            @relation(fields: [workoutId], references: [id], onDelete: SetNull)
-  planned_workouts    planned_workouts[]
+  plannedWorkout      planned_workouts?    @relation("CityRunPlannedTemplate", fields: [plannedWorkoutId], references: [id], onDelete: SetNull)
+  planned_workouts    planned_workouts[]   @relation("CityRunPlannedRows")
 
   @@index([athleteGeneratedId])
   @@index([citySlug])
@@ -2392,7 +2395,8 @@ model planned_workouts {
   id                        String              @id @default(cuid())
   title                     String
   workoutType               WorkoutType
-  athleteId                 String
+  /// Null for club session templates on city_runs.plannedWorkoutId.
+  athleteId                 String?
   planId                    String?
   cityRunId                 String?
   /// Frozen course at stamp time. Not a live routes FK. Not a Garmin course id.
@@ -2412,9 +2416,10 @@ model planned_workouts {
   prescriptionNarrative     String?
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
-  Athlete                   Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  Athlete                   Athlete?            @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   training_plans            training_plans?     @relation(fields: [planId], references: [id], onDelete: Cascade)
-  city_run                  city_runs?          @relation(fields: [cityRunId], references: [id], onDelete: SetNull)
+  city_run                  city_runs?          @relation("CityRunPlannedRows", fields: [cityRunId], references: [id], onDelete: SetNull)
+  city_run_template         city_runs?          @relation("CityRunPlannedTemplate")
   workout_catalogue         workout_catalogue?  @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
   segments                  planned_workout_segments[]
   spawned_instances         workouts[]

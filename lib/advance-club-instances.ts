@@ -386,6 +386,15 @@ async function duplicateRunForward(
     },
   });
 
+  try {
+    const { cloneClubPlannedTemplateToRun } = await import(
+      '@/lib/club-planned-workouts/clone-template-on-advance'
+    );
+    await cloneClubPlannedTemplateToRun(prior.id, created.id, targetDate);
+  } catch (e) {
+    console.warn('[advance-club-instances] planned template clone skipped', e);
+  }
+
   return created;
 }
 

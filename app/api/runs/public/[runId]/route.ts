@@ -81,6 +81,27 @@ export async function GET(
           },
         },
       },
+      plannedWorkout: {
+        select: {
+          id: true,
+          title: true,
+          workoutType: true,
+          description: true,
+          segments: {
+            orderBy: { stepOrder: "asc" as const },
+            select: {
+              id: true,
+              stepOrder: true,
+              title: true,
+              durationType: true,
+              durationValue: true,
+              targets: true,
+              repeatCount: true,
+              notes: true,
+            },
+          },
+        },
+      },
     };
 
     let run = await prisma.city_runs.findUnique({ where: { id: segment }, include });
@@ -121,6 +142,7 @@ export async function GET(
         workoutDescription: run.workoutDescription ?? null,
         routeId: run.routeId ?? null,
         workoutId: run.workoutId ?? null,
+        plannedWorkoutId: run.plannedWorkoutId ?? null,
         route: run.route
           ? {
               id: run.route.id,
@@ -143,6 +165,15 @@ export async function GET(
               description: run.workout.description,
               scope: run.workout.scope,
               segments: run.workout.segments ?? [],
+            }
+          : null,
+        plannedWorkout: run.plannedWorkout
+          ? {
+              id: run.plannedWorkout.id,
+              title: run.plannedWorkout.title,
+              workoutType: run.plannedWorkout.workoutType,
+              description: run.plannedWorkout.description,
+              segments: run.plannedWorkout.segments ?? [],
             }
           : null,
         runClub: run.runClub || null,

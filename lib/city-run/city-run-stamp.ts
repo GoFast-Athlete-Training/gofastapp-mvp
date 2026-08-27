@@ -2,6 +2,10 @@ import { WorkoutType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { buildCourseSnapFromRun, courseSnapToJson } from '@/lib/city-run/course-snap';
 import { buildCityRunMatchLabel } from '@/lib/city-run/match-label';
+import {
+  clonePlannedWorkoutForAthlete,
+  resyncAthleteStampFromTemplate,
+} from '@/lib/club-planned-workouts/clone-planned-for-athlete';
 import { pushPlannedWorkoutToGarminForAthlete } from '@/lib/garmin-workouts/push-workout-for-athlete';
 import { ymdFromDate } from '@/lib/training/plan-utils';
 
@@ -23,7 +27,12 @@ export type CityRunStampResult =
 function deriveWorkoutTitle(run: {
   workoutDescription: string | null;
   title: string;
+  runType: string | null;
+  plannedWorkout?: { title: string } | null;
 }): string {
+  if (run.plannedWorkout?.title?.trim()) {
+    return run.plannedWorkout.title.trim();
+  }
   const desc = run.workoutDescription?.trim();
   if (desc) {
     const first = desc.split(/[\n.]/)[0]?.trim();
@@ -32,13 +41,20 @@ function deriveWorkoutTitle(run: {
   const stripped = run.title.replace(/\s*\(\d{1,2}\/\d{1,2}\)\s*$/, '').trim();
   const parts = stripped.split(/\s+/);
   const last = parts[parts.length - 1];
-  if (last && /^(run|tempo|intervals|longrun|easy)$/i.test(last)) {
+  if (last && /^(run|tempo|intervals|longrun|easy|track)$/i.test(last)) {
+    const normalized = last.toLowerCase();
+    if (normalized === 'track') return 'Track';
     return last.charAt(0).toUpperCase() + last.slice(1).toLowerCase();
   }
+  if (run.runType?.trim().toLowerCase() === 'track') return 'Track';
   return 'Run';
 }
 
-async function ensureMinimalSegments(plannedWorkoutId: string, miles: number | null) {
+async function ensureMinimalSegments(
+  plannedWorkoutId: string,
+  miles: number | null,
+  fallbackTitle = 'Run'
+) {
   const count = await prisma.planned_workout_segments.count({
     where: { plannedWorkoutId },
   });
@@ -51,7 +67,7 @@ async function ensureMinimalSegments(plannedWorkoutId: string, miles: number | n
     data: {
       plannedWorkoutId,
       stepOrder: 1,
-      title: 'Run',
+      title: fallbackTitle,
       durationType: 'DISTANCE',
       durationValue: distanceMeters,
       paceTargetEncodingVersion: 2,
@@ -71,6 +87,9 @@ export async function upsertCityRunStampForAthlete(
     where: { id: cityRunId },
     include: {
       runClub: { select: { id: true, slug: true, name: true, matchToken: true } },
+      plannedWorkout: {
+        include: { segments: { orderBy: { stepOrder: 'asc' } } },
+      },
       route: {
         select: {
           id: true,
@@ -91,7 +110,10 @@ export async function upsertCityRunStampForAthlete(
     return { ok: false, code: 'not_club_run', message: 'Not a club run' };
   }
 
+  const template = run.plannedWorkout;
   const workoutTitle = deriveWorkoutTitle(run);
+  const fallbackSegmentTitle =
+    run.runType?.trim().toLowerCase() === 'track' ? 'Track' : workoutTitle;
   const matchLabel = buildCityRunMatchLabel({
     club: run.runClub,
     dayOfWeek: run.dayOfWeek,
@@ -99,6 +121,7 @@ export async function upsertCityRunStampForAthlete(
     workoutTitle,
   });
   const courseSnap = buildCourseSnapFromRun(run, 'city_run_rsvp');
+  const courseJson = courseSnapToJson(courseSnap);
 
   const existingStamp = await prisma.planned_workouts.findFirst({
     where: { athleteId, cityRunId },
@@ -123,23 +146,31 @@ export async function upsertCityRunStampForAthlete(
   let plannedWorkoutId: string;
 
   if (existingStamp) {
-    const updated = await prisma.planned_workouts.update({
-      where: { id: existingStamp.id },
-      data: {
+    plannedWorkoutId = existingStamp.id;
+    if (existingStamp.planId == null && template?.id) {
+      await resyncAthleteStampFromTemplate(existingStamp.id, template.id, {
         date: run.date,
-        courseSnapJson: courseSnapToJson(courseSnap),
+        courseSnapJson: courseJson,
         cityRunMatchLabel: matchLabel,
-        updatedAt: new Date(),
-      },
-    });
-    plannedWorkoutId = updated.id;
+      });
+    } else {
+      await prisma.planned_workouts.update({
+        where: { id: existingStamp.id },
+        data: {
+          date: run.date,
+          courseSnapJson: courseJson,
+          cityRunMatchLabel: matchLabel,
+          updatedAt: new Date(),
+        },
+      });
+    }
   } else if (planDayOnDate) {
     action = 'fulfilled';
     const updated = await prisma.planned_workouts.update({
       where: { id: planDayOnDate.id },
       data: {
         cityRunId,
-        courseSnapJson: courseSnapToJson(courseSnap),
+        courseSnapJson: courseJson,
         cityRunMatchLabel: matchLabel,
         updatedAt: new Date(),
       },
@@ -163,25 +194,54 @@ export async function upsertCityRunStampForAthlete(
       };
     }
 
-    const created = await prisma.planned_workouts.create({
-      data: {
-        title: workoutTitle,
-        workoutType: WorkoutType.Easy,
-        athleteId,
-        planId: null,
+    if (template?.id) {
+      const cloned = await clonePlannedWorkoutForAthlete(template.id, athleteId, {
         cityRunId,
         date: run.date,
-        estimatedDistanceInMeters:
-          run.totalMiles != null ? Math.round(run.totalMiles * 1609.34) : null,
-        courseSnapJson: courseSnapToJson(courseSnap),
+        courseSnapJson: courseJson,
         cityRunMatchLabel: matchLabel,
-        updatedAt: new Date(),
-      },
-    });
-    plannedWorkoutId = created.id;
+      });
+      plannedWorkoutId = cloned.id;
+    } else {
+      const created = await prisma.planned_workouts.create({
+        data: {
+          title: workoutTitle,
+          workoutType:
+            run.runType?.trim().toLowerCase() === 'track'
+              ? WorkoutType.Intervals
+              : WorkoutType.Easy,
+          athleteId,
+          planId: null,
+          cityRunId,
+          date: run.date,
+          estimatedDistanceInMeters:
+            run.totalMiles != null ? Math.round(run.totalMiles * 1609.34) : null,
+          courseSnapJson: courseJson,
+          cityRunMatchLabel: matchLabel,
+          updatedAt: new Date(),
+        },
+      });
+      plannedWorkoutId = created.id;
+      await ensureMinimalSegments(
+        plannedWorkoutId,
+        run.totalMiles,
+        fallbackSegmentTitle
+      );
+    }
   }
 
-  await ensureMinimalSegments(plannedWorkoutId, run.totalMiles);
+  if (!template?.segments?.length) {
+    const segCount = await prisma.planned_workout_segments.count({
+      where: { plannedWorkoutId },
+    });
+    if (segCount === 0) {
+      await ensureMinimalSegments(
+        plannedWorkoutId,
+        run.totalMiles,
+        fallbackSegmentTitle
+      );
+    }
+  }
 
   let garminPush: { ok: boolean; message?: string } | undefined;
   try {

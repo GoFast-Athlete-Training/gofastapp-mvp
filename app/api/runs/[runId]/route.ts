@@ -190,6 +190,7 @@ export async function GET(
         workoutDescription: true,
         directionsText: true,
         workoutId: true,
+        plannedWorkoutId: true,
         locationId: true,
         location: { select: { id: true, name: true } },
         workout: {
@@ -198,6 +199,24 @@ export async function GET(
             title: true,
             workoutType: true,
             description: true,
+            segments: {
+              orderBy: { stepOrder: 'asc' as const },
+              select: {
+                id: true,
+                stepOrder: true,
+                title: true,
+                durationType: true,
+                durationValue: true,
+                repeatCount: true,
+              },
+            },
+          },
+        },
+        plannedWorkout: {
+          select: {
+            id: true,
+            title: true,
+            workoutType: true,
             segments: {
               orderBy: { stepOrder: 'asc' as const },
               select: {
