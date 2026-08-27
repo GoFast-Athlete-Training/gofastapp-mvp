@@ -9,10 +9,6 @@ import { totalWeeksFromDates } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { metersToMiles } from "@/lib/pace-utils";
-import {
-  presetMatchesRaceDistance,
-  raceDistanceForPresetMatch,
-} from "@/lib/training/preset-distance-match";
 import { claimAthleteRace, findAthleteRaceByRegistry } from "@/lib/athlete-races-service";
 import {
   listSecondaryCandidatesForPlan,
@@ -163,15 +159,6 @@ export async function POST(request: NextRequest) {
       if (meters == null || meters <= 0) return null;
       return metersToMiles(meters);
     })();
-    if (raceDistanceMilesForPace == null) {
-      return NextResponse.json(
-        {
-          error:
-            "Confirm your race distance in plan setup before creating a training plan.",
-        },
-        { status: 422 }
-      );
-    }
     const resolvedGoalPace = resolveGoalRacePace({
       goalTime: gt,
       dbGoalRacePaceSecPerMile: terminalAthleteRace.goalRacePace ?? null,
@@ -181,7 +168,9 @@ export async function POST(request: NextRequest) {
     });
     const imprintedGoalPace =
       resolvedGoalPace.goalPaceDisplay ??
-      goalRacePaceDisplayString(gt, raceDistanceMilesForPace);
+      (raceDistanceMilesForPace != null
+        ? goalRacePaceDisplayString(gt, raceDistanceMilesForPace)
+        : null);
 
     const prefs = await prisma.trainingPreferences.findUnique({
       where: { athleteId: athlete.id },
@@ -257,21 +246,6 @@ export async function POST(request: NextRequest) {
       });
       if (!preset) {
         return NextResponse.json({ error: "presetId not found" }, { status: 400 });
-      }
-      const raceDistanceInput = {
-        athleteRaceMeters: terminalAthleteRace.distanceMeters,
-        registryMeters: race.distanceMeters,
-        distanceLabel:
-          terminalAthleteRace.distanceLabel ?? race.distanceLabel ?? null,
-      };
-      const raceDistance = raceDistanceForPresetMatch(raceDistanceInput);
-      if (!presetMatchesRaceDistance(preset.targetDistanceLabel, raceDistanceInput)) {
-        return NextResponse.json(
-          {
-            error: `This training level is built for a ${preset.targetDistanceLabel ?? "specific distance"}. Your goal race${raceDistance.label ? ` (${raceDistance.label})` : ""} does not match.`,
-          },
-          { status: 422 }
-        );
       }
       presetIdResolved = preset.id;
     }
