@@ -683,7 +683,9 @@ export default function TrainingSetupClient() {
     if (opts?.forceReplace) setReplaceGoalAcknowledged(true);
 
     if (!selectedPreset?.id && !selectedAthletePresetId) {
-      setCreateFeedback("preset");
+      setFormError("Pick a training level before continuing.");
+      setCreateFeedback(null);
+      setCreateFeedbackMessage(null);
       return;
     }
 
