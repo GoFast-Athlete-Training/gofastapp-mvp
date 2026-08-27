@@ -45,8 +45,6 @@ import {
   planSharingTitle,
   planTitleRaceMismatch,
 } from "@/lib/training/plan-display-title";
-import { COMMON_RACE_DISTANCE_PRESETS } from "@/lib/training/race-distance-presets";
-import { metersForCanonicalDistanceLabel } from "@/lib/training/race-distance-infer";
 import { resolveGoalRaceMetersInput } from "@/lib/training/resolve-goal-race-meters";
 
 type PlanWeekRow =
@@ -101,18 +99,6 @@ type PlanDetail = {
   } | null;
   training_plan_preset?: PlanPresetSummary | null;
 };
-
-function raceDistanceHelperText(label: string | null | undefined): string | null {
-  const trimmed = label?.trim();
-  if (!trimmed) return null;
-  const preset = COMMON_RACE_DISTANCE_PRESETS.find(
-    (p) => p.label.toLowerCase() === trimmed.toLowerCase()
-  );
-  if (!preset) return null;
-  const mi = preset.meters / 1609.344;
-  const miStr = mi >= 10 ? mi.toFixed(1) : mi.toFixed(2);
-  return `${miStr} mi · ${preset.meters.toLocaleString("en-US")} m`;
-}
 
 const DAY_OPTIONS: { value: number; label: string }[] = [
   { value: 1, label: "Mon" },
@@ -207,10 +193,6 @@ export default function TrainingSetupPlanPage({
   );
   const [archiving, setArchiving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [confirmDistanceSelect, setConfirmDistanceSelect] = useState("");
-  const [distanceConfirmed, setDistanceConfirmed] = useState(true);
-  const [savingAthleteDistance, setSavingAthleteDistance] = useState(false);
-  const [athleteDistanceError, setAthleteDistanceError] = useState<string | null>(null);
   async function getToken() {
     const u = auth.currentUser;
     if (!u) throw new Error("Sign in required");
@@ -421,64 +403,8 @@ export default function TrainingSetupPlanPage({
     });
   }, [plan]);
 
-  const needsDistanceConfirm = !hasSchedule && resolvedGoalDistance.meters == null;
   const goalTimeLabel = plan?.athlete_race?.goalTime?.trim() || null;
   const goalDistanceLine = resolvedGoalDistance.label;
-
-  useEffect(() => {
-    if (!plan) return;
-    setConfirmDistanceSelect(resolvedGoalDistance.label ?? "");
-    setDistanceConfirmed(resolvedGoalDistance.meters != null);
-    setAthleteDistanceError(null);
-  }, [plan?.id, resolvedGoalDistance.meters, resolvedGoalDistance.label]);
-
-  async function saveAthleteRaceDistance(distanceLabel: string) {
-    const athleteRaceId = plan?.athleteRaceId ?? plan?.athlete_race?.id;
-    if (!athleteRaceId || !distanceLabel.trim()) return false;
-    setSavingAthleteDistance(true);
-    setAthleteDistanceError(null);
-    try {
-      const meters = metersForCanonicalDistanceLabel(distanceLabel.trim());
-      const token = await getToken();
-      const res = await fetch(`/api/athlete-races/${encodeURIComponent(athleteRaceId)}`, {
-        method: "PATCH",
-        headers: {
-          ...athleteBearerFetchHeaders(token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          distanceLabel: distanceLabel.trim(),
-          ...(meters != null ? { distanceMeters: meters } : {}),
-        }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setAthleteDistanceError(data.error ?? "Could not save distance");
-        return false;
-      }
-      await loadPlan({ quiet: true });
-      return true;
-    } catch (e) {
-      setAthleteDistanceError(e instanceof Error ? e.message : "Could not save distance");
-      return false;
-    } finally {
-      setSavingAthleteDistance(false);
-    }
-  }
-
-  async function confirmRaceDistance() {
-    const label = confirmDistanceSelect.trim();
-    if (!label) {
-      setAthleteDistanceError("Pick your race distance to continue.");
-      return;
-    }
-    const ok = await saveAthleteRaceDistance(label);
-    if (ok) {
-      setDistanceConfirmed(true);
-      setAthleteDistanceError(null);
-      setError(null);
-    }
-  }
 
   /** Setup form: first-time generate, or user opened "Edit preferences". */
   const inPreferencesSetupMode = !hasSchedule || showPreferencesEditor;
@@ -927,11 +853,6 @@ export default function TrainingSetupPlanPage({
                   {" · "}
                   <span className="font-medium text-gray-800">{goalDistanceLine}</span>
                 </>
-              ) : needsDistanceConfirm ? (
-                <>
-                  {" · "}
-                  <span className="font-medium text-amber-800">Distance not confirmed</span>
-                </>
               ) : null}
               {goalTimeLabel ? (
                 <>
@@ -1195,53 +1116,6 @@ export default function TrainingSetupPlanPage({
 
           {inPreferencesSetupMode && !generating && (
           <div className="mb-6 space-y-6">
-            {needsDistanceConfirm && !distanceConfirmed ? (
-              <div className="space-y-4">
-                <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
-                  <p className="font-medium text-sky-950">Confirm your race distance</p>
-                  <p className="mt-1 text-sky-900/90">
-                    We need this before we can generate your schedule. Pick how far you&apos;re
-                    racing for {plan.race_registry?.name ?? "your goal race"}.
-                  </p>
-                  <label className="mt-4 block text-xs font-medium text-sky-900">
-                    How far are you racing?
-                  </label>
-                  <select
-                    value={confirmDistanceSelect}
-                    disabled={savingAthleteDistance}
-                    onChange={(e) => {
-                      setConfirmDistanceSelect(e.target.value);
-                      setAthleteDistanceError(null);
-                    }}
-                    className="mt-1 w-full max-w-sm rounded-md border border-sky-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                  >
-                    <option value="">Choose distance…</option>
-                    {COMMON_RACE_DISTANCE_PRESETS.map((p) => (
-                      <option key={p.label} value={p.label}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                  {raceDistanceHelperText(confirmDistanceSelect) ? (
-                    <p className="mt-1 text-xs text-sky-800">
-                      {raceDistanceHelperText(confirmDistanceSelect)}
-                    </p>
-                  ) : null}
-                  {athleteDistanceError ? (
-                    <p className="mt-2 text-xs text-red-700">{athleteDistanceError}</p>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  disabled={savingAthleteDistance || !confirmDistanceSelect.trim()}
-                  onClick={() => void confirmRaceDistance()}
-                  className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
-                >
-                  {savingAthleteDistance ? "Saving…" : "Confirm distance & continue"}
-                </button>
-              </div>
-            ) : (
-            <>
             <div className="rounded-xl border border-orange-100 bg-orange-50/80 p-4 text-sm text-gray-800">
               <p className="font-medium text-gray-900">
                 {hasSchedule ? "Edit weekly miles & training days" : "Choose your training preferences"}
@@ -1540,8 +1414,6 @@ export default function TrainingSetupPlanPage({
             </button>
 
             {error && <p className="text-sm text-red-600">{error}</p>}
-            </>
-            )}
           </div>
           )}
 

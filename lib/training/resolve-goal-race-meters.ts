@@ -45,18 +45,16 @@ export function resolveGoalRaceMetersInput(race: GoalRaceMetersInput): {
   return { meters, label };
 }
 
-/** Throws when distance cannot be resolved; persists snapshot meters when inferred from registry/label. */
-export async function ensureGoalRaceMetersForGenerate(params: {
+/** Best-effort: resolve meters, persist when inferred; returns null when unknown (generate still proceeds). */
+export async function resolveGoalRaceMetersForGenerate(params: {
   athleteId: string;
   race: GoalRaceMetersInput;
-}): Promise<number> {
+}): Promise<number | null> {
   const { athleteId, race } = params;
   const resolved = resolveGoalRaceMetersInput(race);
   const meters = resolved.meters;
   if (meters == null || meters <= 0) {
-    throw new Error(
-      "Your goal race needs a confirmed distance before we can generate a schedule. Pick how far you're racing below, then try again."
-    );
+    return null;
   }
 
   const stored =
@@ -73,3 +71,6 @@ export async function ensureGoalRaceMetersForGenerate(params: {
   }
   return meters;
 }
+
+/** @deprecated use resolveGoalRaceMetersForGenerate */
+export const ensureGoalRaceMetersForGenerate = resolveGoalRaceMetersForGenerate;

@@ -42,7 +42,7 @@ import {
   persistPlanRaceSnapshots,
   resolvePlanRaceCalendar,
 } from "@/lib/training/race-plan-calendar-service";
-import { ensureGoalRaceMetersForGenerate } from "@/lib/training/resolve-goal-race-meters";
+import { resolveGoalRaceMetersForGenerate } from "@/lib/training/resolve-goal-race-meters";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -177,7 +177,7 @@ export async function executePlanGenerate(params: {
         : [1, 2, 3, 4, 5, 6];
 
   const weekCount = calendarTrainingWeekCount(plan.startDate, race.raceDate);
-  const raceMeters = await ensureGoalRaceMetersForGenerate({
+  const raceMeters = await resolveGoalRaceMetersForGenerate({
     athleteId,
     race: {
       id: race.id,
@@ -187,7 +187,9 @@ export async function executePlanGenerate(params: {
       race_registry: race.race_registry,
     },
   });
-  const raceDistanceMiles = metersToMiles(raceMeters);
+  /** Long-run volume comes from peak cup; distance only stamps race-day miles and goal pace. */
+  const raceDistanceMiles =
+    raceMeters != null && raceMeters > 0 ? metersToMiles(raceMeters) : 0;
 
   const cLen = LONG_RUN_BLOCK_WEEKS;
 
@@ -365,7 +367,7 @@ export async function executePlanGenerate(params: {
   });
   const imprintPace =
     resolvedGoalPace.goalPaceDisplay ??
-    (mergedGoalTime != null
+    (mergedGoalTime != null && raceDistanceMiles > 0
       ? goalRacePaceDisplayString(mergedGoalTime, raceDistanceMiles)
       : null);
 
