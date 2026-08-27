@@ -12,6 +12,7 @@ import {
   cloneRotationsFromSourcePreset,
   seedWorkoutBlueprintFromSource,
   setupAthleteRotationsFromSource,
+  syncAthletePresetFromSourceIfStale,
 } from "@/lib/training/clone-preset-configs";
 import { deleteAthletePresetForAthlete } from "@/lib/training/delete-athlete-preset";
 import {
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
     const { id } = await params;
+    await syncAthletePresetFromSourceIfStale({ athletePresetId: id });
     const row = await loadOwnedPreset(auth.athlete.id, id);
     if (!row) {
       return NextResponse.json({ error: "Athlete preset not found" }, { status: 404 });
@@ -70,9 +72,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
     const { id } = await params;
-    const existing = await loadOwnedPreset(auth.athlete.id, id);
+    let existing = await loadOwnedPreset(auth.athlete.id, id);
     if (!existing) {
       return NextResponse.json({ error: "Athlete preset not found" }, { status: 404 });
+    }
+
+    if (existing.sourcePresetId) {
+      const synced = await syncAthletePresetFromSourceIfStale({ athletePresetId: id });
+      if (synced) {
+        existing = (await loadOwnedPreset(auth.athlete.id, id)) ?? existing;
+      }
     }
 
     const body = (await request.json()) as Record<string, unknown>;

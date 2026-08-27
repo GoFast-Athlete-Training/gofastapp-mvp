@@ -69,6 +69,25 @@ function athleteLaneAsCatalogConfig(
   } as LoadedPresetInclude["tempoConfig"];
 }
 
+function qualityLanePositions(
+  athleteLane:
+    | {
+        positions: Array<{
+          id: string;
+          cyclePosition: number;
+          distributionWeight: number;
+          catalogueWorkoutId: string | null;
+          workout_catalogue?: unknown;
+        }>;
+      }
+    | null
+    | undefined,
+  legacyConfig: { positions: PositionWithCatalogue[] } | null | undefined
+): PositionWithCatalogue[] | undefined {
+  if (athleteLane?.positions?.length) return athleteLane.positions;
+  return legacyConfig?.positions;
+}
+
 export function resolveAthletePresetRotations(
   row: LoadedAthletePresetInclude & {
     longRunOrders?: Array<{
@@ -76,6 +95,8 @@ export function resolveAthletePresetRotations(
       longRunConfigPositionId: string;
     }>;
     easyOrders?: Array<{ cyclePosition: number; easyConfigPositionId: string }>;
+    tempoConfig?: { name?: string; positions: PositionWithCatalogue[] } | null;
+    intervalsConfig?: { name?: string; positions: PositionWithCatalogue[] } | null;
     athleteTempoConfig?: {
       positions: Array<{
         id: string;
@@ -122,12 +143,16 @@ export function resolveAthletePresetRotations(
     : null;
 
   const tempoConfig = athleteLaneAsCatalogConfig(
-    row.athleteTempoConfig?.positions,
-    "Athlete tempo"
+    qualityLanePositions(row.athleteTempoConfig, row.tempoConfig),
+    row.athleteTempoConfig?.positions?.length
+      ? "Athlete tempo"
+      : row.tempoConfig?.name ?? "Tempo"
   );
   const intervalsConfig = athleteLaneAsCatalogConfig(
-    row.athleteIntervalsConfig?.positions,
-    "Athlete intervals"
+    qualityLanePositions(row.athleteIntervalsConfig, row.intervalsConfig),
+    row.athleteIntervalsConfig?.positions?.length
+      ? "Athlete intervals"
+      : row.intervalsConfig?.name ?? "Intervals"
   ) as LoadedPresetInclude["intervalsConfig"];
 
   return { longRunConfig, easyConfig, tempoConfig, intervalsConfig };

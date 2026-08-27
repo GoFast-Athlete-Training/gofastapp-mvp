@@ -84,3 +84,38 @@ export async function seedWorkoutBlueprintFromSource(params: {
     },
   });
 }
+
+/** Backfill athlete-owned quality lanes when resuming legacy presets. */
+export async function syncAthletePresetFromSourceIfStale(params: {
+  athletePresetId: string;
+}): Promise<boolean> {
+  const athlete = await prisma.athlete_presets.findUnique({
+    where: { id: params.athletePresetId },
+    select: {
+      sourcePresetId: true,
+      workoutStructure: true,
+      athleteTempoConfig: { select: { id: true } },
+      athleteIntervalsConfig: { select: { id: true } },
+    },
+  });
+  if (!athlete?.sourcePresetId) return false;
+
+  const needsBlueprint = athlete.workoutStructure == null;
+  const needsQuality =
+    athlete.athleteTempoConfig == null || athlete.athleteIntervalsConfig == null;
+  if (!needsBlueprint && !needsQuality) return false;
+
+  if (needsBlueprint) {
+    await seedWorkoutBlueprintFromSource({
+      athletePresetId: params.athletePresetId,
+      sourcePresetId: athlete.sourcePresetId,
+    });
+  }
+  if (needsQuality) {
+    await setupAthleteRotationsFromSource({
+      athletePresetId: params.athletePresetId,
+      sourcePresetId: athlete.sourcePresetId,
+    });
+  }
+  return true;
+}

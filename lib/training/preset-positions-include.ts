@@ -30,6 +30,8 @@ export const positionsInclude = {
 export const athletePresetRotationInclude = {
   longRunConfig: { include: { positions: positionsInclude } },
   easyConfig: { include: { positions: positionsInclude } },
+  tempoConfig: { include: { positions: positionsInclude } },
+  intervalsConfig: { include: { positions: positionsInclude } },
   longRunOrders: { orderBy: { cyclePosition: "asc" as const } },
   easyOrders: { orderBy: { cyclePosition: "asc" as const } },
   athleteTempoConfig: {
