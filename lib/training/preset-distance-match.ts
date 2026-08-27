@@ -1,4 +1,8 @@
 import { COMMON_RACE_DISTANCE_PRESETS } from "@/lib/training/race-distance-presets";
+import {
+  canonicalDistanceLabelFromText,
+  inferDistanceLabelFromRaceName,
+} from "@/lib/training/race-distance-infer";
 
 const SNAP_TOLERANCE_M = 300;
 
@@ -23,13 +27,14 @@ export function parseTargetDistanceLabelFromBody(body: Record<string, unknown>):
   }
   const t = v.trim();
   if (!t) return { ok: true, value: null };
-  if (!ALLOWED_TARGET_LABELS.has(t)) {
+  const canonical = canonicalDistanceLabelFromText(t);
+  if (!canonical) {
     return {
       ok: false,
       error: `targetDistanceLabel must be one of: ${[...ALLOWED_TARGET_LABELS].sort().join(", ")}`,
     };
   }
-  return { ok: true, value: t };
+  return { ok: true, value: canonical };
 }
 
 /** Returns the canonical label for distanceMeters (e.g. 42195 → "Marathon"). */
@@ -59,22 +64,24 @@ export function resolveRaceDistanceMeters(
   return finiteMeters(registryMeters);
 }
 
-/** Snap meters to a canonical label; fall back to a known distanceLabel when meters are absent or non-standard. */
+/** Snap meters, canonical label, aliases, then race-name hint. */
 export function resolveRaceDistanceLabel(
   meters: number | null | undefined,
-  distanceLabel: string | null | undefined
+  distanceLabel: string | null | undefined,
+  raceName?: string | null
 ): string | null {
   const snapped = snapDistanceLabelFromMeters(meters);
   if (snapped) return snapped;
-  const label = distanceLabel?.trim();
-  if (label && ALLOWED_TARGET_LABELS.has(label)) return label;
-  return null;
+  const fromLabel = canonicalDistanceLabelFromText(distanceLabel);
+  if (fromLabel) return fromLabel;
+  return inferDistanceLabelFromRaceName(raceName);
 }
 
 export type RaceDistanceMatchInput = {
   athleteRaceMeters?: number | null;
   registryMeters?: number | null;
   distanceLabel?: string | null;
+  raceName?: string | null;
 };
 
 /** Canonical race distance for preset filtering and create-plan validation. */
@@ -86,7 +93,7 @@ export function raceDistanceForPresetMatch(input: RaceDistanceMatchInput): {
     input.athleteRaceMeters,
     input.registryMeters
   );
-  const label = resolveRaceDistanceLabel(meters, input.distanceLabel);
+  const label = resolveRaceDistanceLabel(meters, input.distanceLabel, input.raceName);
   return { meters, label };
 }
 
@@ -94,10 +101,11 @@ export function raceDistanceForPresetMatch(input: RaceDistanceMatchInput): {
 export function presetMatchesDistance(
   presetLabel: string | null | undefined,
   raceMeters: number | null | undefined,
-  distanceLabel?: string | null
+  distanceLabel?: string | null,
+  raceName?: string | null
 ): boolean {
   if (!presetLabel?.trim()) return true;
-  const raceLabel = resolveRaceDistanceLabel(raceMeters, distanceLabel);
+  const raceLabel = resolveRaceDistanceLabel(raceMeters, distanceLabel, raceName);
   return raceLabel === presetLabel.trim();
 }
 
@@ -107,5 +115,5 @@ export function presetMatchesRaceDistance(
   input: RaceDistanceMatchInput
 ): boolean {
   const { meters, label } = raceDistanceForPresetMatch(input);
-  return presetMatchesDistance(presetLabel, meters, label);
+  return presetMatchesDistance(presetLabel, meters, label, input.raceName);
 }

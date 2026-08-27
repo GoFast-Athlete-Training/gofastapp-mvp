@@ -4,6 +4,10 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import {
+  canonicalDistanceLabelFromText,
+  metersForCanonicalDistanceLabel,
+} from "@/lib/training/race-distance-infer";
 
 const registrySelectForClaim = {
   id: true,
@@ -46,6 +50,8 @@ export type SerializedAthleteRace = AthleteRaceRow & {
     country: string | null;
     registrationUrl: string | null;
     startTime: string | null;
+    distanceMeters: number | null;
+    distanceLabel: string | null;
   } | null;
 };
 
@@ -116,6 +122,8 @@ export async function claimAthleteRace(params: {
           country: true,
           registrationUrl: true,
           startTime: true,
+          distanceMeters: true,
+          distanceLabel: true,
         },
       },
     },
@@ -136,6 +144,8 @@ export async function listAthleteRaces(athleteId: string): Promise<SerializedAth
           country: true,
           registrationUrl: true,
           startTime: true,
+          distanceMeters: true,
+          distanceLabel: true,
         },
       },
     },
@@ -158,6 +168,8 @@ export async function getAthleteRaceForAthlete(
           country: true,
           registrationUrl: true,
           startTime: true,
+          distanceMeters: true,
+          distanceLabel: true,
         },
       },
     },
@@ -187,6 +199,46 @@ export async function findAthleteRaceByRegistry(params: {
       athleteId_raceRegistryId: {
         athleteId: params.athleteId,
         raceRegistryId: params.raceRegistryId,
+      },
+    },
+  });
+}
+
+/** Athlete sets or corrects working-set race distance (e.g. stub race missing catalog meta). */
+export async function updateAthleteRaceDistance(params: {
+  athleteId: string;
+  athleteRaceId: string;
+  distanceLabel: string;
+}): Promise<SerializedAthleteRace | null> {
+  const canonical = canonicalDistanceLabelFromText(params.distanceLabel);
+  if (!canonical) {
+    throw new Error("Pick a standard race distance");
+  }
+  const meters = metersForCanonicalDistanceLabel(canonical);
+
+  const existing = await getAthleteRaceForAthlete(params.athleteId, params.athleteRaceId);
+  if (!existing) return null;
+
+  return prisma.athlete_races.update({
+    where: { id: existing.id },
+    data: {
+      distanceLabel: canonical,
+      distanceMeters: meters,
+      goalDistance: canonical.toLowerCase().replace(/\s+/g, "-"),
+      updatedAt: new Date(),
+    },
+    include: {
+      race_registry: {
+        select: {
+          id: true,
+          slug: true,
+          logoUrl: true,
+          country: true,
+          registrationUrl: true,
+          startTime: true,
+          distanceMeters: true,
+          distanceLabel: true,
+        },
       },
     },
   });

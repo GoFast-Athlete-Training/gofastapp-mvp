@@ -16,7 +16,19 @@ test("resolveRaceDistanceMeters prefers athlete snapshot over registry", () => {
 test("resolveRaceDistanceLabel snaps meters before label fallback", () => {
   assert.equal(resolveRaceDistanceLabel(42195, "Half Marathon"), "Marathon");
   assert.equal(resolveRaceDistanceLabel(null, "Half Marathon"), "Half Marathon");
+  assert.equal(resolveRaceDistanceLabel(null, "26.2 mi"), "Marathon");
   assert.equal(resolveRaceDistanceLabel(null, "Custom 10 miler"), null);
+});
+
+test("resolveRaceDistanceLabel uses race name when label and meters missing", () => {
+  assert.equal(
+    resolveRaceDistanceLabel(null, null, "Boulderthon Marathon"),
+    "Marathon"
+  );
+  assert.equal(
+    resolveRaceDistanceLabel(null, null, "DC Half Marathon"),
+    "Half Marathon"
+  );
 });
 
 test("raceDistanceForPresetMatch uses athlete snapshot then label fallback", () => {
@@ -35,8 +47,21 @@ test("presetMatchesRaceDistance rejects labeled preset when distance unknown", (
       athleteRaceMeters: null,
       registryMeters: null,
       distanceLabel: null,
+      raceName: null,
     }),
     false
+  );
+});
+
+test("presetMatchesRaceDistance accepts marathon preset from race name hint", () => {
+  assert.equal(
+    presetMatchesRaceDistance("Marathon", {
+      athleteRaceMeters: null,
+      registryMeters: null,
+      distanceLabel: null,
+      raceName: "Boulderthon Marathon",
+    }),
+    true
   );
 });
 
@@ -46,6 +71,7 @@ test("presetMatchesRaceDistance accepts any-distance preset when distance unknow
       athleteRaceMeters: null,
       registryMeters: null,
       distanceLabel: null,
+      raceName: null,
     }),
     true
   );

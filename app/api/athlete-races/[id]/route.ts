@@ -10,6 +10,7 @@ import {
   getAthleteRaceById,
   removeAthleteRaceWithSideEffects,
 } from "@/lib/athlete-race-claim";
+import { updateAthleteRaceDistance } from "@/lib/athlete-races-service";
 
 async function athleteFromRequest(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -51,7 +52,7 @@ export async function GET(
   }
 }
 
-/** PATCH /api/athlete-races/[id] — mark/unmark Goal race */
+/** PATCH /api/athlete-races/[id] — mark/unmark Goal race, or set race distance */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -67,6 +68,20 @@ export async function PATCH(
 
     const body = await request.json().catch(() => ({}));
     const isPrimaryRace = body.isPrimaryRace;
+    const distanceLabel =
+      typeof body.distanceLabel === "string" ? body.distanceLabel.trim() : "";
+
+    if (distanceLabel) {
+      const athleteRace = await updateAthleteRaceDistance({
+        athleteId: athlete!.id,
+        athleteRaceId: id,
+        distanceLabel,
+      });
+      if (!athleteRace) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      return NextResponse.json({ athleteRace, signup: athleteRace });
+    }
 
     if (isPrimaryRace === true) {
       const athleteRace = await setPrimaryAthleteRace({
@@ -85,7 +100,7 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { error: "isPrimaryRace true or false is required" },
+      { error: "distanceLabel or isPrimaryRace true/false is required" },
       { status: 400 }
     );
   } catch (err: unknown) {

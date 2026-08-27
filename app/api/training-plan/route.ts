@@ -244,6 +244,7 @@ export async function POST(request: NextRequest) {
         registryMeters: race.distanceMeters,
         distanceLabel:
           terminalAthleteRace.distanceLabel ?? race.distanceLabel ?? null,
+        raceName: terminalAthleteRace.name ?? race.name ?? null,
       };
       const raceDistance = raceDistanceForPresetMatch(raceDistanceInput);
       if (!presetMatchesRaceDistance(preset.targetDistanceLabel, raceDistanceInput)) {
