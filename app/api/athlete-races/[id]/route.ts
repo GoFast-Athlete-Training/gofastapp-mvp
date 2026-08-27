@@ -70,12 +70,20 @@ export async function PATCH(
     const isPrimaryRace = body.isPrimaryRace;
     const distanceLabel =
       typeof body.distanceLabel === "string" ? body.distanceLabel.trim() : "";
+    const distanceMetersRaw = body.distanceMeters;
+    const distanceMeters =
+      distanceMetersRaw != null &&
+      Number.isFinite(Number(distanceMetersRaw)) &&
+      Number(distanceMetersRaw) > 0
+        ? Math.round(Number(distanceMetersRaw))
+        : null;
 
-    if (distanceLabel) {
+    if (distanceLabel || distanceMeters != null) {
       const athleteRace = await updateAthleteRaceDistance({
         athleteId: athlete!.id,
         athleteRaceId: id,
-        distanceLabel,
+        ...(distanceMeters != null ? { distanceMeters } : {}),
+        ...(distanceLabel ? { distanceLabel } : {}),
       });
       if (!athleteRace) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -100,7 +108,7 @@ export async function PATCH(
     }
 
     return NextResponse.json(
-      { error: "distanceLabel or isPrimaryRace true/false is required" },
+      { error: "distanceMeters, distanceLabel, or isPrimaryRace true/false is required" },
       { status: 400 }
     );
   } catch (err: unknown) {

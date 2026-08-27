@@ -8,17 +8,22 @@
 
 import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
-import { longRunCupSetter } from "@/lib/training/long-run-cup-setter";
+import {
+  longRunCupSetter,
+  type LongRunFitnessPhase,
+} from "@/lib/training/long-run-cup-setter";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
-import { weekCycleMeta } from "@/lib/training/cycle-blocks";
 
 export type ApplyLongRunInput = {
   planSchedule: PlanWeekSchedule[];
   totalWeeks: number;
   longRunCycleWeeks?: number;
-  baseLongRunPoolMiles: number;
   peakLongRunPoolMiles: number;
-  taperLongRunPoolMiles: number;
+  fitnessPhase?: LongRunFitnessPhase;
+  /** @deprecated ignored — peak-only cup service */
+  baseLongRunPoolMiles?: number;
+  /** @deprecated ignored — peak-only cup service */
+  taperLongRunPoolMiles?: number;
   /** Sum of preset distributionWeights need not equal 1; we normalize inside the macro block */
   longRunPositions: readonly RunTypePosition[];
 };
@@ -32,17 +37,16 @@ function sortedPos(positions: readonly RunTypePosition[]): RunTypePosition[] {
 }
 
 /**
- * Per-week share of the macro-cycle long-run pool. Weights must renormalize over the
- * `cycleLen` weeks in the block so that Σ (pool × norm_k) === pool (rotation can have more
- * slots than cycleLen — previously we divided by full rotation sum and under-filled the pool).
+ * Per-week share of the macro-cycle long-run pool. Weights renormalize over the
+ * actual calendar weeks in this block (1–4), not always 4.
  */
 function weightNormInMacroBlock(
   positions: readonly RunTypePosition[],
   cyclePos: number,
-  longRunCycleWeeks: number
+  weeksInThisCycle: number
 ): { catalogueWorkoutId: string | null; weightNorm: number } {
   const rows = sortedPos(positions);
-  const len = Math.max(1, Math.floor(longRunCycleWeeks));
+  const len = Math.max(1, Math.floor(weeksInThisCycle));
   if (rows.length === 0) {
     return {
       catalogueWorkoutId: null,
@@ -56,8 +60,7 @@ function weightNormInMacroBlock(
   }
   const r = rows[cyclePos % rows.length];
   const wi = Math.max(0, Number(r.distributionWeight) || 0);
-  const norm =
-    blockWeightSum > 0 ? wi / blockWeightSum : 1 / len;
+  const norm = blockWeightSum > 0 ? wi / blockWeightSum : 1 / len;
   return {
     catalogueWorkoutId: r.catalogueWorkoutId ?? null,
     weightNorm: norm,
@@ -70,31 +73,31 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     planSchedule,
     totalWeeks,
     longRunCycleWeeks: cycleWeeksIn,
-    baseLongRunPoolMiles,
     peakLongRunPoolMiles,
-    taperLongRunPoolMiles,
+    fitnessPhase,
     longRunPositions,
   } = input;
   const len = Math.max(1, Math.floor(cycleWeeksIn ?? LONG_RUN_BLOCK_WEEKS));
-  const { poolMilesByCycle, nCycles } = longRunCupSetter({
+  const { poolMilesByCycle, nCycles, weeksInCycle } = longRunCupSetter({
     totalWeeks,
     longRunCycleWeeks: len,
-    baseLongRunPoolMiles,
     peakLongRunPoolMiles,
-    taperLongRunPoolMiles,
+    fitnessPhase,
   });
 
   for (const week of planSchedule) {
     const wn = week.weekNumber;
-    const { cyclePos } = weekCycleMeta({ weekNumber: wn, totalWeeks, longRunCycleWeeks: len });
     const cycleIdx = Math.min(nCycles - 1, Math.floor((wn - 1) / len));
+    const weeksInBlock = weeksInCycle[cycleIdx] ?? len;
+    const cyclePos = (wn - 1) % len;
+    if (cyclePos >= weeksInBlock) continue;
+
     const macroPool = poolMilesByCycle[cycleIdx] ?? 0;
     const { weightNorm, catalogueWorkoutId } = weightNormInMacroBlock(
       longRunPositions,
       cyclePos,
-      len
+      weeksInBlock
     );
-    // Pool × weight IS the long run — no cap, no ramp.
     const lrMi = round1(macroPool * weightNorm);
 
     for (const d of week.days) {

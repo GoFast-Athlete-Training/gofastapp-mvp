@@ -12,9 +12,14 @@ import { raceCalendarBeforeTodayUtc } from "@/lib/training/plan-utils";
 import {
   presetMatchesRaceDistance,
   raceDistanceForPresetMatch,
+  resolveRaceDistanceMeters,
   snapDistanceLabelFromMeters,
 } from "@/lib/training/preset-distance-match";
 import { COMMON_RACE_DISTANCE_PRESETS } from "@/lib/training/race-distance-presets";
+import {
+  inferDistanceLabelFromRaceName,
+  metersForCanonicalDistanceLabel,
+} from "@/lib/training/race-distance-infer";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import { AthletePresetBuilder } from "@/components/training/AthletePresetBuilder";
 import { InlineGoalForm, type InlineGoalRow } from "@/components/races/InlineGoalForm";
@@ -111,6 +116,17 @@ function buildFiveKPaceFromParts(minStr: string, secStr: string): string | null 
   return `${Math.round(min)}:${String(Math.round(sec)).padStart(2, "0")}`;
 }
 
+function raceDistanceHelperText(label: string | null | undefined): string | null {
+  const trimmed = label?.trim();
+  if (!trimmed) return null;
+  const preset = COMMON_RACE_DISTANCE_PRESETS.find(
+    (p) => p.label.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (!preset) return null;
+  const mi = preset.meters / 1609.344;
+  const miStr = mi >= 10 ? mi.toFixed(1) : mi.toFixed(2);
+  return `${miStr} mi · ${preset.meters.toLocaleString("en-US")} m`;
+}
 function formatRaceWhen(iso: string): string {
   try {
     const d = new Date(iso);
@@ -297,6 +313,9 @@ export default function TrainingSetupClient() {
   } | null>(null);
   const [savingAthleteDistance, setSavingAthleteDistance] = useState(false);
   const [athleteDistanceError, setAthleteDistanceError] = useState<string | null>(null);
+  /** Athlete must confirm distance every setup — pre-filled from snapshot/registry/name hint. */
+  const [distanceConfirmed, setDistanceConfirmed] = useState(false);
+  const [confirmDistanceSelect, setConfirmDistanceSelect] = useState("");
 
   const qualifyingGoals = useMemo(() => goals.filter(isQualifyingGoal), [goals]);
 
@@ -315,7 +334,6 @@ export default function TrainingSetupClient() {
       athleteRaceMeters: ar.distanceMeters ?? null,
       registryMeters: wizardRegistryDistance?.distanceMeters ?? null,
       distanceLabel: ar.distanceLabel ?? wizardRegistryDistance?.distanceLabel ?? null,
-      raceName: ar.name ?? null,
     };
   }, [wizardGoal?.athlete_race, wizardRegistryDistance]);
 
@@ -324,31 +342,20 @@ export default function TrainingSetupClient() {
     return raceDistanceForPresetMatch(raceDistanceMatchInput);
   }, [raceDistanceMatchInput]);
 
-  /** Presets that match the resolved goal distance (when known). */
+  /** Presets that match confirmed race distance meters. */
   const preferredPresetsForWizardGoal = useMemo(() => {
-    if (!raceDistanceMatchInput || !resolvedGoalDistance.label) return [];
+    if (!raceDistanceMatchInput || !distanceConfirmed || resolvedGoalDistance.meters == null) {
+      return [];
+    }
     return prodPresets.filter((p) =>
       presetMatchesRaceDistance(p.targetDistanceLabel, raceDistanceMatchInput)
     );
-  }, [prodPresets, raceDistanceMatchInput, resolvedGoalDistance.label]);
+  }, [prodPresets, raceDistanceMatchInput, resolvedGoalDistance.meters, distanceConfirmed]);
 
-  /** Never empty-gate: show matching presets when known, otherwise the full catalog. */
   const catalogPresetsForWizardGoal = useMemo(() => {
-    if (resolvedGoalDistance.label && preferredPresetsForWizardGoal.length > 0) {
-      return preferredPresetsForWizardGoal;
-    }
-    return prodPresets;
-  }, [prodPresets, preferredPresetsForWizardGoal, resolvedGoalDistance.label]);
-
-  const distanceNeedsAthleteConfirm = useMemo(() => {
-    const ar = wizardGoal?.athlete_race;
-    if (!ar) return false;
-    const hasSnapshot =
-      (ar.distanceLabel != null && ar.distanceLabel.trim() !== "") ||
-      (ar.distanceMeters != null && Number.isFinite(Number(ar.distanceMeters)));
-    if (hasSnapshot) return false;
-    return resolvedGoalDistance.label == null;
-  }, [wizardGoal?.athlete_race, resolvedGoalDistance.label]);
+    if (!distanceConfirmed) return [];
+    return preferredPresetsForWizardGoal;
+  }, [preferredPresetsForWizardGoal, distanceConfirmed]);
 
   const futureSignups = useMemo(
     () =>
@@ -512,7 +519,24 @@ export default function TrainingSetupClient() {
   }, [ready, loadOrientation]);
 
   useEffect(() => {
+    if (!ready || loadingOrientation || !athleteRaceIdFromUrl) return;
+    const existingPlan = activePlans.find(
+      (p) =>
+        p.lifecycleStatus === "ACTIVE" && p.athleteRaceId === athleteRaceIdFromUrl
+    );
+    if (existingPlan) {
+      router.replace(`/training-setup/${existingPlan.id}`);
+    }
+  }, [ready, loadingOrientation, athleteRaceIdFromUrl, activePlans, router]);
+
+  useEffect(() => {
     if (!ready || loadingOrientation || !athleteRaceIdFromUrl || wizardGoal) return;
+
+    const existingPlan = activePlans.find(
+      (p) =>
+        p.lifecycleStatus === "ACTIVE" && p.athleteRaceId === athleteRaceIdFromUrl
+    );
+    if (existingPlan) return;
 
     const fromGoals = goals.find(
       (g) => g.id === athleteRaceIdFromUrl || g.athleteRaceId === athleteRaceIdFromUrl
@@ -549,7 +573,36 @@ export default function TrainingSetupClient() {
     return () => {
       cancelled = true;
     };
-  }, [ready, loadingOrientation, athleteRaceIdFromUrl, goals, signups, wizardGoal]);
+  }, [ready, loadingOrientation, athleteRaceIdFromUrl, goals, signups, wizardGoal, activePlans]);
+
+  useEffect(() => {
+    const ar = wizardGoal?.athlete_race;
+    if (!ar) {
+      setConfirmDistanceSelect("");
+      return;
+    }
+    const meters = resolveRaceDistanceMeters(
+      ar.distanceMeters,
+      wizardRegistryDistance?.distanceMeters
+    );
+    let label = snapDistanceLabelFromMeters(meters);
+    if (!label) {
+      label =
+        snapDistanceLabelFromMeters(
+          metersForCanonicalDistanceLabel(
+            ar.distanceLabel ?? wizardRegistryDistance?.distanceLabel ?? ""
+          )
+        ) ??
+        ar.distanceLabel ??
+        wizardRegistryDistance?.distanceLabel ??
+        null;
+    }
+    if (!label && ar.name) {
+      label = inferDistanceLabelFromRaceName(ar.name);
+    }
+    setConfirmDistanceSelect(label ?? "");
+    setDistanceConfirmed(false);
+  }, [wizardGoal?.id, wizardGoal?.athlete_race, wizardRegistryDistance]);
 
   useEffect(() => {
     if (!ready || !wizardGoal?.athleteRaceId) {
@@ -593,10 +646,11 @@ export default function TrainingSetupClient() {
 
   async function saveAthleteRaceDistance(distanceLabel: string) {
     const athleteRaceId = wizardGoal?.athleteRaceId ?? wizardGoal?.id;
-    if (!athleteRaceId || !distanceLabel.trim()) return;
+    if (!athleteRaceId || !distanceLabel.trim()) return false;
     setSavingAthleteDistance(true);
     setAthleteDistanceError(null);
     try {
+      const meters = metersForCanonicalDistanceLabel(distanceLabel.trim());
       const token = await getToken();
       const res = await fetch(`/api/athlete-races/${encodeURIComponent(athleteRaceId)}`, {
         method: "PATCH",
@@ -604,7 +658,10 @@ export default function TrainingSetupClient() {
           ...athleteBearerFetchHeaders(token),
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ distanceLabel: distanceLabel.trim() }),
+        body: JSON.stringify({
+          distanceLabel: distanceLabel.trim(),
+          ...(meters != null ? { distanceMeters: meters } : {}),
+        }),
       });
       const data = (await res.json()) as {
         athleteRace?: Parameters<typeof athleteRaceApiToGoalRow>[0];
@@ -612,7 +669,7 @@ export default function TrainingSetupClient() {
       };
       if (!res.ok) {
         setAthleteDistanceError(data.error ?? "Could not save distance");
-        return;
+        return false;
       }
       if (data.athleteRace) {
         const row = athleteRaceApiToGoalRow(data.athleteRace);
@@ -623,10 +680,25 @@ export default function TrainingSetupClient() {
           );
         }
       }
+      return true;
     } catch (e) {
       setAthleteDistanceError(e instanceof Error ? e.message : "Could not save distance");
+      return false;
     } finally {
       setSavingAthleteDistance(false);
+    }
+  }
+
+  async function confirmRaceDistance() {
+    const label = confirmDistanceSelect.trim();
+    if (!label) {
+      setAthleteDistanceError("Pick your race distance to continue.");
+      return;
+    }
+    const ok = await saveAthleteRaceDistance(label);
+    if (ok) {
+      setDistanceConfirmed(true);
+      setAthleteDistanceError(null);
     }
   }
 
@@ -734,6 +806,9 @@ export default function TrainingSetupClient() {
     setReplaceGoalAcknowledged(false);
     setReplaceBlockPlan(null);
     setChangeRaceForkChoice(null);
+    setDistanceConfirmed(false);
+    setConfirmDistanceSelect("");
+    setAthleteDistanceError(null);
     const today = new Date();
     setStartDate(today.toISOString().split("T")[0]);
     const qs = new URLSearchParams({ athleteRaceId: g.id });
@@ -774,7 +849,11 @@ export default function TrainingSetupClient() {
     exitWizard();
   }
 
-  async function createPlan(opts?: { forceReplace?: boolean }) {
+  async function createPlan(opts?: {
+    forceReplace?: boolean;
+    presetOverride?: PresetForWizard;
+    athletePresetOverride?: string;
+  }) {
     if (!wizardGoal?.athlete_race?.raceRegistryId) {
       setFormError(null);
       setCreateFeedback("goals");
@@ -784,6 +863,9 @@ export default function TrainingSetupClient() {
       setFormError("Pick a start date for your plan.");
       return;
     }
+
+    const presetForCreate = opts?.presetOverride ?? selectedPreset;
+    const athletePresetForCreate = opts?.athletePresetOverride ?? selectedAthletePresetId;
 
     const conflicting = activePlans.find(
       (p) => p.lifecycleStatus === "ACTIVE" && p.athleteRaceId === wizardGoal.athleteRaceId
@@ -798,7 +880,7 @@ export default function TrainingSetupClient() {
     setReplaceBlockPlan(null);
     if (opts?.forceReplace) setReplaceGoalAcknowledged(true);
 
-    if (!selectedPreset?.id && !selectedAthletePresetId) {
+    if (!presetForCreate?.id && !athletePresetForCreate) {
       setFormError("Pick a training level before continuing.");
       setCreateFeedback(null);
       setCreateFeedbackMessage(null);
@@ -853,9 +935,9 @@ export default function TrainingSetupClient() {
               ? null
               : Number(baselineWeeklyMileage),
           syncAthleteBaseline: true,
-          ...(selectedAthletePresetId
-            ? { athletePresetId: selectedAthletePresetId }
-            : { presetId: selectedPreset!.id }),
+          ...(athletePresetForCreate
+            ? { athletePresetId: athletePresetForCreate }
+            : { presetId: presetForCreate!.id }),
           ...(hasOtherActivePlan || replacingFromAddedRace
             ? {
                 replaceActivePlan: true,
@@ -1022,8 +1104,12 @@ export default function TrainingSetupClient() {
       changeRaceForkChoice === null &&
       !needsGoalTimeStep;
 
+    const stepConfirmDistance =
+      !needsGoalTimeStep && !showChangeRaceFork && !distanceConfirmed;
+
     const stepChoosePreset =
       !showChangeRaceFork &&
+      !stepConfirmDistance &&
       !hasBlueprintSelected &&
       (presetPickMode === "choose" ||
         (presetPickMode === "catalog" && !selectedPreset) ||
@@ -1033,6 +1119,7 @@ export default function TrainingSetupClient() {
       setSelectedPreset(p);
       setSelectedAthletePresetId(null);
       setFormError(null);
+      void createPlan({ presetOverride: p });
     }
 
     const baselinePresetTitle =
@@ -1164,6 +1251,69 @@ export default function TrainingSetupClient() {
                   ← Back
                 </button>
               </div>
+            ) : stepConfirmDistance ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+                  <p className="font-medium text-sky-950">Confirm your race distance</p>
+                  <p className="mt-1 text-sky-900/90">
+                    We use this to match coach training levels and size your plan. Pre-filled from
+                    your race — change it if you&apos;re running a different distance.
+                  </p>
+                  <p className="mt-3 text-sm text-gray-800">
+                    <span className="font-medium text-gray-900">{rr.name}</span>
+                    {" · "}
+                    {formatRaceWhen(rr.raceDate)}
+                    {wizardGoal.goalTime ? (
+                      <>
+                        {" · Goal "}
+                        <span className="font-medium text-gray-900">{wizardGoal.goalTime}</span>
+                      </>
+                    ) : null}
+                  </p>
+                  <label className="mt-4 block text-xs font-medium text-sky-900">
+                    How far are you racing?
+                  </label>
+                  <select
+                    value={confirmDistanceSelect}
+                    disabled={savingAthleteDistance}
+                    onChange={(e) => {
+                      setConfirmDistanceSelect(e.target.value);
+                      setAthleteDistanceError(null);
+                    }}
+                    className="mt-1 w-full max-w-sm rounded-md border border-sky-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  >
+                    <option value="">Choose distance…</option>
+                    {COMMON_RACE_DISTANCE_PRESETS.map((p) => (
+                      <option key={p.label} value={p.label}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  {raceDistanceHelperText(confirmDistanceSelect) ? (
+                    <p className="mt-1 text-xs text-sky-800">
+                      {raceDistanceHelperText(confirmDistanceSelect)}
+                    </p>
+                  ) : null}
+                  {athleteDistanceError ? (
+                    <p className="mt-2 text-xs text-red-700">{athleteDistanceError}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  disabled={savingAthleteDistance || !confirmDistanceSelect.trim()}
+                  onClick={() => void confirmRaceDistance()}
+                  className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                >
+                  {savingAthleteDistance ? "Saving…" : "Continue"}
+                </button>
+                <button
+                  type="button"
+                  onClick={exitWizard}
+                  className="text-sm font-medium text-orange-600 hover:text-orange-800"
+                >
+                  ← Back
+                </button>
+              </div>
             ) : stepChoosePreset ? (
               <>
                 {presetPickMode === "choose" ? (
@@ -1231,6 +1381,7 @@ export default function TrainingSetupClient() {
                       if (!planNameTouched) {
                         setPlanName(ap.title);
                       }
+                      void createPlan({ athletePresetOverride: ap.id });
                     }}
                     onCancel={() => {
                       setCustomBuilderPresetId(undefined);
@@ -1381,6 +1532,7 @@ export default function TrainingSetupClient() {
                                             setSelectedAthletePresetId(ap.id);
                                             setSelectedPreset(null);
                                             if (!planNameTouched) setPlanName(ap.title);
+                                            void createPlan({ athletePresetOverride: ap.id });
                                           }}
                                           className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
                                         >
@@ -1479,54 +1631,26 @@ export default function TrainingSetupClient() {
                             You can still build your own preset below, or check back later.
                           </p>
                         </div>
+                      ) : catalogPresetsForWizardGoal.length === 0 ? (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                          <p className="font-medium text-amber-950">
+                            No coach levels for{" "}
+                            {resolvedGoalDistance.label ?? "this distance"} yet
+                          </p>
+                          <p className="mt-1">
+                            Try creating your own preset, or check back when new levels are
+                            published.
+                          </p>
+                        </div>
                       ) : (
                         <>
-                          {distanceNeedsAthleteConfirm ? (
-                            <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
-                              <p className="font-medium text-sky-950">
-                                What distance are you training for?
-                              </p>
-                              <p className="mt-1 text-sky-900/90">
-                                We don&apos;t have a distance on file for this race yet. Pick yours
-                                so we can highlight the best coach plans — or choose any plan below.
-                              </p>
-                              <label className="mt-3 block text-xs font-medium text-sky-900">
-                                Your race distance
-                              </label>
-                              <select
-                                defaultValue=""
-                                disabled={savingAthleteDistance}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  if (v) void saveAthleteRaceDistance(v);
-                                }}
-                                className="mt-1 w-full max-w-sm rounded-md border border-sky-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                              >
-                                <option value="">Choose distance…</option>
-                                {COMMON_RACE_DISTANCE_PRESETS.map((p) => (
-                                  <option key={p.label} value={p.label}>
-                                    {p.label}
-                                  </option>
-                                ))}
-                              </select>
-                              {savingAthleteDistance ? (
-                                <p className="mt-2 text-xs text-sky-800">Saving…</p>
-                              ) : null}
-                              {athleteDistanceError ? (
-                                <p className="mt-2 text-xs text-red-700">{athleteDistanceError}</p>
-                              ) : null}
-                            </div>
-                          ) : resolvedGoalDistance.label &&
-                            preferredPresetsForWizardGoal.length > 0 &&
-                            preferredPresetsForWizardGoal.length < prodPresets.length ? (
-                            <p className="text-sm text-gray-600">
-                              Showing coach plans for{" "}
-                              <span className="font-medium text-gray-900">
-                                {resolvedGoalDistance.label}
-                              </span>
-                              . All plans are listed below if you want a different distance.
-                            </p>
-                          ) : null}
+                          <p className="text-sm text-gray-600">
+                            Coach plans for{" "}
+                            <span className="font-medium text-gray-900">
+                              {resolvedGoalDistance.label}
+                            </span>
+                            .
+                          </p>
                           <ul className="grid gap-3 sm:grid-cols-1">
                             {catalogPresetsForWizardGoal.map((p) => {
                               const blurb = p.publicDescription ?? p.description;

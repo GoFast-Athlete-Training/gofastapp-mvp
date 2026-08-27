@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  normalizeDistanceInput,
   presetMatchesRaceDistance,
   raceDistanceForPresetMatch,
   resolveRaceDistanceLabel,
@@ -20,70 +21,70 @@ test("resolveRaceDistanceLabel snaps meters before label fallback", () => {
   assert.equal(resolveRaceDistanceLabel(null, "Custom 10 miler"), null);
 });
 
-test("resolveRaceDistanceLabel uses race name when label and meters missing", () => {
-  assert.equal(
-    resolveRaceDistanceLabel(null, null, "Boulderthon Marathon"),
-    "Marathon"
-  );
-  assert.equal(
-    resolveRaceDistanceLabel(null, null, "DC Half Marathon"),
-    "Half Marathon"
-  );
-});
-
-test("raceDistanceForPresetMatch uses athlete snapshot then label fallback", () => {
+test("raceDistanceForPresetMatch uses athlete snapshot then registry", () => {
   const resolved = raceDistanceForPresetMatch({
     athleteRaceMeters: null,
-    registryMeters: null,
-    distanceLabel: "Marathon",
+    registryMeters: 42195,
+    distanceLabel: null,
   });
-  assert.equal(resolved.meters, null);
+  assert.equal(resolved.meters, 42195);
   assert.equal(resolved.label, "Marathon");
 });
 
-test("presetMatchesRaceDistance rejects labeled preset when distance unknown", () => {
+test("presetMatchesRaceDistance rejects labeled preset when meters unknown", () => {
   assert.equal(
     presetMatchesRaceDistance("Marathon", {
       athleteRaceMeters: null,
       registryMeters: null,
       distanceLabel: null,
-      raceName: null,
     }),
     false
   );
 });
 
-test("presetMatchesRaceDistance accepts marathon preset from race name hint", () => {
+test("presetMatchesRaceDistance does not match from race name alone", () => {
   assert.equal(
     presetMatchesRaceDistance("Marathon", {
       athleteRaceMeters: null,
       registryMeters: null,
       distanceLabel: null,
-      raceName: "Boulderthon Marathon",
     }),
-    true
+    false
   );
 });
 
-test("presetMatchesRaceDistance accepts any-distance preset when distance unknown", () => {
+test("presetMatchesRaceDistance accepts any-distance preset when meters unknown", () => {
   assert.equal(
     presetMatchesRaceDistance(null, {
       athleteRaceMeters: null,
       registryMeters: null,
       distanceLabel: null,
-      raceName: null,
     }),
     true
   );
 });
 
-test("presetMatchesRaceDistance matches registry when athlete snapshot missing meters", () => {
+test("presetMatchesRaceDistance matches on meters snap", () => {
   assert.equal(
     presetMatchesRaceDistance("Marathon", {
-      athleteRaceMeters: null,
-      registryMeters: 42195,
+      athleteRaceMeters: 42195,
+      registryMeters: null,
       distanceLabel: null,
     }),
     true
   );
+  assert.equal(
+    presetMatchesRaceDistance("Half Marathon", {
+      athleteRaceMeters: 42195,
+      registryMeters: null,
+      distanceLabel: null,
+    }),
+    false
+  );
+});
+
+test("normalizeDistanceInput converts 26.2 to Marathon meters", () => {
+  const n = normalizeDistanceInput("26.2");
+  assert.equal(n.label, "Marathon");
+  assert.ok(n.meters != null && Math.abs(n.meters - 42195) <= 300);
 });

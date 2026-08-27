@@ -149,10 +149,29 @@ export async function POST(request: NextRequest) {
 
     const totalWeeks = totalWeeksFromDates(startDate, raceDate);
 
-    const raceDistanceMilesForPace =
-      race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
-        ? metersToMiles(Number(race.distanceMeters))
-        : 26.21875;
+    const raceDistanceMilesForPace = (() => {
+      const athleteMeters =
+        terminalAthleteRace.distanceMeters != null &&
+        Number.isFinite(Number(terminalAthleteRace.distanceMeters))
+          ? Math.round(Number(terminalAthleteRace.distanceMeters))
+          : null;
+      const registryMeters =
+        race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
+          ? Math.round(Number(race.distanceMeters))
+          : null;
+      const meters = athleteMeters ?? registryMeters;
+      if (meters == null || meters <= 0) return null;
+      return metersToMiles(meters);
+    })();
+    if (raceDistanceMilesForPace == null) {
+      return NextResponse.json(
+        {
+          error:
+            "Confirm your race distance in plan setup before creating a training plan.",
+        },
+        { status: 422 }
+      );
+    }
     const resolvedGoalPace = resolveGoalRacePace({
       goalTime: gt,
       dbGoalRacePaceSecPerMile: terminalAthleteRace.goalRacePace ?? null,
@@ -244,7 +263,6 @@ export async function POST(request: NextRequest) {
         registryMeters: race.distanceMeters,
         distanceLabel:
           terminalAthleteRace.distanceLabel ?? race.distanceLabel ?? null,
-        raceName: terminalAthleteRace.name ?? race.name ?? null,
       };
       const raceDistance = raceDistanceForPresetMatch(raceDistanceInput);
       if (!presetMatchesRaceDistance(preset.targetDistanceLabel, raceDistanceInput)) {

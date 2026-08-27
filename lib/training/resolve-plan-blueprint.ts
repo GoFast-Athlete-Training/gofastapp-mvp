@@ -15,7 +15,7 @@ import {
   athletePresetAsRotationSource,
   isAthletePresetBlueprintComplete,
 } from "@/lib/training/athlete-preset-blueprint";
-import type { training_plan_preset } from "@prisma/client";
+import type { AthletePresetFitnessPhase, training_plan_preset } from "@prisma/client";
 
 export type ResolvedPlanBlueprint = {
   kind: "catalog" | "athlete";
@@ -37,6 +37,7 @@ export type ResolvedPlanBlueprint = {
     | "title"
   >;
   label: string;
+  fitnessPhase: AthletePresetFitnessPhase;
 };
 
 export async function loadPlanBlueprintForGenerate(params: {
@@ -84,6 +85,7 @@ export async function loadPlanBlueprintForGenerate(params: {
       rotationPreset,
       volumePreset,
       label: athletePreset.title,
+      fitnessPhase: athletePreset.fitnessPhase,
     };
   }
 
@@ -101,6 +103,7 @@ export async function loadPlanBlueprintForGenerate(params: {
       rotationPreset: rawPreset as LoadedPresetInclude,
       volumePreset: rawPreset,
       label: rawPreset.title,
+      fitnessPhase: "BASE",
     };
   }
 

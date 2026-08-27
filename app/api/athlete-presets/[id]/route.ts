@@ -126,16 +126,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             : Math.max(1, Math.round(num(raw, existing.maxWeeklyMiles ?? 0)));
       }
       if (body.step === "core" && body.action === "confirmCups") {
-        const base = num(body.baseLongRunPoolMiles, existing.baseLongRunPoolMiles);
         const peak = num(body.peakLongRunPoolMiles, existing.peakLongRunPoolMiles);
-        const taper = num(body.taperLongRunPoolMiles, existing.taperLongRunPoolMiles);
         if (existing.trainingStartDate && existing.raceDateSnapshot) {
           const calendar = computeCoreVolumeCalendarPreview({
             planStartDate: existing.trainingStartDate,
             raceDate: existing.raceDateSnapshot,
-            baseLongRunPoolMiles: base,
             peakLongRunPoolMiles: peak,
-            taperLongRunPoolMiles: taper,
+            fitnessPhase: existing.fitnessPhase,
           });
           data.peakLongRunDate = calendar.peakLongRunDate
             ? new Date(`${calendar.peakLongRunDate}T12:00:00.000Z`)

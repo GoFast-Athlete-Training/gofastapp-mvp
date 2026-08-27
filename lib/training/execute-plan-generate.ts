@@ -167,10 +167,16 @@ export async function executePlanGenerate(params: {
         : [1, 2, 3, 4, 5, 6];
 
   const weekCount = calendarTrainingWeekCount(plan.startDate, race.raceDate);
-  const raceDistanceMiles =
+  const raceMeters =
     race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
-      ? metersToMiles(Number(race.distanceMeters))
-      : 3.1;
+      ? Math.round(Number(race.distanceMeters))
+      : null;
+  if (raceMeters == null || raceMeters <= 0) {
+    throw new Error(
+      "Your goal race needs a confirmed distance before we can generate a schedule. Go back to plan setup and confirm how far you're racing."
+    );
+  }
+  const raceDistanceMiles = metersToMiles(raceMeters);
 
   const cLen = LONG_RUN_BLOCK_WEEKS;
 
@@ -240,53 +246,45 @@ export async function executePlanGenerate(params: {
     }
   }
 
-  const vb = Number(vol.baseLongRunPoolMiles);
   const vp = Number(vol.peakLongRunPoolMiles);
-  const vt = Number(vol.taperLongRunPoolMiles);
-  if (!Number.isFinite(vb) || vb <= 0) {
-    throw new Error(
-      `Training preset "${presetLabel}" has invalid baseLongRunPoolMiles. Fix this preset in GoFast Company.`
-    );
-  }
   if (!Number.isFinite(vp) || vp <= 0) {
     throw new Error(
       `Training preset "${presetLabel}" has invalid peakLongRunPoolMiles. Fix this preset in GoFast Company.`
     );
   }
-  if (!Number.isFinite(vt) || vt <= 0) {
-    throw new Error(
-      `Training preset "${presetLabel}" has invalid taperLongRunPoolMiles. Fix this preset in GoFast Company.`
-    );
-  }
-  const baseLongRunPoolMiles = vb;
-  const peakLongRunPoolMiles = Math.max(baseLongRunPoolMiles, vp);
-  const taperLongRunPoolMiles = vt;
+  const peakLongRunPoolMiles = vp;
+  const { derivedBaseLongRunPoolMiles, derivedTaperLongRunPoolMiles } = longRunCupSetter({
+    totalWeeks: weekCount,
+    longRunCycleWeeks: cLen,
+    peakLongRunPoolMiles,
+    fitnessPhase: blueprint.fitnessPhase,
+  });
 
   applyLongRunSchedule({
     planSchedule: schedule,
     totalWeeks: weekCount,
     longRunCycleWeeks: cLen,
-    baseLongRunPoolMiles,
     peakLongRunPoolMiles,
-    taperLongRunPoolMiles,
+    fitnessPhase: blueprint.fitnessPhase,
     longRunPositions,
   });
 
   const cupResult = longRunCupSetter({
     totalWeeks: weekCount,
     longRunCycleWeeks: cLen,
-    baseLongRunPoolMiles,
     peakLongRunPoolMiles,
-    taperLongRunPoolMiles,
+    fitnessPhase: blueprint.fitnessPhase,
   });
 
   const cyclePoolData = {
     nCycles: cupResult.nCycles,
     longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
     poolMilesByCycle: cupResult.poolMilesByCycle,
-    baseLongRunPoolMiles,
+    weeksInCycle: cupResult.weeksInCycle,
     peakLongRunPoolMiles,
-    taperLongRunPoolMiles,
+    baseLongRunPoolMiles: derivedBaseLongRunPoolMiles,
+    taperLongRunPoolMiles: derivedTaperLongRunPoolMiles,
+    fitnessPhase: blueprint.fitnessPhase,
     positionCounts: {
       longRun: longRunPositions.length,
       intervals: intervalsPositions.length,

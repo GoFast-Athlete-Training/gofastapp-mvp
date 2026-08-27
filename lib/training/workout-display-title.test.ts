@@ -107,7 +107,7 @@ test("canonicalPlannedWorkoutTitle returns null for standalone workouts", () => 
   );
 });
 
-test("mergePlanDayTitle prefers canonical day/type over catalogue row title", () => {
+test("mergePlanDayTitle prefers catalogue schedule title over generic canonical", () => {
   const merged = mergePlanDayTitle({
     rowTitle: "2-1 Tempo",
     scheduleTitle: "2-1 Tempo",
@@ -116,7 +116,7 @@ test("mergePlanDayTitle prefers canonical day/type over catalogue row title", ()
     dayAssigned: "Tuesday",
     planId: "plan-1",
   });
-  assert.equal(merged, "Tuesday Tempo");
+  assert.equal(merged, "2-1 Tempo");
 });
 
 test("mergePlanDayTitle prefers schedule catalogue title over generic row title", () => {
@@ -149,7 +149,7 @@ test("mergePlanDayTitle keeps custom stored row title", () => {
   assert.equal(merged, "My custom tempo");
 });
 
-test("resolveWorkoutDisplayTitle prefers canonical title on planned workout detail", () => {
+test("resolveWorkoutDisplayTitle prefers catalogue name on planned workout detail", () => {
   const title = resolveWorkoutDisplayTitle({
     title: "2-1 Tempo",
     workoutType: "Tempo",
@@ -158,7 +158,7 @@ test("resolveWorkoutDisplayTitle prefers canonical title on planned workout deta
     dayAssigned: "Tuesday",
     planId: "plan-1",
   });
-  assert.equal(title, "Tuesday Tempo");
+  assert.equal(title, "2-1 Tempo");
 });
 
 test("resolveWorkoutDisplayTitle prefers catalogue name on workout detail without plan", () => {

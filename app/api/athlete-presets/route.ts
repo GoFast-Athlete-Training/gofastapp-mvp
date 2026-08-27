@@ -211,9 +211,8 @@ export async function POST(request: NextRequest) {
     const calendar = computeCoreVolumeCalendarPreview({
       planStartDate: planStart,
       raceDate: raceDt,
-      baseLongRunPoolMiles,
       peakLongRunPoolMiles,
-      taperLongRunPoolMiles,
+      fitnessPhase,
     });
     const longestSaturdayMiles =
       "longestSaturdayMiles" in body

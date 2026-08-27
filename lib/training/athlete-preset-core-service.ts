@@ -7,7 +7,10 @@ import {
   computeCoreVolumeCalendarPreview,
   normalizeLongRunPools,
 } from "@/lib/training/core-volume-compute";
-import { clampPeakLongRunPoolToBand } from "@/lib/training/long-run-pool-fields";
+import {
+  clampPeakLongRunPoolMiles,
+  clampPeakLongRunPoolToBand,
+} from "@/lib/training/long-run-pool-fields";
 import {
   clampWeeklyRangeToKey,
   resolveWeeklyVolumeKey,
@@ -100,19 +103,34 @@ function resolveVolume(input: AthletePresetCoreInferInput, parsed?: Record<strin
   return { aggressiveness, row, weekly };
 }
 
+function resolvePeakLongRunPoolMiles(
+  band: WeeklyVolumeBand,
+  elite: boolean,
+  parsedPeak?: unknown
+): number {
+  if (band === "FINISH") {
+    const raw = Number(parsedPeak);
+    const fallback = 30;
+    const p = Number.isFinite(raw) && raw > 0 ? raw : fallback;
+    return clampPeakLongRunPoolMiles(Math.max(24, Math.min(40, p)));
+  }
+  let peakRaw = Number(parsedPeak);
+  if (!Number.isFinite(peakRaw) || peakRaw <= 0) {
+    peakRaw = elite ? 65 : 55;
+  }
+  return clampPeakLongRunPoolToBand(peakRaw, elite);
+}
+
 function fallbackCoreInfer(input: AthletePresetCoreInferInput): AthletePresetCoreInferResult {
   const { aggressiveness, row, weekly } = resolveVolume(input);
   const elite = inferElitePeakPool(input, row.band);
-  const peak = clampPeakLongRunPoolToBand(elite ? 65 : 55, elite);
-  const cups = normalizeLongRunPools({
-    baseLongRunPoolMiles: Math.max(30, Math.round(peak * 0.65)),
-    peakLongRunPoolMiles: peak,
-    taperLongRunPoolMiles: Math.max(25, Math.round(peak * 0.85)),
-  });
+  const peak = resolvePeakLongRunPoolMiles(row.band, elite);
+  const cups = normalizeLongRunPools({ peakLongRunPoolMiles: peak });
   const calendar = computeCoreVolumeCalendarPreview({
     planStartDate: new Date(input.planStartDate),
     raceDate: new Date(input.raceDate),
-    ...cups,
+    peakLongRunPoolMiles: cups.peakLongRunPoolMiles,
+    fitnessPhase: input.fitnessPhase,
   });
   const lrCap = input.longRunCapabilityMiles;
   const longestSaturdayMiles =
@@ -236,22 +254,19 @@ Rules:
     const { aggressiveness, row, weekly } = resolveVolume(input, parsed);
     const elite = inferElitePeakPool(input, row.band);
 
-    let peakRaw = Number(parsed.peakLongRunPoolMiles);
-    if (!Number.isFinite(peakRaw) || peakRaw <= 0) {
-      peakRaw = elite ? 65 : 55;
-    }
-    peakRaw = clampPeakLongRunPoolToBand(peakRaw, elite);
+    const peakRaw = resolvePeakLongRunPoolMiles(
+      row.band,
+      elite,
+      parsed.peakLongRunPoolMiles
+    );
 
-    const cups = normalizeLongRunPools({
-      baseLongRunPoolMiles: parsed.baseLongRunPoolMiles as number,
-      peakLongRunPoolMiles: peakRaw,
-      taperLongRunPoolMiles: parsed.taperLongRunPoolMiles as number,
-    });
+    const cups = normalizeLongRunPools({ peakLongRunPoolMiles: peakRaw });
 
     const calendar = computeCoreVolumeCalendarPreview({
       planStartDate: new Date(input.planStartDate),
       raceDate: new Date(input.raceDate),
-      ...cups,
+      peakLongRunPoolMiles: cups.peakLongRunPoolMiles,
+      fitnessPhase: input.fitnessPhase,
     });
 
     const peakSatFromKey =

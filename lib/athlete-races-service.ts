@@ -8,6 +8,7 @@ import {
   canonicalDistanceLabelFromText,
   metersForCanonicalDistanceLabel,
 } from "@/lib/training/race-distance-infer";
+import { snapDistanceLabelFromMeters } from "@/lib/training/preset-distance-match";
 
 const registrySelectForClaim = {
   id: true,
@@ -204,17 +205,39 @@ export async function findAthleteRaceByRegistry(params: {
   });
 }
 
-/** Athlete sets or corrects working-set race distance (e.g. stub race missing catalog meta). */
+/** Athlete sets or corrects working-set race distance (confirmed meters). */
 export async function updateAthleteRaceDistance(params: {
   athleteId: string;
   athleteRaceId: string;
-  distanceLabel: string;
+  distanceLabel?: string;
+  distanceMeters?: number;
 }): Promise<SerializedAthleteRace | null> {
-  const canonical = canonicalDistanceLabelFromText(params.distanceLabel);
-  if (!canonical) {
+  let canonical: string | null = null;
+  let meters: number | null = null;
+
+  if (
+    params.distanceMeters != null &&
+    Number.isFinite(Number(params.distanceMeters)) &&
+    Number(params.distanceMeters) > 0
+  ) {
+    meters = Math.round(Number(params.distanceMeters));
+    canonical = snapDistanceLabelFromMeters(meters);
+  } else if (params.distanceLabel?.trim()) {
+    canonical = canonicalDistanceLabelFromText(params.distanceLabel);
+    if (!canonical) {
+      throw new Error("Pick a standard race distance");
+    }
+    meters = metersForCanonicalDistanceLabel(canonical);
+  } else {
+    throw new Error("distanceMeters or distanceLabel is required");
+  }
+
+  if (meters == null || meters <= 0) {
     throw new Error("Pick a standard race distance");
   }
-  const meters = metersForCanonicalDistanceLabel(canonical);
+  if (!canonical) {
+    canonical = snapDistanceLabelFromMeters(meters);
+  }
 
   const existing = await getAthleteRaceForAthlete(params.athleteId, params.athleteRaceId);
   if (!existing) return null;
@@ -224,7 +247,7 @@ export async function updateAthleteRaceDistance(params: {
     data: {
       distanceLabel: canonical,
       distanceMeters: meters,
-      goalDistance: canonical.toLowerCase().replace(/\s+/g, "-"),
+      goalDistance: canonical?.toLowerCase().replace(/\s+/g, "-") ?? null,
       updatedAt: new Date(),
     },
     include: {

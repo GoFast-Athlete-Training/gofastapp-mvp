@@ -172,7 +172,7 @@ export function isGeneratedGenericWorkoutTitle(
   return false;
 }
 
-/** Prefer catalogue or schedule-specific titles over stale generic materialized titles. */
+/** Prefer catalogue or schedule-specific titles over generic day+type labels. */
 export function resolveWorkoutDisplayTitle(workout: {
   title: string;
   workoutType: string;
@@ -185,9 +185,6 @@ export function resolveWorkoutDisplayTitle(workout: {
   const raw = workout.title.trim();
   if (/^Race\s*—/i.test(raw)) return raw;
 
-  const canonical = canonicalPlannedWorkoutTitle(workout);
-  if (canonical) return canonical;
-
   const catalogueName = workout.catalogueName?.trim() || null;
   const scheduleTitle = workout.scheduleTitle?.trim() || null;
   const genericStored = isGeneratedGenericWorkoutTitle(
@@ -196,22 +193,20 @@ export function resolveWorkoutDisplayTitle(workout: {
     workout.estimatedDistanceInMeters
   );
 
+  if (catalogueName) return catalogueName;
+
   if (
-    (workout.workoutType === "Tempo" || workout.workoutType === "Intervals") &&
-    genericStored
+    scheduleTitle &&
+    !isGeneratedGenericWorkoutTitle(
+      scheduleTitle,
+      workout.workoutType,
+      workout.estimatedDistanceInMeters
+    )
   ) {
-    if (catalogueName) return catalogueName;
-    if (
-      scheduleTitle &&
-      !isGeneratedGenericWorkoutTitle(
-        scheduleTitle,
-        workout.workoutType,
-        workout.estimatedDistanceInMeters
-      )
-    ) {
-      return scheduleTitle;
-    }
+    return scheduleTitle;
   }
+
+  if (raw.length > 0 && !genericStored) return raw;
 
   if (/\b—\s*Week\s*\d+/i.test(raw) || /\bWeek\s*\d+\s*$/i.test(raw)) {
     return formatCorePlannedWorkoutTitle(
@@ -219,6 +214,10 @@ export function resolveWorkoutDisplayTitle(workout: {
       workout.estimatedDistanceInMeters
     );
   }
+
+  const canonical = canonicalPlannedWorkoutTitle(workout);
+  if (canonical) return canonical;
+
   if (genericStored && scheduleTitle) return scheduleTitle;
   if (raw.length > 0) return raw;
   return formatCorePlannedWorkoutTitle(
@@ -249,15 +248,9 @@ export function mergePlanDayTitle(params: {
   dayAssigned?: string | null;
   planId?: string | null;
 }): string {
-  const canonical = canonicalPlannedWorkoutTitle({
-    title: params.rowTitle?.trim() || params.scheduleTitle,
-    workoutType: params.workoutType,
-    dayAssigned: params.dayAssigned,
-    planId: params.planId,
-  });
-  if (canonical) return canonical;
-
   const rowTitle = params.rowTitle?.trim() ?? "";
+  const scheduleTitle = params.scheduleTitle?.trim() ?? "";
+
   if (
     rowTitle &&
     !isGeneratedGenericWorkoutTitle(
@@ -268,5 +261,25 @@ export function mergePlanDayTitle(params: {
   ) {
     return rowTitle;
   }
-  return params.scheduleTitle;
+
+  if (
+    scheduleTitle &&
+    !isGeneratedGenericWorkoutTitle(
+      scheduleTitle,
+      params.workoutType,
+      params.estimatedDistanceInMeters
+    )
+  ) {
+    return scheduleTitle;
+  }
+
+  const canonical = canonicalPlannedWorkoutTitle({
+    title: rowTitle || scheduleTitle,
+    workoutType: params.workoutType,
+    dayAssigned: params.dayAssigned,
+    planId: params.planId,
+  });
+  if (canonical) return canonical;
+
+  return scheduleTitle || rowTitle;
 }

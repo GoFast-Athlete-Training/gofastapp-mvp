@@ -4,7 +4,11 @@
  */
 
 import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
-import { longRunCupSetter } from "@/lib/training/long-run-cup-setter";
+import {
+  deriveLongRunPoolTripletFromPeak,
+  longRunCupSetter,
+  type LongRunFitnessPhase,
+} from "@/lib/training/long-run-cup-setter";
 import {
   peakWeekNumberFromTotal,
   taperStartWeekNumberFromTotal,
@@ -35,16 +39,14 @@ export type PeakPoolKeySaturday = {
 /** (2) Pool shape across macro blocks from plan weeks (always 4-week blocks). */
 export function computePeakPoolPattern(input: {
   totalWeeks: number;
-  baseLongRunPoolMiles: number;
   peakLongRunPoolMiles: number;
-  taperLongRunPoolMiles: number;
+  fitnessPhase?: LongRunFitnessPhase;
 }) {
   return longRunCupSetter({
     totalWeeks: input.totalWeeks,
     longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
-    baseLongRunPoolMiles: input.baseLongRunPoolMiles,
     peakLongRunPoolMiles: input.peakLongRunPoolMiles,
-    taperLongRunPoolMiles: input.taperLongRunPoolMiles,
+    fitnessPhase: input.fitnessPhase,
   });
 }
 
@@ -54,10 +56,11 @@ function sortedPos(positions: readonly RunTypePosition[]): RunTypePosition[] {
 
 function weightNormInBlock(
   positions: readonly RunTypePosition[],
-  cyclePos: number
+  cyclePos: number,
+  weeksInBlock: number = LONG_RUN_BLOCK_WEEKS
 ): number {
   const rows = sortedPos(positions);
-  const len = LONG_RUN_BLOCK_WEEKS;
+  const len = Math.max(1, Math.floor(weeksInBlock));
   if (rows.length === 0) return 1 / len;
   let blockWeightSum = 0;
   for (let k = 0; k < len; k++) {
@@ -72,12 +75,14 @@ function weightNormInBlock(
 /** (3) Split one block's pool across 4 Saturday long runs. */
 export function computeLongRunAcrossCycle(
   blockPoolMiles: number,
-  longRunPositions: readonly RunTypePosition[] = []
+  longRunPositions: readonly RunTypePosition[] = [],
+  weeksInBlock: number = LONG_RUN_BLOCK_WEEKS
 ): number[] {
   const pool = Math.max(0, Number(blockPoolMiles));
+  const len = Math.max(1, Math.floor(weeksInBlock));
   const miles: number[] = [];
-  for (let cyclePos = 0; cyclePos < LONG_RUN_BLOCK_WEEKS; cyclePos++) {
-    const norm = weightNormInBlock(longRunPositions, cyclePos);
+  for (let cyclePos = 0; cyclePos < len; cyclePos++) {
+    const norm = weightNormInBlock(longRunPositions, cyclePos, len);
     miles.push(Math.round(pool * norm * 10) / 10);
   }
   return miles;
@@ -109,17 +114,15 @@ export type CoreVolumeCalendarPreview = {
 export function computeCoreVolumeCalendarPreview(input: {
   planStartDate: Date;
   raceDate: Date;
-  baseLongRunPoolMiles: number;
   peakLongRunPoolMiles: number;
-  taperLongRunPoolMiles: number;
+  fitnessPhase?: LongRunFitnessPhase;
   longRunPositions?: readonly RunTypePosition[];
 }): CoreVolumeCalendarPreview {
   const totalWeeks = calendarTrainingWeekCount(input.planStartDate, input.raceDate);
   const cup = computePeakPoolPattern({
     totalWeeks,
-    baseLongRunPoolMiles: input.baseLongRunPoolMiles,
     peakLongRunPoolMiles: input.peakLongRunPoolMiles,
-    taperLongRunPoolMiles: input.taperLongRunPoolMiles,
+    fitnessPhase: input.fitnessPhase,
   });
   const peakWeekNumber = peakWeekNumberFromTotal(totalWeeks, LONG_RUN_BLOCK_WEEKS);
   const taperStartWeekNumber = taperStartWeekNumberFromTotal(
@@ -132,9 +135,11 @@ export function computeCoreVolumeCalendarPreview(input: {
     const peakSlot =
       cup.nCycles >= 2 ? cup.nCycles - 2 : Math.max(0, cup.nCycles - 1);
     const peakBlockPool = cup.poolMilesByCycle[peakSlot] ?? input.peakLongRunPoolMiles;
+    const peakWeeksInBlock = cup.weeksInCycle[peakSlot] ?? LONG_RUN_BLOCK_WEEKS;
     const saturdayMiles = computeLongRunAcrossCycle(
       peakBlockPool,
-      input.longRunPositions ?? []
+      input.longRunPositions ?? [],
+      peakWeeksInBlock
     );
     const blockStartWeek = peakSlot * LONG_RUN_BLOCK_WEEKS + 1;
     peakPoolKey = saturdayMiles.map((miles, i) => {
@@ -171,17 +176,7 @@ export function normalizeLongRunPools(raw: {
   taperLongRunPoolMiles?: number;
 }): LongRunPoolTriplet {
   const peak = clampPeakLongRunPoolMiles(raw.peakLongRunPoolMiles ?? 55);
-  let base = Number(raw.baseLongRunPoolMiles);
-  if (!Number.isFinite(base) || base <= 0) base = Math.max(25, Math.round(peak * 0.65));
-  base = Math.min(base, peak);
-  let taper = Number(raw.taperLongRunPoolMiles);
-  if (!Number.isFinite(taper) || taper <= 0) taper = Math.max(20, Math.round(peak * 0.85));
-  taper = Math.min(taper, peak);
-  return {
-    baseLongRunPoolMiles: Math.round(base * 10) / 10,
-    peakLongRunPoolMiles: peak,
-    taperLongRunPoolMiles: Math.round(taper * 10) / 10,
-  };
+  return deriveLongRunPoolTripletFromPeak(peak);
 }
 
 /** @deprecated use normalizeLongRunPools */
