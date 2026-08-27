@@ -21,6 +21,7 @@ import {
   type SegmentSnapshotSource,
 } from "./workout-segment-snapshot";
 import { resolveGoalRacePace } from "./goal-pace-calculator";
+import { buildTempoPrescriptionGoalBenchmark } from "./goal-threshold-from-mp";
 import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
 import { ensurePlannedWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
 import { loadCatalogueTitleByIdFromPlanSchedule } from "./catalogue-title-map";
@@ -111,9 +112,17 @@ async function createPlannedSegments(params: {
   snapshotSource: SegmentSnapshotSource;
   scheduled: PlanScheduleDay;
   dateKey: string;
+  goalRacePaceSecPerMile?: number | null;
 }): Promise<void> {
   const { tx, plannedWorkoutId, steps, snapshotSource, scheduled, dateKey } = params;
   assertPrescriptionSteps(steps, scheduled, dateKey);
+  const goalBenchmark =
+    scheduled.workoutType === "Tempo"
+      ? buildTempoPrescriptionGoalBenchmark({
+          steps,
+          goalRacePaceSecPerMile: params.goalRacePaceSecPerMile ?? null,
+        })
+      : null;
   const segmentRows: Prisma.planned_workout_segmentsCreateManyInput[] = steps.map((s) => ({
     plannedWorkoutId,
     stepOrder: s.stepOrder,
@@ -129,7 +138,11 @@ async function createPlannedSegments(params: {
   await tx.planned_workouts.update({
     where: { id: plannedWorkoutId },
     data: {
-      segmentSnapshotJson: segmentSnapshotDocumentFromApiSegments(steps, snapshotSource),
+      segmentSnapshotJson: segmentSnapshotDocumentFromApiSegments(
+        steps,
+        snapshotSource,
+        goalBenchmark
+      ),
       updatedAt: new Date(),
     },
   });
@@ -158,7 +171,7 @@ async function buildPrescriptionSteps(params: {
     distanceMeters: number | null;
     distanceLabel: string | null;
   } | null;
-}): Promise<WorkoutStep[]> {
+}): Promise<{ steps: WorkoutStep[]; goalRacePaceSecPerMile: number | null }> {
   const { scheduled, plan, race } = params;
   if (!plan) {
     throw new MaterializeWorkoutError("Plan not found");
@@ -206,7 +219,7 @@ async function buildPrescriptionSteps(params: {
     if (scheduled.workoutType === "Easy") {
       throw new MaterializeWorkoutError(EASY_RUN_NOT_CONFIGURED);
     }
-    return [];
+    return { steps: [], goalRacePaceSecPerMile: null };
   }
 
   const anchorSecPerMile = anchorSecondsPerMileFromPlanPace(plan.currentFiveKPace ?? null);
@@ -233,15 +246,18 @@ async function buildPrescriptionSteps(params: {
     })
   );
 
-  return prescribe({
-    entry: catalogueEntryForDay,
-    scheduleMiles: miles,
-    anchorSecondsPerMile: anchorSecPerMile,
-    racePaceSecondsPerMile: racePaceSec,
-    planCycleIndex: scheduled.planCycleIndex ?? null,
-    easyWorkPaceOffsetOverrideSecPerMile: null,
-    paceAdjuster,
-  });
+  return {
+    steps: prescribe({
+      entry: catalogueEntryForDay,
+      scheduleMiles: miles,
+      anchorSecondsPerMile: anchorSecPerMile,
+      racePaceSecondsPerMile: racePaceSec,
+      planCycleIndex: scheduled.planCycleIndex ?? null,
+      easyWorkPaceOffsetOverrideSecPerMile: null,
+      paceAdjuster,
+    }),
+    goalRacePaceSecPerMile: racePaceSec,
+  };
 }
 
 function resultFromPlannedId(
@@ -349,7 +365,7 @@ export async function materializeWorkoutForPlanDay(params: {
     return resultFromPlannedId(existing.id, "already_ready");
   }
 
-  const steps = await buildPrescriptionSteps({ scheduled, plan, race });
+  const { steps, goalRacePaceSecPerMile } = await buildPrescriptionSteps({ scheduled, plan, race });
   assertPrescriptionSteps(steps, scheduled, dateKey);
 
   if (existing && existing._count.segments > 0) {
@@ -383,6 +399,7 @@ export async function materializeWorkoutForPlanDay(params: {
         snapshotSource: "plan_day_materialize_existing",
         scheduled,
         dateKey,
+        goalRacePaceSecPerMile,
       });
     });
     enqueuePrescriptionNarrative(existing.id, athleteId);
@@ -414,6 +431,7 @@ export async function materializeWorkoutForPlanDay(params: {
       snapshotSource: "plan_day_materialize",
       scheduled,
       dateKey,
+      goalRacePaceSecPerMile,
     });
 
     return pw.id;

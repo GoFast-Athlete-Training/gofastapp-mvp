@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/training/hydrate
  * Optional body: { applyAdaptive?: boolean, planId?: string, weekNumber?: number, workoutId?: string }
- * Applies light adaptive 5K nudge when eligible (sandbox / explicit trigger).
+ * Applies long-run durability credit when eligible (sandbox / explicit trigger).
  */
 export async function POST(request: NextRequest) {
   try {

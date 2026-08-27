@@ -10,7 +10,9 @@ import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculat
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { metersToMiles } from "@/lib/pace-utils";
 import type { Prisma, WorkoutType } from "@prisma/client";
-import { segmentSnapshotDocumentFromApiSegments } from "@/lib/training/workout-segment-snapshot";
+import { segmentSnapshotDocumentFromApiSegments, goalBenchmarkFromSegmentSnapshot } from "@/lib/training/workout-segment-snapshot";
+import { buildTempoPrescriptionGoalBenchmark } from "@/lib/training/goal-threshold-from-mp";
+import { loadWorkoutPerformanceSignals } from "@/lib/training/workout-pace-performance";
 import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
 import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
 import { parseAthletePaceAdjuster } from "@/lib/training/athlete-pace-adjuster";
@@ -232,13 +234,47 @@ export async function GET(request: NextRequest, context: Ctx) {
         })),
       });
 
+      const linkedRace = plannedDetail.training_plans?.athlete_race ?? null;
+      const goalFinishTime =
+        linkedRace?.goalTime?.trim() ||
+        plannedDetail.training_plans?.goalRaceTime?.trim() ||
+        null;
+      const goalRacePaceSecPerMile = resolveGoalRacePace({
+        goalTime: goalFinishTime,
+        dbGoalRacePaceSecPerMile: linkedRace?.goalRacePace ?? null,
+        planGoalRacePace: plannedDetail.training_plans?.goalRacePace ?? null,
+        distanceMeters:
+          plannedDetail.training_plans?.race_registry?.distanceMeters != null
+            ? Number(plannedDetail.training_plans.race_registry.distanceMeters)
+            : null,
+        distanceLabel: plannedDetail.training_plans?.race_registry?.distanceLabel ?? null,
+        goalDistance: linkedRace?.goalDistance ?? null,
+      }).goalPaceSecPerMile;
+
+      const performanceSignals = await loadWorkoutPerformanceSignals({
+        athleteId: auth.athlete.id,
+        workout: {
+          workoutType: plannedDetail.workoutType,
+          paceSecPerMile: plannedDetail.actualAvgPaceSecPerMile,
+          paceDeltaSecPerMile: plannedDetail.paceDeltaSecPerMile,
+          creditedFiveKPaceSecPerMile: plannedDetail.creditedFiveKPaceSecPerMile,
+          creditedThresholdPaceSecPerMile: plannedDetail.creditedThresholdPaceSecPerMile,
+          goalRacePaceSecPerMile,
+          intervalsCatalogueOffsetSecPerMile:
+            plannedDetail.workout_catalogue?.workBasePaceOffsetSecPerMile ?? null,
+        },
+      });
+
       return NextResponse.json({
         workout: {
           ...plannedDetail,
           catalogueName: plannedDetail.workout_catalogue?.name ?? null,
           paceAnchor: plannedDetail.workout_catalogue?.paceAnchor ?? null,
+          tempoGoalBenchmark: plannedDetail.tempoGoalBenchmark,
+          goalRacePaceSecPerMile,
         },
         performanceAnalysis,
+        performanceSignals,
       });
     }
 
@@ -319,6 +355,13 @@ export async function GET(request: NextRequest, context: Ctx) {
         }
 
         if (apiSegs?.length) {
+          const tempoGoalBenchmark =
+            workout.workoutType === "Tempo"
+              ? buildTempoPrescriptionGoalBenchmark({
+                  steps: apiSegs,
+                  goalRacePaceSecPerMile: racePaceSecondsPerMile,
+                })
+              : null;
           const segmentRows: Prisma.workout_segmentsCreateManyInput[] =
             apiSegs.map((s) => ({
               id: newEntityId(),
@@ -338,7 +381,8 @@ export async function GET(request: NextRequest, context: Ctx) {
             data: {
               segmentSnapshotJson: segmentSnapshotDocumentFromApiSegments(
                 apiSegs,
-                "api_lazy_segments"
+                "api_lazy_segments",
+                tempoGoalBenchmark
               ),
             },
           });
@@ -366,6 +410,53 @@ export async function GET(request: NextRequest, context: Ctx) {
         athleteId: auth.athlete.id,
       }).catch((e) => console.warn("ensureWorkoutPrescriptionNarrative:", e));
     }
+
+    const linkedRaceInstance = workout.training_plans?.athlete_race ?? null;
+    const goalFinishTimeInstance =
+      linkedRaceInstance?.goalTime?.trim() ||
+      workout.training_plans?.goalRaceTime?.trim() ||
+      null;
+    const goalRacePaceSecPerMile = resolveGoalRacePace({
+      goalTime: goalFinishTimeInstance,
+      dbGoalRacePaceSecPerMile: linkedRaceInstance?.goalRacePace ?? null,
+      planGoalRacePace: workout.training_plans?.goalRacePace ?? null,
+      distanceMeters:
+        workout.training_plans?.race_registry?.distanceMeters != null
+          ? Number(workout.training_plans.race_registry.distanceMeters)
+          : null,
+      distanceLabel: workout.training_plans?.race_registry?.distanceLabel ?? null,
+      goalDistance: linkedRaceInstance?.goalDistance ?? null,
+    }).goalPaceSecPerMile;
+
+    const tempoGoalBenchmark =
+      goalBenchmarkFromSegmentSnapshot(workout.segmentSnapshotJson) ??
+      (workout.workoutType === "Tempo" && workout.segments.length > 0
+        ? buildTempoPrescriptionGoalBenchmark({
+            steps: workout.segments.map((s) => ({
+              stepOrder: s.stepOrder,
+              title: s.title,
+              durationType: s.durationType === "TIME" ? "TIME" : "DISTANCE",
+              durationValue: s.durationValue,
+              targets: s.targets as WorkoutStep["targets"],
+              repeatCount: s.repeatCount ?? undefined,
+            })),
+            goalRacePaceSecPerMile,
+          })
+        : null);
+
+    const performanceSignals = await loadWorkoutPerformanceSignals({
+      athleteId: auth.athlete.id,
+      workout: {
+        workoutType: workout.workoutType,
+        paceSecPerMile: workout.actualAvgPaceSecPerMile,
+        paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
+        creditedFiveKPaceSecPerMile: workout.creditedFiveKPaceSecPerMile,
+        creditedThresholdPaceSecPerMile: workout.creditedThresholdPaceSecPerMile,
+        goalRacePaceSecPerMile,
+        intervalsCatalogueOffsetSecPerMile:
+          workout.workout_catalogue?.workBasePaceOffsetSecPerMile ?? null,
+      },
+    });
 
     const performanceAnalysis = computeWorkoutPerformanceAnalysis({
       workoutType: workout.workoutType,
@@ -400,8 +491,11 @@ export async function GET(request: NextRequest, context: Ctx) {
         ...workout,
         catalogueName: workout.workout_catalogue?.name ?? null,
         paceAnchor: workout.workout_catalogue?.paceAnchor ?? null,
+        tempoGoalBenchmark,
+        goalRacePaceSecPerMile,
       },
       performanceAnalysis,
+      performanceSignals,
     });
   } catch (e: unknown) {
     console.error("GET /api/training/workout/[id]", e);

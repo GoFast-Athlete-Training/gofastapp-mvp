@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { ensurePlannedWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
 import { materializeWorkoutForPlanDay } from "./workout-materializer";
 import { ymdFromDate } from "./plan-utils";
+import { goalBenchmarkFromSegmentSnapshot } from "./workout-segment-snapshot";
 
 const plannedDetailInclude = {
   segments: { orderBy: { stepOrder: "asc" as const } },
@@ -124,6 +125,8 @@ export async function loadPlannedWorkoutDetailForAthlete(params: {
     athleteId: params.athleteId,
   }).catch((e) => console.warn("ensurePlannedWorkoutPrescriptionNarrative:", e));
 
+  const tempoGoalBenchmark = goalBenchmarkFromSegmentSnapshot(planned.segmentSnapshotJson);
+
   return {
     id: instance?.id ?? planned.id,
     plannedWorkoutId: planned.id,
@@ -172,6 +175,7 @@ export async function loadPlannedWorkoutDetailForAthlete(params: {
     runContextUpdatedAt: instance?.runContextUpdatedAt ?? null,
     prescriptionNarrative:
       planned.prescriptionNarrative ?? instance?.prescriptionNarrative ?? null,
+    tempoGoalBenchmark,
     segments: prescribeSegments,
     workout_catalogue: planned.workout_catalogue,
     training_plans: planned.training_plans,

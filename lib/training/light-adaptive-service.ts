@@ -1,21 +1,15 @@
 /**
- * MVP1 light adaptive path: aggregate mileage + long-run target met → conservative 5K nudge.
- * Easy/tempo/interval runs count for volume only until lap/detail data is reliable.
+ * Long-run durability credit after matched long runs (≥10 mi).
+ * 5K pace is no longer auto-nudged here — athlete confirms speed updates separately.
  */
 
 import { prisma } from "@/lib/prisma";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
-import { syncAthleteFiveKPaceToActivePlan } from "@/lib/training/plan-lifecycle";
 import { EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE } from "@/lib/training/apply-activity-to-workout";
 import { applyLongRunCapabilityCreditFromWorkout } from "@/lib/training/apply-long-run-capability-credit";
-import { rematerializeFuturePlannedWorkoutsForPlan } from "@/lib/training/rematerialize-future-planned-workouts";
 
 const METERS_PER_MILE = 1609.34;
-/** Long run distance considered "target met" when actual >= this fraction of planned. */
 const LONG_RUN_DISTANCE_RATIO = 0.9;
-/** Max sec/mi improvement from light adaptive (conservative). */
-const LIGHT_ADAPTIVE_MAX_NUDGE_SEC = 5;
-/** Minimum completed plan workouts before a long-run nudge is considered. */
 const MIN_COMPLETED_WORKOUTS = 1;
 
 export type LightAdaptiveEvaluation = {
@@ -30,12 +24,6 @@ export type LightAdaptiveEvaluation = {
   currentFiveKSecPerMile: number | null;
 };
 
-function secondsPerMileToPaceString(sec: number): string {
-  const minutes = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return `${minutes}:${s.toString().padStart(2, "0")}`;
-}
-
 function roundMi(meters: number): number {
   return Math.round((meters / METERS_PER_MILE) * 10) / 10;
 }
@@ -45,7 +33,6 @@ type LongRunRow = {
   estimatedDistanceInMeters: number | null;
   actualDistanceMeters: number | null;
   paceDeltaSecPerMile: number | null;
-  date: Date | null;
 };
 
 function longRunTargetMet(row: LongRunRow): boolean {
@@ -53,7 +40,6 @@ function longRunTargetMet(row: LongRunRow): boolean {
   const actual = row.actualDistanceMeters;
   if (planned == null || actual == null || planned <= 0 || actual <= 0) return false;
   if (actual < planned * LONG_RUN_DISTANCE_RATIO) return false;
-
   const paceDelta = row.paceDeltaSecPerMile;
   if (paceDelta != null) {
     if (paceDelta < -30) return false;
@@ -62,6 +48,7 @@ function longRunTargetMet(row: LongRunRow): boolean {
   return true;
 }
 
+/** Read-only plan snapshot — 5K auto-nudge removed; durability tracked separately. */
 export async function evaluateLightAdaptive(params: {
   athleteId: string;
   planId: string;
@@ -92,7 +79,6 @@ export async function evaluateLightAdaptive(params: {
       estimatedDistanceInMeters: true,
       actualDistanceMeters: true,
       paceDeltaSecPerMile: true,
-      date: true,
     },
     orderBy: { date: "desc" },
   });
@@ -105,26 +91,10 @@ export async function evaluateLightAdaptive(params: {
 
   const completedWorkouts = matched.length;
   const completedMiles = roundMi(completedMeters);
-
   const longRuns = matched.filter(
     (w) => w.workoutType === "LongRun" || w.workoutType === "Race"
   ) as LongRunRow[];
-
   const metLongRun = longRuns.find((lr) => longRunTargetMet(lr)) ?? null;
-
-  if (!currentFiveKSecPerMile) {
-    return {
-      eligible: false,
-      wouldUpdate: false,
-      reason: "Set a current 5K pace before adaptive updates can apply.",
-      completedWorkouts,
-      completedMiles,
-      longRunTargetMet: Boolean(metLongRun),
-      longRunWorkoutId: metLongRun?.id ?? null,
-      suggestedFiveKSecPerMile: null,
-      currentFiveKSecPerMile: null,
-    };
-  }
 
   if (completedWorkouts < MIN_COMPLETED_WORKOUTS) {
     return {
@@ -154,34 +124,16 @@ export async function evaluateLightAdaptive(params: {
     };
   }
 
-  const suggestedFiveKSecPerMile = Math.max(
-    Math.floor(currentFiveKSecPerMile * 0.95),
-    currentFiveKSecPerMile - LIGHT_ADAPTIVE_MAX_NUDGE_SEC
-  );
-
-  if (suggestedFiveKSecPerMile >= currentFiveKSecPerMile) {
-    return {
-      eligible: true,
-      wouldUpdate: false,
-      reason: "Long run target met, but 5K pace is already at or faster than the conservative nudge.",
-      completedWorkouts,
-      completedMiles,
-      longRunTargetMet: true,
-      longRunWorkoutId: metLongRun.id,
-      suggestedFiveKSecPerMile,
-      currentFiveKSecPerMile,
-    };
-  }
-
   return {
     eligible: true,
-    wouldUpdate: true,
-    reason: `Long run target met with ${completedMiles} mi completed on plan — conservative 5K pace nudge available.`,
+    wouldUpdate: false,
+    reason:
+      "Long run target met — durability is tracked on your profile. Confirm 5K updates after interval or race efforts.",
     completedWorkouts,
     completedMiles,
     longRunTargetMet: true,
     longRunWorkoutId: metLongRun.id,
-    suggestedFiveKSecPerMile,
+    suggestedFiveKSecPerMile: null,
     currentFiveKSecPerMile,
   };
 }
@@ -193,7 +145,7 @@ export type LightAdaptiveApplyResult = {
   newFiveKSecPerMile: number | null;
 };
 
-/** Apply conservative 5K nudge when evaluateLightAdaptive says wouldUpdate. */
+/** Apply long-run durability credit when a matched long run qualifies. */
 export async function applyLightAdaptiveIfEligible(params: {
   athleteId: string;
   planId: string;
@@ -206,67 +158,52 @@ export async function applyLightAdaptiveIfEligible(params: {
         athleteId: params.athleteId,
         workoutId: params.workoutId,
       });
+      return {
+        applied: true,
+        reason: "Long-run durability updated when distance qualifies.",
+        previousFiveKSecPerMile: null,
+        newFiveKSecPerMile: null,
+      };
     } catch (err) {
       console.error("applyLongRunCapabilityCreditFromWorkout:", err);
+      return {
+        applied: false,
+        reason: "Could not update long-run durability.",
+        previousFiveKSecPerMile: null,
+        newFiveKSecPerMile: null,
+      };
     }
   }
 
-  const evaluation = await evaluateLightAdaptive({
-    athleteId: params.athleteId,
-    planId: params.planId,
+  const metLongRun = await prisma.workouts.findFirst({
+    where: {
+      athleteId: params.athleteId,
+      planId: params.planId,
+      workoutType: { in: ["LongRun", "Race"] },
+      matchedActivityId: { not: null },
+    },
+    orderBy: { date: "desc" },
+    select: { id: true },
   });
 
-  if (!evaluation.wouldUpdate || evaluation.suggestedFiveKSecPerMile == null) {
+  if (!metLongRun) {
     return {
       applied: false,
-      reason: evaluation.reason,
-      previousFiveKSecPerMile: evaluation.currentFiveKSecPerMile,
+      reason: "No matched long run on this plan yet.",
+      previousFiveKSecPerMile: null,
       newFiveKSecPerMile: null,
     };
   }
 
-  const previousSec = evaluation.currentFiveKSecPerMile!;
-  const newSec = evaluation.suggestedFiveKSecPerMile;
-  const newPaceStr = secondsPerMileToPaceString(newSec);
-  const summaryMessage = `Long run target met — 5K pace nudged to ${newPaceStr}/mi based on plan volume.`;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.athlete.update({
-      where: { id: params.athleteId },
-      data: { fiveKPace: newPaceStr, updatedAt: new Date() },
-    });
-    await tx.pace_adjustment_log.create({
-      data: {
-        athleteId: params.athleteId,
-        planId: params.planId,
-        weekNumber: params.weekNumber ?? undefined,
-        workoutId: params.workoutId ?? evaluation.longRunWorkoutId ?? undefined,
-        notificationType: "PACE_UPDATE",
-        previousPaceSecPerMile: previousSec,
-        newPaceSecPerMile: newSec,
-        adjustmentSecPerMile: previousSec - newSec,
-        qualityWorkoutsCount: 0,
-        longRunCompleted: true,
-        summaryMessage,
-      },
-    });
+  await applyLongRunCapabilityCreditFromWorkout({
+    athleteId: params.athleteId,
+    workoutId: metLongRun.id,
   });
-
-  await syncAthleteFiveKPaceToActivePlan(params.athleteId);
-
-  try {
-    await rematerializeFuturePlannedWorkoutsForPlan({
-      athleteId: params.athleteId,
-      planId: params.planId,
-    });
-  } catch (err) {
-    console.error("rematerializeFuturePlannedWorkoutsForPlan after light adaptive:", err);
-  }
 
   return {
     applied: true,
-    reason: summaryMessage,
-    previousFiveKSecPerMile: previousSec,
-    newFiveKSecPerMile: newSec,
+    reason: "Long-run durability refreshed from latest matched long run.",
+    previousFiveKSecPerMile: null,
+    newFiveKSecPerMile: null,
   };
 }

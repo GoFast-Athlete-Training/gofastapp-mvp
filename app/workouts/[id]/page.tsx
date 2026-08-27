@@ -71,6 +71,12 @@ import {
   type PhaseAwareLapRow,
   type WorkSegmentDelta,
 } from "@/lib/training/workout-performance-analysis";
+import {
+  TempoGoalBenchmarkPanel,
+  WorkoutFiveKConfirmPanel,
+} from "@/components/training/WorkoutGoalPacePanel";
+import type { TempoPrescriptionGoalBenchmark } from "@/lib/training/goal-threshold-from-mp";
+import type { WorkoutPerformanceSignals } from "@/lib/training/workout-pace-performance";
 
 interface WorkoutSegmentLap {
   lapIndex: number;
@@ -182,6 +188,8 @@ interface Workout {
   runContextTags?: string[] | null;
   runContextNote?: string | null;
   catalogueName?: string | null;
+  tempoGoalBenchmark?: TempoPrescriptionGoalBenchmark | null;
+  goalRacePaceSecPerMile?: number | null;
 }
 
 function workoutListTitle(w: Pick<
@@ -883,6 +891,8 @@ export default function WorkoutDetailPage() {
   const workoutId = params.id as string;
 
   const [workout, setWorkout] = useState<Workout | null>(null);
+  const [performanceSignals, setPerformanceSignals] =
+    useState<WorkoutPerformanceSignals | null>(null);
   const [loading, setLoading] = useState(true);
   const [pushing, setPushing] = useState(false);
   const [copyRepushing, setCopyRepushing] = useState(false);
@@ -1432,10 +1442,14 @@ export default function WorkoutDetailPage() {
 
   const fetchWorkout = async () => {
     try {
-      const response = await api.get<{ workout: Workout }>(`/training/workout/${workoutId}`);
+      const response = await api.get<{
+        workout: Workout;
+        performanceSignals?: WorkoutPerformanceSignals;
+      }>(`/training/workout/${workoutId}`);
       const w = response.data?.workout;
       if (w) {
         setWorkout(w);
+        setPerformanceSignals(response.data?.performanceSignals ?? null);
       } else {
         setPushStatus({
           success: false,
@@ -3253,6 +3267,19 @@ export default function WorkoutDetailPage() {
             targetPaceSecPerMileHigh={workout.targetPaceSecPerMileHigh}
           />
         )}
+
+        {workout.workoutType === "Tempo" ? (
+          <TempoGoalBenchmarkPanel
+            benchmark={workout.tempoGoalBenchmark}
+            goalRacePaceSecPerMile={workout.goalRacePaceSecPerMile}
+          />
+        ) : null}
+
+        <WorkoutFiveKConfirmPanel
+          workoutId={workout.id}
+          performanceSignals={performanceSignals}
+          onConfirmed={() => void fetchWorkout()}
+        />
 
         {(planDayMi != null || structuredMiLine !== "") && (
           <div className="bg-white rounded-lg border border-gray-200 p-5 mb-6">

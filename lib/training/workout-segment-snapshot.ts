@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { WorkoutStep } from "@/lib/training/prescription";
+import type { TempoPrescriptionGoalBenchmark } from "@/lib/training/goal-threshold-from-mp";
 
 /** Prescription-only segment shape stored on workouts.segmentSnapshotJson (no DB lap actuals). */
 export type SegmentSnapshotStep = {
@@ -20,6 +21,7 @@ export type SegmentSnapshotDocument = {
   capturedAt: string;
   source: SegmentSnapshotSource;
   segments: SegmentSnapshotStep[];
+  goalBenchmark?: TempoPrescriptionGoalBenchmark;
 };
 
 export type SegmentSnapshotSource =
@@ -31,10 +33,20 @@ export type SegmentSnapshotSource =
   | "garmin_push"
   | "group_workout_create";
 
+export function goalBenchmarkFromSegmentSnapshot(
+  snapshot: unknown
+): TempoPrescriptionGoalBenchmark | null {
+  if (!snapshot || typeof snapshot !== "object") return null;
+  const gb = (snapshot as SegmentSnapshotDocument).goalBenchmark;
+  if (!gb || gb.goalBenchmark !== "goalThreshold") return null;
+  return gb;
+}
+
 /** Build JSON document for workouts.segmentSnapshotJson from materialized API segments. */
 export function segmentSnapshotDocumentFromApiSegments(
   apiSegs: WorkoutStep[],
-  source: SegmentSnapshotSource
+  source: SegmentSnapshotSource,
+  goalBenchmark?: TempoPrescriptionGoalBenchmark | null
 ): Prisma.InputJsonValue {
   const segments: SegmentSnapshotStep[] = apiSegs.map((s) => ({
     stepOrder: s.stepOrder,
@@ -51,6 +63,7 @@ export function segmentSnapshotDocumentFromApiSegments(
     capturedAt: new Date().toISOString(),
     source,
     segments,
+    ...(goalBenchmark ? { goalBenchmark } : {}),
   };
   return doc as unknown as Prisma.InputJsonValue;
 }

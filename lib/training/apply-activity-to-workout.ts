@@ -5,10 +5,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { applyWorkoutPaceCredit } from "./apply-workout-pace-credit";
-import { applyThresholdPaceCredit } from "./apply-threshold-pace-credit";
 import { applyAerobicCeilingCredit } from "./apply-aerobic-ceiling-credit";
-import { applyLightAdaptiveIfEligible } from "./light-adaptive-service";
+import { applyLongRunCapabilityCreditFromWorkout } from "./apply-long-run-capability-credit";
 import {
   normalizePaceTargetEncodingVersion,
   storedPaceSecondsKmToSecondsPerMile,
@@ -29,7 +27,8 @@ function defaultRepPaceOffsetSecPerMile(workoutType: string): number | null {
 
 /**
  * Which pace credits apply after a successful tempo or interval match.
- * Intervals → 5K credit, Tempo → threshold credit.
+ * Intervals/Race → implied 5K (stored on workout; athlete confirms to apply).
+ * Tempo → threshold inference stored for display only (no Athlete.thresholdPace writes).
  */
 export function computeMatchedWorkoutPaceCredits(params: {
   workoutType: string;
@@ -66,6 +65,10 @@ export function computeMatchedWorkoutPaceCredits(params: {
 
   if (workoutType === "Tempo" && paceCreditEligible && paceSecPerMile != null) {
     creditedThresholdPaceSecPerMile = Math.round(paceSecPerMile);
+  }
+
+  if (workoutType === "Race" && paceCreditEligible && paceSecPerMile != null) {
+    creditedFiveKPaceSecPerMile = Math.round(paceSecPerMile);
   }
 
   return { creditedFiveKPaceSecPerMile, creditedThresholdPaceSecPerMile };
@@ -229,33 +232,6 @@ async function applyMatchCreditsFromWorkoutRow(params: {
     }
   }
 
-  if (creditedFiveKPaceSecPerMile != null) {
-    try {
-      await applyWorkoutPaceCredit({
-        athleteId: params.activity.athleteId,
-        creditedFiveKPaceSecPerMile,
-        planId: params.workout.planId ?? null,
-        weekNumber: params.workout.weekNumber ?? null,
-      });
-    } catch (err) {
-      console.error("applyWorkoutPaceCredit after match:", err);
-    }
-  }
-
-  if (creditedThresholdPaceSecPerMile != null) {
-    try {
-      await applyThresholdPaceCredit({
-        athleteId: params.activity.athleteId,
-        creditedThresholdPaceSecPerMile,
-        planId: params.workout.planId ?? null,
-        weekNumber: params.workout.weekNumber ?? null,
-        workoutId: params.workout.id,
-      });
-    } catch (err) {
-      console.error("applyThresholdPaceCredit after match:", err);
-    }
-  }
-
   if (creditedAerobicCeilingBpm != null) {
     try {
       await applyAerobicCeilingCredit({
@@ -275,14 +251,12 @@ async function applyMatchCreditsFromWorkoutRow(params: {
     params.workout.planId
   ) {
     try {
-      await applyLightAdaptiveIfEligible({
+      await applyLongRunCapabilityCreditFromWorkout({
         athleteId: params.activity.athleteId,
-        planId: params.workout.planId,
-        weekNumber: params.workout.weekNumber ?? null,
         workoutId: params.workout.id,
       });
     } catch (err) {
-      console.error("applyLightAdaptiveIfEligible after long run match:", err);
+      console.error("applyLongRunCapabilityCreditFromWorkout after long run match:", err);
     }
   }
 
