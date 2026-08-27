@@ -3,7 +3,7 @@
  */
 
 import type { Prisma } from "@prisma/client";
-import { athletePresetInclude, type LoadedAthletePresetInclude } from "@/lib/training/plan-generate-presets-loader";
+import { athletePresetInclude, type LoadedAthletePresetInclude, type LoadedPresetInclude } from "@/lib/training/plan-generate-presets-loader";
 import { resolveAthletePresetRotations } from "@/lib/training/apply-athlete-rotation-order";
 import { builderProgressFromOverview } from "@/lib/training/athlete-preset-builder-progress";
 
@@ -86,8 +86,8 @@ export function serializeAthletePresetForApi(row: {
   intervalsConfigId: string | null;
   longRunConfig?: LoadedAthletePresetInclude["longRunConfig"];
   easyConfig?: LoadedAthletePresetInclude["easyConfig"];
-  tempoConfig?: LoadedAthletePresetInclude["tempoConfig"];
-  intervalsConfig?: LoadedAthletePresetInclude["intervalsConfig"];
+  tempoConfig?: LoadedPresetInclude["tempoConfig"];
+  intervalsConfig?: LoadedPresetInclude["intervalsConfig"];
   longRunOrders?: Array<{ cyclePosition: number; longRunConfigPositionId: string }>;
   easyOrders?: Array<{ cyclePosition: number; easyConfigPositionId: string }>;
   athleteTempoConfig?: LoadedAthletePresetInclude["athleteTempoConfig"];

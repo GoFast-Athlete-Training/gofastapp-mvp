@@ -2,7 +2,10 @@
  * Join athlete ordering overlays onto shared catalog positions for API / generation.
  */
 
-import type { LoadedAthletePresetInclude } from "@/lib/training/plan-generate-presets-loader";
+import type {
+  LoadedAthletePresetInclude,
+  LoadedPresetInclude,
+} from "@/lib/training/plan-generate-presets-loader";
 import { positionsInclude } from "@/lib/training/plan-generate-presets-loader";
 
 type PositionWithCatalogue = {
@@ -16,8 +19,8 @@ type PositionWithCatalogue = {
 export type ResolvedAthleteRotations = {
   longRunConfig: LoadedAthletePresetInclude["longRunConfig"];
   easyConfig: LoadedAthletePresetInclude["easyConfig"];
-  tempoConfig: LoadedAthletePresetInclude["tempoConfig"];
-  intervalsConfig: LoadedAthletePresetInclude["intervalsConfig"];
+  tempoConfig: LoadedPresetInclude["tempoConfig"];
+  intervalsConfig: LoadedPresetInclude["intervalsConfig"];
 };
 
 function applyOrder<T extends PositionWithCatalogue>(
@@ -49,7 +52,7 @@ function athleteQualityAsCatalogConfig(
     workout_catalogue?: unknown;
   }> | undefined,
   name: string
-): LoadedAthletePresetInclude["tempoConfig"] {
+): LoadedPresetInclude["tempoConfig"] {
   if (!positions?.length) return null;
   return {
     id: name,
@@ -64,7 +67,7 @@ function athleteQualityAsCatalogConfig(
       catalogueWorkoutId: p.catalogueWorkoutId,
       workout_catalogue: p.workout_catalogue ?? null,
     })),
-  } as LoadedAthletePresetInclude["tempoConfig"];
+  } as LoadedPresetInclude["tempoConfig"];
 }
 
 export function resolveAthletePresetRotations(
@@ -126,7 +129,7 @@ export function resolveAthletePresetRotations(
   const intervalsConfig = athleteQualityAsCatalogConfig(
     row.athleteIntervalsConfig?.positions,
     "Athlete intervals"
-  ) as LoadedAthletePresetInclude["intervalsConfig"];
+  ) as LoadedPresetInclude["intervalsConfig"];
 
   return { longRunConfig, easyConfig, tempoConfig, intervalsConfig };
 }

@@ -142,11 +142,12 @@ export default function WelcomePage() {
       }
 
       if (!firebaseUser) {
-        if (!LocalStorageAPI.getAthleteId()) {
-          hasProcessedRef.current = true;
-          clearSessionGate();
-          router.replace('/signup');
+        hasProcessedRef.current = true;
+        clearSessionGate();
+        if (LocalStorageAPI.getAthleteId()) {
+          LocalStorageAPI.clearAll();
         }
+        router.replace('/signup');
         return;
       }
 
@@ -175,7 +176,10 @@ export default function WelcomePage() {
           setHasProfileHandle(gate.profileComplete);
           setStep(nextStep);
           try {
-            const profRes = await api.get(`/athlete/${storedAthleteId}`);
+            const token = await firebaseUser.getIdToken();
+            const profRes = await api.get(`/athlete/${storedAthleteId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
             const clubs = (profRes.data?.athlete?.leaderContext?.clubs ?? []) as LeaderContextClub[];
             setIsClubManager(athleteHasManagerMemberships(clubs));
           } catch {
