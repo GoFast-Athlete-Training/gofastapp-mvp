@@ -286,16 +286,67 @@ export async function setupAthleteRotationsFromSource(params: {
   });
 }
 
+async function ensureLongRunOrderRows(params: {
+  athletePresetId: string;
+  orderedPositionIds: string[];
+}): Promise<
+  Array<{
+    id: string;
+    longRunConfigPositionId: string;
+    cyclePosition: number;
+  }>
+> {
+  const existing = await prisma.athlete_preset_long_run_order.findMany({
+    where: { athletePresetId: params.athletePresetId },
+    orderBy: { cyclePosition: "asc" },
+  });
+  if (existing.length > 0) return existing;
+
+  const preset = await prisma.athlete_presets.findUnique({
+    where: { id: params.athletePresetId },
+    include: {
+      longRunConfig: {
+        include: { positions: { orderBy: { cyclePosition: "asc" } } },
+      },
+    },
+  });
+  const catalogIds = preset?.longRunConfig?.positions.map((p) => p.id) ?? [];
+  if (catalogIds.length === 0) {
+    throw new Error("No long-run config positions to reorder");
+  }
+
+  const positionIdSet = new Set(catalogIds);
+  if (params.orderedPositionIds.length !== catalogIds.length) {
+    throw new Error("Reorder must include every position exactly once");
+  }
+  for (const id of params.orderedPositionIds) {
+    if (!positionIdSet.has(id)) {
+      throw new Error("Invalid long-run position id in reorder");
+    }
+  }
+
+  await seedLongRunOrder({
+    athletePresetId: params.athletePresetId,
+    sourcePositionIds: params.orderedPositionIds,
+  });
+
+  return prisma.athlete_preset_long_run_order.findMany({
+    where: { athletePresetId: params.athletePresetId },
+    orderBy: { cyclePosition: "asc" },
+  });
+}
+
 export async function reorderAthleteLongRunOrder(params: {
   athletePresetId: string;
   orderedPositionIds: string[];
 }): Promise<void> {
-  const rows = await prisma.athlete_preset_long_run_order.findMany({
-    where: { athletePresetId: params.athletePresetId },
-    orderBy: { cyclePosition: "asc" },
-  });
-  if (rows.length === 0) {
-    throw new Error("No long-run order rows to reorder");
+  const rows = await ensureLongRunOrderRows(params);
+  const currentOrder = rows
+    .slice()
+    .sort((a, b) => a.cyclePosition - b.cyclePosition)
+    .map((r) => r.longRunConfigPositionId);
+  if (currentOrder.join("\0") === params.orderedPositionIds.join("\0")) {
+    return;
   }
 
   const positionIdSet = new Set(rows.map((r) => r.longRunConfigPositionId));
@@ -328,16 +379,67 @@ export async function reorderAthleteLongRunOrder(params: {
   });
 }
 
+async function ensureEasyOrderRows(params: {
+  athletePresetId: string;
+  orderedPositionIds: string[];
+}): Promise<
+  Array<{
+    id: string;
+    easyConfigPositionId: string;
+    cyclePosition: number;
+  }>
+> {
+  const existing = await prisma.athlete_preset_easy_order.findMany({
+    where: { athletePresetId: params.athletePresetId },
+    orderBy: { cyclePosition: "asc" },
+  });
+  if (existing.length > 0) return existing;
+
+  const preset = await prisma.athlete_presets.findUnique({
+    where: { id: params.athletePresetId },
+    include: {
+      easyConfig: {
+        include: { positions: { orderBy: { cyclePosition: "asc" } } },
+      },
+    },
+  });
+  const catalogIds = preset?.easyConfig?.positions.map((p) => p.id) ?? [];
+  if (catalogIds.length === 0) {
+    throw new Error("No easy config positions to reorder");
+  }
+
+  const positionIdSet = new Set(catalogIds);
+  if (params.orderedPositionIds.length !== catalogIds.length) {
+    throw new Error("Reorder must include every position exactly once");
+  }
+  for (const id of params.orderedPositionIds) {
+    if (!positionIdSet.has(id)) {
+      throw new Error("Invalid easy position id in reorder");
+    }
+  }
+
+  await seedEasyOrder({
+    athletePresetId: params.athletePresetId,
+    sourcePositionIds: params.orderedPositionIds,
+  });
+
+  return prisma.athlete_preset_easy_order.findMany({
+    where: { athletePresetId: params.athletePresetId },
+    orderBy: { cyclePosition: "asc" },
+  });
+}
+
 export async function reorderAthleteEasyOrder(params: {
   athletePresetId: string;
   orderedPositionIds: string[];
 }): Promise<void> {
-  const rows = await prisma.athlete_preset_easy_order.findMany({
-    where: { athletePresetId: params.athletePresetId },
-    orderBy: { cyclePosition: "asc" },
-  });
-  if (rows.length === 0) {
-    throw new Error("No easy order rows to reorder");
+  const rows = await ensureEasyOrderRows(params);
+  const currentOrder = rows
+    .slice()
+    .sort((a, b) => a.cyclePosition - b.cyclePosition)
+    .map((r) => r.easyConfigPositionId);
+  if (currentOrder.join("\0") === params.orderedPositionIds.join("\0")) {
+    return;
   }
 
   const positionIdSet = new Set(rows.map((r) => r.easyConfigPositionId));
