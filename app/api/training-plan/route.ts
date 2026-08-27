@@ -10,8 +10,8 @@ import { TrainingPlanLifecycle } from "@prisma/client";
 import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { metersToMiles } from "@/lib/pace-utils";
 import {
-  presetMatchesDistance,
-  snapDistanceLabelFromMeters,
+  presetMatchesRaceDistance,
+  raceDistanceForPresetMatch,
 } from "@/lib/training/preset-distance-match";
 import { claimAthleteRace, findAthleteRaceByRegistry } from "@/lib/athlete-races-service";
 import {
@@ -239,12 +239,17 @@ export async function POST(request: NextRequest) {
       if (!preset) {
         return NextResponse.json({ error: "presetId not found" }, { status: 400 });
       }
-      const raceMeters = race.distanceMeters;
-      if (!presetMatchesDistance(preset.targetDistanceLabel, raceMeters)) {
-        const raceLabel = snapDistanceLabelFromMeters(raceMeters);
+      const raceDistanceInput = {
+        athleteRaceMeters: terminalAthleteRace.distanceMeters,
+        registryMeters: race.distanceMeters,
+        distanceLabel:
+          terminalAthleteRace.distanceLabel ?? race.distanceLabel ?? null,
+      };
+      const raceDistance = raceDistanceForPresetMatch(raceDistanceInput);
+      if (!presetMatchesRaceDistance(preset.targetDistanceLabel, raceDistanceInput)) {
         return NextResponse.json(
           {
-            error: `This training level is built for a ${preset.targetDistanceLabel ?? "specific distance"}. Your goal race${raceLabel ? ` (${raceLabel})` : ""} does not match.`,
+            error: `This training level is built for a ${preset.targetDistanceLabel ?? "specific distance"}. Your goal race${raceDistance.label ? ` (${raceDistance.label})` : ""} does not match.`,
           },
           { status: 422 }
         );

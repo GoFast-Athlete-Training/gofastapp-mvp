@@ -10,7 +10,7 @@ import { LocalStorageAPI } from "@/lib/localstorage";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { raceCalendarBeforeTodayUtc } from "@/lib/training/plan-utils";
 import {
-  presetMatchesDistance,
+  presetMatchesRaceDistance,
   snapDistanceLabelFromMeters,
 } from "@/lib/training/preset-distance-match";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
@@ -138,14 +138,25 @@ function raceDistanceDisplayForGoal(rr: RaceRegistryLite): string | null {
   return null;
 }
 
+type CreateFeedbackKind =
+  | "goals"
+  | "dates"
+  | "distanceMismatch"
+  | "incompletePreset"
+  | "generic";
+
 /** Map API failures to safe UX (avoid surfacing raw 400 strings). */
 function planCreateFeedbackKind(
   status: number,
   message?: string
-): "goals" | "dates" | "preset" | "generic" {
+): CreateFeedbackKind {
   const m = (message ?? "").toLowerCase();
   if (status === 422) {
-    if (m.includes("preset")) return "preset";
+    if (m.includes("finish building your athlete preset")) return "incompletePreset";
+    if (m.includes("training level is built for") || m.includes("does not match")) {
+      return "distanceMismatch";
+    }
+    if (m.includes("preset")) return "incompletePreset";
     return "generic";
   }
   if (status === 400) {
@@ -239,9 +250,8 @@ export default function TrainingSetupClient() {
   const [startDate, setStartDate] = useState("");
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [createFeedback, setCreateFeedback] = useState<
-    "goals" | "dates" | "preset" | "generic" | null
-  >(null);
+  const [createFeedback, setCreateFeedback] = useState<CreateFeedbackKind | null>(null);
+  const [createFeedbackMessage, setCreateFeedbackMessage] = useState<string | null>(null);
   const [paceMin, setPaceMin] = useState("");
   const [paceSec, setPaceSec] = useState("");
   const [baselineWeeklyMileage, setBaselineWeeklyMileage] = useState("");
@@ -290,14 +300,18 @@ export default function TrainingSetupClient() {
     return active;
   }, [activePlans, wizardGoal]);
 
-  /** Presets compatible with the current wizard goal race distance (or all if distance unknown). */
+  /** Presets compatible with the current wizard goal race distance (or any-distance presets if unknown). */
   const presetsForWizardGoal = useMemo(() => {
-    const dm = wizardGoal?.athlete_race?.distanceMeters;
-    if (dm == null || !Number.isFinite(Number(dm))) {
-      return prodPresets;
-    }
-    return prodPresets.filter((p) => presetMatchesDistance(p.targetDistanceLabel, Number(dm)));
-  }, [prodPresets, wizardGoal?.athlete_race?.distanceMeters, wizardGoal?.id]);
+    const ar = wizardGoal?.athlete_race;
+    if (!ar) return prodPresets;
+    return prodPresets.filter((p) =>
+      presetMatchesRaceDistance(p.targetDistanceLabel, {
+        athleteRaceMeters: ar.distanceMeters ?? null,
+        registryMeters: null,
+        distanceLabel: ar.distanceLabel ?? null,
+      })
+    );
+  }, [prodPresets, wizardGoal?.athlete_race, wizardGoal?.id]);
 
   const futureSignups = useMemo(
     () =>
@@ -700,6 +714,7 @@ export default function TrainingSetupClient() {
     setCreating(true);
     setFormError(null);
     setCreateFeedback(null);
+    setCreateFeedbackMessage(null);
     try {
       const token = await getToken();
       const hasOtherActivePlan = activePlans.some((p) => p.lifecycleStatus === "ACTIVE");
@@ -740,7 +755,16 @@ export default function TrainingSetupClient() {
         data = {};
       }
       if (!res.ok) {
-        setCreateFeedback(planCreateFeedbackKind(res.status, data.error));
+        const kind = planCreateFeedbackKind(res.status, data.error);
+        setCreateFeedback(kind);
+        if (
+          data.error &&
+          (kind === "distanceMismatch" || kind === "incompletePreset")
+        ) {
+          setCreateFeedbackMessage(data.error);
+        } else {
+          setCreateFeedbackMessage(null);
+        }
         return;
       }
       if (data.plan?.id) {
@@ -1539,24 +1563,68 @@ export default function TrainingSetupClient() {
                     </div>
                   )}
 
-                  {createFeedback === "preset" && (
+                  {createFeedback === "distanceMismatch" && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-                      <p className="mb-2 font-medium text-red-950">Training level not available</p>
+                      <p className="mb-2 font-medium text-red-950">
+                        Training level doesn&apos;t match your race
+                      </p>
                       <p className="mb-3 text-red-900/95">
-                        We couldn&apos;t load a training level for your account. Tap retry, or contact
-                        support.
+                        {createFeedbackMessage ??
+                          "Pick a training level built for your goal race distance, then try again."}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => void loadOrientation()}
+                          onClick={() => {
+                            setSelectedPreset(null);
+                            setSelectedAthletePresetId(null);
+                            setPresetPickMode("choose");
+                            setCreateFeedback(null);
+                            setCreateFeedbackMessage(null);
+                          }}
                           className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
                         >
-                          Retry
+                          Choose another level
                         </button>
                         <button
                           type="button"
-                          onClick={() => setCreateFeedback(null)}
+                          onClick={() => {
+                            setCreateFeedback(null);
+                            setCreateFeedbackMessage(null);
+                          }}
+                          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {createFeedback === "incompletePreset" && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                      <p className="mb-2 font-medium text-red-950">Finish your training blueprint</p>
+                      <p className="mb-3 text-red-900/95">
+                        {createFeedbackMessage ??
+                          "Complete your custom preset before creating a plan."}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPresetPickMode("custom");
+                            setCreateFeedback(null);
+                            setCreateFeedbackMessage(null);
+                          }}
+                          className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
+                        >
+                          Open preset builder
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCreateFeedback(null);
+                            setCreateFeedbackMessage(null);
+                          }}
                           className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
                         >
                           Dismiss

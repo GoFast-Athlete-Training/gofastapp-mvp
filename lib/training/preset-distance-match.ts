@@ -44,12 +44,68 @@ export function snapDistanceLabelFromMeters(
   return match?.label ?? null;
 }
 
+function finiteMeters(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(Number(value))) return null;
+  return Math.round(Number(value));
+}
+
+/** Working-set first: athlete_races snapshot, then race_registry origin. */
+export function resolveRaceDistanceMeters(
+  athleteRaceMeters: number | null | undefined,
+  registryMeters: number | null | undefined
+): number | null {
+  const athlete = finiteMeters(athleteRaceMeters);
+  if (athlete != null) return athlete;
+  return finiteMeters(registryMeters);
+}
+
+/** Snap meters to a canonical label; fall back to a known distanceLabel when meters are absent or non-standard. */
+export function resolveRaceDistanceLabel(
+  meters: number | null | undefined,
+  distanceLabel: string | null | undefined
+): string | null {
+  const snapped = snapDistanceLabelFromMeters(meters);
+  if (snapped) return snapped;
+  const label = distanceLabel?.trim();
+  if (label && ALLOWED_TARGET_LABELS.has(label)) return label;
+  return null;
+}
+
+export type RaceDistanceMatchInput = {
+  athleteRaceMeters?: number | null;
+  registryMeters?: number | null;
+  distanceLabel?: string | null;
+};
+
+/** Canonical race distance for preset filtering and create-plan validation. */
+export function raceDistanceForPresetMatch(input: RaceDistanceMatchInput): {
+  meters: number | null;
+  label: string | null;
+} {
+  const meters = resolveRaceDistanceMeters(
+    input.athleteRaceMeters,
+    input.registryMeters
+  );
+  const label = resolveRaceDistanceLabel(meters, input.distanceLabel);
+  return { meters, label };
+}
+
 /** True if preset is compatible with the given race distance (null preset label = any). */
 export function presetMatchesDistance(
   presetLabel: string | null | undefined,
-  raceMeters: number | null | undefined
+  raceMeters: number | null | undefined,
+  distanceLabel?: string | null
 ): boolean {
   if (!presetLabel?.trim()) return true;
-  const raceLabel = snapDistanceLabelFromMeters(raceMeters);
+  const raceLabel = resolveRaceDistanceLabel(raceMeters, distanceLabel);
   return raceLabel === presetLabel.trim();
+}
+
+/** True when preset distance matches athlete race snapshot + registry fallback. */
+export function presetMatchesRaceDistance(
+  presetLabel: string | null | undefined,
+  input: RaceDistanceMatchInput
+): boolean {
+  const { meters, label } = raceDistanceForPresetMatch(input);
+  return presetMatchesDistance(presetLabel, meters, label);
 }
