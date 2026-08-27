@@ -4,7 +4,13 @@
 
 import { WorkoutType, Prisma, type training_plan_preset } from "@prisma/client";
 import { runTypeConfigPositionsToInputs, type RunTypeConfigInput } from "@/lib/training/run-type-config-shared";
-import { athletePresetRotationInclude } from "@/lib/training/apply-athlete-rotation-order";
+import {
+  athletePresetRotationInclude,
+  catalogueSelectForGeneration,
+  positionsInclude,
+} from "@/lib/training/preset-positions-include";
+
+export { catalogueSelectForGeneration, positionsInclude };
 
 export interface PlanGenConfig {
   minWeeklyMiles?: number | null;
@@ -41,29 +47,6 @@ export function presetToPlanGenConfig(
     longRunDefaultDow: preset.longRunDefaultDow,
   };
 }
-
-export const catalogueSelectForGeneration = {
-  id: true,
-  name: true,
-  workoutType: true,
-  slug: true,
-  paceAnchor: true,
-  segmentPaceDist: true,
-  warmupMiles: true,
-  cooldownMiles: true,
-  workBaseMiles: true,
-  workBaseReps: true,
-  workBaseRepMeters: true,
-} as const;
-
-export const positionsInclude = {
-  orderBy: { cyclePosition: "asc" as const },
-  include: {
-    workout_catalogue: {
-      select: catalogueSelectForGeneration,
-    },
-  },
-} as const;
 
 export const trainingPlanPresetInclude = {
   longRunConfig: { include: { positions: positionsInclude } },

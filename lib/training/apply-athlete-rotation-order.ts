@@ -6,7 +6,6 @@ import type {
   LoadedAthletePresetInclude,
   LoadedPresetInclude,
 } from "@/lib/training/plan-generate-presets-loader";
-import { positionsInclude } from "@/lib/training/plan-generate-presets-loader";
 
 type PositionWithCatalogue = {
   id: string;
@@ -133,58 +132,3 @@ export function resolveAthletePresetRotations(
 
   return { longRunConfig, easyConfig, tempoConfig, intervalsConfig };
 }
-
-export const athletePresetRotationInclude = {
-  longRunConfig: { include: { positions: positionsInclude } },
-  easyConfig: { include: { positions: positionsInclude } },
-  longRunOrders: { orderBy: { cyclePosition: "asc" as const } },
-  easyOrders: { orderBy: { cyclePosition: "asc" as const } },
-  athleteTempoConfig: {
-    include: {
-      positions: {
-        orderBy: { cyclePosition: "asc" as const },
-        include: {
-          workout_catalogue: {
-            select: {
-              id: true,
-              name: true,
-              workoutType: true,
-              slug: true,
-              paceAnchor: true,
-              segmentPaceDist: true,
-              warmupMiles: true,
-              cooldownMiles: true,
-              workBaseMiles: true,
-              workBaseReps: true,
-              workBaseRepMeters: true,
-            },
-          },
-        },
-      },
-    },
-  },
-  athleteIntervalsConfig: {
-    include: {
-      positions: {
-        orderBy: { cyclePosition: "asc" as const },
-        include: {
-          workout_catalogue: {
-            select: {
-              id: true,
-              name: true,
-              workoutType: true,
-              slug: true,
-              paceAnchor: true,
-              segmentPaceDist: true,
-              warmupMiles: true,
-              cooldownMiles: true,
-              workBaseMiles: true,
-              workBaseReps: true,
-              workBaseRepMeters: true,
-            },
-          },
-        },
-      },
-    },
-  },
-} as const;
