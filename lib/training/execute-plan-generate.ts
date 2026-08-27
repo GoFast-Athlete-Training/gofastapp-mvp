@@ -42,6 +42,7 @@ import {
   persistPlanRaceSnapshots,
   resolvePlanRaceCalendar,
 } from "@/lib/training/race-plan-calendar-service";
+import { ensureGoalRaceMetersForGenerate } from "@/lib/training/resolve-goal-race-meters";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -70,7 +71,16 @@ export async function executePlanGenerate(params: {
   const planRow = await prisma.training_plans.findFirst({
     where: { id: plan.id, athleteId },
     include: {
-      athlete_race: true,
+      athlete_race: {
+        include: {
+          race_registry: {
+            select: {
+              distanceMeters: true,
+              distanceLabel: true,
+            },
+          },
+        },
+      },
     },
   });
   if (!planRow) {
@@ -167,15 +177,16 @@ export async function executePlanGenerate(params: {
         : [1, 2, 3, 4, 5, 6];
 
   const weekCount = calendarTrainingWeekCount(plan.startDate, race.raceDate);
-  const raceMeters =
-    race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
-      ? Math.round(Number(race.distanceMeters))
-      : null;
-  if (raceMeters == null || raceMeters <= 0) {
-    throw new Error(
-      "Your goal race needs a confirmed distance before we can generate a schedule. Go back to plan setup and confirm how far you're racing."
-    );
-  }
+  const raceMeters = await ensureGoalRaceMetersForGenerate({
+    athleteId,
+    race: {
+      id: race.id,
+      name: race.name,
+      distanceMeters: race.distanceMeters,
+      distanceLabel: race.distanceLabel,
+      race_registry: race.race_registry,
+    },
+  });
   const raceDistanceMiles = metersToMiles(raceMeters);
 
   const cLen = LONG_RUN_BLOCK_WEEKS;
