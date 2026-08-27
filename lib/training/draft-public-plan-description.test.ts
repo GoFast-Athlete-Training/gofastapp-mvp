@@ -6,7 +6,7 @@ import {
 } from "./draft-public-plan-description-facts";
 
 describe("summarizePlanScheduleForDescription", () => {
-  it("counts quality sessions and long runs from structured weeks", () => {
+  it("counts tempo/interval sessions and long runs from structured weeks", () => {
     const summary = summarizePlanScheduleForDescription([
       {
         weekNumber: 1,
@@ -26,14 +26,14 @@ describe("summarizePlanScheduleForDescription", () => {
     ]);
 
     expect(summary.weekCount).toBe(2);
-    expect(summary.qualitySessionsPerWeek).toBe(1.5);
+    expect(summary.tempoIntervalSessionsPerWeek).toBe(1.5);
     expect(summary.weeksWithLongRun).toBe(2);
     expect(summary.distinctCycleSlots).toBe(2);
   });
 });
 
 describe("buildDeterministicPublicPlanDescriptionFallback", () => {
-  it("mentions race, weeks, goal, and quality rhythm when facts exist", () => {
+  it("mentions race, weeks, goal, and tempo/interval rhythm when facts exist", () => {
     const facts = buildPublicPlanDescriptionFacts({
       raceName: "Boston Marathon",
       raceDistanceLabel: "26.2 mi",
@@ -55,6 +55,6 @@ describe("buildDeterministicPublicPlanDescriptionFallback", () => {
     expect(text).toContain("Boston Marathon");
     expect(text).toContain("18-week");
     expect(text).toContain("3:05:00");
-    expect(text).toContain("quality session");
+    expect(text).toContain("tempo or interval session");
   });
 });

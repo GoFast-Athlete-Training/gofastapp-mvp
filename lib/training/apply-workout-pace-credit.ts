@@ -60,8 +60,6 @@ export async function applyWorkoutPaceCredit(params: {
         previousPaceSecPerMile: previousSec,
         newPaceSecPerMile: newSec,
         adjustmentSecPerMile: previousSec - newSec,
-        qualityWorkoutsCount: 1,
-        qualityAvgDeltaSecPerMile: null,
         longRunCompleted: false,
         longRunCompletionRatio: null,
         weeklyMileageCompletionPct: null,

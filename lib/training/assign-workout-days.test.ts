@@ -23,7 +23,7 @@ const baseInput = {
   easyPositions: [{ cyclePosition: 0, distributionWeight: 1, catalogueWorkoutId: "easy-1" }],
 };
 
-test("mid-week week 1 skips missed tempo instead of cramming both quality sessions", () => {
+test("mid-week week 1 skips missed tempo instead of cramming both tempo/interval sessions", () => {
   const { schedule } = assignWorkoutDays(baseInput);
   const week1 = schedule[0];
 
@@ -47,24 +47,24 @@ test("easy days receive catalogue workout ids from easy rotation", () => {
   }
 });
 
-test("partial week 1 caps quality work at one hard session", () => {
+test("partial week 1 caps tempo/interval work at one hard session", () => {
   const { schedule } = assignWorkoutDays({
     ...baseInput,
     preferredDays: [3, 4, 5, 6],
     preferredTempoDow: 3,
     tempoIdealDow: 3,
   });
-  const week1Quality = schedule[0]?.days.filter(
+  const week1TempoInterval = schedule[0]?.days.filter(
     (d) => d.workoutType === "Tempo" || d.workoutType === "Intervals"
   );
 
   assert.deepEqual(
-    week1Quality?.map((d) => d.workoutType),
+    week1TempoInterval?.map((d) => d.workoutType),
     ["Tempo"]
   );
 });
 
-test("weeklyWorkoutComposition tempo:0 intervals:0 skips quality sessions", () => {
+test("weeklyWorkoutComposition tempo:0 intervals:0 skips tempo/interval sessions", () => {
   const { schedule } = assignWorkoutDays({
     ...baseInput,
     weeklyTempoSessions: 0,

@@ -33,7 +33,7 @@ Output rules:
 - Exactly 2–4 short sentences.
 - First person ("I'm…") or light host voice is fine.
 - This appears under the plan title on the public page. Race name, distance, weeks, and goal time already show elsewhere — weave them in naturally but do not repeat metadata as a dry list.
-- Mention goal time, quality workouts, long run rhythm, and progression only when supported by the facts payload.
+- Mention goal time, tempo and interval workouts, long run rhythm, and progression only when supported by the facts payload.
 - Do NOT invent races, finish times, workout types, or schedule details not in the payload.
 - Warm, direct tone — what followers should know about this build.`;
 

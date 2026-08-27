@@ -10,7 +10,7 @@ export type SwimPlanDaySchedule = {
   /** Training DOW convention: 1=Monday … 7=Sunday */
   dow: number;
   workoutType: SwimWorkoutType;
-  /** Planned meters for the day (quality + filler); materialized workouts may diverge after edits */
+  /** Planned meters for the day (workoutStructure + filler); materialized workouts may diverge after edits */
   meters: number;
   catalogueWorkoutId: string | null;
   /** Rotation slot aligned with preset position lists; null when not applicable */

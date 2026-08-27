@@ -620,7 +620,6 @@ export async function adoptPublishedPlanBySlug(
         preferredLongRunDow: sourcePlan.preferredLongRunDow,
         preferredTempoDow: sourcePlan.preferredTempoDow,
         preferredIntervalDow: sourcePlan.preferredIntervalDow,
-        preferredQualityDays: sourcePlan.preferredQualityDays ?? [],
         presetId: sourcePlan.presetId,
         updatedAt: now,
       },

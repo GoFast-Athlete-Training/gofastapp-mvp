@@ -570,7 +570,7 @@ export function prescribe(params: {
     const wkf0 = entry.workFraction;
     const cf0 = entry.cooldownFraction;
 
-    // Canonical quality long run: workFraction + goalRacePace at the back (no easy-before-work mpBlock).
+    // Canonical goal-pace long run: workFraction + goalRacePace at the back (no easy-before-work mpBlock).
     const canonicalWorkFractionOnly =
       wkf0 != null &&
       wkf0 > 0 &&

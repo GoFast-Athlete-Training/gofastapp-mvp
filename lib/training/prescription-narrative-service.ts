@@ -154,7 +154,7 @@ Output rules:
 - When weekNumber and planTotalWeeks are numbers, anchor placement (e.g. "Week 3 of your 24-week build").
 - When dayAssigned is present, reference the day of week naturally if it helps framing.
 - Use catalogue.trainingIntent and notes as the "why" — your job is the "how to run it today."
-- Be specific when you can infer context: first quality session of the week, easy day tomorrow, save legs for the long run, commit on the last rep/push — only when supported by workout type, week, day, or structuredSteps. Do not invent schedule facts not in the payload.
+- Be specific when you can infer context: first tempo or interval session of the week, easy day tomorrow, save legs for the long run, commit on the last rep/push — only when supported by workout type, week, day, or structuredSteps. Do not invent schedule facts not in the payload.
 - If workPaceOffsetSecPerMile is a number, describe it plainly using the actual value — do NOT invent offsets.
 - If hasMarathonBlock is false — do NOT mention marathon pace or hard fast finishes unless notes/trainingIntent clearly say otherwise.
 - If hasMarathonBlock is true — you may briefly mention the marathon-pace segment as prescribed.
@@ -334,7 +334,7 @@ Output rules:
 - When weekNumber and planTotalWeeks are numbers, anchor placement (e.g. "Week 3 of your 24-week build").
 - When dayAssigned is present, reference the day of week naturally if it helps framing.
 - Use catalogue.trainingIntent and notes as the "why" — your job is the "how to run it today."
-- Be specific when you can infer context: first quality session of the week, easy day tomorrow, save legs for the long run, commit on the last rep/push — only when supported by workout type, week, day, or structuredSteps. Do not invent schedule facts not in the payload.
+- Be specific when you can infer context: first tempo or interval session of the week, easy day tomorrow, save legs for the long run, commit on the last rep/push — only when supported by workout type, week, day, or structuredSteps. Do not invent schedule facts not in the payload.
 - If workPaceOffsetSecPerMile is a number, describe it plainly using the actual value — do NOT invent offsets.
 - If hasMarathonBlock is false — do NOT mention marathon pace or hard fast finishes unless notes/trainingIntent clearly say otherwise.
 - If hasMarathonBlock is true — you may briefly mention the marathon-pace segment as prescribed.

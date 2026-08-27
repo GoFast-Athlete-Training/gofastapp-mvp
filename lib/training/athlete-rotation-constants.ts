@@ -1,2 +1,2 @@
 /** Shared rotation slot count — safe for client components. */
-export const QUALITY_ROTATION_SLOTS = 8;
+export const CATALOGUE_ROTATION_SLOTS = 8;

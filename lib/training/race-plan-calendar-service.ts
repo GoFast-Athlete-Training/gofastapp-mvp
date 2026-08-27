@@ -283,7 +283,7 @@ export function previewPlanRaceCollision(params: {
   } else {
     nearbyChanges.push("Race will be added to your plan on that date.");
   }
-  nearbyChanges.push("Quality sessions within a day of the race will be reduced.");
+  nearbyChanges.push("Tempo and interval sessions within a day of the race will be reduced.");
   nearbyChanges.push(
     `About ${recoveryDaysEstimate(distMi)} days of lighter training afterward before rebuilding toward your goal race.`
   );

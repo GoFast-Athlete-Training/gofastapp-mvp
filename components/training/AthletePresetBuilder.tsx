@@ -11,7 +11,7 @@ import {
   foundationPeakPoolComparisonRows,
   peakLongRunPoolFoundationKey,
 } from "@/lib/training/long-run-pool-fields";
-import { QUALITY_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
+import { CATALOGUE_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
 import {
   DEFAULT_ATHLETE_PACE_ADJUSTER,
   type AthletePaceAdjuster,
@@ -19,7 +19,7 @@ import {
 import { InlineGoalForm, type InlineGoalRow } from "@/components/races/InlineGoalForm";
 import { FoundationCompareExpander } from "@/components/training/FoundationCompareExpander";
 import { RotationOrderList } from "@/components/training/RotationOrderList";
-import { QualityRotationEditor } from "@/components/training/QualityRotationEditor";
+import { CatalogueRotationEditor } from "@/components/training/CatalogueRotationEditor";
 
 export type PresetForWizardLite = {
   id: string;
@@ -145,8 +145,8 @@ function catalogueIdsFromPositions(positions: ConfigPosition[] | undefined): str
     .filter((id): id is string => Boolean(id));
 }
 
-function qualitySelectionValid(ids: string[]): boolean {
-  if (ids.length !== QUALITY_ROTATION_SLOTS) return false;
+function rotationSelectionValid(ids: string[]): boolean {
+  if (ids.length !== CATALOGUE_ROTATION_SLOTS) return false;
   return new Set(ids).size === ids.length && ids.every((id) => id.trim());
 }
 
@@ -687,8 +687,8 @@ export function AthletePresetBuilder({
     setSaving(true);
     setError(null);
     try {
-      if (!qualitySelectionValid(tempoCatalogueIds)) {
-        throw new Error(`Pick ${QUALITY_ROTATION_SLOTS} unique tempo workouts`);
+      if (!rotationSelectionValid(tempoCatalogueIds)) {
+        throw new Error(`Pick ${CATALOGUE_ROTATION_SLOTS} unique tempo workouts`);
       }
       await patchPreset({
         step: "tempo",
@@ -707,8 +707,8 @@ export function AthletePresetBuilder({
     setSaving(true);
     setError(null);
     try {
-      if (!qualitySelectionValid(intervalCatalogueIds)) {
-        throw new Error(`Pick ${QUALITY_ROTATION_SLOTS} unique interval workouts`);
+      if (!rotationSelectionValid(intervalCatalogueIds)) {
+        throw new Error(`Pick ${CATALOGUE_ROTATION_SLOTS} unique interval workouts`);
       }
       await patchPreset({
         step: "interval",
@@ -1203,7 +1203,7 @@ export function AthletePresetBuilder({
           <p className="text-sm text-gray-600">
             Choose eight threshold workouts from the catalogue and set the order they rotate.
           </p>
-          <QualityRotationEditor
+          <CatalogueRotationEditor
             workoutType="Tempo"
             initialCatalogueIds={tempoCatalogueIds}
             getToken={getToken}
@@ -1212,7 +1212,7 @@ export function AthletePresetBuilder({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={saving || !qualitySelectionValid(tempoCatalogueIds)}
+              disabled={saving || !rotationSelectionValid(tempoCatalogueIds)}
               onClick={() => void confirmTempoAndContinue()}
               className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
             >
@@ -1229,7 +1229,7 @@ export function AthletePresetBuilder({
           <p className="text-sm text-gray-600">
             Choose eight interval workouts from the catalogue and set the order they rotate.
           </p>
-          <QualityRotationEditor
+          <CatalogueRotationEditor
             workoutType="Intervals"
             initialCatalogueIds={intervalCatalogueIds}
             getToken={getToken}
@@ -1238,7 +1238,7 @@ export function AthletePresetBuilder({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={saving || !qualitySelectionValid(intervalCatalogueIds)}
+              disabled={saving || !rotationSelectionValid(intervalCatalogueIds)}
               onClick={() => void confirmIntervalAndContinue()}
               className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
             >

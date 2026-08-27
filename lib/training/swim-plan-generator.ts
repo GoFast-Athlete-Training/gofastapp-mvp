@@ -67,7 +67,7 @@ const TYPE_TO_DOW_FIELD: Record<
 
 /**
  * Generate swim plan schedule JSON rows for `totalWeeks`.
- * Quality days are placed from workoutStructure; meter allocation is simplified until catalogue seed exists.
+ * WorkoutStructure days are placed from workoutStructure; meter allocation is simplified until catalogue seed exists.
  */
 export function generateSwimPlanSchedule(
   input: SwimPlanGeneratorInput
@@ -114,7 +114,7 @@ export function generateSwimPlanSchedule(
 
   if (!structure) {
     warnings.push(
-      "workoutStructure missing or invalid — generated schedule has no quality days"
+      "workoutStructure missing or invalid — generated schedule has no workoutStructure days"
     );
   }
 

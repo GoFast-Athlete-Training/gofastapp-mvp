@@ -28,7 +28,6 @@ export type RunAssessmentContext = {
 type AiAssessmentRaw = {
   narrative?: string;
   hrPattern?: string;
-  effortQuality?: string;
 };
 
 function normalizeHrPattern(
@@ -39,16 +38,6 @@ function normalizeHrPattern(
     .trim();
   if (u === "steady" || u === "drift_up" || u === "drift_down" || u === "variable")
     return u;
-  return "unknown";
-}
-
-function normalizeEffortQuality(
-  raw: string | undefined
-): RunAnalysisJsonV1["effortQuality"] {
-  const u = String(raw || "")
-    .toLowerCase()
-    .trim();
-  if (u === "on_target" || u === "above" || u === "below") return u;
   return "unknown";
 }
 
@@ -70,7 +59,6 @@ function parseAssessmentJson(
     assessedAt: new Date().toISOString(),
     narrative,
     hrPattern: normalizeHrPattern(parsed.hrPattern),
-    effortQuality: normalizeEffortQuality(parsed.effortQuality),
     recommendation: null,
     contextTags: context.contextTags,
     contextNote: context.contextNote?.trim() || null,
@@ -287,8 +275,7 @@ Write 2-4 short sentences that:
 Respond with ONLY a JSON object (no markdown):
 {
   "narrative": "2-4 sentences",
-  "hrPattern": one of "steady","drift_up","drift_down","variable","unknown",
-  "effortQuality": one of "on_target","above","below","unknown"
+  "hrPattern": one of "steady","drift_up","drift_down","variable","unknown"
 }`;
 
   const userPrompt = JSON.stringify(payload, null, 2);

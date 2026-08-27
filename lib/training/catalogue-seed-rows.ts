@@ -153,7 +153,7 @@ export const SEED_CATALOGUE_ROWS: CatalogueSeedRow[] = [
     notes: null,
   },
   {
-    name: "Long Run Quality",
+    name: "Long Run Goal Pace",
     runSubType: "mp-block",
     workoutType: "LongRun",
     description:

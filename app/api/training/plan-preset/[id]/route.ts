@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
-import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
 import { parseTargetDistanceLabelFromBody } from "@/lib/training/preset-distance-match";
 import {
   easyRunConfigToSnapshot,
@@ -92,7 +91,7 @@ export async function GET(
   }
   return NextResponse.json({
     success: true,
-    preset: attachEntityFields(serializePlanPresetForApi(preset), {
+    preset: attachEntityFields(preset, {
       persona: preset.persona ?? null,
       goal: preset.goal ?? null,
     }),
@@ -398,7 +397,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      preset: attachEntityFields(serializePlanPresetForApi(updated), {
+      preset: attachEntityFields(updated, {
         persona: updated.persona ?? null,
         goal: updated.goal ?? null,
       }),

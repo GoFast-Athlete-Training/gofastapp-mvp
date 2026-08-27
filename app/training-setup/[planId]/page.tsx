@@ -81,8 +81,6 @@ type PlanDetail = {
   preferredLongRunDow?: number | null;
   preferredTempoDow?: number | null;
   preferredIntervalDow?: number | null;
-  /** Legacy; used only to hydrate UI when new columns are empty */
-  preferredQualityDays?: number[];
   weeklyMileageTarget?: number | null;
   currentWeeklyMileage?: number | null;
   _count?: { planned_workouts: number };
@@ -293,29 +291,14 @@ export default function TrainingSetupPlanPage({
     } else {
       setPreferredLongRunDowLocal(6);
     }
-    let tempo = plan.preferredTempoDow ?? null;
-    let interval = plan.preferredIntervalDow ?? null;
-    if (
-      tempo == null &&
-      interval == null &&
-      Array.isArray(plan.preferredQualityDays) &&
-      plan.preferredQualityDays.length > 0
-    ) {
-      const q = [...plan.preferredQualityDays]
-        .filter((n) => n >= 1 && n <= 7)
-        .sort((a, b) => a - b);
-      if (q.length >= 1) tempo = q[0]!;
-      if (q.length >= 2) interval = q[1]!;
-    }
-    setPreferredTempoDowLocal(tempo);
-    setPreferredIntervalDowLocal(interval);
+    setPreferredTempoDowLocal(plan.preferredTempoDow ?? null);
+    setPreferredIntervalDowLocal(plan.preferredIntervalDow ?? null);
   }, [
     plan?.id,
     plan?.preferredDays,
     plan?.preferredLongRunDow,
     plan?.preferredTempoDow,
     plan?.preferredIntervalDow,
-    plan?.preferredQualityDays,
     plan?.weeklyMileageTarget,
     athleteWeeklyTargetPreference,
   ]);

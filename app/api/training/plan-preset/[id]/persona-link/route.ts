@@ -4,8 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { attachEntityFields } from "@/lib/training/plan-entity-serialize";
-import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -46,7 +44,7 @@ export async function POST(
 
   return NextResponse.json({
     success: true,
-    preset: attachEntityFields(serializePlanPresetForApi(updated), {
+    preset: attachEntityFields(updated, {
       persona: updated.persona ?? null,
       goal: updated.goal ?? null,
     }),

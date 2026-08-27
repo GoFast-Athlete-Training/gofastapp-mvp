@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { RotationOrderList } from "@/components/training/RotationOrderList";
-import { QUALITY_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
+import { CATALOGUE_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
 
 export type CatalogueOption = {
   id: string;
@@ -22,7 +22,7 @@ type Props = {
   onChange: (orderedCatalogueIds: string[]) => void;
 };
 
-export function QualityRotationEditor({
+export function CatalogueRotationEditor({
   workoutType,
   initialCatalogueIds,
   getToken,
@@ -45,8 +45,8 @@ export function QualityRotationEditor({
         const items = data.items ?? [];
         setCatalogue(items);
         const byId = new Map(items.map((i) => [i.id, i.name]));
-        const seed = initialCatalogueIds.slice(0, QUALITY_ROTATION_SLOTS);
-        while (seed.length < QUALITY_ROTATION_SLOTS) {
+        const seed = initialCatalogueIds.slice(0, CATALOGUE_ROTATION_SLOTS);
+        while (seed.length < CATALOGUE_ROTATION_SLOTS) {
           seed.push(seed[seed.length - 1] ?? items[0]?.id ?? "");
         }
         setSlots(

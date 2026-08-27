@@ -8,8 +8,6 @@ import {
   type WorkoutPickerApplyInput,
 } from "@/lib/training/apply-workout-picker";
 import { attachEntityFields } from "@/lib/training/plan-entity-serialize";
-import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
-
 const presetInclude = {
   longRunConfig: {
     include: {
@@ -95,7 +93,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       configIds,
-      preset: attachEntityFields(serializePlanPresetForApi(preset), {
+      preset: attachEntityFields(preset, {
         persona: preset.persona ?? null,
         goal: preset.goal ?? null,
       }),

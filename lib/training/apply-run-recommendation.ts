@@ -130,7 +130,6 @@ export async function applyRunRecommendationFromWorkout(params: {
           previousPaceSecPerMile: null,
           newPaceSecPerMile: suggestedSec,
           adjustmentSecPerMile: null,
-          qualityWorkoutsCount: 1,
           summaryMessage,
         },
       });
@@ -180,7 +179,6 @@ export async function applyRunRecommendationFromWorkout(params: {
           previousPaceSecPerMile: previousSec,
           newPaceSecPerMile: capped,
           adjustmentSecPerMile: capped - previousSec,
-          qualityWorkoutsCount: 1,
           summaryMessage,
         },
       });

@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
-import { serializePlanPresetForApi } from "@/lib/training/quality-percent";
 import { parseTargetDistanceLabelFromBody } from "@/lib/training/preset-distance-match";
 import {
   easyRunConfigToSnapshot,
@@ -104,7 +103,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     presets: presets.map((p) =>
-      attachEntityFields(serializePlanPresetForApi(p), {
+      attachEntityFields(p, {
         persona: p.persona ?? null,
         goal: p.goal ?? null,
       })
@@ -407,7 +406,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        preset: attachEntityFields(serializePlanPresetForApi(preset), {
+        preset: attachEntityFields(preset, {
           persona: preset.persona ?? null,
           goal: preset.goal ?? null,
         }),

@@ -123,8 +123,6 @@ export async function generateWeeklySummary(params: {
       previousPaceSecPerMile: currentSec,
       newPaceSecPerMile: currentSec,
       adjustmentSecPerMile: 0,
-      qualityWorkoutsCount: metrics.structuredSessionsCompleted,
-      qualityAvgDeltaSecPerMile: metrics.structuredPaceAvgDeltaSecPerMile,
       longRunCompleted: metrics.longRunCompleted,
       longRunCompletionRatio: metrics.longRunCompletionRatio,
       weeklyMileageCompletionPct: metrics.weeklyMileageCompletionPct,

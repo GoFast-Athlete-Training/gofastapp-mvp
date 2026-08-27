@@ -600,7 +600,7 @@
 - `dayIndex` - Int (required)
 - `date` - DateTime (required)
 - `plannedData` - Json? - Snapshot when executed
-- `analysis` - Json? - { workoutCompleted, hitTargetMileage, hitTargetPace, stayedInHRZone, mileageVariance, paceVariance, qualityScore, performanceNotes }
+- `analysis` - Json? - { workoutCompleted, hitTargetMileage, hitTargetPace, stayedInHRZone, mileageVariance, paceVariance, performanceNotes }
 - `feedback` - Json? - { mood, effort, injuryFlag, notes, submittedAt }
 - `createdAt` - DateTime (default: now())
 - `updatedAt` - DateTime (auto-updated)

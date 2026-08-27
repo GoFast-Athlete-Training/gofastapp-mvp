@@ -2,7 +2,7 @@
 
 ## Why totals can look “short”
 
-- **Week mileage** (e.g. 44 mi/week) is allocated across all days in `planWeeks`. A single day may list ~6–10 mi while the **Garmin / segment builder** only encodes the *quality* pieces (e.g. 2 mi at 5K effort) plus explicit warm-up / cool-down.
+- **Week mileage** (e.g. 44 mi/week) is allocated across all days in `planWeeks`. A single day may list ~6–10 mi while the **Garmin / segment builder** only encodes the *Tempo/Intervals* pieces (e.g. 2 mi at 5K effort) plus explicit warm-up / cool-down.
 - **Easy volume** is often implied: before/after the main set you’re meant to jog easy to reach the day’s total. The UI surfaces **plan distance** (`estimatedDistanceInMeters` / schedule card) next to **structured distance** (sum of distance-based steps) so athletes aren’t surprised.
 - **“Not a repeat”**: catalogue / progression rows may be flagged non-repeating when this instance is tied to a specific week; that is separate from interval workouts that literally say `4×800`.
 

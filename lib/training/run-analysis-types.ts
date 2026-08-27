@@ -5,7 +5,6 @@ export type RunAnalysisJsonV1 = {
   assessedAt: string;
   narrative: string;
   hrPattern: "steady" | "drift_up" | "drift_down" | "variable" | "unknown";
-  effortQuality: "on_target" | "above" | "below" | "unknown";
   recommendation: {
     field: "aerobicCeilingBpm" | "fiveKPaceSecPerMile";
     suggestedValue: number;

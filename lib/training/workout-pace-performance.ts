@@ -291,7 +291,6 @@ export async function confirmAthleteFiveKPaceFromWorkout(params: {
         previousPaceSecPerMile: previousSec,
         newPaceSecPerMile: newSec,
         adjustmentSecPerMile: previousSec - newSec,
-        qualityWorkoutsCount: 1,
         summaryMessage: `You confirmed updating 5K pace to ${newPaceStr}/mi based on this workout.`,
       },
     });

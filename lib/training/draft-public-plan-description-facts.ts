@@ -12,7 +12,7 @@ export type PublicPlanDescriptionFacts = {
   athleteFirstName: string | null;
   schedule: {
     weekCount: number;
-    qualitySessionsPerWeek: number | null;
+    tempoIntervalSessionsPerWeek: number | null;
     weeksWithLongRun: number;
     distinctCycleSlots: number | null;
   };
@@ -28,7 +28,7 @@ export function summarizePlanScheduleForDescription(planSchedule: unknown): Publ
   if (!Array.isArray(planSchedule) || planSchedule.length === 0) {
     return {
       weekCount: 0,
-      qualitySessionsPerWeek: null,
+      tempoIntervalSessionsPerWeek: null,
       weeksWithLongRun: 0,
       distinctCycleSlots: null,
     };
@@ -38,35 +38,35 @@ export function summarizePlanScheduleForDescription(planSchedule: unknown): Publ
   if (structuredWeeks.length === 0) {
     return {
       weekCount: planSchedule.length,
-      qualitySessionsPerWeek: null,
+      tempoIntervalSessionsPerWeek: null,
       weeksWithLongRun: 0,
       distinctCycleSlots: null,
     };
   }
 
-  let qualityTotal = 0;
+  let tempoIntervalTotal = 0;
   let weeksWithLongRun = 0;
   const cycleIndices = new Set<number>();
 
   for (const week of structuredWeeks) {
-    let quality = 0;
+    let tempoInterval = 0;
     let hasLong = false;
     for (const day of week.days) {
-      if (day.workoutType === "Tempo" || day.workoutType === "Intervals") quality++;
+      if (day.workoutType === "Tempo" || day.workoutType === "Intervals") tempoInterval++;
       if (day.workoutType === "LongRun") hasLong = true;
       if (day.planCycleIndex != null) cycleIndices.add(day.planCycleIndex);
     }
-    qualityTotal += quality;
+    tempoIntervalTotal += tempoInterval;
     if (hasLong) weeksWithLongRun++;
   }
 
   const weekCount = structuredWeeks.length;
-  const qualitySessionsPerWeek =
-    weekCount > 0 ? Math.round((qualityTotal / weekCount) * 10) / 10 : null;
+  const tempoIntervalSessionsPerWeek =
+    weekCount > 0 ? Math.round((tempoIntervalTotal / weekCount) * 10) / 10 : null;
 
   return {
     weekCount,
-    qualitySessionsPerWeek,
+    tempoIntervalSessionsPerWeek,
     weeksWithLongRun,
     distinctCycleSlots: cycleIndices.size > 0 ? cycleIndices.size : null,
   };
@@ -109,11 +109,11 @@ export function buildDeterministicPublicPlanDescriptionFallback(
     sentences.push(`My target finish is ${facts.goalRaceTime}.`);
   }
 
-  const q = facts.schedule.qualitySessionsPerWeek;
+  const q = facts.schedule.tempoIntervalSessionsPerWeek;
   if (q != null && q >= 1) {
     const rounded = Math.round(q);
     sentences.push(
-      `Most weeks include about ${rounded} quality session${rounded === 1 ? "" : "s"} plus a long run.`
+      `Most weeks include about ${rounded} tempo or interval session${rounded === 1 ? "" : "s"} plus a long run.`
     );
   } else if (facts.schedule.weeksWithLongRun > 0) {
     sentences.push("Long runs anchor the week with easy days filling in the rest.");

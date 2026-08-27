@@ -1,5 +1,7 @@
 # Pace delta — stone tablet (step 2)
 
+**Adaptive handoff:** `pace_adjustment_log.qualityWorkoutsCount` / `qualityAvgDeltaSecPerMile` were dropped — never a read path. Do not build adaptive on the log table. SOT is `workouts.paceDeltaSecPerMile`. Week-level Tempo/Intervals avg is computed live as `structuredPaceAvgDeltaSecPerMile` in `week-performance-metrics.ts`. The log table is a notification inbox (`summaryMessage`), not an analyzer.
+
 **Freeze here.** Former us already shipped the three-table bolt. Do not invent a fourth place to store “how they ran.”
 
 ```text
@@ -133,7 +135,7 @@ paceDelta = round(mean(deltas))
 evaluationEligibleFlag = true
 ```
 
-This is the real step-2 write for quality workouts. Added `b878f0e` (May 29 2026) as “activity-to-segment execution parsing.”
+This is the real step-2 write for Tempo/Intervals workouts. Added `b878f0e` (May 29 2026) as “activity-to-segment execution parsing.”
 
 **Before it writes, it always clears.**
 
@@ -213,7 +215,7 @@ History, not mythology:
 3. **`70c4358` / `c1af675`** — display-time `computeWorkoutPerformanceAnalysis` becomes a **second brain**. Structured types go `completion_only` unless `structuredSegmentLapsAligned()` (exactly one lap per segment row).
 4. **`e47e4ef`** — Writer A stops writing whole-run delta when paced work segments exist. Correct for structured. Credits still fire on that same call.
 
-So a finished quality workout can be `MATCHED`, notification sent, and:
+So a finished Tempo/Intervals workout can be `MATCHED`, notification sent, and:
 
 - column null (Writer A skipped, Writer B never ran or cleared and failed)
 - or column written by Writer B, and GET still hides +/- because display re-gates harder than the writer

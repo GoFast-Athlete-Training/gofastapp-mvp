@@ -34,7 +34,7 @@ export default function PlanSecondaryRacesReview({
       <p className="mt-2 leading-relaxed text-gray-700">
         These races fall between your plan start and
         {goalRaceName ? ` ${goalRaceName}` : " your goal race"}. We&apos;ll treat each included
-        race as a real race effort — adjusting long runs, quality work, and recovery around them.
+        race as a real race effort — adjusting long runs, tempo and interval work, and recovery around them.
       </p>
       <ul className="mt-4 space-y-2">
         {candidates.map((c) => {

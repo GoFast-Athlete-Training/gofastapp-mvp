@@ -42,7 +42,7 @@ function applyOrder<T extends PositionWithCatalogue>(
     .filter((p): p is T => p != null);
 }
 
-function athleteQualityAsCatalogConfig(
+function athleteLaneAsCatalogConfig(
   positions: Array<{
     id: string;
     cyclePosition: number;
@@ -121,11 +121,11 @@ export function resolveAthletePresetRotations(
     ? { ...row.easyConfig, positions: easyPositions }
     : null;
 
-  const tempoConfig = athleteQualityAsCatalogConfig(
+  const tempoConfig = athleteLaneAsCatalogConfig(
     row.athleteTempoConfig?.positions,
     "Athlete tempo"
   );
-  const intervalsConfig = athleteQualityAsCatalogConfig(
+  const intervalsConfig = athleteLaneAsCatalogConfig(
     row.athleteIntervalsConfig?.positions,
     "Athlete intervals"
   ) as LoadedPresetInclude["intervalsConfig"];

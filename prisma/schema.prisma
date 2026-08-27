@@ -481,8 +481,6 @@ model pace_adjustment_log {
   previousPaceSecPerMile       Int?
   newPaceSecPerMile            Int?
   adjustmentSecPerMile         Int?
-  qualityWorkoutsCount         Int            @default(0)
-  qualityAvgDeltaSecPerMile    Int?
   longRunCompleted             Boolean        @default(false)
   longRunCompletionRatio       Float?
   weeklyMileageCompletionPct   Float?
@@ -2230,8 +2228,6 @@ model training_plans {
   preferredDays        Int[]                  @default([])
   /// Preferred long-run day: 6=Saturday, 7=Sunday (default 6)
   preferredLongRunDow  Int?
-  /// User-selected DOWs for quality sessions (1=Mon..7=Sun), max 2 entries
-  preferredQualityDays Int[]                  @default([])
   /// Athlete tempo day (1=Mon..7=Sun); null = preset default at generation.
   preferredTempoDow    Int?
   /// Athlete interval day (1=Mon..7=Sun); null = preset default at generation.
