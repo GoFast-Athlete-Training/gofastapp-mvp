@@ -16,6 +16,7 @@ import {
   scoreActivityCandidateForWorkout,
   type ScoredActivityCandidate,
 } from "@/lib/training/workout-activity-match-candidates";
+import { plannedDayConsumedByOtherActivity } from "@/lib/training/match-planned-workout";
 
 /** m/s → seconds per mile */
 function speedMpsToSecPerMile(mps: number | null | undefined): number | null {
@@ -93,11 +94,9 @@ export async function promoteUnmatchedRunningActivityToWorkout(
     return { promoted: false, blockedByPlannedWorkout: true };
   }
 
-  const plannedNearby = await prisma.workouts.findMany({
+  const plannedNearby = await prisma.planned_workouts.findMany({
     where: {
       athleteId: activity.athleteId,
-      planId: { not: null },
-      matchedActivityId: null,
       date: { gte: start, lt: end },
     },
     select: {
@@ -113,6 +112,17 @@ export async function promoteUnmatchedRunningActivityToWorkout(
     },
   });
 
+  const availablePlanned = [];
+  for (const planned of plannedNearby) {
+    const consumed = await plannedDayConsumedByOtherActivity({
+      plannedWorkoutId: planned.id,
+      activityId: activity.id,
+    });
+    if (!consumed) {
+      availablePlanned.push(planned);
+    }
+  }
+
   const activityInput = {
     id: activity.id,
     activityName: activity.activityName,
@@ -127,12 +137,12 @@ export async function promoteUnmatchedRunningActivityToWorkout(
     matchedWorkoutTitle: null,
   };
 
-  const plausiblePlanned = plannedNearby
-    .map((workout) =>
+  const plausiblePlanned = availablePlanned
+    .map((planned) =>
       scoreActivityCandidateForWorkout({
         workout: {
-          ...workout,
-          catalogueName: workout.workout_catalogue?.name ?? null,
+          ...planned,
+          catalogueName: planned.workout_catalogue?.name ?? null,
         },
         activity: activityInput,
       })
@@ -147,7 +157,7 @@ export async function promoteUnmatchedRunningActivityToWorkout(
       athleteActivityId,
       activityName: activity.activityName,
       activityYmd,
-      candidateWorkoutIds: plausiblePlanned.map((row) => row.id),
+      candidatePlannedWorkoutIds: plausiblePlanned.map((row) => row.id),
     });
     await prisma.athlete_activities.update({
       where: { id: athleteActivityId },

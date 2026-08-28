@@ -58,7 +58,10 @@ export async function plannedDayConsumedByOtherActivity(params: {
 }): Promise<boolean> {
   const row = await prisma.workouts.findFirst({
     where: {
-      plannedWorkoutId: params.plannedWorkoutId,
+      OR: [
+        { plannedWorkoutId: params.plannedWorkoutId },
+        { id: params.plannedWorkoutId },
+      ],
       matchedActivityId: { not: null },
     },
     select: { matchedActivityId: true },

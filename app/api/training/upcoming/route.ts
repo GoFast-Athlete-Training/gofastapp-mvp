@@ -177,20 +177,19 @@ export async function GET(request: NextRequest) {
     }
 
     const planDateKeys = [...planByDate.keys()].sort();
-    let materializedByKey = new Map<
-      string,
-      {
-        id: string;
-        title: string;
-        workoutType: string;
-        matchedActivityId: string | null;
-        skippedAt: string | null;
-        skipReason: string | null;
-        paceDeltaSecPerMile: number | null;
-        estimatedDistanceInMeters: number | null;
-        segments: { stepOrder: number; targets: unknown }[];
-      }
-    >();
+    type MaterializedPlanDay = {
+      plannedWorkoutId: string | null;
+      workoutId: string | null;
+      title: string;
+      workoutType: string;
+      matchedActivityId: string | null;
+      skippedAt: string | null;
+      skipReason: string | null;
+      paceDeltaSecPerMile: number | null;
+      estimatedDistanceInMeters: number | null;
+      segments: { stepOrder: number; targets: unknown }[];
+    };
+    const materializedByKey = new Map<string, MaterializedPlanDay>();
 
     if (plan && planDateKeys.length > 0) {
       const minKey = planDateKeys[0]!;
@@ -207,11 +206,6 @@ export async function GET(request: NextRequest) {
           },
           include: {
             segments: { orderBy: { stepOrder: "asc" } },
-            spawned_instances: {
-              where: { athleteId: athlete.id },
-              orderBy: { updatedAt: "desc" },
-              take: 1,
-            },
           },
         }),
         prisma.workouts.findMany({
@@ -226,12 +220,47 @@ export async function GET(request: NextRequest) {
         }),
       ]);
 
+      const plannedIds = plannedRows.map((p) => p.id);
+      const spawnedInstances =
+        plannedIds.length > 0
+          ? await prisma.workouts.findMany({
+              where: {
+                athleteId: athlete.id,
+                OR: [
+                  { id: { in: plannedIds } },
+                  { plannedWorkoutId: { in: plannedIds } },
+                ],
+              },
+              orderBy: { updatedAt: "desc" },
+            })
+          : [];
+
+      const instanceByPlannedId = new Map<
+        string,
+        (typeof spawnedInstances)[number]
+      >();
+      for (const inst of spawnedInstances) {
+        let plannedKey: string | null = null;
+        if (plannedIds.includes(inst.id)) {
+          plannedKey = inst.id;
+        } else if (
+          inst.plannedWorkoutId &&
+          plannedIds.includes(inst.plannedWorkoutId)
+        ) {
+          plannedKey = inst.plannedWorkoutId;
+        }
+        if (plannedKey && !instanceByPlannedId.has(plannedKey)) {
+          instanceByPlannedId.set(plannedKey, inst);
+        }
+      }
+
       for (const w of plannedRows) {
         if (!w.date) continue;
         const key = ymdFromDate(utcDateOnly(w.date));
-        const instance = w.spawned_instances[0] ?? null;
+        const instance = instanceByPlannedId.get(w.id);
         materializedByKey.set(key, {
-          id: instance?.id ?? w.id,
+          plannedWorkoutId: w.id,
+          workoutId: instance?.id ?? null,
           title: w.title,
           workoutType: w.workoutType,
           matchedActivityId: instance?.matchedActivityId ?? null,
@@ -246,44 +275,21 @@ export async function GET(request: NextRequest) {
         });
       }
 
+      // Legacy plan workouts: merge match/skip onto an existing plan day only (leftover instances).
       for (const w of legacyRows) {
         if (!w.date) continue;
         const key = ymdFromDate(utcDateOnly(w.date));
-        if (materializedByKey.has(key)) {
-          const existing = materializedByKey.get(key)!;
-          if (
-            !existing.matchedActivityId &&
-            !existing.skippedAt &&
-            (w.matchedActivityId || w.skippedAt)
-          ) {
-            materializedByKey.set(key, {
-              ...existing,
-              id: w.id,
-              matchedActivityId: w.matchedActivityId,
-              skippedAt: w.skippedAt?.toISOString() ?? null,
-              skipReason: w.skipReason ?? null,
-              paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
-              segments: w.segments.map((s) => ({
-                stepOrder: s.stepOrder,
-                targets: s.targets as unknown,
-              })),
-            });
-          }
-          continue;
-        }
+        const existing = materializedByKey.get(key);
+        if (!existing) continue;
+        if (existing.workoutId) continue;
+        if (!w.matchedActivityId && !w.skippedAt) continue;
         materializedByKey.set(key, {
-          id: w.id,
-          title: w.title,
-          workoutType: w.workoutType,
+          ...existing,
+          workoutId: w.id,
           matchedActivityId: w.matchedActivityId,
           skippedAt: w.skippedAt?.toISOString() ?? null,
           skipReason: w.skipReason ?? null,
           paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
-          estimatedDistanceInMeters: w.estimatedDistanceInMeters,
-          segments: w.segments.map((s) => ({
-            stepOrder: s.stepOrder,
-            targets: s.targets as unknown,
-          })),
         });
       }
     }
@@ -293,12 +299,15 @@ export async function GET(request: NextRequest) {
     for (const dateKey of planDateKeys) {
       const slot = planByDate.get(dateKey)!;
       const row = materializedByKey.get(dateKey);
-      const workoutId = row?.id ?? null;
+      const workoutId = row?.workoutId ?? null;
+      const plannedWorkoutId = row?.plannedWorkoutId ?? null;
       const workoutType = row?.workoutType ?? slot.workoutType;
       const estimatedDistanceInMeters =
         row?.estimatedDistanceInMeters ?? slot.estimatedDistanceInMeters;
       merged.push({
-        id: workoutId ?? `plan-${dateKey}`,
+        id:
+          workoutId ??
+          (plannedWorkoutId ? `plan-${plannedWorkoutId}` : `plan-${dateKey}`),
         title: mergePlanDayTitle({
           rowTitle: row?.title,
           scheduleTitle: slot.title,
