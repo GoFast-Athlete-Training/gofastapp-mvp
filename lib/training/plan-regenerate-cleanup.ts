@@ -38,7 +38,7 @@ async function unscheduleGarminIds(params: {
   let garminSchedulesStale = 0;
   let garminScheduleDeleteErrors = 0;
 
-  if (scheduleIds.length === 0) {
+  if (params.scheduleIds.length === 0) {
     return { garminSchedulesDeleted, garminSchedulesStale, garminScheduleDeleteErrors };
   }
 
@@ -46,7 +46,7 @@ async function unscheduleGarminIds(params: {
     const token = await requireGarminTokenFresh(params.athleteId);
     const client = createGarminTrainingApiForAthlete(params.athleteId, token);
 
-    for (const scheduleId of scheduleIds) {
+    for (const scheduleId of params.scheduleIds) {
       try {
         const result = await deleteGarminScheduleIfPresent(client, scheduleId);
         if (result.wasStaleOnGarmin) {
@@ -66,7 +66,7 @@ async function unscheduleGarminIds(params: {
     }
   } catch (e) {
     if (!(e instanceof GarminNotConnectedError)) {
-      garminScheduleDeleteErrors += scheduleIds.length;
+      garminScheduleDeleteErrors += params.scheduleIds.length;
       console.warn("[plan-regenerate-cleanup] Garmin unschedule skipped", {
         planId: params.planId,
         athleteId: params.athleteId,
