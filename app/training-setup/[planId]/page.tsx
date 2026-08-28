@@ -393,13 +393,8 @@ export default function TrainingSetupPlanPage({
       id: ar?.id ?? plan.athleteRaceId ?? plan.id,
       name: rr?.name ?? plan.name,
       distanceMeters: ar?.distanceMeters ?? null,
-      distanceLabel: ar?.distanceLabel ?? rr?.distanceLabel ?? null,
-      race_registry: rr
-        ? {
-            distanceMeters: rr.distanceMeters ?? null,
-            distanceLabel: rr.distanceLabel ?? null,
-          }
-        : null,
+      distanceLabel: ar?.distanceLabel ?? null,
+      race_registry: null,
     });
   }, [plan]);
 

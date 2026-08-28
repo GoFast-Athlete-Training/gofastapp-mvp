@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, use } from "react";
+import { useCallback, useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
@@ -8,6 +8,10 @@ import api from "@/lib/api";
 import { auth } from "@/lib/firebase";
 import { formatRaceListDate } from "@/lib/races-display";
 import { InlineGoalForm, type InlineGoalRow } from "@/components/races/InlineGoalForm";
+import {
+  AthleteRaceDistanceField,
+  athleteRaceDistanceReady,
+} from "@/components/races/AthleteRaceDistanceField";
 import { AddedRacePlanPrompt } from "@/components/training/AddedRacePlanPrompt";
 import {
   fetchPlanRaceEvents,
@@ -28,6 +32,10 @@ type AthleteRaceDetail = {
   goalName?: string | null;
 };
 
+function goalTimeReady(goalTime: string | null | undefined): boolean {
+  return typeof goalTime === "string" && goalTime.trim().length > 0;
+}
+
 export default function RaceSetupPage({
   params,
 }: {
@@ -38,7 +46,6 @@ export default function RaceSetupPage({
   const [athleteRace, setAthleteRace] = useState<AthleteRaceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showGoalForm, setShowGoalForm] = useState(false);
   const [goal, setGoal] = useState<InlineGoalRow | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [terminalRaceName, setTerminalRaceName] = useState<string | null>(null);
@@ -63,14 +70,11 @@ export default function RaceSetupPage({
       }
       const row = data.athleteRace;
       setAthleteRace(row);
-      if (row.goalTime?.trim()) {
-        setGoal({
-          id: row.id,
-          goalTime: row.goalTime,
-          athleteRaceId: row.id,
-        });
-        setShowGoalForm(true);
-      }
+      setGoal({
+        id: row.id,
+        goalTime: row.goalTime?.trim() || null,
+        athleteRaceId: row.id,
+      });
 
       let user = auth.currentUser;
       if (!user) {
@@ -137,6 +141,11 @@ export default function RaceSetupPage({
     void load();
   }, [load]);
 
+  const readyForPlan = useMemo(() => {
+    if (!athleteRace) return false;
+    return athleteRaceDistanceReady(athleteRace.distanceMeters) && goalTimeReady(goal?.goalTime);
+  }, [athleteRace, goal?.goalTime]);
+
   if (loading) {
     return <p className="text-sm text-gray-500">Loading…</p>;
   }
@@ -180,7 +189,6 @@ export default function RaceSetupPage({
         <p className="mt-1 text-sm text-gray-600">
           {dateLine}
           {location ? ` · ${location}` : ""}
-          {athleteRace.distanceLabel ? ` · ${athleteRace.distanceLabel}` : ""}
         </p>
       </div>
 
@@ -207,39 +215,29 @@ export default function RaceSetupPage({
         />
       ) : null}
 
-      {!showGoalForm ? (
-        <div className="mt-8 space-y-3">
-          <p className="text-sm text-gray-700">What&apos;s next?</p>
-          <Link
-            href={addPlanHref()}
-            className="flex w-full items-center justify-center rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600"
-          >
-            Add a plan
-          </Link>
-          <button
-            type="button"
-            onClick={() => setShowGoalForm(true)}
-            className="w-full rounded-xl border border-orange-300 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-100"
-          >
-            Set a goal
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/races")}
-            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-          >
-            Just running for fun
-          </button>
-          <p className="text-xs text-gray-500 leading-snug">
-            You can add a goal later from My Races whenever you&apos;re ready to train toward a
-            finish time.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-8 rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="text-sm font-semibold text-gray-900">Set a goal</h2>
+      <div className="mt-8 space-y-6 rounded-xl border border-gray-200 bg-white p-5">
+        <AthleteRaceDistanceField
+          athleteRaceId={athleteRace.id}
+          distanceLabel={athleteRace.distanceLabel}
+          distanceMeters={athleteRace.distanceMeters}
+          required
+          onSaved={(updated) => {
+            setAthleteRace((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    distanceLabel: updated.distanceLabel,
+                    distanceMeters: updated.distanceMeters,
+                  }
+                : prev
+            );
+          }}
+        />
+
+        <div className="border-t border-gray-100 pt-5">
+          <h2 className="text-sm font-semibold text-gray-900">Goal finish time</h2>
           <p className="mt-1 text-xs text-gray-600">
-            Optional — skip saves your race without a goal for now.
+            Required to build a training plan — we use this for pace targets.
           </p>
           <InlineGoalForm
             className="mt-4"
@@ -251,19 +249,46 @@ export default function RaceSetupPage({
               distanceMeters: athleteRace.distanceMeters,
             }}
             goal={goal}
-            onSaved={() => {
-              router.push(addPlanHref());
+            onSaved={(updated) => {
+              const gt = updated.goalTime?.trim() || null;
+              setGoal({ ...updated, goalTime: gt });
+              setAthleteRace((prev) => (prev ? { ...prev, goalTime: gt } : prev));
             }}
           />
+        </div>
+      </div>
+
+      <div className="mt-6 space-y-3">
+        <p className="text-sm text-gray-700">What&apos;s next?</p>
+        {readyForPlan ? (
+          <Link
+            href={addPlanHref()}
+            className="flex w-full items-center justify-center rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-600"
+          >
+            Add a plan
+          </Link>
+        ) : (
           <button
             type="button"
-            onClick={() => router.push("/races")}
-            className="mt-4 text-sm font-medium text-gray-600 hover:text-gray-900"
+            disabled
+            className="flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-orange-300 px-4 py-3 text-sm font-semibold text-white opacity-80"
           >
-            Skip for now → My Races
+            Add a plan
           </button>
-        </div>
-      )}
+        )}
+        {!readyForPlan ? (
+          <p className="text-xs text-gray-600">
+            Pick your race distance and set a goal time above to continue.
+          </p>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => router.push("/races")}
+          className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+        >
+          Just running for fun
+        </button>
+      </div>
     </div>
   );
 }
