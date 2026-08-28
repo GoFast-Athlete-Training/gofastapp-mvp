@@ -302,7 +302,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         orderedCatalogueWorkoutIds: ordered as string[],
       });
       data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
-        tempoConfirmed: true,
+        tempoPicked: true,
       });
     }
 
@@ -316,7 +316,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         orderedCatalogueWorkoutIds: ordered as string[],
       });
       data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
-        intervalConfirmed: true,
+        intervalPicked: true,
       });
     }
 

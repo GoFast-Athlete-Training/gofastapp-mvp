@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { CATALOGUE_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { reorderPositionRows } from "@/lib/training/reorder-position-rows";
 import { trainingPlanPresetInclude } from "@/lib/training/plan-generate-presets-loader";
@@ -505,6 +506,9 @@ export async function reorderAthleteEasyOrder(params: {
 function validateRotationSelection(catalogueWorkoutIds: string[]): void {
   if (catalogueWorkoutIds.length === 0) {
     throw new Error("At least one catalogue workout is required");
+  }
+  if (catalogueWorkoutIds.length > CATALOGUE_ROTATION_SLOTS) {
+    throw new Error(`At most ${CATALOGUE_ROTATION_SLOTS} catalogue workouts are allowed`);
   }
   const unique = new Set(catalogueWorkoutIds);
   if (unique.size !== catalogueWorkoutIds.length) {

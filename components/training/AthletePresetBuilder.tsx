@@ -24,6 +24,11 @@ import {
   qualitySlotsHaveCatalogue,
   type QualityRotationSlot,
 } from "@/components/training/QualityRotationReview";
+import { QualityCataloguePicker } from "@/components/training/QualityCataloguePicker";
+import {
+  builderProgressFromOverview,
+  qualityStepSubPhase,
+} from "@/lib/training/athlete-preset-builder-progress";
 
 export type PresetForWizardLite = {
   id: string;
@@ -205,6 +210,8 @@ export function AthletePresetBuilder({
   const [lrOrder, setLrOrder] = useState<ConfigPosition[]>([]);
   const [tempoOrder, setTempoOrder] = useState<QualityRotationSlot[]>([]);
   const [intervalOrder, setIntervalOrder] = useState<QualityRotationSlot[]>([]);
+  const [tempoTemplateSeedIds, setTempoTemplateSeedIds] = useState<string[]>([]);
+  const [intervalTemplateSeedIds, setIntervalTemplateSeedIds] = useState<string[]>([]);
   const [paceAdjuster, setPaceAdjuster] = useState<AthletePaceAdjuster>({
     ...DEFAULT_ATHLETE_PACE_ADJUSTER,
   });
@@ -265,8 +272,12 @@ export function AthletePresetBuilder({
       setMaxWeeklyMiles(ap.maxWeeklyMiles);
       const positions = ap.longRunConfig?.positions ?? [];
       setLrOrder([...positions].sort((a, b) => a.cyclePosition - b.cyclePosition));
-      setTempoOrder(sortedQualitySlots(ap.tempoConfig?.positions));
-      setIntervalOrder(sortedQualitySlots(ap.intervalsConfig?.positions));
+      const tempoSlots = sortedQualitySlots(ap.tempoConfig?.positions);
+      const intervalSlots = sortedQualitySlots(ap.intervalsConfig?.positions);
+      setTempoOrder(tempoSlots);
+      setIntervalOrder(intervalSlots);
+      setTempoTemplateSeedIds(catalogueIdsFromQualitySlots(tempoSlots));
+      setIntervalTemplateSeedIds(catalogueIdsFromQualitySlots(intervalSlots));
 
       if (ap.buildStep === "core") {
         const overview = ap.coachPlanOverview as Record<string, unknown> | null;
@@ -625,8 +636,12 @@ export function AthletePresetBuilder({
           (a, b) => a.cyclePosition - b.cyclePosition
         )
       );
-      setTempoOrder(sortedQualitySlots(setupData.athletePreset.tempoConfig?.positions));
-      setIntervalOrder(sortedQualitySlots(setupData.athletePreset.intervalsConfig?.positions));
+      const tempoSlots = sortedQualitySlots(setupData.athletePreset.tempoConfig?.positions);
+      const intervalSlots = sortedQualitySlots(setupData.athletePreset.intervalsConfig?.positions);
+      setTempoOrder(tempoSlots);
+      setIntervalOrder(intervalSlots);
+      setTempoTemplateSeedIds(catalogueIdsFromQualitySlots(tempoSlots));
+      setIntervalTemplateSeedIds(catalogueIdsFromQualitySlots(intervalSlots));
       setStep("longRun");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save foundation");
@@ -669,7 +684,23 @@ export function AthletePresetBuilder({
     }
   }
 
-  async function confirmTempoAndContinue() {
+  async function confirmTempoPick(selectedIds: string[]) {
+    setSaving(true);
+    setError(null);
+    try {
+      await patchPreset({
+        step: "tempo",
+        action: "saveSelection",
+        orderedCatalogueWorkoutIds: selectedIds,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save tempo workouts");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmTempoOrderAndContinue() {
     setSaving(true);
     setError(null);
     try {
@@ -680,9 +711,8 @@ export function AthletePresetBuilder({
           action: "saveSelection",
           orderedCatalogueWorkoutIds: ids,
         });
-      } else {
-        await patchPreset({ step: "tempo", action: "confirm" });
       }
+      await patchPreset({ step: "tempo", action: "confirm" });
       setStep("interval");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save tempo rotation");
@@ -691,7 +721,23 @@ export function AthletePresetBuilder({
     }
   }
 
-  async function confirmIntervalAndContinue() {
+  async function confirmIntervalPick(selectedIds: string[]) {
+    setSaving(true);
+    setError(null);
+    try {
+      await patchPreset({
+        step: "interval",
+        action: "saveSelection",
+        orderedCatalogueWorkoutIds: selectedIds,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save interval workouts");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmIntervalOrderAndContinue() {
     setSaving(true);
     setError(null);
     try {
@@ -702,9 +748,8 @@ export function AthletePresetBuilder({
           action: "saveSelection",
           orderedCatalogueWorkoutIds: ids,
         });
-      } else {
-        await patchPreset({ step: "interval", action: "confirm" });
       }
+      await patchPreset({ step: "interval", action: "confirm" });
       setStep("adjuster");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save interval rotation");
@@ -743,6 +788,16 @@ export function AthletePresetBuilder({
   const weeklyKeyLine = weeklyBand
     ? foundationWeeklyBandMeaning(weeklyBand)
     : null;
+
+  const builderProgress = builderProgressFromOverview(presetApi?.coachPlanOverview);
+  const tempoSubPhase = step === "tempo" ? qualityStepSubPhase(builderProgress, "tempo") : "pick";
+  const intervalSubPhase =
+    step === "interval" ? qualityStepSubPhase(builderProgress, "interval") : "pick";
+  const progressionAggressiveness =
+    corePreview?.progressionAggressiveness ??
+    (typeof presetApi?.progressionAggressiveness === "string"
+      ? presetApi.progressionAggressiveness
+      : "MODERATE");
 
   const weeklyCompareRows = foundationWeeklyComparisonRows({
     raceDistanceLabel,
@@ -1161,67 +1216,137 @@ export function AthletePresetBuilder({
         </>
       ) : step === "tempo" ? (
         <>
-          <p className="text-sm font-medium text-gray-900">Your tempo rotation</p>
-          <p className="text-sm text-gray-600">
-            These threshold workouts come from the GoFast template — drag or use Earlier/Later to
-            change the order they rotate.
-          </p>
-          {qualitySlotsHaveCatalogue(tempoOrder) ? (
-            <QualityRotationReview
-              slots={tempoOrder}
-              onReorder={reorderTempo}
-              slotLabel={(i) => `Week ${i + 1} slot`}
-            />
+          {tempoSubPhase === "pick" ? (
+            <>
+              <p className="text-sm font-medium text-gray-900">Pick your tempo workouts</p>
+              <p className="text-sm text-gray-600">
+                Choose which threshold workouts you want in your rotation — up to 8. We&apos;ve
+                pre-selected a set based on your goal; uncheck any you don&apos;t want or add more
+                from the catalogue.
+              </p>
+              <QualityCataloguePicker
+                workoutType="Tempo"
+                templateSeedIds={tempoTemplateSeedIds}
+                weeklyVolumeBand={weeklyBand ?? null}
+                progressionAggressiveness={progressionAggressiveness}
+                getToken={getToken}
+                saving={saving}
+                onContinue={(ids) => void confirmTempoPick(ids)}
+              />
+            </>
           ) : (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              This template has no tempo workouts configured yet.
-            </p>
+            <>
+              <p className="text-sm font-medium text-gray-900">Your tempo rotation</p>
+              <p className="text-sm text-gray-600">
+                Drag or use Earlier/Later to set the order these {tempoOrder.length} tempo workouts
+                rotate through your plan.
+              </p>
+              {qualitySlotsHaveCatalogue(tempoOrder) ? (
+                <QualityRotationReview
+                  slots={tempoOrder}
+                  onReorder={reorderTempo}
+                  slotLabel={(i) => `Rotation ${i + 1}`}
+                />
+              ) : (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  No tempo workouts selected yet.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={saving || !qualitySlotsHaveCatalogue(tempoOrder)}
+                  onClick={() => void confirmTempoOrderAndContinue()}
+                  className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                >
+                  {saving ? "Saving…" : "Continue"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800"
+                >
+                  Save & exit
+                </button>
+              </div>
+            </>
           )}
-          <div className="flex flex-wrap gap-2">
+          {tempoSubPhase === "pick" ? (
             <button
               type="button"
-              disabled={saving}
-              onClick={() => void confirmTempoAndContinue()}
-              className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+              onClick={onCancel}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800"
             >
-              Continue
-            </button>
-            <button type="button" onClick={onCancel} className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800">
               Save & exit
             </button>
-          </div>
+          ) : null}
         </>
       ) : step === "interval" ? (
         <>
-          <p className="text-sm font-medium text-gray-900">Your interval rotation</p>
-          <p className="text-sm text-gray-600">
-            These interval workouts come from the GoFast template — drag or use Earlier/Later to
-            change the order they rotate.
-          </p>
-          {qualitySlotsHaveCatalogue(intervalOrder) ? (
-            <QualityRotationReview
-              slots={intervalOrder}
-              onReorder={reorderInterval}
-              slotLabel={(i) => `Week ${i + 1} slot`}
-            />
+          {intervalSubPhase === "pick" ? (
+            <>
+              <p className="text-sm font-medium text-gray-900">Pick your interval workouts</p>
+              <p className="text-sm text-gray-600">
+                Choose which interval workouts you want in your rotation — up to 8. We&apos;ve
+                pre-selected a set based on your goal; uncheck any you don&apos;t want or add more
+                from the catalogue.
+              </p>
+              <QualityCataloguePicker
+                workoutType="Intervals"
+                templateSeedIds={intervalTemplateSeedIds}
+                weeklyVolumeBand={weeklyBand ?? null}
+                progressionAggressiveness={progressionAggressiveness}
+                getToken={getToken}
+                saving={saving}
+                onContinue={(ids) => void confirmIntervalPick(ids)}
+              />
+            </>
           ) : (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              This template has no interval workouts configured yet.
-            </p>
+            <>
+              <p className="text-sm font-medium text-gray-900">Your interval rotation</p>
+              <p className="text-sm text-gray-600">
+                Drag or use Earlier/Later to set the order these {intervalOrder.length} interval
+                workouts rotate through your plan.
+              </p>
+              {qualitySlotsHaveCatalogue(intervalOrder) ? (
+                <QualityRotationReview
+                  slots={intervalOrder}
+                  onReorder={reorderInterval}
+                  slotLabel={(i) => `Rotation ${i + 1}`}
+                />
+              ) : (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  No interval workouts selected yet.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={saving || !qualitySlotsHaveCatalogue(intervalOrder)}
+                  onClick={() => void confirmIntervalOrderAndContinue()}
+                  className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                >
+                  {saving ? "Saving…" : "Continue"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800"
+                >
+                  Save & exit
+                </button>
+              </div>
+            </>
           )}
-          <div className="flex flex-wrap gap-2">
+          {intervalSubPhase === "pick" ? (
             <button
               type="button"
-              disabled={saving}
-              onClick={() => void confirmIntervalAndContinue()}
-              className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+              onClick={onCancel}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800"
             >
-              Continue
-            </button>
-            <button type="button" onClick={onCancel} className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800">
               Save & exit
             </button>
-          </div>
+          ) : null}
         </>
       ) : (
         <>
