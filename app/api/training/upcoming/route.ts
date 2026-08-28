@@ -207,6 +207,11 @@ export async function GET(request: NextRequest) {
           },
           include: {
             segments: { orderBy: { stepOrder: "asc" } },
+            spawned_instances: {
+              where: { athleteId: athlete.id },
+              orderBy: { updatedAt: "desc" },
+              take: 1,
+            },
           },
         }),
         prisma.workouts.findMany({
@@ -224,14 +229,15 @@ export async function GET(request: NextRequest) {
       for (const w of plannedRows) {
         if (!w.date) continue;
         const key = ymdFromDate(utcDateOnly(w.date));
+        const instance = w.spawned_instances[0] ?? null;
         materializedByKey.set(key, {
-          id: w.id,
+          id: instance?.id ?? w.id,
           title: w.title,
           workoutType: w.workoutType,
-          matchedActivityId: w.matchedActivityId,
-          skippedAt: w.skippedAt?.toISOString() ?? null,
-          skipReason: w.skipReason ?? null,
-          paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
+          matchedActivityId: instance?.matchedActivityId ?? null,
+          skippedAt: instance?.skippedAt?.toISOString() ?? null,
+          skipReason: instance?.skipReason ?? null,
+          paceDeltaSecPerMile: instance?.paceDeltaSecPerMile ?? null,
           estimatedDistanceInMeters: w.estimatedDistanceInMeters,
           segments: w.segments.map((s) => ({
             stepOrder: s.stepOrder,
@@ -243,7 +249,28 @@ export async function GET(request: NextRequest) {
       for (const w of legacyRows) {
         if (!w.date) continue;
         const key = ymdFromDate(utcDateOnly(w.date));
-        if (materializedByKey.has(key)) continue;
+        if (materializedByKey.has(key)) {
+          const existing = materializedByKey.get(key)!;
+          if (
+            !existing.matchedActivityId &&
+            !existing.skippedAt &&
+            (w.matchedActivityId || w.skippedAt)
+          ) {
+            materializedByKey.set(key, {
+              ...existing,
+              id: w.id,
+              matchedActivityId: w.matchedActivityId,
+              skippedAt: w.skippedAt?.toISOString() ?? null,
+              skipReason: w.skipReason ?? null,
+              paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
+              segments: w.segments.map((s) => ({
+                stepOrder: s.stepOrder,
+                targets: s.targets as unknown,
+              })),
+            });
+          }
+          continue;
+        }
         materializedByKey.set(key, {
           id: w.id,
           title: w.title,
