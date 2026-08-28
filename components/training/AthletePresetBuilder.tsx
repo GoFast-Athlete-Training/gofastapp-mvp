@@ -60,6 +60,7 @@ type AthletePresetApi = AthletePresetIngestResult & {
   isComplete: boolean;
   description: string | null;
   fitnessPhase: "PEAK" | "BASE";
+  progressionAggressiveness: string | null;
   trainingHistory: string | null;
   minWeeklyMiles: number;
   maxWeeklyMiles: number | null;
