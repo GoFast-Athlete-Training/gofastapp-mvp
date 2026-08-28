@@ -198,20 +198,52 @@ export async function GET(request: NextRequest) {
       const gte = utcStartOfDayFromKey(minKey);
       const lt = utcNextDayStartFromKey(maxKey);
 
-      const rows = await prisma.workouts.findMany({
-        where: {
-          athleteId: athlete.id,
-          planId: plan.id,
-          date: { gte, lt },
-        },
-        include: {
-          segments: { orderBy: { stepOrder: "asc" } },
-        },
-      });
+      const [plannedRows, legacyRows] = await Promise.all([
+        prisma.planned_workouts.findMany({
+          where: {
+            athleteId: athlete.id,
+            planId: plan.id,
+            date: { gte, lt },
+          },
+          include: {
+            segments: { orderBy: { stepOrder: "asc" } },
+          },
+        }),
+        prisma.workouts.findMany({
+          where: {
+            athleteId: athlete.id,
+            planId: plan.id,
+            date: { gte, lt },
+          },
+          include: {
+            segments: { orderBy: { stepOrder: "asc" } },
+          },
+        }),
+      ]);
 
-      for (const w of rows) {
+      for (const w of plannedRows) {
         if (!w.date) continue;
         const key = ymdFromDate(utcDateOnly(w.date));
+        materializedByKey.set(key, {
+          id: w.id,
+          title: w.title,
+          workoutType: w.workoutType,
+          matchedActivityId: w.matchedActivityId,
+          skippedAt: w.skippedAt?.toISOString() ?? null,
+          skipReason: w.skipReason ?? null,
+          paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
+          estimatedDistanceInMeters: w.estimatedDistanceInMeters,
+          segments: w.segments.map((s) => ({
+            stepOrder: s.stepOrder,
+            targets: s.targets as unknown,
+          })),
+        });
+      }
+
+      for (const w of legacyRows) {
+        if (!w.date) continue;
+        const key = ymdFromDate(utcDateOnly(w.date));
+        if (materializedByKey.has(key)) continue;
         materializedByKey.set(key, {
           id: w.id,
           title: w.title,
@@ -317,6 +349,8 @@ export async function GET(request: NextRequest) {
         : [];
     const activePlanSummary = plan
       ? {
+          planId: plan.id,
+          athleteRaceId: plan.athleteRaceId ?? null,
           name: plan.name,
           hasSchedule: planScheduleArr.length > 0,
           weekNumber: planWeekNumber,

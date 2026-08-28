@@ -187,12 +187,16 @@ async function persistGarminPlannedPush(params: {
 async function persistGarminWorkoutPush(params: {
   workoutId: string;
   garminWorkoutId: number;
+  garminScheduleId?: number | null;
   snapshot: ReturnType<typeof segmentSnapshotFromWorkout>;
 }): Promise<void> {
   await prisma.workouts.update({
     where: { id: params.workoutId },
     data: {
       garminWorkoutId: params.garminWorkoutId,
+      ...(params.garminScheduleId !== undefined
+        ? { garminScheduleId: params.garminScheduleId }
+        : {}),
       segmentSnapshotJson: params.snapshot,
     },
   });
@@ -411,13 +415,14 @@ export async function pushPlannedWorkoutToGarminForAthlete(
     await persistGarminPlannedPush({
       plannedWorkoutId: planned.id,
       garminWorkoutId,
+      garminScheduleId: scheduleResult.garminScheduleId,
       snapshot,
     });
 
     return {
       ok: true,
       garminWorkoutId,
-      garminScheduleId: null,
+      garminScheduleId: scheduleResult.garminScheduleId,
       scheduledDate,
       mode,
       calendarState: "scheduled_on_calendar",
@@ -658,10 +663,17 @@ export async function pushWorkoutToGarminForAthlete(
       };
     }
 
+    await persistGarminWorkoutPush({
+      workoutId: workout.id,
+      garminWorkoutId,
+      garminScheduleId: scheduleResult.garminScheduleId,
+      snapshot,
+    });
+
     return {
       ok: true,
       garminWorkoutId,
-      garminScheduleId: null,
+      garminScheduleId: scheduleResult.garminScheduleId,
       scheduledDate,
       mode,
       calendarState: "scheduled_on_calendar",

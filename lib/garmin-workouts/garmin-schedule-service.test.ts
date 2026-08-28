@@ -30,6 +30,9 @@ test("scheduleWorkoutOnCalendar succeeds on POST /schedule", async () => {
     { garminWorkoutId: 42, scheduledDate: "2026-05-29" }
   );
   assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.garminScheduleId, 555);
+  }
   assert.equal(scheduled, true);
 });
 

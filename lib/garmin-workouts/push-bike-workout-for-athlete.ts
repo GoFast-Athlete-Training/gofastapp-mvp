@@ -119,7 +119,7 @@ export async function pushBikeWorkoutToGarminForAthlete(
       };
     }
 
-    return { ok: true, garminWorkoutId, garminScheduleId: null, scheduledDate };
+    return { ok: true, garminWorkoutId, garminScheduleId: scheduleResult.garminScheduleId, scheduledDate };
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {
       return { ok: false, code: "garmin_disconnected", message: error.message };

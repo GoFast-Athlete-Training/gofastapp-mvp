@@ -19,6 +19,7 @@ import {
 } from "@/lib/training/plan-race-snapshots";
 import { isRaceCalendarBeforeTodayUtc } from "@/lib/training/plan-lifecycle";
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
+import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
 import { isAthletePresetBlueprintComplete } from "@/lib/training/athlete-preset-blueprint";
 
 /**
@@ -331,8 +332,12 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    if (existingActive && bodyRetireActivePlan === "archive") {
+    if (existingActive) {
       await cleanupFutureGarminSchedulesForPlan({
+        planId: existingActive.id,
+        athleteId: athlete.id,
+      });
+      await cleanupFutureWorkoutsForRetiredPlan({
         planId: existingActive.id,
         athleteId: athlete.id,
       });

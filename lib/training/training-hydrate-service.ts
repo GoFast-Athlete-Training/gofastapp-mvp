@@ -276,12 +276,8 @@ export async function loadTrainingHydrateSnapshot(
         distance: plan.athlete_race.goalDistance,
         athlete_race: plan.athlete_race,
       }
-    : goal;
-  const race =
-    athleteRaceToHydrateSource(plan.athlete_race) ??
-    athleteRaceToHydrateSource(linkedGoal?.athlete_race) ??
-    athleteRaceToHydrateSource(goal?.athlete_race) ??
-    null;
+    : null;
+  const race = athleteRaceToHydrateSource(plan.athlete_race) ?? null;
 
   const distanceMiles =
     raceDistanceMilesFromRegistry(race?.distanceMeters ?? null) ??

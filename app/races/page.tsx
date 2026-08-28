@@ -17,6 +17,10 @@ import {
   type InlineGoalRow,
   type RaceForGoal,
 } from "@/components/races/InlineGoalForm";
+import {
+  AthleteRaceDistanceField,
+  type AthleteRaceDistanceSnapshot,
+} from "@/components/races/AthleteRaceDistanceField";
 import { pickHeroAthleteRace } from "@/lib/races/my-races-hero";
 import { trainingPlanCtaForRace } from "@/lib/races/training-plan-cta";
 
@@ -209,6 +213,7 @@ function NextSixMonthsRaceCards({
 function AthleteRaceCard({
   row,
   onGoalSaved,
+  onDistanceSaved,
   onRemove,
   onMarkPrimary,
   onUnmarkPrimary,
@@ -217,6 +222,7 @@ function AthleteRaceCard({
 }: {
   row: AthleteRaceRow;
   onGoalSaved: (row: AthleteRaceRow, goal: InlineGoalRow) => void;
+  onDistanceSaved: (row: AthleteRaceRow, updated: AthleteRaceDistanceSnapshot) => void;
   onRemove: (athleteRaceId: string) => void;
   onMarkPrimary: (athleteRaceId: string) => void;
   onUnmarkPrimary: (athleteRaceId: string) => void;
@@ -256,12 +262,15 @@ function AthleteRaceCard({
           {[row.city, row.state].filter(Boolean).join(", ")}
         </p>
       )}
-      <p className="text-gray-600 text-[11px] mt-1.5">
-        {row.distanceLabel?.trim() ||
-          (row.distanceMeters != null
-            ? `${(row.distanceMeters / 1609.344).toFixed(1)} mi`
-            : "—")}
-      </p>
+      <div className="mt-2">
+        <AthleteRaceDistanceField
+          variant="inline"
+          athleteRaceId={row.athleteRaceId}
+          distanceLabel={row.distanceLabel}
+          distanceMeters={row.distanceMeters}
+          onSaved={(updated) => onDistanceSaved(row, updated)}
+        />
+      </div>
 
       {goal ? (
         <div className="mt-2.5">
@@ -472,6 +481,20 @@ export default function MyRacesPage() {
     }
   }
 
+  function onDistanceSaved(row: AthleteRaceRow, updated: AthleteRaceDistanceSnapshot) {
+    setMyRaces((prev) =>
+      prev.map((r) =>
+        r.athleteRaceId === row.athleteRaceId
+          ? {
+              ...r,
+              distanceLabel: updated.distanceLabel,
+              distanceMeters: updated.distanceMeters,
+            }
+          : r
+      )
+    );
+  }
+
   function onGoalSaved(row: AthleteRaceRow, updated: InlineGoalRow) {
     setMyRaces((prev) =>
       prev.map((r) =>
@@ -589,11 +612,16 @@ export default function MyRacesPage() {
                         {[heroRace.city, heroRace.state].filter(Boolean).join(", ")}
                       </span>
                     ) : null}
-                    {heroRace.distanceLabel?.trim() ? (
-                      <span className="font-medium text-gray-800">
-                        {heroRace.distanceLabel}
-                      </span>
-                    ) : null}
+                  </div>
+
+                  <div className="mt-3">
+                    <AthleteRaceDistanceField
+                      variant="inline"
+                      athleteRaceId={heroRace.athleteRaceId}
+                      distanceLabel={heroRace.distanceLabel}
+                      distanceMeters={heroRace.distanceMeters}
+                      onSaved={(updated) => onDistanceSaved(heroRace, updated)}
+                    />
                   </div>
 
                   {heroGoal ? (
@@ -692,6 +720,7 @@ export default function MyRacesPage() {
                     key={row.athleteRaceId}
                     row={row}
                     onGoalSaved={onGoalSaved}
+                    onDistanceSaved={onDistanceSaved}
                     onRemove={onRemove}
                     onMarkPrimary={onMarkPrimary}
                     onUnmarkPrimary={onUnmarkPrimary}

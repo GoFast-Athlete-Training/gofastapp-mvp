@@ -21,6 +21,7 @@ export type GarminScheduleClient = {
 
 export type ScheduleWorkoutSuccess = {
   ok: true;
+  garminScheduleId: number | null;
 };
 
 export type ScheduleWorkoutFailure = {
@@ -66,8 +67,12 @@ export async function scheduleWorkoutOnCalendar(
   params: { garminWorkoutId: number; scheduledDate: string }
 ): Promise<ScheduleWorkoutResult> {
   try {
-    await client.scheduleWorkout(params.garminWorkoutId, params.scheduledDate);
-    return { ok: true };
+    const created = await client.scheduleWorkout(params.garminWorkoutId, params.scheduledDate);
+    const garminScheduleId =
+      typeof created.scheduleId === "number" && Number.isFinite(created.scheduleId)
+        ? created.scheduleId
+        : null;
+    return { ok: true, garminScheduleId };
   } catch (e) {
     const message =
       e instanceof GarminApiError

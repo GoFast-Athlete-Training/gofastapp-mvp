@@ -5,6 +5,7 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
 import { ensureTrainingPlanPresetLinked } from "@/lib/training/ensure-training-plan-preset-linked";
 import { cleanupFuturePlanWorkoutsAfterRegenerate } from "@/lib/training/plan-regenerate-cleanup";
+import { syncPlanAfterGenerate } from "@/lib/training/post-generate-sync";
 
 export async function planGeneratePostHandler(
   request: NextRequest
@@ -125,14 +126,21 @@ export async function planGeneratePostHandler(
       athleteId: athlete.id,
     });
 
+    const sync = await syncPlanAfterGenerate({ athleteId: athlete.id });
+
     return NextResponse.json({
       success: true,
       planId: result.planId,
       weekCount: result.weekCount,
       clearedFutureWorkouts: cleanup.clearedFutureWorkouts,
+      clearedFuturePlannedWorkouts: cleanup.clearedFuturePlannedWorkouts,
       garminSchedulesDeleted: cleanup.garminSchedulesDeleted,
       garminSchedulesStale: cleanup.garminSchedulesStale,
       garminScheduleDeleteErrors: cleanup.garminScheduleDeleteErrors,
+      horizonMaterialized: sync.horizon.summary.materialized,
+      horizonAlreadyReady: sync.horizon.summary.alreadyReady,
+      garminPush: sync.garmin.summary,
+      garminPushSkippedReason: sync.garmin.skippedReason,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Plan generation failed";

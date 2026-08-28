@@ -17,6 +17,7 @@ const MOTIVATION_ICON_SET = new Set<string>(MOTIVATION_ICON_SLUGS);
 export const athleteRaceGoalSelect = {
   ...goalAthleteRaceSelect,
   athleteId: true,
+  isPrimaryRace: true,
   goalName: true,
   goalDescription: true,
   goalDistance: true,
@@ -107,19 +108,38 @@ export function serializeGoalFromAthleteRace(row: AthleteRaceGoalRow) {
 }
 
 export async function listAthleteRaceGoals(athleteId: string) {
-  const rows = await prisma.athlete_races.findMany({
-    where: {
-      athleteId,
-      OR: [
-        { goalTime: { not: null } },
-        { goalDistance: { not: null } },
-        { goalName: { not: null } },
-      ],
-    },
-    select: athleteRaceGoalSelect,
-    orderBy: { raceDate: "asc" },
+  const [rows, activePlan] = await Promise.all([
+    prisma.athlete_races.findMany({
+      where: {
+        athleteId,
+        OR: [
+          { goalTime: { not: null } },
+          { goalDistance: { not: null } },
+          { goalName: { not: null } },
+        ],
+      },
+      select: athleteRaceGoalSelect,
+      orderBy: { raceDate: "asc" },
+    }),
+    prisma.training_plans.findFirst({
+      where: { athleteId, lifecycleStatus: "ACTIVE" },
+      orderBy: { updatedAt: "desc" },
+      select: { athleteRaceId: true },
+    }),
+  ]);
+
+  const planRaceId = activePlan?.athleteRaceId ?? null;
+  const sorted = [...rows].sort((a, b) => {
+    const aPlan = planRaceId && a.id === planRaceId ? 0 : 1;
+    const bPlan = planRaceId && b.id === planRaceId ? 0 : 1;
+    if (aPlan !== bPlan) return aPlan - bPlan;
+    const aPrimary = a.isPrimaryRace ? 0 : 1;
+    const bPrimary = b.isPrimaryRace ? 0 : 1;
+    if (aPrimary !== bPrimary) return aPrimary - bPrimary;
+    return a.raceDate.getTime() - b.raceDate.getTime();
   });
-  return rows.map((r) => serializeGoalFromAthleteRace(r));
+
+  return sorted.map((r) => serializeGoalFromAthleteRace(r));
 }
 
 export async function getAthleteRaceGoalById(athleteId: string, athleteRaceId: string) {
@@ -130,7 +150,7 @@ export async function getAthleteRaceGoalById(athleteId: string, athleteRaceId: s
   return row ? serializeGoalFromAthleteRace(row) : null;
 }
 
-/** Primary Goal race: explicit isPrimaryRace, else active plan terminal. */
+/** Primary Goal race: ACTIVE plan terminal, else explicit isPrimaryRace. */
 export async function getPrimaryAthleteRaceForAthlete(athleteId: string) {
   const [primaryRow, activePlan] = await Promise.all([
     prisma.athlete_races.findFirst({
@@ -144,8 +164,6 @@ export async function getPrimaryAthleteRaceForAthlete(athleteId: string) {
     }),
   ]);
 
-  if (primaryRow) return primaryRow;
-
   if (activePlan?.athleteRaceId) {
     const planRace = await prisma.athlete_races.findFirst({
       where: { id: activePlan.athleteRaceId, athleteId },
@@ -153,6 +171,8 @@ export async function getPrimaryAthleteRaceForAthlete(athleteId: string) {
     });
     if (planRace) return planRace;
   }
+
+  if (primaryRow) return primaryRow;
 
   return null;
 }

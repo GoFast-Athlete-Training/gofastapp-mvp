@@ -30,6 +30,7 @@ export async function materializeTodayPlanWorkoutForAthlete(
       athleteId,
       lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
     },
+    orderBy: { updatedAt: "desc" },
     include: {
       race_registry: {
         select: {
