@@ -10,11 +10,24 @@ export type GarminCalendarSyncState =
   | "library_only"
   | "scheduled_on_calendar";
 
+export type GarminPushedCalendarState = Exclude<GarminCalendarSyncState, "not_pushed">;
+
 export function garminCalendarSyncState(workout: {
   garminWorkoutId?: number | null;
   garminScheduleId?: number | null;
 }): GarminCalendarSyncState {
   if (workout.garminWorkoutId == null) return "not_pushed";
+  return garminPushedCalendarState({
+    garminWorkoutId: workout.garminWorkoutId,
+    garminScheduleId: workout.garminScheduleId,
+  });
+}
+
+/** After a successful push, garminWorkoutId is always set. */
+export function garminPushedCalendarState(workout: {
+  garminWorkoutId: number;
+  garminScheduleId?: number | null;
+}): GarminPushedCalendarState {
   if (workout.garminScheduleId == null) return "library_only";
   return "scheduled_on_calendar";
 }

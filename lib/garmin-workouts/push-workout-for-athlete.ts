@@ -19,7 +19,8 @@ import { garminPushTitleForPlannedWorkout, garminTitleForWorkout } from "@/lib/t
 import { normalizePaceTargetEncodingVersion } from "@/lib/workout-generator/pace-calculator";
 import {
   type GarminPushMode,
-  garminCalendarSyncState,
+  type GarminPushedCalendarState,
+  garminPushedCalendarState,
   normalizePushWorkoutOptions,
   type PushWorkoutToGarminOptions,
 } from "@/lib/garmin-workouts/garmin-calendar-state";
@@ -34,7 +35,7 @@ export type PushWorkoutForAthleteResult =
       garminScheduleId: number | null;
       scheduledDate: string;
       mode: GarminPushMode;
-      calendarState: "scheduled_on_calendar" | "library_only";
+      calendarState: GarminPushedCalendarState;
     }
   | {
       ok: false;
@@ -395,7 +396,7 @@ export async function pushPlannedWorkoutToGarminForAthlete(
         garminScheduleId,
         scheduledDate,
         mode: mode === "schedule-today" && hadGarminWorkoutId ? "update-library" : mode,
-        calendarState: garminCalendarSyncState({
+        calendarState: garminPushedCalendarState({
           garminWorkoutId,
           garminScheduleId,
         }),
@@ -650,7 +651,7 @@ export async function pushWorkoutToGarminForAthlete(
         garminScheduleId,
         scheduledDate,
         mode: mode === "schedule-today" && hadGarminWorkoutId ? "update-library" : mode,
-        calendarState: garminCalendarSyncState({
+        calendarState: garminPushedCalendarState({
           garminWorkoutId,
           garminScheduleId,
         }),
