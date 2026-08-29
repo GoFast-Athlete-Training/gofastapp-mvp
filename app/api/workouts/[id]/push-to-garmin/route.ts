@@ -1,6 +1,12 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
+import {
+  resolveGarminIdsForAthlete,
+  resolveWorkoutTargetForAthlete,
+} from "@/lib/training/workout-or-planned-resolve";
 import { GarminApiError } from "@/lib/garmin-workouts/garmin-training-api";
 import { GarminNotConnectedError } from "@/lib/domain-garmin";
 import { summarizeGarminTokenForLogs } from "@/lib/garmin-access-token-claims";
@@ -10,8 +16,6 @@ import {
   garminCalendarSyncState,
   parseGarminPushModeFromBody,
 } from "@/lib/garmin-workouts/garmin-calendar-state";
-
-export const dynamic = "force-dynamic";
 
 /**
  * POST /api/workouts/[id]/push-to-garmin
@@ -38,15 +42,12 @@ export async function POST(
       /* empty body ok */
     }
 
-    const existing = await prisma.workouts.findFirst({
-      where: { id, athleteId: auth.athlete.id },
-      select: { garminWorkoutId: true, garminScheduleId: true },
-    });
-    if (!existing) {
+    const garminIds = await resolveGarminIdsForAthlete(id, auth.athlete.id);
+    if (!garminIds) {
       return NextResponse.json({ error: "Workout not found" }, { status: 404 });
     }
 
-    const calendarState = garminCalendarSyncState(existing);
+    const calendarState = garminCalendarSyncState(garminIds);
     const mode =
       parseGarminPushModeFromBody(body) ?? defaultGarminPushModeForState(calendarState);
 
@@ -86,13 +87,25 @@ export async function POST(
       );
     }
 
-    const workout = await prisma.workouts.findFirst({
-      where: { id, athleteId: auth.athlete.id },
-      include: {
-        segments: { orderBy: { stepOrder: "asc" } },
-        training_plans: { select: { id: true, startDate: true } },
-      },
-    });
+    const target = await resolveWorkoutTargetForAthlete(id, auth.athlete.id);
+    const workout =
+      target?.kind === "standalone"
+        ? await prisma.workouts.findFirst({
+            where: { id: target.workoutId, athleteId: auth.athlete.id },
+            include: {
+              segments: { orderBy: { stepOrder: "asc" } },
+              training_plans: { select: { id: true, startDate: true } },
+            },
+          })
+        : target?.kind === "planned"
+          ? await prisma.planned_workouts.findFirst({
+              where: { id: target.plannedWorkoutId, athleteId: auth.athlete.id },
+              include: {
+                segments: { orderBy: { stepOrder: "asc" } },
+                training_plans: { select: { id: true, startDate: true } },
+              },
+            })
+          : null;
 
     return NextResponse.json({
       success: true,

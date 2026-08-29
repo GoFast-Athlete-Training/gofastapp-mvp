@@ -3,12 +3,18 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
+import {
+  resolveInstanceWorkoutIdForAthlete,
+  resolveWorkoutTargetForAthlete,
+} from "@/lib/training/workout-or-planned-resolve";
+import { loadPlannedWorkoutDetailForAthlete } from "@/lib/training/planned-workout-detail";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 /**
  * PATCH /api/workouts/[id]/status
  * Body: { status: "skipped", reason?: string } | { status: "planned" } to undo skip.
+ * Plan days spawn an instance row when needed (skip state lives on workouts).
  */
 export async function PATCH(request: NextRequest, ctx: Ctx) {
   try {
@@ -18,15 +24,27 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     }
 
     const { id } = await ctx.params;
-    const existing = await prisma.workouts.findFirst({
-      where: { id, athleteId: auth.athlete.id },
-    });
-
-    if (!existing) {
+    const target = await resolveWorkoutTargetForAthlete(id, auth.athlete.id);
+    if (!target) {
       return NextResponse.json({ error: "Workout not found" }, { status: 404 });
     }
 
-    if (existing.matchedActivityId) {
+    let matchedActivityId: string | null = null;
+    if (target.kind === "standalone") {
+      const row = await prisma.workouts.findFirst({
+        where: { id: target.workoutId, athleteId: auth.athlete.id },
+        select: { matchedActivityId: true },
+      });
+      matchedActivityId = row?.matchedActivityId ?? null;
+    } else {
+      const detail = await loadPlannedWorkoutDetailForAthlete({
+        plannedWorkoutId: target.plannedWorkoutId,
+        athleteId: auth.athlete.id,
+      });
+      matchedActivityId = detail?.matchedActivityId ?? null;
+    }
+
+    if (matchedActivityId) {
       return NextResponse.json(
         { error: "Completed workouts cannot be marked skipped. Unlink the activity first." },
         { status: 400 }
@@ -61,8 +79,15 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       }
     }
 
+    const instanceId = await resolveInstanceWorkoutIdForAthlete(id, auth.athlete.id, {
+      spawnIfPlanned: true,
+    });
+    if (!instanceId) {
+      return NextResponse.json({ error: "Workout not found" }, { status: 404 });
+    }
+
     const updated = await prisma.workouts.update({
-      where: { id: existing.id },
+      where: { id: instanceId },
       data:
         status === "skipped"
           ? {

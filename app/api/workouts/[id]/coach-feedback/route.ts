@@ -8,6 +8,11 @@ import {
   normalizeRunContextTags,
   runRunAssessment,
 } from "@/lib/training/run-assessment-service";
+import { loadPlannedWorkoutDetailForAthlete } from "@/lib/training/planned-workout-detail";
+import {
+  resolveInstanceWorkoutIdForAthlete,
+  resolveWorkoutTargetForAthlete,
+} from "@/lib/training/workout-or-planned-resolve";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -46,16 +51,42 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     );
   }
 
-  const workout = await prisma.workouts.findFirst({
-    where: { id, athleteId: auth.athlete.id },
-    select: { id: true, matchedActivityId: true },
-  });
-
-  if (!workout) {
+  const target = await resolveWorkoutTargetForAthlete(id, auth.athlete.id);
+  if (!target) {
     return NextResponse.json({ error: "Workout not found" }, { status: 404 });
   }
 
-  if (!workout.matchedActivityId) {
+  let workoutId: string | null = null;
+  let matchedActivityId: string | null = null;
+
+  if (target.kind === "standalone") {
+    const workout = await prisma.workouts.findFirst({
+      where: { id: target.workoutId, athleteId: auth.athlete.id },
+      select: { id: true, matchedActivityId: true },
+    });
+    workoutId = workout?.id ?? null;
+    matchedActivityId = workout?.matchedActivityId ?? null;
+  } else {
+    const detail = await loadPlannedWorkoutDetailForAthlete({
+      plannedWorkoutId: target.plannedWorkoutId,
+      athleteId: auth.athlete.id,
+    });
+    if (detail) {
+      matchedActivityId = detail.matchedActivityId;
+      workoutId =
+        detail.matchedActivityId != null
+          ? await resolveInstanceWorkoutIdForAthlete(id, auth.athlete.id, {
+              spawnIfPlanned: true,
+            })
+          : null;
+    }
+  }
+
+  if (!workoutId) {
+    return NextResponse.json({ error: "Workout not found" }, { status: 404 });
+  }
+
+  if (!matchedActivityId) {
     return NextResponse.json(
       { error: "Link a Garmin activity before requesting coach feedback" },
       { status: 400 }
@@ -64,7 +95,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
 
   try {
     await prisma.workouts.update({
-      where: { id: workout.id },
+      where: { id: workoutId },
       data: {
         runContextTags: contextTags,
         runContextNote: contextNote,
@@ -74,13 +105,13 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     });
 
     const analysisJson = await runRunAssessment({
-      workoutId: workout.id,
+      workoutId,
       athleteId: auth.athlete.id,
       context: { contextTags, contextNote },
     });
 
     const updated = await prisma.workouts.findFirst({
-      where: { id: workout.id },
+      where: { id: workoutId },
       select: {
         analysisJson: true,
         runContextTags: true,

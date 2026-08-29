@@ -3,23 +3,14 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { newEntityId } from "@/lib/training/new-entity-id";
 import { Prisma } from "@prisma/client";
-import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
+import {
+  replacePrescribeSegmentsForAthlete,
+  resolveWorkoutTargetForAthlete,
+  type PrescribeSegmentInput,
+} from "@/lib/training/workout-or-planned-resolve";
 
 type Ctx = { params: Promise<{ id: string }> };
-
-type SegmentInput = {
-  stepOrder: number;
-  title: string;
-  durationType: string;
-  durationValue: number;
-  targets: Prisma.InputJsonValue | null;
-  repeatCount: number | null;
-  notes: string | null;
-  recoveryDurationType: string | null;
-  recoveryDurationValue: number | null;
-};
 
 function normalizeRecoveryFields(o: Record<string, unknown>): {
   recoveryDurationType: string | null;
@@ -49,9 +40,9 @@ function normalizeRecoveryFields(o: Record<string, unknown>): {
   return { recoveryDurationType: t, recoveryDurationValue: v };
 }
 
-function normalizeSegments(raw: unknown): SegmentInput[] | null {
+function normalizeSegments(raw: unknown): PrescribeSegmentInput[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null;
-  const out: SegmentInput[] = [];
+  const out: PrescribeSegmentInput[] = [];
   for (let i = 0; i < raw.length; i++) {
     const seg = raw[i];
     if (!seg || typeof seg !== "object") return null;
@@ -99,9 +90,27 @@ function normalizeSegments(raw: unknown): SegmentInput[] | null {
   return out;
 }
 
+async function loadSegmentsResponseWorkout(id: string, athleteId: string) {
+  const target = await resolveWorkoutTargetForAthlete(id, athleteId);
+  if (!target) return null;
+
+  if (target.kind === "standalone") {
+    return prisma.workouts.findFirst({
+      where: { id: target.workoutId, athleteId },
+      include: { segments: { orderBy: { stepOrder: "asc" } } },
+    });
+  }
+
+  return prisma.planned_workouts.findFirst({
+    where: { id: target.plannedWorkoutId, athleteId },
+    include: { segments: { orderBy: { stepOrder: "asc" } } },
+  });
+}
+
 /**
  * PUT /api/workouts/[id]/segments
  * Atomically replace all segments (prescribed only; clears lap actuals on new rows).
+ * Plan days write to planned_workout_segments (and synced instance when spawned).
  */
 export async function PUT(request: NextRequest, ctx: Ctx) {
   try {
@@ -111,14 +120,6 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
     }
 
     const { id: workoutId } = await ctx.params;
-
-    const workout = await prisma.workouts.findFirst({
-      where: { id: workoutId, athleteId: auth.athlete.id },
-    });
-
-    if (!workout) {
-      return NextResponse.json({ error: "Workout not found" }, { status: 404 });
-    }
 
     let body: unknown;
     try {
@@ -144,53 +145,17 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
       );
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.workout_segments.deleteMany({ where: { workoutId } });
-      await tx.workout_segments.createMany({
-        data: normalized.map((seg, index) => ({
-          id: newEntityId(),
-          workoutId,
-          stepOrder: seg.stepOrder ?? index + 1,
-          title: seg.title,
-          durationType: seg.durationType === "TIME" ? "TIME" : "DISTANCE",
-          durationValue: seg.durationValue,
-          targets:
-            seg.targets === null
-              ? Prisma.DbNull
-              : (seg.targets as Prisma.InputJsonValue),
-          repeatCount: seg.repeatCount,
-          notes: seg.notes,
-          paceTargetEncodingVersion: 2,
-          recoveryDurationType: seg.recoveryDurationType,
-          recoveryDurationValue: seg.recoveryDurationValue,
-        })),
-      });
-      await tx.workouts.update({
-        where: { id: workoutId },
-        data: {
-          segmentSnapshotJson: segmentSnapshotDocumentFromDbRows(
-            normalized.map((seg, index) => ({
-              stepOrder: seg.stepOrder ?? index + 1,
-              title: seg.title,
-              durationType: seg.durationType === "TIME" ? "TIME" : "DISTANCE",
-              durationValue: seg.durationValue,
-              targets: seg.targets,
-              repeatCount: seg.repeatCount,
-              notes: seg.notes,
-              paceTargetEncodingVersion: 2,
-              recoveryDurationType: seg.recoveryDurationType,
-              recoveryDurationValue: seg.recoveryDurationValue,
-            })),
-            "segments_put"
-          ),
-        },
-      });
+    const target = await replacePrescribeSegmentsForAthlete({
+      id: workoutId,
+      athleteId: auth.athlete.id,
+      normalized,
     });
 
-    const updated = await prisma.workouts.findFirst({
-      where: { id: workoutId, athleteId: auth.athlete.id },
-      include: { segments: { orderBy: { stepOrder: "asc" } } },
-    });
+    if (!target) {
+      return NextResponse.json({ error: "Workout not found" }, { status: 404 });
+    }
+
+    const updated = await loadSegmentsResponseWorkout(workoutId, auth.athlete.id);
 
     return NextResponse.json({ workout: updated });
   } catch (error: unknown) {

@@ -11,7 +11,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { parseOptionalWorkoutDate } from "@/lib/training/workout-date-parse";
 import { newEntityId } from "@/lib/training/new-entity-id";
-import { Prisma } from "@prisma/client";
+import { Prisma, WorkoutType } from "@prisma/client";
+import { loadPrescribeCloneSourceForAthlete } from "@/lib/training/workout-or-planned-resolve";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -37,10 +38,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
 
     const { id: sourceId } = await ctx.params;
 
-    const source = await prisma.workouts.findFirst({
-      where: { id: sourceId, athleteId: auth.athlete.id },
-      include: { segments: { orderBy: { stepOrder: "asc" } } },
-    });
+    const source = await loadPrescribeCloneSourceForAthlete(sourceId, auth.athlete.id);
 
     if (!source) {
       return NextResponse.json({ error: "Workout not found" }, { status: 404 });
@@ -99,7 +97,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
             id: newWorkoutId,
             title: source.title,
             description: source.description,
-            workoutType: source.workoutType,
+            workoutType: source.workoutType as WorkoutType,
             athleteId: auth.athlete.id,
             planId: null,
             catalogueWorkoutId: source.catalogueWorkoutId,
@@ -127,6 +125,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
             creditedThresholdPaceSecPerMile: null,
             creditedAerobicCeilingBpm: null,
             evaluationEligibleFlag: false,
+            segmentSnapshotJson: source.segmentSnapshotJson ?? Prisma.DbNull,
             segments:
               source.segments.length > 0
                 ? {
@@ -143,6 +142,8 @@ export async function POST(request: NextRequest, ctx: Ctx) {
                       repeatCount: seg.repeatCount,
                       notes: seg.notes,
                       paceTargetEncodingVersion: seg.paceTargetEncodingVersion,
+                      recoveryDurationType: seg.recoveryDurationType,
+                      recoveryDurationValue: seg.recoveryDurationValue,
                     })),
                   }
                 : undefined,
