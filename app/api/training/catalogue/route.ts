@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
       const row = await prisma.workout_catalogue.findFirst({
         where: {
           slug,
+          ownerAthleteId: null,
           ...(workoutType ? { workoutType: workoutType as import("@prisma/client").WorkoutType } : {}),
         },
       });
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
     }
 
     const items = await prisma.workout_catalogue.findMany({
+      where: { ownerAthleteId: null },
       orderBy: [{ workoutType: "asc" }, { name: "asc" }],
     });
     return NextResponse.json({ success: true, items });

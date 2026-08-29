@@ -159,6 +159,7 @@ model Athlete {
   routes                  routes[]
   training_plans          training_plans[]
   athlete_presets         athlete_presets[]
+  athlete_owned_catalogue workout_catalogue[]
   workouts                workouts[]
   bike_workouts           bike_workout[]
   swim_workouts           swim_workout[]
@@ -2374,6 +2375,9 @@ model workout_catalogue {
   notes                        String?
   /// Optional purpose sentences (AI, manual, CSV); coaching context downstream.
   trainingIntent               String[]    @default([])
+  /// Null = staff/Company catalogue. Set for athlete-authored rotation workouts (private to owner).
+  ownerAthleteId               String?
+  ownerAthlete                 Athlete?    @relation(fields: [ownerAthleteId], references: [id], onDelete: Cascade)
   createdAt                    DateTime    @default(now())
   updatedAt                    DateTime    @updatedAt
   workouts                    workouts[]
@@ -2385,8 +2389,8 @@ model workout_catalogue {
   athlete_tempo_config_positions     athlete_tempo_config_position[]
   athlete_intervals_config_positions athlete_intervals_config_position[]
 
-  @@unique([name, workoutType])
   @@index([workoutType])
+  @@index([ownerAthleteId])
 }
 
 /// Prescribe-only plan day — segments live on planned_workout_segments until match spawns an instance.

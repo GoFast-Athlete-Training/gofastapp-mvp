@@ -1221,9 +1221,9 @@ export function AthletePresetBuilder({
             <>
               <p className="text-sm font-medium text-gray-900">Pick your tempo workouts</p>
               <p className="text-sm text-gray-600">
-                Choose which threshold workouts you want in your rotation — up to 8. We&apos;ve
-                pre-selected a set based on your goal; uncheck any you don&apos;t want or add more
-                from the catalogue.
+                Here&apos;s what&apos;s in the catalogue — pick up to 8 tempo workouts for your
+                rotation, or create your own below. Tap &ldquo;Use recommended&rdquo; if you want a
+                suggested set for your goal.
               </p>
               <QualityCataloguePicker
                 workoutType="Tempo"
@@ -1288,9 +1288,9 @@ export function AthletePresetBuilder({
             <>
               <p className="text-sm font-medium text-gray-900">Pick your interval workouts</p>
               <p className="text-sm text-gray-600">
-                Choose which interval workouts you want in your rotation — up to 8. We&apos;ve
-                pre-selected a set based on your goal; uncheck any you don&apos;t want or add more
-                from the catalogue.
+                Here&apos;s what&apos;s in the catalogue — pick up to 8 interval workouts for your
+                rotation, or create your own below. Tap &ldquo;Use recommended&rdquo; if you want a
+                suggested set for your goal.
               </p>
               <QualityCataloguePicker
                 workoutType="Intervals"

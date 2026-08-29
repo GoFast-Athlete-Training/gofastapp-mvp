@@ -21,9 +21,11 @@ export async function GET(request: NextRequest) {
     const wtRaw = searchParams.get("workoutType")?.trim();
 
     const items = await prisma.workout_catalogue.findMany({
-      where:
-        wtRaw && wtRaw.length > 0 ? { workoutType: wtRaw as WorkoutType } : undefined,
-      orderBy: [{ workoutType: "asc" }, { name: "asc" }],
+      where: {
+        ...(wtRaw && wtRaw.length > 0 ? { workoutType: wtRaw as WorkoutType } : {}),
+        OR: [{ ownerAthleteId: null }, { ownerAthleteId: auth.athlete.id }],
+      },
+      orderBy: [{ ownerAthleteId: "asc" }, { name: "asc" }],
       select: {
         id: true,
         name: true,
@@ -31,6 +33,7 @@ export async function GET(request: NextRequest) {
         workoutType: true,
         workBaseReps: true,
         workBaseRepMeters: true,
+        ownerAthleteId: true,
         recoveryDistanceMeters: true,
         recoveryDurationSeconds: true,
         warmupMiles: true,
