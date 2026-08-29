@@ -1219,12 +1219,7 @@ export function AthletePresetBuilder({
         <>
           {tempoSubPhase === "pick" ? (
             <>
-              <p className="text-sm font-medium text-gray-900">Pick your tempo workouts</p>
-              <p className="text-sm text-gray-600">
-                Here&apos;s what&apos;s in the catalogue — pick up to 8 tempo workouts for your
-                rotation, or create your own below. Tap &ldquo;Use recommended&rdquo; if you want a
-                suggested set for your goal.
-              </p>
+              <p className="text-sm font-medium text-gray-900">Select tempo workouts</p>
               <QualityCataloguePicker
                 workoutType="Tempo"
                 templateSeedIds={tempoTemplateSeedIds}
@@ -1286,12 +1281,7 @@ export function AthletePresetBuilder({
         <>
           {intervalSubPhase === "pick" ? (
             <>
-              <p className="text-sm font-medium text-gray-900">Pick your interval workouts</p>
-              <p className="text-sm text-gray-600">
-                Here&apos;s what&apos;s in the catalogue — pick up to 8 interval workouts for your
-                rotation, or create your own below. Tap &ldquo;Use recommended&rdquo; if you want a
-                suggested set for your goal.
-              </p>
+              <p className="text-sm font-medium text-gray-900">Select interval workouts</p>
               <QualityCataloguePicker
                 workoutType="Intervals"
                 templateSeedIds={intervalTemplateSeedIds}

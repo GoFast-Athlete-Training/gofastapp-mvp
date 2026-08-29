@@ -181,9 +181,14 @@ export function QualityCataloguePicker({
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-gray-600">
+        Select the {typeLabel} workouts you want in your plan — up to {CATALOGUE_ROTATION_SLOTS}.
+        Don&apos;t see what you want? Create your own below.
+      </p>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-medium text-gray-600">
-          Selected {selectedIds.length} / {CATALOGUE_ROTATION_SLOTS}
+          {selectedIds.length} selected · max {CATALOGUE_ROTATION_SLOTS}
         </p>
         {recommendedIds.length > 0 ? (
           <button
@@ -319,7 +324,13 @@ export function QualityCataloguePicker({
         onClick={() => onContinue(selectedIds)}
         className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
       >
-        {saving ? "Saving…" : "I'm good"}
+        {saving
+          ? "Adding…"
+          : selectedIds.length === 0
+            ? "Select workouts to continue"
+            : selectedIds.length === 1
+              ? "Add 1 workout to my plan"
+              : `Add ${selectedIds.length} workouts to my plan`}
       </button>
     </div>
   );
