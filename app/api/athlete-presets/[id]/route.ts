@@ -359,6 +359,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             },
           });
         }
+        if (existing.workoutStructure == null && existing.sourcePresetId) {
+          await seedWorkoutBlueprintFromSource({
+            athletePresetId: id,
+            sourcePresetId: existing.sourcePresetId,
+          });
+          existing = (await loadOwnedPreset(auth.athlete.id, id)) ?? existing;
+        }
         data.coachPlanOverview = mergeCoachPlanOverview(existing.coachPlanOverview, {
           adjusterConfirmed: true,
         });

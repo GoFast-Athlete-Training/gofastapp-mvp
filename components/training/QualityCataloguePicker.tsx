@@ -124,6 +124,14 @@ export function QualityCataloguePicker({
     });
   }, []);
 
+  const selectAllCatalogue = useCallback(() => {
+    setSelectedIds(catalogue.slice(0, CATALOGUE_ROTATION_SLOTS).map((c) => c.id));
+  }, [catalogue]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds([]);
+  }, []);
+
   function appendCatalogueItem(item: QualityCatalogueItem) {
     setCatalogue((prev) => {
       const next = [...prev.filter((c) => c.id !== item.id), item];
@@ -223,6 +231,10 @@ export function QualityCataloguePicker({
 
   const atMax = selectedIds.length >= CATALOGUE_ROTATION_SLOTS;
   const typeLabel = workoutType === "Tempo" ? "tempo" : "interval";
+  const selectableCount = Math.min(catalogue.length, CATALOGUE_ROTATION_SLOTS);
+  const allSelectableSelected =
+    selectableCount > 0 &&
+    catalogue.slice(0, CATALOGUE_ROTATION_SLOTS).every((c) => selectedIds.includes(c.id));
 
   if (loading) {
     return <p className="text-sm text-gray-600">Loading workout catalogue…</p>;
@@ -240,9 +252,33 @@ export function QualityCataloguePicker({
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-medium text-gray-600">
-          {selectedIds.length} selected · max {CATALOGUE_ROTATION_SLOTS}
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-xs font-medium text-gray-600">
+            {selectedIds.length} selected · max {CATALOGUE_ROTATION_SLOTS}
+          </p>
+          {catalogue.length > 0 ? (
+            <>
+              {!allSelectableSelected ? (
+                <button
+                  type="button"
+                  onClick={selectAllCatalogue}
+                  className="text-xs font-semibold text-orange-700 hover:text-orange-900"
+                >
+                  Select all{selectableCount < catalogue.length ? ` (${selectableCount})` : ""}
+                </button>
+              ) : null}
+              {selectedIds.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="text-xs font-semibold text-gray-600 hover:text-gray-900"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </>
+          ) : null}
+        </div>
         <button
           type="button"
           disabled={recommending}

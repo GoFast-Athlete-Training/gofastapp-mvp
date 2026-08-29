@@ -366,6 +366,9 @@ export default function TrainingSetupClient() {
   const [customBuilderPresetId, setCustomBuilderPresetId] = useState<string | null | undefined>(
     undefined
   );
+  const [presetSavedBanner, setPresetSavedBanner] = useState<{ id: string; title: string } | null>(
+    null
+  );
   /** When switching to a different race: null = show fork, same-shape | create-own */
   const [changeRaceForkChoice, setChangeRaceForkChoice] = useState<
     null | "same-shape" | "create-own"
@@ -719,6 +722,7 @@ export default function TrainingSetupClient() {
     setSelectedAthletePresetId(null);
     setPresetPickMode("choose");
     setCustomBuilderPresetId(undefined);
+    setPresetSavedBanner(null);
     setPlanName("");
     setPlanNameTouched(false);
     setFormError(null);
@@ -1245,10 +1249,11 @@ export default function TrainingSetupClient() {
                       setSelectedAthletePresetId(ap.id);
                       setSelectedPreset(null);
                       setCustomBuilderPresetId(undefined);
+                      setPresetSavedBanner({ id: ap.id, title: ap.title });
                       if (!planNameTouched) {
                         setPlanName(ap.title);
                       }
-                      void createPlan({ athletePresetOverride: ap.id });
+                      void loadAthletePresets();
                     }}
                     onCancel={() => {
                       setCustomBuilderPresetId(undefined);
@@ -1257,6 +1262,24 @@ export default function TrainingSetupClient() {
                   />
                   ) : (
                     <div className="space-y-4">
+                      {presetSavedBanner ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 p-4 text-sm text-gray-800">
+                          <p className="font-semibold text-gray-900">Your preset is saved</p>
+                          <p className="mt-1 text-gray-700">
+                            <span className="font-medium">{presetSavedBanner.title}</span> is ready
+                            under &ldquo;Ready to use.&rdquo; Select it below or use{" "}
+                            <span className="font-medium">Choose preferences</span> when you are
+                            ready to generate your plan.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setPresetSavedBanner(null)}
+                            className="mt-2 text-sm font-medium text-emerald-800 hover:text-emerald-950"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      ) : null}
                       <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
                         <p className="font-medium text-gray-900">What is a preset?</p>
                         <p className="mt-2 leading-relaxed text-gray-700">

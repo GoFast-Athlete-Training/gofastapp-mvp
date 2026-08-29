@@ -25,6 +25,7 @@ import {
   type QualityRotationSlot,
 } from "@/components/training/QualityRotationReview";
 import { QualityCataloguePicker } from "@/components/training/QualityCataloguePicker";
+import { SignedSecPerMileStepper } from "@/components/training/SignedSecPerMileStepper";
 import {
   builderProgressFromOverview,
   qualityStepSubPhase,
@@ -135,7 +136,13 @@ type BuilderStep =
   | "longRun"
   | "tempo"
   | "interval"
-  | "adjuster";
+  | "adjuster"
+  | "saved";
+
+type SavedPresetSummary = {
+  id: string;
+  title: string;
+};
 
 function buildStepToUi(step: AthletePresetApi["buildStep"]): BuilderStep {
   if (step === "core") return "foundation";
@@ -218,6 +225,7 @@ export function AthletePresetBuilder({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedPreset, setSavedPreset] = useState<SavedPresetSummary | null>(null);
   const [effectiveGoalTime, setEffectiveGoalTime] = useState<string | null>(
     goalTimeProp?.trim() || null
   );
@@ -759,20 +767,50 @@ export function AthletePresetBuilder({
     }
   }
 
+  async function confirmAdjusterPatch() {
+    return patchPreset({
+      step: "adjuster",
+      action: "confirm",
+      paceAdjuster,
+    });
+  }
+
   async function saveAdjusterAndFinish() {
     setSaving(true);
     setError(null);
     try {
-      const ap = await patchPreset({
-        step: "adjuster",
-        action: "confirm",
-        paceAdjuster,
-      });
-      if (ap.isComplete) {
-        onComplete({ id: ap.id, title: ap.title });
-      }
+      const ap = await confirmAdjusterPatch();
+      setSavedPreset({ id: ap.id, title: ap.title });
+      setStep("saved");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save pace adjuster");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveAdjusterAndExit() {
+    setSaving(true);
+    setError(null);
+    try {
+      await confirmAdjusterPatch();
+      onCancel();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save pace adjuster");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resetAdjusterToDefaults() {
+    setSaving(true);
+    setError(null);
+    try {
+      const ap = await patchPreset({ step: "adjuster", action: "defaultAdjuster" });
+      setPaceAdjuster({ ...DEFAULT_ATHLETE_PACE_ADJUSTER });
+      setPresetApi(ap);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not reset pace adjuster");
     } finally {
       setSaving(false);
     }
@@ -1341,12 +1379,33 @@ export function AthletePresetBuilder({
             </button>
           ) : null}
         </>
+      ) : step === "saved" && savedPreset ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-6 text-center space-y-4">
+          <p className="text-lg font-semibold text-gray-900">Your preset is saved</p>
+          <p className="text-sm text-gray-700">
+            <span className="font-medium text-gray-900">{savedPreset.title}</span> is ready to use.
+            Return to plan setup to attach it, pick your weekly miles and training days, and generate
+            your schedule.
+          </p>
+          <button
+            type="button"
+            onClick={() => onComplete({ id: savedPreset.id, title: savedPreset.title })}
+            className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            Return to plan setup
+          </button>
+        </div>
       ) : (
         <>
-          <p className="text-sm font-medium text-gray-900">Pace adjuster</p>
+          <p className="text-sm font-medium text-gray-900">Your paces are already tuned</p>
           <p className="text-sm text-gray-600">
-            Nudge each run type faster (negative) or slower (positive). Generate uses{" "}
-            <span className="font-medium">5K + catalogue offset + your adjuster</span>.
+            We start from offsets that match your goal race and workout types. Only change these if
+            your easy runs, long runs, or quality sessions consistently feel too fast or too slow.
+          </p>
+          <p className="text-xs text-gray-500">
+            Each workout you picked also has its own structure offsets (see Details on quality
+            workouts). When we generate your plan:{" "}
+            <span className="font-medium">5K + workout offset + your adjuster</span>.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
@@ -1357,20 +1416,18 @@ export function AthletePresetBuilder({
                 ["interval", "Interval"],
               ] as const
             ).map(([key, label]) => (
-              <div key={key}>
-                <label className="mb-1 block text-xs font-medium text-gray-700">{label} (sec/mi)</label>
-                <input
-                  type="number"
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
-                  value={paceAdjuster[key]}
-                  onChange={(e) =>
-                    setPaceAdjuster((prev) => ({
-                      ...prev,
-                      [key]: Number(e.target.value),
-                    }))
-                  }
-                />
-              </div>
+              <SignedSecPerMileStepper
+                key={key}
+                label={`${label} (sec/mi)`}
+                value={paceAdjuster[key]}
+                disabled={saving}
+                onChange={(next) =>
+                  setPaceAdjuster((prev) => ({
+                    ...prev,
+                    [key]: next,
+                  }))
+                }
+              />
             ))}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1382,8 +1439,21 @@ export function AthletePresetBuilder({
             >
               {saving ? "Saving…" : "Save preset"}
             </button>
-            <button type="button" onClick={onCancel} className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void saveAdjusterAndExit()}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 disabled:opacity-60"
+            >
               Save & exit
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void resetAdjusterToDefaults()}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+            >
+              Reset to defaults
             </button>
           </div>
         </>
