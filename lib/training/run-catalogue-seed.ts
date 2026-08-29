@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { generateCatalogueSlug } from "@/lib/training/catalogue-slug";
 import { SEED_CATALOGUE_ROWS } from "@/lib/training/catalogue-seed-rows";
+import { findStaffCatalogueByNameAndType } from "@/lib/training/staff-catalogue-lookup";
 
 export async function runCatalogueSeed(prisma: PrismaClient): Promise<{
   created: number;
@@ -13,11 +14,7 @@ export async function runCatalogueSeed(prisma: PrismaClient): Promise<{
   let updated = 0;
 
   for (const row of SEED_CATALOGUE_ROWS) {
-    const existing = await prisma.workout_catalogue.findUnique({
-      where: {
-        name_workoutType: { name: row.name, workoutType: row.workoutType },
-      },
-    });
+    const existing = await findStaffCatalogueByNameAndType(row.name, row.workoutType, prisma);
 
     const slug = row.slug ?? generateCatalogueSlug(row.name);
     const data = {

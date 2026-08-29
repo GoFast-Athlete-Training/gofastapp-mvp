@@ -9,6 +9,7 @@ import { archiveOtherActivePlans, cascadeLinkedGoalAfterPlanArchived } from "@/l
 import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
 import { cleanupPlanWorkoutsBeforeDelete } from "@/lib/training/plan-delete-cleanup";
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
+import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
 import {
@@ -542,6 +543,10 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     if (body.lifecycleStatus === TrainingPlanLifecycle.ARCHIVED) {
       await cascadeLinkedGoalAfterPlanArchived(id, auth.athlete.id);
       await cleanupFutureGarminSchedulesForPlan({
+        planId: id,
+        athleteId: auth.athlete.id,
+      });
+      await cleanupFutureWorkoutsForRetiredPlan({
         planId: id,
         athleteId: auth.athlete.id,
       });

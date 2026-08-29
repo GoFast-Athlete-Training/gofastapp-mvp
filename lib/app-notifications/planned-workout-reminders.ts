@@ -1,3 +1,4 @@
+import { TrainingPlanLifecycle } from '@prisma/client';
 import { getEnabledDeviceTokens } from '@/lib/app-notifications/devices';
 import { renderNotificationTemplate } from '@/lib/app-notifications/templates';
 import { templateKeyToMobileType } from '@/lib/app-notifications/types';
@@ -63,10 +64,15 @@ export async function sendPlannedWorkoutReminders(
       matchedActivityId: null,
       skippedAt: null,
       appnotificationReminderSentAt: null,
+      OR: [
+        { planId: null },
+        { training_plans: { lifecycleStatus: TrainingPlanLifecycle.ACTIVE } },
+      ],
     },
     select: {
       id: true,
       athleteId: true,
+      planId: true,
       title: true,
       workoutType: true,
       estimatedDistanceInMeters: true,

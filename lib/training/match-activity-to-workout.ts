@@ -5,6 +5,7 @@
  * otherwise athletes confirm via POST /match-activity.
  */
 
+import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { extractGarminWorkoutIdFromSummary } from "./extract-garmin-workout-id";
 import { RUNNING_ACTIVITY_TYPES } from "./activity-type-sets";
@@ -298,6 +299,10 @@ export async function tryMatchActivityToTrainingWorkout(
       where: {
         athleteId: activity.athleteId,
         garminWorkoutId,
+        OR: [
+          { planId: null },
+          { training_plans: { lifecycleStatus: TrainingPlanLifecycle.ACTIVE } },
+        ],
       },
       include: plannedMatchInclude,
     });
@@ -322,6 +327,10 @@ export async function tryMatchActivityToTrainingWorkout(
       where: {
         athleteId: activity.athleteId,
         date: { gte: start, lt: end },
+        OR: [
+          { planId: null },
+          { training_plans: { lifecycleStatus: TrainingPlanLifecycle.ACTIVE } },
+        ],
       },
       include: plannedMatchInclude,
       orderBy: [{ garminWorkoutId: "desc" }, { updatedAt: "desc" }],

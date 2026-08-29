@@ -10,6 +10,7 @@ import {
   type CatalogueRowInput,
 } from "@/lib/training/catalogue-row";
 import { generateCatalogueSlug } from "@/lib/training/catalogue-slug";
+import { findStaffCatalogueByNameAndType } from "@/lib/training/staff-catalogue-lookup";
 
 /**
  * POST body: `{ items: Record<string, unknown>[] }`
@@ -20,7 +21,7 @@ import { generateCatalogueSlug } from "@/lib/training/catalogue-slug";
  * `paceAnchor` → `currentBuildup`, `mpBlockProgression` → `flat`. Legacy JSON keys
  * (`segmentPatternJson`, `workSegmentsJson`) are accepted where documented in `bodyToCatalogueRow`.
  *
- * Upserts by unique `(name, workoutType)`.
+ * Upserts by unique staff `(name, workoutType)` (ownerAthleteId null).
  */
 export async function POST(request: NextRequest) {
   const authErr = await assertStaffBearerAuth(request);
@@ -76,11 +77,11 @@ export async function POST(request: NextRequest) {
     await prisma.$transaction(async (tx) => {
       const now = new Date();
       for (const d of parsedRows) {
-        const existing = await tx.workout_catalogue.findUnique({
-          where: {
-            name_workoutType: { name: d.name, workoutType: d.workoutType },
-          },
-        });
+        const existing = await findStaffCatalogueByNameAndType(
+          d.name,
+          d.workoutType,
+          tx
+        );
         if (existing) {
           const updateData: Record<string, unknown> = {
             description: d.description,

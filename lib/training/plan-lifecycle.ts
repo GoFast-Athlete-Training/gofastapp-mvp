@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { rematerializeFuturePlannedWorkoutsForPlan } from "@/lib/training/rematerialize-future-planned-workouts";
 import { utcDateOnly } from "@/lib/training/plan-utils";
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
+import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
 
 /** Race calendar day strictly before today (UTC) — aligns with training hub "past race" treatment. */
 export function isRaceCalendarBeforeTodayUtc(raceDate: Date | null | undefined): boolean {
@@ -32,6 +33,17 @@ export async function parkOtherActivePlans(
   athleteId: string,
   exceptPlanId?: string | null
 ): Promise<void> {
+  const toPark = await prisma.training_plans.findMany({
+    where: {
+      athleteId,
+      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+      ...(exceptPlanId ? { NOT: { id: exceptPlanId } } : {}),
+    },
+    select: { id: true },
+  });
+
+  if (toPark.length === 0) return;
+
   await prisma.training_plans.updateMany({
     where: {
       athleteId,
@@ -43,6 +55,19 @@ export async function parkOtherActivePlans(
       updatedAt: new Date(),
     },
   });
+
+  await Promise.all(
+    toPark.map(async (p) => {
+      await cleanupFutureGarminSchedulesForPlan({
+        planId: p.id,
+        athleteId,
+      });
+      await cleanupFutureWorkoutsForRetiredPlan({
+        planId: p.id,
+        athleteId,
+      });
+    })
+  );
 }
 
 /** @deprecated use parkOtherActivePlans */
@@ -81,6 +106,10 @@ export async function archiveOtherActivePlans(
         planId: p.id,
         athleteId,
       });
+      await cleanupFutureWorkoutsForRetiredPlan({
+        planId: p.id,
+        athleteId,
+      });
     })
   );
 }
@@ -116,6 +145,15 @@ export async function restoreParkedPlan(params: {
     return { ok: false, error: "Parked plan not found" };
   }
 
+  const outgoingActive = await prisma.training_plans.findMany({
+    where: {
+      athleteId: params.athleteId,
+      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+      NOT: { id: params.parkedPlanId },
+    },
+    select: { id: true },
+  });
+
   const now = new Date();
   await prisma.$transaction(async (tx) => {
     await tx.training_plans.updateMany({
@@ -137,6 +175,19 @@ export async function restoreParkedPlan(params: {
       },
     });
   });
+
+  await Promise.all(
+    outgoingActive.map(async (p) => {
+      await cleanupFutureGarminSchedulesForPlan({
+        planId: p.id,
+        athleteId: params.athleteId,
+      });
+      await cleanupFutureWorkoutsForRetiredPlan({
+        planId: p.id,
+        athleteId: params.athleteId,
+      });
+    })
+  );
 
   return { ok: true };
 }
