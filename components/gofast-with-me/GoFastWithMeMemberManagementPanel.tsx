@@ -2,30 +2,50 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ExternalLink, Users } from 'lucide-react';
 import api from '@/lib/api';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 import type { ContainerMemberRow } from '@/lib/gofast-with-me/container-members-types';
-import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
+import {
+  athleteCommunityPath,
+  athletePublicPagePath,
+} from '@/lib/gofast-with-me/athlete-community-routes';
+import GoFastWithMeUrlEditor from '@/components/profile/GoFastWithMeUrlEditor';
 
 type Props = {
   athleteId: string;
   publicSlug: string;
+  gofastHandle: string;
+  slugUsesHandle: boolean;
+  liveUrl: string;
   embedded?: boolean;
   memberCount?: number;
   members?: ContainerHubPayload['members'];
   membersLoading?: boolean;
   onMembersRefresh?: () => Promise<void>;
+  onUrlUpdated?: (slug: string, usesHandle: boolean) => void;
 };
+
+function memberDisplayName(m: ContainerMemberRow): string {
+  const name = [m.firstName, m.lastName].filter(Boolean).join(' ').trim();
+  if (name) return name;
+  if (m.gofastHandle) return `@${m.gofastHandle}`;
+  return 'Follower';
+}
 
 export default function GoFastWithMeMemberManagementPanel({
   athleteId,
   publicSlug,
+  gofastHandle,
+  slugUsesHandle,
+  liveUrl,
   embedded = false,
   memberCount: memberCountProp,
   members: membersProp,
   membersLoading = false,
   onMembersRefresh,
+  onUrlUpdated,
 }: Props) {
   const [memberCount, setMemberCount] = useState(memberCountProp ?? 0);
   const [members, setMembers] = useState<ContainerMemberRow[]>(
@@ -78,13 +98,12 @@ export default function GoFastWithMeMemberManagementPanel({
         <div>
           <h2 className="text-lg font-bold text-gray-900">Members</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Runners following your athlete community — they see your goal, plan, updates, and
-            GoRuns for free after they follow.
+            See all runners following your athlete community — face, name, and profile.
           </p>
         </div>
       ) : (
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Followers</h3>
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Members</h3>
           <p className="text-xs text-gray-600 mt-1">Who follows your athlete community.</p>
         </div>
       )}
@@ -100,7 +119,7 @@ export default function GoFastWithMeMemberManagementPanel({
           <div className="flex items-start gap-3">
             <Users className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Follower list</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Roster</h3>
               {isLoading ? (
                 <p className="text-xs text-gray-500 mt-1">Loading…</p>
               ) : (
@@ -124,38 +143,78 @@ export default function GoFastWithMeMemberManagementPanel({
         </div>
 
         {!isLoading && members.length > 0 ? (
-          <ul className="flex flex-wrap gap-2">
-            {members.map((m) => (
-              <li
-                key={m.id}
-                className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-800"
-              >
-                {[m.firstName, m.lastName].filter(Boolean).join(' ') ||
-                  (m.gofastHandle ? `@${m.gofastHandle}` : null) ||
-                  'Follower'}
-              </li>
-            ))}
+          <ul className="divide-y divide-gray-100">
+            {members.map((m) => {
+              const name = memberDisplayName(m);
+              const profileHref = m.gofastHandle
+                ? athletePublicPagePath(m.gofastHandle)
+                : null;
+              const row = (
+                <>
+                  <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-100">
+                    {m.photoURL ? (
+                      <Image
+                        src={m.photoURL}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        sizes="40px"
+                        unoptimized
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-gray-500">
+                        {(m.firstName?.[0] ?? m.gofastHandle?.[0] ?? '?').toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 truncate">{name}</p>
+                    {m.gofastHandle ? (
+                      <p className="text-xs text-gray-500 truncate">@{m.gofastHandle}</p>
+                    ) : null}
+                  </div>
+                </>
+              );
+
+              return (
+                <li key={m.id}>
+                  {profileHref ? (
+                    <Link
+                      href={profileHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 py-3 hover:bg-gray-50 -mx-2 px-2 rounded-lg transition"
+                    >
+                      {row}
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-3 py-3">{row}</div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         ) : !isLoading ? (
-          <p className="text-sm text-gray-500">No followers yet — share your public page to grow.</p>
+          <p className="text-sm text-gray-500">No followers yet — share your invite link to grow.</p>
         ) : null}
       </div>
 
-      {!embedded ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-900">Public community</h3>
-          <p className="text-xs text-gray-600 mt-1">
-            Preview what followers see — training goal, plan, updates, GoRuns, Chatter, and
-            followers in one scroll.
-          </p>
-          <Link
-            href={athleteCommunityPath(publicSlug)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-flex rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
-          >
-            View public community
-          </Link>
+      {!embedded && onUrlUpdated ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Public URL</h3>
+            <p className="text-xs text-gray-600 mt-1">
+              Your community landing slug — followers use this to find you.
+            </p>
+          </div>
+          <GoFastWithMeUrlEditor
+            gofastHandle={gofastHandle}
+            publicSlug={publicSlug}
+            slugUsesHandle={slugUsesHandle}
+            publicUrl={liveUrl}
+            onUpdated={(slug, usesHandle) => onUrlUpdated(slug, usesHandle)}
+          />
         </div>
       ) : null}
     </section>

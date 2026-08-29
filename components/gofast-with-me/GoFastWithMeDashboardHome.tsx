@@ -1,40 +1,37 @@
 'use client';
 
-import { useState } from 'react';
-import { Copy, ExternalLink, Users } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Calendar, Copy, DollarSign, Route, Users } from 'lucide-react';
+import api from '@/lib/api';
+import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 import { STUDIO_COMMUNITY_LABEL } from '@/components/gofast-with-me/studio-sections';
-import GoFastWithMeUrlEditor from '@/components/profile/GoFastWithMeUrlEditor';
-import {
-  athleteCommunityPath,
-  athleteCommunityPreviewPath,
-} from '@/lib/gofast-with-me/athlete-community-routes';
 
 export type DashboardMetrics = {
   followerCount: number | null;
-  liveUrl: string;
   invitePath: string;
-  publicSlug: string;
-  gofastHandle: string;
-  slugUsesHandle: boolean;
 };
 
 type Props = {
+  athleteId: string;
   metrics: DashboardMetrics;
   visitorHeadline: string;
   onOpenMembers?: () => void;
-  onUrlUpdated?: (slug: string, usesHandle: boolean) => void;
+  onOpenWorkouts?: () => void;
 };
 
 export default function GoFastWithMeDashboardHome({
+  athleteId,
   metrics,
   visitorHeadline,
   onOpenMembers,
-  onUrlUpdated,
+  onOpenWorkouts,
 }: Props) {
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [nextRun, setNextRun] = useState<ContainerHubPayload['upcomingRuns'][number] | null>(null);
+  const [runsLoading, setRunsLoading] = useState(true);
+
   const memberCount = metrics.followerCount ?? 0;
-  const publicCommunityPath = athleteCommunityPath(metrics.publicSlug);
-  const followerPreviewPath = athleteCommunityPreviewPath(metrics.publicSlug);
 
   const inviteUrl =
     typeof window !== 'undefined'
@@ -51,42 +48,31 @@ export default function GoFastWithMeDashboardHome({
     }
   };
 
+  const loadNextRun = useCallback(async () => {
+    setRunsLoading(true);
+    try {
+      const res = await api.get(`/athlete/${athleteId}/container/hub`);
+      if (res.data?.success && res.data.hub) {
+        const hub = res.data.hub as ContainerHubPayload;
+        setNextRun(hub.upcomingRuns?.[0] ?? null);
+      }
+    } catch {
+      setNextRun(null);
+    } finally {
+      setRunsLoading(false);
+    }
+  }, [athleteId]);
+
+  useEffect(() => {
+    void loadNextRun();
+  }, [loadNextRun]);
+
   return (
-    <div className="space-y-5 max-w-3xl pb-8">
+    <div className="space-y-4 max-w-3xl pb-8">
       <div>
         <h2 className="text-lg font-bold text-gray-900">{STUDIO_COMMUNITY_LABEL}</h2>
-        <p className="text-sm text-gray-600 mt-0.5">
-          Your follower feed — invite people, then preview what they see.
-        </p>
+        <p className="text-sm text-gray-600 mt-0.5">Your community home — invite, roster, and next run.</p>
       </div>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-5">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Followers</p>
-        <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-3">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-orange-100 p-2 text-orange-700">
-              <Users className="h-5 w-5" aria-hidden />
-            </div>
-            <p className="text-4xl font-bold text-gray-900 tabular-nums leading-none">{memberCount}</p>
-          </div>
-          <div className="text-sm text-gray-600 pb-0.5">
-            {memberCount === 0
-              ? 'No followers yet.'
-              : memberCount === 1
-                ? '1 follower'
-                : `${memberCount} followers`}
-          </div>
-          {onOpenMembers ? (
-            <button
-              type="button"
-              onClick={onOpenMembers}
-              className="text-sm font-semibold text-orange-600 hover:text-orange-700 pb-0.5"
-            >
-              Manage members →
-            </button>
-          ) : null}
-        </div>
-      </section>
 
       <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 space-y-3">
         <div>
@@ -106,45 +92,104 @@ export default function GoFastWithMeDashboardHome({
         <p className="text-xs text-gray-500">
           Headline: <strong className="text-gray-700">{visitorHeadline}</strong>
         </p>
-        <details className="rounded-lg border border-gray-200 bg-white/80">
-          <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900">
-            Edit public URL
-          </summary>
-          <div className="border-t border-gray-100 px-3 py-3">
-            <GoFastWithMeUrlEditor
-              gofastHandle={metrics.gofastHandle}
-              publicSlug={metrics.publicSlug}
-              slugUsesHandle={metrics.slugUsesHandle}
-              publicUrl={metrics.liveUrl}
-              onUpdated={(slug, usesHandle) => onUrlUpdated?.(slug, usesHandle)}
-            />
-          </div>
-        </details>
       </section>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-5 space-y-2">
-        <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Preview</p>
-        <p className="text-xs text-gray-600">Check how your community looks to followers.</p>
-        <div className="flex flex-wrap gap-2 pt-1">
-          <a
-            href={followerPreviewPath}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 hover:bg-orange-100"
-          >
-            See what followers see
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-          <a
-            href={publicCommunityPath}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
-          >
-            Open public community
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
+      <section className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-orange-100 p-2 text-orange-700">
+              <Users className="h-5 w-5" aria-hidden />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Members</p>
+              <p className="text-xs text-gray-600 mt-0.5">
+                {memberCount === 0
+                  ? 'No followers yet.'
+                  : memberCount === 1
+                    ? '1 follower'
+                    : `${memberCount} followers`}
+              </p>
+            </div>
+          </div>
+          {onOpenMembers ? (
+            <button
+              type="button"
+              onClick={onOpenMembers}
+              className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+            >
+              See all →
+            </button>
+          ) : null}
         </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
+              <DollarSign className="h-5 w-5" aria-hidden />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Sponsors</p>
+              <p className="text-xs text-gray-600 mt-0.5">Brand deals and payout history.</p>
+            </div>
+          </div>
+          <Link
+            href="/gofast-with-others?view=payouts"
+            className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+          >
+            Earnings →
+          </Link>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-violet-100 p-2 text-violet-700">
+              <Route className="h-5 w-5" aria-hidden />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Next join-me run</p>
+              <p className="text-xs text-gray-600 mt-0.5">Your next upcoming hosted GoRun.</p>
+            </div>
+          </div>
+          {onOpenWorkouts ? (
+            <button
+              type="button"
+              onClick={onOpenWorkouts}
+              className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+            >
+              Runs & Training →
+            </button>
+          ) : null}
+        </div>
+
+        {runsLoading ? (
+          <p className="text-sm text-gray-500">Loading…</p>
+        ) : nextRun ? (
+          <Link
+            href={nextRun.gorunPath.startsWith('/') ? nextRun.gorunPath : `/${nextRun.gorunPath}`}
+            className="block rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm hover:border-orange-300 transition"
+          >
+            <span className="font-medium text-gray-900">{nextRun.title}</span>
+            <span className="flex items-center gap-1.5 text-gray-500 mt-1">
+              <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              {new Date(nextRun.date).toLocaleString(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+              {nextRun.meetUpPoint ? ` · ${nextRun.meetUpPoint}` : ''}
+            </span>
+          </Link>
+        ) : (
+          <p className="text-sm text-gray-600 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4">
+            No upcoming hosted run. Pick a plan day in Runs & Training to invite followers.
+          </p>
+        )}
       </section>
     </div>
   );

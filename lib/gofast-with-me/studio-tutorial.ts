@@ -18,34 +18,34 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'My Community is the studio: Community Management hydrates the whole hub, Landing page is your public front door, Messages is the daily feed, Runs & Training shares plans and GoRuns, and Tips & Thinking holds durable advice.',
+    'My Community is your studio. Use the header to flip between Landing (public door) and Community (home). Build with My Story, daily log, tips, routes, and Runs & Training. Manage announcements, chatter, and your member roster from the left nav.',
   steps: [
     {
       id: 'page',
-      title: 'Landing page — public front door',
+      title: 'My Story — public landing',
       instruction:
-        'Your public landing where strangers see who you are and What I\'m training for before they follow.',
+        'Photo, welcome, and about — what strangers see before they follow.',
       sortOrder: 0,
     },
     {
       id: 'community',
-      title: 'Messages — daily community',
+      title: 'Daily log — community feed',
       instruction:
-        'Post journey updates and review Chatter. Manage followers from Community Management.',
+        'Post how you feel today — updates spill into the member feed.',
       sortOrder: 1,
     },
     {
       id: 'workouts',
-      title: 'Runs & Training — plan sharing',
+      title: 'Runs & Training — join-me runs',
       instruction:
-        'Polish your plan title and follower intro, preview the public hub, and build a GoRun With Me when ready.',
+        'Pick a plan day and invite followers to a hosted GoRun.',
       sortOrder: 2,
     },
     {
       id: 'content',
-      title: 'Tips & Thinking — durable content',
+      title: 'Tips & routes — durable content',
       instruction:
-        'Publish athlete-owned tips that hydrate your public page and community outside the daily update feed.',
+        'Nutrition, training thoughts, and routes followers revisit.',
       sortOrder: 3,
     },
   ],

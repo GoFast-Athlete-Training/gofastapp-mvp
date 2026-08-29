@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { Layout, Users, X, type LucideIcon } from 'lucide-react';
 import {
   STUDIO_CHROME_LABELS,
-  STUDIO_VIEW_NAV_ORDER,
   STUDIO_COMMUNITY_LABEL,
   STUDIO_LANDING_LABEL,
   type StudioChromeView,
@@ -48,8 +47,8 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-violet-800">Tutorial</p>
           <p className="mt-1 text-sm text-violet-950 leading-relaxed">
-            {STUDIO_TUTORIAL_FALLBACK.summary} Earnings live in the top app bar with Home and
-            Settings — not under View.
+            {tutorial.summary ?? STUDIO_TUTORIAL_FALLBACK.summary} Earnings live in the top app
+            bar — not in the studio nav.
           </p>
         </div>
         <button
@@ -67,21 +66,31 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
       ) : (
         <ul className="space-y-2">
           <TutorialRow
-            icon={Users}
-            label="Build first"
-            description="My Story, daily log, tips, routes, and runs — create content on the left."
+            icon={Layout}
+            label="Header: Landing | Community"
+            description={`Flip between ${STUDIO_LANDING_LABEL} (public door) and ${STUDIO_COMMUNITY_LABEL} (home with invite, members, and your next run).`}
           />
-          {STUDIO_VIEW_NAV_ORDER.map((item) => {
-            const Icon = CHROME_ICONS[item.view];
+          <TutorialRow
+            icon={Users}
+            label="Build on the left"
+            description="My Story, daily log, tips, routes, and Runs & Training — where you create content."
+          />
+          <TutorialRow
+            icon={Users}
+            label="Manage on the left"
+            description="Announcements, chatter, and your member roster."
+          />
+          {(['landingView', 'communityHome'] as StudioChromeView[]).map((view) => {
+            const Icon = CHROME_ICONS[view];
             const description =
-              item.view === 'landingView'
-                ? `${STUDIO_LANDING_LABEL} — ${item.hint}. Edit in My Story and Build.`
-                : `${STUDIO_COMMUNITY_LABEL} — ${item.hint}. Invite and moderate from Manage.`;
+              view === 'landingView'
+                ? `${STUDIO_LANDING_LABEL} — preview your public page. Edit in My Story.`
+                : `${STUDIO_COMMUNITY_LABEL} — home with invite link, members, sponsors, and next join-me run.`;
             return (
               <TutorialRow
-                key={item.view}
+                key={view}
                 icon={Icon}
-                label={`Preview: ${STUDIO_CHROME_LABELS[item.view]}`}
+                label={STUDIO_CHROME_LABELS[view]}
                 description={description}
               />
             );

@@ -10,6 +10,8 @@ import { LocalStorageAPI } from '@/lib/localstorage';
 import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 import api from '@/lib/api';
 import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
+import GoFastWithMeCreatorTypeSettings from '@/components/gofast-with-me/GoFastWithMeCreatorTypeSettings';
+import type { GoFastWithMeCreatorType } from '@/lib/gofast-with-me/gofast-with-me-service';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -30,6 +32,10 @@ export default function SettingsPage() {
     periodStart: string | null;
     amountPerCreditCents: number;
   } | null>(null);
+
+  const [gwmCreatorType, setGwmCreatorType] = useState<GoFastWithMeCreatorType | null>(null);
+  const [gwmCoachSpecialty, setGwmCoachSpecialty] = useState<string | null>(null);
+  const [gwmLoading, setGwmLoading] = useState(false);
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -83,6 +89,24 @@ export default function SettingsPage() {
       })
       .catch(() => setAmbassadorCredits(null));
   }, [athlete?.role]);
+
+  useEffect(() => {
+    if (!athlete?.isGoFastContainer) return;
+    setGwmLoading(true);
+    api
+      .get('/me/gofast-with-me')
+      .then((res) => {
+        const gwm = res.data?.gofastWithMe;
+        if (gwm) {
+          setGwmCreatorType(gwm.creatorType ?? null);
+          setGwmCoachSpecialty(gwm.coachSpecialty ?? null);
+        }
+      })
+      .catch(() => {
+        /* optional section */
+      })
+      .finally(() => setGwmLoading(false));
+  }, [athlete?.isGoFastContainer]);
 
   const copyPublicProfileUrl = async () => {
     const h = athlete?.gofastHandle;
@@ -211,6 +235,35 @@ export default function SettingsPage() {
               </Link>
             </div>
           )}
+
+          {/* GoFast With Me creator type */}
+          {athlete?.isGoFastContainer ? (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-1">GoFast With Me</h2>
+              <p className="text-gray-600 text-sm mb-4">
+                Creator type for your public With Me landing. Set once during studio onboarding — edit
+                here anytime.
+              </p>
+              {gwmLoading ? (
+                <p className="text-sm text-gray-500">Loading…</p>
+              ) : (
+                <GoFastWithMeCreatorTypeSettings
+                  initialCreatorType={gwmCreatorType}
+                  initialCoachSpecialty={gwmCoachSpecialty}
+                  onSaved={({ creatorType, coachSpecialty }) => {
+                    setGwmCreatorType(creatorType);
+                    setGwmCoachSpecialty(coachSpecialty);
+                  }}
+                />
+              )}
+              <Link
+                href="/gofast-with-others"
+                className="inline-block mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700"
+              >
+                Open My Community →
+              </Link>
+            </div>
+          ) : null}
 
           {/* Profile Settings */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

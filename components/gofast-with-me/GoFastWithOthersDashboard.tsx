@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Pencil } from "lucide-react";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import type { ShareHubStatus } from "@/lib/profile/share-creator-card-logic";
@@ -97,7 +96,7 @@ export default function GoFastWithOthersDashboard() {
   const [contentFocus, setContentFocus] = useState<ContentEditorFocus | null>(null);
   const [followerCount, setFollowerCount] = useState<number | null>(null);
   const [shareHubStatus, setShareHubStatus] = useState<ShareHubStatus | null>(null);
-  const [introDismissed, setIntroDismissed] = useState(false);
+  const [introDismissed, setIntroDismissed] = useState(() => readStudioIntroDismissed());
 
   const landingValues = ownerRowToLanding(ownerGwm);
   const isWelcomeComplete = isWelcomeContentComplete(landingValues);
@@ -354,20 +353,10 @@ export default function GoFastWithOthersDashboard() {
   const liveUrl = runnerPublicLandingUrl(publicSlug);
   const invitePath = goFastWithFrontDoorPath(publicSlug);
   const visitorHeadline = firstName ? `GoFast with ${firstName}` : "Your public page";
-  const creatorLabel =
-    ownerGwm?.creatorType === "coach"
-      ? "Coach"
-      : ownerGwm?.creatorType === "person"
-        ? "Athlete"
-        : null;
 
   const dashboardMetrics: DashboardMetrics = {
     followerCount,
-    liveUrl,
     invitePath,
-    publicSlug,
-    gofastHandle,
-    slugUsesHandle,
   };
 
   const renderStudioContent = () => {
@@ -388,36 +377,12 @@ export default function GoFastWithOthersDashboard() {
             <GoFastWithMeStudioExplainer onDismiss={handleDismissStudioIntro} />
           ) : null}
 
-          {creatorLabel ? (
-            <div className="rounded-xl border border-gray-200 bg-white p-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Creator type
-                </p>
-                <p className="text-sm font-semibold text-gray-900 mt-0.5">{creatorLabel}</p>
-                {ownerGwm?.creatorType === "coach" && ownerGwm.coachSpecialty?.trim() ? (
-                  <p className="text-sm text-gray-600 mt-1">{ownerGwm.coachSpecialty.trim()}</p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowOnboarding(true)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit creator type
-              </button>
-            </div>
-          ) : null}
-
           <GoFastWithMeDashboardHome
+            athleteId={athleteId}
             metrics={dashboardMetrics}
             visitorHeadline={visitorHeadline}
             onOpenMembers={() => openWorkspace('members')}
-            onUrlUpdated={(slug, usesHandle) => {
-              setPublicSlug(slug);
-              setSlugUsesHandle(usesHandle);
-            }}
+            onOpenWorkouts={() => openWorkspace('workouts')}
           />
         </div>
       );
@@ -452,7 +417,17 @@ export default function GoFastWithOthersDashboard() {
         return <GoFastWithMeChatterPanel athleteId={athleteId} publicSlug={publicSlug} />;
       case "members":
         return (
-          <GoFastWithMeMemberManagementPanel athleteId={athleteId} publicSlug={publicSlug} />
+          <GoFastWithMeMemberManagementPanel
+            athleteId={athleteId}
+            publicSlug={publicSlug}
+            gofastHandle={gofastHandle}
+            slugUsesHandle={slugUsesHandle}
+            liveUrl={liveUrl}
+            onUrlUpdated={(slug, usesHandle) => {
+              setPublicSlug(slug);
+              setSlugUsesHandle(usesHandle);
+            }}
+          />
         );
       case "workouts":
         return (

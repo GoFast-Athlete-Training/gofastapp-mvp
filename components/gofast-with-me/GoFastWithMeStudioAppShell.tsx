@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Eye, type LucideIcon } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
 import {
   STUDIO_BUILD_NAV_ORDER,
+  STUDIO_CHROME_LABELS,
   STUDIO_MANAGE_NAV_ORDER,
   STUDIO_MY_STORY_LABEL,
-  STUDIO_VIEW_NAV_ORDER,
-  STUDIO_VIEW_SECTION_HINT,
+  isStudioChromeView,
   type ContentEditorFocus,
+  type StudioChromeView,
   type StudioSection,
   type StudioView,
 } from '@/components/gofast-with-me/studio-sections';
@@ -33,6 +34,8 @@ function isBuildNavActive(
   return true;
 }
 
+const CHROME_VIEWS: StudioChromeView[] = ['landingView', 'communityHome'];
+
 export default function GoFastWithMeStudioAppShell({
   activeView,
   contentFocus,
@@ -40,16 +43,51 @@ export default function GoFastWithMeStudioAppShell({
   landingNeedsAction,
   children,
 }: Props) {
+  const chromeActive = isStudioChromeView(activeView);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-lg font-bold text-gray-900">My Community</p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Build first — preview Landing and Community under View.
-            </p>
+          <div className="min-w-0 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <div>
+              <p className="text-lg font-bold text-gray-900">My Community</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Build on the left — flip Landing or Community in the header.
+              </p>
+            </div>
+            <div
+              className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 self-start"
+              role="tablist"
+              aria-label="View"
+            >
+              {CHROME_VIEWS.map((view) => {
+                const active = activeView === view;
+                const needsAction = view === 'landingView' && landingNeedsAction;
+                return (
+                  <button
+                    key={view}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => onViewChange(view)}
+                    className={`relative inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      active
+                        ? 'bg-white text-orange-900 shadow-sm'
+                        : chromeActive
+                          ? 'text-gray-600 hover:text-gray-900'
+                          : 'text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    {STUDIO_CHROME_LABELS[view]}
+                    {needsAction ? (
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <Link
             href="/athlete-home"
@@ -106,28 +144,6 @@ export default function GoFastWithMeStudioAppShell({
                 ))}
               </div>
             </div>
-
-            <div>
-              <p className="px-2 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                View
-              </p>
-              <p className="px-2 pb-1.5 text-[10px] leading-snug text-gray-400">
-                {STUDIO_VIEW_SECTION_HINT}
-              </p>
-              <div className="space-y-0.5">
-                {STUDIO_VIEW_NAV_ORDER.map((item) => (
-                  <SidebarButton
-                    key={item.view}
-                    label={item.label}
-                    hint={item.hint}
-                    icon={Eye}
-                    active={activeView === item.view}
-                    onClick={() => onViewChange(item.view)}
-                    badge={item.view === 'landingView' && landingNeedsAction ? 'action' : undefined}
-                  />
-                ))}
-              </div>
-            </div>
           </nav>
         </aside>
 
@@ -159,15 +175,6 @@ export default function GoFastWithMeStudioAppShell({
                   label={item.label}
                   active={activeView === item.section}
                   onClick={() => onViewChange(item.section)}
-                />
-              ))}
-              {STUDIO_VIEW_NAV_ORDER.map((item) => (
-                <MobileNavPill
-                  key={`m-${item.view}`}
-                  label={`Preview ${item.label}`}
-                  active={activeView === item.view}
-                  onClick={() => onViewChange(item.view)}
-                  badge={item.view === 'landingView' && landingNeedsAction}
                 />
               ))}
             </nav>
@@ -207,15 +214,11 @@ function MobileNavPill({
 
 function SidebarButton({
   label,
-  hint,
-  icon: Icon,
   active,
   onClick,
   badge,
 }: {
   label: string;
-  hint?: string;
-  icon?: LucideIcon;
   active: boolean;
   onClick: () => void;
   badge?: 'action';
@@ -230,10 +233,8 @@ function SidebarButton({
           : 'text-gray-700 hover:bg-gray-100'
       }`}
     >
-      {Icon ? <Icon className="h-4 w-4 shrink-0 mt-0.5 opacity-70" aria-hidden /> : null}
       <span className="min-w-0 flex-1">
         <span className="block truncate">{label}</span>
-        {hint ? <span className="block truncate text-[10px] font-normal text-gray-500">{hint}</span> : null}
       </span>
       {badge === 'action' ? (
         <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500 mt-1.5" aria-hidden />

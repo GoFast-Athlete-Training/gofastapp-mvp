@@ -11,8 +11,7 @@ export function hasGoFastWithMeStudioData(row: GwmIntroRow): boolean {
   return Boolean(row?.creatorType);
 }
 
-export function shouldShowStudioExplainer(row: GwmIntroRow, introDismissed: boolean): boolean {
-  if (!hasGoFastWithMeStudioData(row)) return true;
+export function shouldShowStudioExplainer(_row: GwmIntroRow, introDismissed: boolean): boolean {
   return !introDismissed;
 }
 

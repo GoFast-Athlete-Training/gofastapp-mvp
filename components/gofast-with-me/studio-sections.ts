@@ -82,7 +82,7 @@ export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
   content: 'Durable tips — nutrition, training thoughts, and what followers revisit',
   announcements: 'Journey updates followers see in your community feed',
   chatter: 'Follower conversation — review and moderate from studio',
-  members: 'Who follows your athlete community',
+  members: 'Who follows your athlete community — see all roster',
 };
 
 export const STUDIO_ROUTES_NAV_LABEL = 'Routes';
