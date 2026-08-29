@@ -35,6 +35,10 @@ import {
 import PlanSecondaryRacesReview, {
   type SecondaryRaceCandidate,
 } from "@/components/training/PlanSecondaryRacesReview";
+import {
+  PlanLongRunTrajectorySection,
+  trajectoryContextFromPlanDetail,
+} from "@/components/training/PlanLongRunTrajectorySection";
 import { AddedRacePlanPrompt } from "@/components/training/AddedRacePlanPrompt";
 import {
   isAddedRacePromptDismissed,
@@ -65,8 +69,16 @@ type PlanPresetSummary = {
   slug: string | null;
   title: string;
   minWeeklyMiles?: number | null;
+  peakLongRunPoolMiles?: number | null;
   intervalsConfig: { positions: unknown[] } | null;
   tempoConfig: { positions: unknown[] } | null;
+  longRunConfig?: {
+    positions?: Array<{
+      cyclePosition: number;
+      catalogueWorkoutId: string | null;
+      distributionWeight: number;
+    }>;
+  } | null;
 } | null;
 
 type PlanDetail = {
@@ -83,6 +95,7 @@ type PlanDetail = {
   preferredTempoDow?: number | null;
   preferredIntervalDow?: number | null;
   weeklyMileageTarget?: number | null;
+  peakLongRunPoolMiles?: number | null;
   currentWeeklyMileage?: number | null;
   _count?: { planned_workouts: number };
   athlete_race?: {
@@ -98,6 +111,17 @@ type PlanDetail = {
     distanceLabel?: string | null;
   } | null;
   training_plan_preset?: PlanPresetSummary | null;
+  athlete_preset?: {
+    peakLongRunPoolMiles?: number;
+    fitnessPhase?: "BASE" | "PEAK";
+    longRunConfig?: {
+      positions?: Array<{
+        cyclePosition: number;
+        catalogueWorkoutId: string | null;
+        distributionWeight: number;
+      }>;
+    } | null;
+  } | null;
 };
 
 const DAY_OPTIONS: { value: number; label: string }[] = [
@@ -193,6 +217,7 @@ export default function TrainingSetupPlanPage({
   );
   const [archiving, setArchiving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [peakLongRunPoolDraft, setPeakLongRunPoolDraft] = useState<number | null>(null);
   async function getToken() {
     const u = auth.currentUser;
     if (!u) throw new Error("Sign in required");
@@ -420,6 +445,11 @@ export default function TrainingSetupPlanPage({
     return 40;
   }, [plan?.training_plan_preset?.minWeeklyMiles]);
 
+  const trajectoryContext = useMemo(
+    () => (plan ? trajectoryContextFromPlanDetail(plan) : null),
+    [plan]
+  );
+
   const buildWarnings = useMemo(() => {
     const miles = Math.round(Number(weeklyMilesTarget));
     const milesFinite = Number.isFinite(miles);
@@ -640,6 +670,9 @@ export default function TrainingSetupPlanPage({
       body: JSON.stringify({
         preferredDays: normalized,
         weeklyMileageTarget: targetMiles,
+        ...(peakLongRunPoolDraft != null && peakLongRunPoolDraft > 0
+          ? { peakLongRunPoolMiles: peakLongRunPoolDraft }
+          : {}),
         preferredLongRunDow: preferredLongRunDowLocal,
         preferredTempoDow: preferredTempoDowLocal,
         preferredIntervalDow: preferredIntervalDowLocal,
@@ -1206,6 +1239,30 @@ export default function TrainingSetupPlanPage({
                 </p>
               )}
             </div>
+
+            {plan && trajectoryContext ? (
+              <PlanLongRunTrajectorySection
+                planId={planId}
+                getToken={getToken}
+                totalWeeks={plan.totalWeeks}
+                planStartDate={plan.startDate}
+                peakLongRunPoolMiles={plan.peakLongRunPoolMiles ?? null}
+                blueprintPeakLongRunPoolMiles={trajectoryContext.blueprintPeakLongRunPoolMiles}
+                fitnessPhase={trajectoryContext.fitnessPhase}
+                longRunPositions={trajectoryContext.longRunPositions}
+                hasSchedule={hasSchedule}
+                editable
+                showRegenerate={false}
+                weeklyMileageTarget={
+                  resolveTargetMiles() ??
+                  (plan.weeklyMileageTarget != null
+                    ? Math.round(Number(plan.weeklyMileageTarget))
+                    : athleteWeeklyTargetPreference ?? 40)
+                }
+                presetMinWeeklyMiles={presetMinWeeklyMiles}
+                onDraftPeakChange={setPeakLongRunPoolDraft}
+              />
+            ) : null}
 
             <div>
               <p className="mb-2 text-sm font-medium text-gray-800">Preferred training days</p>

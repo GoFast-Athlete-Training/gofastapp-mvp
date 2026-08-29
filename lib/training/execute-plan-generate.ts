@@ -259,7 +259,7 @@ export async function executePlanGenerate(params: {
     }
   }
 
-  const vp = Number(vol.peakLongRunPoolMiles);
+  const vp = Number(planRow.peakLongRunPoolMiles ?? vol.peakLongRunPoolMiles);
   if (!Number.isFinite(vp) || vp <= 0) {
     throw new Error(
       `Training preset "${presetLabel}" has invalid peakLongRunPoolMiles. Fix this preset in GoFast Company.`
@@ -382,6 +382,9 @@ export async function executePlanGenerate(params: {
       cyclePoolData: cyclePoolData as unknown as Prisma.InputJsonValue,
       easyRunConfig: easyRunConfigToSnapshot(easyRunResolved) as unknown as Prisma.InputJsonValue,
       weeklyMileageTarget: requestedWeeklyMileageTarget,
+      ...(planRow.peakLongRunPoolMiles == null
+        ? { peakLongRunPoolMiles }
+        : {}),
       totalWeeks: weekCount,
       ...(syncedFiveKPace != null ? { currentFiveKPace: syncedFiveKPace } : {}),
       ...(mergedGoalTime ? { goalRaceTime: mergedGoalTime } : {}),

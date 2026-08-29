@@ -14,8 +14,9 @@ export function garminCalendarSyncState(workout: {
   garminWorkoutId?: number | null;
   garminScheduleId?: number | null;
 }): GarminCalendarSyncState {
-  if (workout.garminWorkoutId != null) return "scheduled_on_calendar";
-  return "not_pushed";
+  if (workout.garminWorkoutId == null) return "not_pushed";
+  if (workout.garminScheduleId == null) return "library_only";
+  return "scheduled_on_calendar";
 }
 
 export function garminCalendarStateLabel(state: GarminCalendarSyncState): string {
@@ -37,7 +38,7 @@ export function defaultGarminPushModeForState(
     case "scheduled_on_calendar":
       return "update-library";
     case "library_only":
-      return "update-library";
+      return "force-reschedule";
     default:
       return "schedule-today";
   }

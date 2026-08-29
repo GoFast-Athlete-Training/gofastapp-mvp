@@ -388,13 +388,17 @@ export async function pushPlannedWorkoutToGarminForAthlete(
       mode === "force-reschedule" || (!hadGarminWorkoutId && mode !== "update-library");
 
     if (mode === "update-library" || !shouldScheduleCalendar) {
+      const garminScheduleId = planned.garminScheduleId;
       return {
         ok: true,
         garminWorkoutId,
-        garminScheduleId: planned.garminScheduleId,
+        garminScheduleId,
         scheduledDate,
         mode: mode === "schedule-today" && hadGarminWorkoutId ? "update-library" : mode,
-        calendarState: "scheduled_on_calendar",
+        calendarState: garminCalendarSyncState({
+          garminWorkoutId,
+          garminScheduleId,
+        }),
       };
     }
 
@@ -639,13 +643,17 @@ export async function pushWorkoutToGarminForAthlete(
       mode === "force-reschedule" || (!hadGarminWorkoutId && mode !== "update-library");
 
     if (mode === "update-library" || !shouldScheduleCalendar) {
+      const garminScheduleId = workout.garminScheduleId;
       return {
         ok: true,
         garminWorkoutId,
-        garminScheduleId: workout.garminScheduleId,
+        garminScheduleId,
         scheduledDate,
         mode: mode === "schedule-today" && hadGarminWorkoutId ? "update-library" : mode,
-        calendarState: "scheduled_on_calendar",
+        calendarState: garminCalendarSyncState({
+          garminWorkoutId,
+          garminScheduleId,
+        }),
       };
     }
 

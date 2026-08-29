@@ -33,6 +33,7 @@ type Ctx = { params: Promise<{ id: string }> };
 /** Preference fields allowed on generated plans before regenerate. */
 const REGENERATE_PATCH_KEYS = new Set([
   "weeklyMileageTarget",
+  "peakLongRunPoolMiles",
   "preferredDays",
   "preferredLongRunDow",
   "preferredTempoDow",
@@ -141,6 +142,25 @@ export async function GET(request: NextRequest, context: Ctx) {
                         slug: true,
                       },
                     },
+                  },
+                },
+              },
+            },
+          },
+        },
+        athlete_preset: {
+          select: {
+            id: true,
+            peakLongRunPoolMiles: true,
+            fitnessPhase: true,
+            longRunConfig: {
+              include: {
+                positions: {
+                  orderBy: { cyclePosition: "asc" },
+                  select: {
+                    cyclePosition: true,
+                    catalogueWorkoutId: true,
+                    distributionWeight: true,
                   },
                 },
               },
@@ -334,7 +354,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         return NextResponse.json(
           {
             error:
-              "After the training schedule is generated, only lifecycleStatus, currentFiveKPace, athleteRaceId, weeklyMileageTarget, and training-day preferences can be updated",
+              "After the training schedule is generated, only lifecycleStatus, currentFiveKPace, athleteRaceId, weeklyMileageTarget, peakLongRunPoolMiles, and training-day preferences can be updated",
           },
           { status: 400 }
         );
@@ -440,6 +460,12 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         const n = Number(body.weeklyMileageTarget);
         if (Number.isFinite(n)) {
           data.weeklyMileageTarget = Math.max(25, Math.min(100, Math.round(n)));
+        }
+      }
+      if (body.peakLongRunPoolMiles != null) {
+        const n = Number(body.peakLongRunPoolMiles);
+        if (Number.isFinite(n) && n > 0) {
+          data.peakLongRunPoolMiles = Math.round(n * 10) / 10;
         }
       }
 

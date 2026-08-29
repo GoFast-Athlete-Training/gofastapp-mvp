@@ -47,6 +47,10 @@ import {
   planRaceDisplayName,
   planTitleRaceMismatch,
 } from "@/lib/training/plan-display-title";
+import {
+  PlanLongRunTrajectorySection,
+  trajectoryContextFromPlanDetail,
+} from "@/components/training/PlanLongRunTrajectorySection";
 
 type PlanDetailHub = {
   id: string;
@@ -55,10 +59,33 @@ type PlanDetailHub = {
   startDate: string;
   planSchedule: unknown;
   weeklyMileageTarget?: number | null;
+  peakLongRunPoolMiles?: number | null;
   currentFiveKPace?: string | null;
   _count?: { planned_workouts: number };
   raceId?: string | null;
   race_registry: { id?: string; name: string; raceDate?: string } | null;
+  training_plan_preset?: {
+    minWeeklyMiles?: number | null;
+    peakLongRunPoolMiles?: number;
+    longRunConfig?: {
+      positions?: Array<{
+        cyclePosition: number;
+        catalogueWorkoutId: string | null;
+        distributionWeight: number;
+      }>;
+    } | null;
+  } | null;
+  athlete_preset?: {
+    peakLongRunPoolMiles?: number;
+    fitnessPhase?: "BASE" | "PEAK";
+    longRunConfig?: {
+      positions?: Array<{
+        cyclePosition: number;
+        catalogueWorkoutId: string | null;
+        distributionWeight: number;
+      }>;
+    } | null;
+  } | null;
 };
 
 type GoalRacePaceResolved = {
@@ -587,6 +614,25 @@ export default function TrainingHubPage() {
     return Math.round(Number(raw));
   }, [planDetail?.weeklyMileageTarget]);
 
+  const trajectoryContext = useMemo(
+    () => (planDetail ? trajectoryContextFromPlanDetail(planDetail) : null),
+    [planDetail]
+  );
+
+  const presetMinWeeklyMiles = useMemo(() => {
+    const raw = planDetail?.training_plan_preset?.minWeeklyMiles;
+    if (raw != null && Number.isFinite(Number(raw))) {
+      return Math.max(1, Math.round(Number(raw)));
+    }
+    return 40;
+  }, [planDetail?.training_plan_preset?.minWeeklyMiles]);
+
+  async function getHubToken() {
+    const u = auth.currentUser;
+    if (!u) throw new Error("Sign in required");
+    return u.getIdToken();
+  }
+
   const weekSummary = useMemo(() => {
     if (!weekDays.length) return null;
     return buildWeekSummary({
@@ -1076,6 +1122,28 @@ export default function TrainingHubPage() {
                 </Link>
               </div>
             </div>
+
+            {planDetail && trajectoryContext ? (
+              <PlanLongRunTrajectorySection
+                planId={planDetail.id}
+                getToken={getHubToken}
+                totalWeeks={effectiveTotalWeeks}
+                planStartDate={planDetail.startDate}
+                peakLongRunPoolMiles={planDetail.peakLongRunPoolMiles ?? null}
+                blueprintPeakLongRunPoolMiles={trajectoryContext.blueprintPeakLongRunPoolMiles}
+                fitnessPhase={trajectoryContext.fitnessPhase}
+                longRunPositions={trajectoryContext.longRunPositions}
+                currentWeek={weekNumber}
+                hasSchedule
+                editable
+                weeklyMileageTarget={savedWeeklyTarget ?? 40}
+                presetMinWeeklyMiles={presetMinWeeklyMiles}
+                onRegenerated={async () => {
+                  await loadHub();
+                  void fetchWeekDays(weekNumber);
+                }}
+              />
+            ) : null}
 
             {scheduledRuns.length > 0 ? (
               <div className="rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm">

@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ListOrdered,
   CopyPlus,
+  CalendarPlus,
   RefreshCw,
   Watch,
 } from "lucide-react";
@@ -350,14 +351,50 @@ function garminAutoPushStatusCopy(
 ): string {
   switch (state) {
     case "waiting_primary":
-      return "Garmin delivery is scheduled automatically overnight. Check back after 1 AM.";
+      return "Sending to Garmin overnight — check back after 1 AM.";
     case "waiting_backup":
-      return "Waiting for automatic Garmin delivery. If it has not appeared by 8 AM, you can retry.";
+      return "Sending to Garmin this morning — if it is not on your calendar by 8 AM, tap Send to Garmin.";
     case "retry":
-      return "Automatic Garmin delivery did not complete. You can retry below.";
+      return "Not on your Garmin calendar yet — tap Send to Garmin below.";
     default:
-      return `Garmin delivery is automatic${scheduleLabel ? ` for ${scheduleLabel}` : ""}.`;
+      return scheduleLabel
+        ? `Will send to Garmin for ${scheduleLabel}.`
+        : "Will send to Garmin automatically.";
   }
+}
+
+function garminBannerStatusCopy(params: {
+  garminConnected: boolean | null;
+  scheduledOnGarmin: boolean;
+  inGarminLibraryOnly: boolean;
+  garminAutoState: GarminAutoPushUiState;
+  scheduleLabel: string | null;
+}): string {
+  const {
+    garminConnected,
+    scheduledOnGarmin,
+    inGarminLibraryOnly,
+    garminAutoState,
+    scheduleLabel,
+  } = params;
+
+  if (garminConnected === null) return "Checking Garmin…";
+  if (!garminConnected) return "Connect Garmin to send this workout to your watch.";
+  if (scheduledOnGarmin) {
+    return "On your Garmin calendar — open Garmin Connect on your phone to sync, then start Run on your watch.";
+  }
+  if (inGarminLibraryOnly) {
+    return scheduleLabel
+      ? `Workout is in Garmin but not on your calendar for ${scheduleLabel} — add it so Run prompts you on your watch.`
+      : "Workout is in Garmin but not on your calendar — add it so Run prompts you on your watch.";
+  }
+  return garminAutoPushStatusCopy(garminAutoState, scheduleLabel);
+}
+
+function garminPrimaryPushMode(params: {
+  inGarminLibraryOnly: boolean;
+}): "force-reschedule" | undefined {
+  return params.inGarminLibraryOnly ? "force-reschedule" : undefined;
 }
 
 /** Left accent for segment cards (readability, not step numbers). */
@@ -1481,21 +1518,32 @@ export default function WorkoutDetailPage() {
           )
         : null;
 
-    if (params.mode === "update-library" || params.calendarState === "scheduled_on_calendar") {
+    if (params.mode === "update-library") {
       const when = dateLabel ? ` for ${dateLabel}` : "";
       return {
-        status: `Updated workout steps on Garmin${when}. Sync your watch in Garmin Connect — it should appear under Training Calendar when you press Run.`,
+        status: `Updated workout steps on Garmin${when}. Open Garmin Connect on your phone to sync your watch.`,
         toast: `Garmin workout updated${when}. Sync your watch.`,
+      };
+    }
+
+    if (params.calendarState === "scheduled_on_calendar" || params.mode === "force-reschedule") {
+      return {
+        status: dateLabel
+          ? `Added to your Garmin calendar for ${dateLabel}. Open Garmin Connect on your phone to sync, then start Run on your watch.`
+          : "Added to your Garmin calendar. Open Garmin Connect on your phone to sync your watch.",
+        toast: dateLabel
+          ? `On Garmin calendar for ${dateLabel} — sync your watch.`
+          : "On Garmin calendar — sync your watch.",
       };
     }
 
     return {
       status: dateLabel
-        ? `Added to Garmin Training Calendar for ${dateLabel}. Sync your watch in Garmin Connect, then press Run — Garmin should prompt you to do this workout.`
-        : "Added to Garmin Training Calendar. Sync your watch in Garmin Connect.",
+        ? `Sent to Garmin for ${dateLabel}. Open Garmin Connect on your phone to sync your watch.`
+        : "Sent to Garmin. Open Garmin Connect on your phone to sync your watch.",
       toast: dateLabel
-        ? `On Garmin Training Calendar for ${dateLabel} — sync your watch.`
-        : "On Garmin Training Calendar — sync your watch.",
+        ? `Sent to Garmin for ${dateLabel}.`
+        : "Sent to Garmin.",
     };
   };
 
@@ -1817,7 +1865,6 @@ export default function WorkoutDetailPage() {
     !scheduledOnGarmin &&
     !isLogged &&
     (inGarminLibraryOnly || garminAutoState === "retry");
-  const garminDeliveryCopy = garminAutoPushStatusCopy(garminAutoState, scheduleLabel);
   const showGarminHeaderCard = !isLogged;
   const dayRel = dayRelativeToToday(workout.date);
   const planName = workout.training_plans?.name?.trim();
@@ -2294,41 +2341,45 @@ export default function WorkoutDetailPage() {
         {showGarminHeaderCard ? (
           <div
             id="workout-garmin"
-            className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-2.5 scroll-mt-24"
+            className="mb-3 flex flex-col gap-3 rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-2.5 scroll-mt-24 sm:flex-row sm:items-center sm:justify-between"
           >
-            <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 items-start gap-2">
               <Watch className="h-4 w-4 shrink-0 text-orange-600" strokeWidth={2} aria-hidden />
-              <span className="truncate text-sm font-medium text-orange-900">
-                {garminConnected === null
-                  ? "Checking Garmin…"
-                  : !garminConnected
-                    ? "Connect Garmin to send workouts to your watch"
-                    : scheduledOnGarmin
-                      ? "On Garmin Training Calendar — sync watch, then press Run for today’s prompt"
-                      : inGarminLibraryOnly
-                        ? "In Garmin workout library only — add to Training Calendar to get today’s Run prompt"
-                        : garminDeliveryCopy}
+              <span className="text-sm font-medium text-orange-900 leading-snug">
+                {garminBannerStatusCopy({
+                  garminConnected,
+                  scheduledOnGarmin,
+                  inGarminLibraryOnly,
+                  garminAutoState,
+                  scheduleLabel,
+                })}
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {showGarminRetryAction && (
                 <button
                   type="button"
-                  onClick={() => void handlePushToGarmin()}
+                  onClick={() =>
+                    void handlePushToGarmin(
+                      garminPrimaryPushMode({ inGarminLibraryOnly })
+                    )
+                  }
                   disabled={pushing || copyRepushing || duplicatingWorkout}
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-orange-300 bg-white px-3 py-1.5 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
                 >
                   {pushing ? (
                     <>
                       <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-orange-600" />
-                      {inGarminLibraryOnly ? "Scheduling…" : "Sending…"}
+                      {inGarminLibraryOnly ? "Adding…" : "Sending…"}
                     </>
                   ) : (
                     <>
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      {inGarminLibraryOnly
-                        ? "Add to calendar"
-                        : "Add to Garmin calendar"}
+                      {inGarminLibraryOnly ? (
+                        <CalendarPlus className="h-3.5 w-3.5" />
+                      ) : (
+                        <Watch className="h-3.5 w-3.5" />
+                      )}
+                      {inGarminLibraryOnly ? "Add to calendar" : "Send to Garmin"}
                     </>
                   )}
                 </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { ageYearsFromBirthday } from "@/lib/training/athlete-preset-volume";
 import {
@@ -9,8 +9,11 @@ import {
 } from "@/lib/training/weekly-volume-key";
 import {
   foundationPeakPoolComparisonRows,
-  peakLongRunPoolFoundationKey,
 } from "@/lib/training/long-run-pool-fields";
+import { deriveLongRunPoolTripletFromPeak } from "@/lib/training/long-run-cup-setter";
+import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
+import { computeLongRunTrajectoryPreview } from "@/lib/training/long-run-trajectory-preview";
+import { LongRunTrajectoryCard } from "@/components/training/LongRunTrajectoryCard";
 import {
   DEFAULT_ATHLETE_PACE_ADJUSTER,
   type AthletePaceAdjuster,
@@ -213,7 +216,6 @@ export function AthletePresetBuilder({
   const [minWeeklyMiles, setMinWeeklyMiles] = useState("");
   const [maxWeeklyMiles, setMaxWeeklyMiles] = useState<number | null>(null);
   const [corePreview, setCorePreview] = useState<CorePreview | null>(null);
-  const [showPoolAdjust, setShowPoolAdjust] = useState(false);
   const [presetApi, setPresetApi] = useState<AthletePresetApi | null>(null);
   const [lrOrder, setLrOrder] = useState<ConfigPosition[]>([]);
   const [tempoOrder, setTempoOrder] = useState<QualityRotationSlot[]>([]);
@@ -543,7 +545,6 @@ export function AthletePresetBuilder({
       setMinWeeklyMiles(String(data.suggestedCups.minWeeklyMiles));
       setMaxWeeklyMiles(data.suggestedCups.maxWeeklyMiles);
       if (data.corePreview) setCorePreview(data.corePreview);
-      setShowPoolAdjust(false);
       setStep("foundation");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not analyze your training");
@@ -821,9 +822,6 @@ export function AthletePresetBuilder({
   const taperDate =
     corePreview?.taperStartDate ?? corePreview?.calendar.taperStartDate ?? null;
   const weeklyBand = corePreview?.weeklyVolumeBand;
-  const peakPoolKeyLine = peakLongRunPoolMiles
-    ? peakLongRunPoolFoundationKey(Number(peakLongRunPoolMiles))
-    : null;
   const weeklyKeyLine = weeklyBand
     ? foundationWeeklyBandMeaning(weeklyBand)
     : null;
@@ -845,6 +843,33 @@ export function AthletePresetBuilder({
   const peakPoolCompareRows = peakLongRunPoolMiles
     ? foundationPeakPoolComparisonRows(Number(peakLongRunPoolMiles))
     : [];
+
+  const foundationTotalWeeks = useMemo(() => {
+    if (corePreview?.calendar.totalWeeks) return corePreview.calendar.totalWeeks;
+    try {
+      return calendarTrainingWeekCount(new Date(planStartDate), new Date(raceDate));
+    } catch {
+      return 16;
+    }
+  }, [corePreview?.calendar.totalWeeks, planStartDate, raceDate]);
+
+  const foundationTrajectory = useMemo(() => {
+    const peak = Number(peakLongRunPoolMiles);
+    if (!Number.isFinite(peak) || peak <= 0) return null;
+    return computeLongRunTrajectoryPreview({
+      totalWeeks: foundationTotalWeeks,
+      peakLongRunPoolMiles: peak,
+      fitnessPhase,
+      planStartDate: new Date(planStartDate),
+    });
+  }, [fitnessPhase, foundationTotalWeeks, peakLongRunPoolMiles, planStartDate]);
+
+  function handleFoundationPeakPoolChange(value: number) {
+    const derived = deriveLongRunPoolTripletFromPeak(value);
+    setPeakMiles(String(derived.peakLongRunPoolMiles));
+    setBaseMiles(String(derived.baseLongRunPoolMiles));
+    setTaperMiles(String(derived.taperLongRunPoolMiles));
+  }
 
   return (
     <div className="space-y-4">
@@ -1131,28 +1156,24 @@ export function AthletePresetBuilder({
                 />
               </div>
 
-              <div className="rounded-xl border border-gray-200 bg-white p-4">
-                <p className="text-sm font-semibold text-gray-900">Long Cycle Pool Peak</p>
-                <p className="mt-2 text-sm text-gray-700">
-                  This is the sum of our 4-cycle long-run system. We work off of a long-long-long-cutback
-                  model.
-                </p>
-                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Cycle pool total
-                </p>
-                <p className="mt-1 text-lg font-bold text-orange-600">
-                  {peakLongRunPoolMiles || "—"} mi
-                </p>
-                {peakPoolKeyLine ? (
-                  <p className="mt-1 text-xs font-medium text-orange-800">{peakPoolKeyLine}</p>
-                ) : null}
-                {peakPoolCompareRows.length ? (
-                  <FoundationCompareExpander
-                    label="See how this peak mileage compares"
-                    rows={peakPoolCompareRows}
-                  />
-                ) : null}
-              </div>
+              {foundationTrajectory ? (
+                <LongRunTrajectoryCard
+                  peakLongRunPoolMiles={Number(peakLongRunPoolMiles)}
+                  onPeakLongRunPoolMilesChange={handleFoundationPeakPoolChange}
+                  editable
+                  totalWeeks={foundationTotalWeeks}
+                  rows={foundationTrajectory.rows}
+                  peakWeekNumber={foundationTrajectory.peakWeekNumber}
+                  peakBlock={foundationTrajectory.peakBlock}
+                />
+              ) : null}
+
+              {peakPoolCompareRows.length ? (
+                <FoundationCompareExpander
+                  label="See how this peak mileage compares"
+                  rows={peakPoolCompareRows}
+                />
+              ) : null}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -1165,46 +1186,6 @@ export function AthletePresetBuilder({
                 <p className="mt-1 text-lg font-bold text-gray-900">{taperDate ?? "—"}</p>
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setShowPoolAdjust((v) => !v)}
-              className="text-sm font-semibold text-orange-600 hover:text-orange-800"
-            >
-              {showPoolAdjust ? "Hide pool adjust" : "Adjust pool totals"}
-            </button>
-
-            {showPoolAdjust ? (
-              <div className="grid grid-cols-2 gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-700">Base pool</label>
-                  <input
-                    type="number"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
-                    value={baseLongRunPoolMiles}
-                    onChange={(e) => setBaseMiles(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-700">Peak pool</label>
-                  <input
-                    type="number"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
-                    value={peakLongRunPoolMiles}
-                    onChange={(e) => setPeakMiles(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-700">Taper pool</label>
-                  <input
-                    type="number"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
-                    value={taperLongRunPoolMiles}
-                    onChange={(e) => setTaperMiles(e.target.value)}
-                  />
-                </div>
-              </div>
-            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <button
