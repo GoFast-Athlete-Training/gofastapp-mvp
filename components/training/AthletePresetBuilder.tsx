@@ -1221,6 +1221,7 @@ export function AthletePresetBuilder({
             <>
               <p className="text-sm font-medium text-gray-900">Select tempo workouts</p>
               <QualityCataloguePicker
+                presetId={presetId!}
                 workoutType="Tempo"
                 templateSeedIds={tempoTemplateSeedIds}
                 weeklyVolumeBand={weeklyBand ?? null}
@@ -1283,6 +1284,7 @@ export function AthletePresetBuilder({
             <>
               <p className="text-sm font-medium text-gray-900">Select interval workouts</p>
               <QualityCataloguePicker
+                presetId={presetId!}
                 workoutType="Intervals"
                 templateSeedIds={intervalTemplateSeedIds}
                 weeklyVolumeBand={weeklyBand ?? null}

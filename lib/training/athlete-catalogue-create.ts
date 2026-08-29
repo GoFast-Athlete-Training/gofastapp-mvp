@@ -1,5 +1,6 @@
 import type { WorkoutType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { bodyToCatalogueRow } from "@/lib/training/catalogue-row";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { PACE_ANCHOR_CURRENT_BUILDUP } from "@/lib/training/goal-pace-calculator";
 
@@ -10,7 +11,28 @@ export type CreateAthleteCatalogueInput = {
   name: string;
   description?: string | null;
   workoutType: "Tempo" | "Intervals";
+  /** Parsed catalogue fields from AI parse or bodyToCatalogueRow-compatible body. */
+  parsedFields?: Record<string, unknown>;
 };
+
+export const athleteCatalogueBrowseSelect = {
+  id: true,
+  name: true,
+  description: true,
+  workoutType: true,
+  workBaseReps: true,
+  workBaseRepMeters: true,
+  ownerAthleteId: true,
+  recoveryDistanceMeters: true,
+  recoveryDurationSeconds: true,
+  warmupMiles: true,
+  cooldownMiles: true,
+  warmupPaceOffsetSecPerMile: true,
+  cooldownPaceOffsetSecPerMile: true,
+  workBaseMiles: true,
+  workPaceOffsetSecPerMile: true,
+  workBasePaceOffsetSecPerMile: true,
+} as const;
 
 export function defaultFieldsForType(workoutType: "Tempo" | "Intervals") {
   if (workoutType === "Tempo") {
@@ -47,8 +69,6 @@ export async function createAthleteCatalogueWorkout(input: CreateAthleteCatalogu
   }
 
   const description = input.description?.trim() || null;
-  const defaults = defaultFieldsForType(input.workoutType);
-  const now = new Date();
 
   const existing = await prisma.workout_catalogue.findFirst({
     where: {
@@ -62,8 +82,28 @@ export async function createAthleteCatalogueWorkout(input: CreateAthleteCatalogu
     throw new Error("You already have a workout with this name");
   }
 
-  return prisma.workout_catalogue.create({
-    data: {
+  const now = new Date();
+  let rowData: Record<string, unknown>;
+
+  if (input.parsedFields && Object.keys(input.parsedFields).length > 0) {
+    const merged = {
+      ...input.parsedFields,
+      name,
+      workoutType: input.workoutType,
+      description: description ?? input.parsedFields.description ?? null,
+    };
+    const parsed = bodyToCatalogueRow(merged);
+    if (!parsed.ok) {
+      throw new Error(parsed.error);
+    }
+    rowData = {
+      ...parsed.data,
+      ownerAthleteId: input.athleteId,
+      updatedAt: now,
+    };
+  } else {
+    const defaults = defaultFieldsForType(input.workoutType);
+    rowData = {
       id: newEntityId(),
       name,
       description,
@@ -73,15 +113,21 @@ export async function createAthleteCatalogueWorkout(input: CreateAthleteCatalogu
       mpBlockProgression: "flat",
       updatedAt: now,
       ...defaults,
-    },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      workoutType: true,
-      workBaseReps: true,
-      workBaseRepMeters: true,
-      ownerAthleteId: true,
-    },
+    };
+  }
+
+  if (!("id" in rowData) || !rowData.id) {
+    rowData.id = newEntityId();
+  }
+  if (!("paceAnchor" in rowData) || !rowData.paceAnchor) {
+    rowData.paceAnchor = PACE_ANCHOR_CURRENT_BUILDUP;
+  }
+  if (!("mpBlockProgression" in rowData) || !rowData.mpBlockProgression) {
+    rowData.mpBlockProgression = "flat";
+  }
+
+  return prisma.workout_catalogue.create({
+    data: rowData as Parameters<typeof prisma.workout_catalogue.create>[0]["data"],
+    select: athleteCatalogueBrowseSelect,
   });
 }

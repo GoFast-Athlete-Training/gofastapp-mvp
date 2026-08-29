@@ -2,7 +2,10 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { createAthleteCatalogueWorkout } from "@/lib/training/athlete-catalogue-create";
+import {
+  athleteCatalogueBrowseSelect,
+  createAthleteCatalogueWorkout,
+} from "@/lib/training/athlete-catalogue-create";
 
 /**
  * POST /api/workouts/athlete-catalogue
@@ -31,11 +34,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const parsedFields =
+      body.parsedFields != null &&
+      typeof body.parsedFields === "object" &&
+      !Array.isArray(body.parsedFields)
+        ? (body.parsedFields as Record<string, unknown>)
+        : body.parsedFields === undefined && typeof body === "object"
+          ? extractParsedFieldsFromBody(body)
+          : undefined;
+
     const item = await createAthleteCatalogueWorkout({
       athleteId: auth.athlete.id,
       name,
       description,
       workoutType: wtRaw,
+      parsedFields,
     });
 
     return NextResponse.json({ item });
@@ -45,4 +58,27 @@ export async function POST(request: NextRequest) {
     console.error("POST /api/workouts/athlete-catalogue", e);
     return NextResponse.json({ error: msg }, { status });
   }
+}
+
+/** Allow flat parsed field payloads (from ai-parse) without nested parsedFields key. */
+function extractParsedFieldsFromBody(body: Record<string, unknown>): Record<string, unknown> | undefined {
+  const structureKeys = [
+    "warmupMiles",
+    "cooldownMiles",
+    "workBaseMiles",
+    "workBaseReps",
+    "workBaseRepMeters",
+    "segmentPaceDist",
+    "workPaceOffsetSecPerMile",
+    "workBasePaceOffsetSecPerMile",
+  ];
+  const hasStructure = structureKeys.some((k) => Object.prototype.hasOwnProperty.call(body, k));
+  if (!hasStructure) return undefined;
+
+  const copy = { ...body };
+  delete copy.name;
+  delete copy.description;
+  delete copy.workoutType;
+  delete copy.parsedFields;
+  return copy;
 }

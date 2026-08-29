@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { athleteCatalogueBrowseSelect } from "@/lib/training/athlete-catalogue-create";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import type { WorkoutType } from "@prisma/client";
 
@@ -26,19 +27,7 @@ export async function GET(request: NextRequest) {
         OR: [{ ownerAthleteId: null }, { ownerAthleteId: auth.athlete.id }],
       },
       orderBy: [{ ownerAthleteId: "asc" }, { name: "asc" }],
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        workoutType: true,
-        workBaseReps: true,
-        workBaseRepMeters: true,
-        ownerAthleteId: true,
-        recoveryDistanceMeters: true,
-        recoveryDurationSeconds: true,
-        warmupMiles: true,
-        cooldownMiles: true,
-      },
+      select: athleteCatalogueBrowseSelect,
     });
 
     return NextResponse.json({ items });
