@@ -237,7 +237,7 @@ export default function ScheduleRunForm({
       <div className={`space-y-5 bg-white rounded-xl border border-gray-200 p-5 shadow-sm ${className}`}>
         <p className="text-green-800 font-medium text-sm flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
-          Run scheduled
+          Start time saved
           {success.startTimeLabel ? ` · ${success.startTimeLabel}` : ""}
         </p>
         <p className="text-gray-900 font-semibold">{success.title}</p>
@@ -436,7 +436,7 @@ export default function ScheduleRunForm({
           onChange={(e) => setInviteFriend(e.target.checked)}
           className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
         />
-        <span className="text-sm font-medium text-gray-900">Invite a friend — get a share link</span>
+        <span className="text-sm text-gray-800">Share with a friend (optional)</span>
       </label>
 
       {error ? (
@@ -461,7 +461,7 @@ export default function ScheduleRunForm({
           disabled={busy || !title.trim()}
           className="flex-1 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg disabled:opacity-50"
         >
-          {busy ? "Saving…" : "Schedule this run"}
+          {busy ? "Saving…" : "Save start time"}
         </button>
       </div>
     </div>

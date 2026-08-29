@@ -172,6 +172,30 @@ export function isGeneratedGenericWorkoutTitle(
   return false;
 }
 
+function extractMilesFromTitle(title: string): number | null {
+  const match = title.match(/(\d+(?:\.\d+)?)\s*miles?\b/i);
+  if (!match) return null;
+  const mi = Number(match[1]);
+  return Number.isFinite(mi) ? mi : null;
+}
+
+function titleHasStaleEmbeddedMiles(
+  title: string,
+  estimatedDistanceInMeters: number | null | undefined
+): boolean {
+  if (
+    estimatedDistanceInMeters == null ||
+    !Number.isFinite(estimatedDistanceInMeters) ||
+    estimatedDistanceInMeters <= 0
+  ) {
+    return false;
+  }
+  const embeddedMi = extractMilesFromTitle(title);
+  if (embeddedMi == null) return false;
+  const plannedMi = estimatedDistanceInMeters / MI_PER_M;
+  return Math.abs(embeddedMi - plannedMi) >= 0.15;
+}
+
 /** Prefer catalogue or schedule-specific titles over generic day+type labels. */
 export function resolveWorkoutDisplayTitle(workout: {
   title: string;
@@ -206,7 +230,16 @@ export function resolveWorkoutDisplayTitle(workout: {
     return scheduleTitle;
   }
 
-  if (raw.length > 0 && !genericStored) return raw;
+  if (raw.length > 0 && !genericStored) {
+    if (titleHasStaleEmbeddedMiles(raw, workout.estimatedDistanceInMeters)) {
+      return formatPlannedWorkoutTitle(
+        workout.workoutType,
+        workout.estimatedDistanceInMeters,
+        { dayAssigned: workout.dayAssigned }
+      );
+    }
+    return raw;
+  }
 
   if (/\b—\s*Week\s*\d+/i.test(raw) || /\bWeek\s*\d+\s*$/i.test(raw)) {
     return formatCorePlannedWorkoutTitle(

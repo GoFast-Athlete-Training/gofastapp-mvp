@@ -27,10 +27,10 @@ function ScheduleRunPageInner() {
 
         <div className="flex items-center gap-2 mb-2">
           <CalendarClock className="w-6 h-6 text-orange-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Schedule this run</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Set start time</h1>
         </div>
         <p className="text-sm text-gray-600 mb-6">
-          Lock in a time, optional meetup spot, and share with a friend. No full CityRun setup required.
+          Pick when you plan to start this workout. Invite a friend afterward if you want company.
         </p>
 
         <ScheduleRunForm

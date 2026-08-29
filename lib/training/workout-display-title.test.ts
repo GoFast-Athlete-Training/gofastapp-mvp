@@ -181,6 +181,18 @@ test("resolveWorkoutDisplayTitle prefers schedule title over legacy generic stor
   assert.equal(title, "Wednesday Easy 6 miles");
 });
 
+test("resolveWorkoutDisplayTitle refreshes stale embedded miles from live estimate", () => {
+  const LR_21_5_MI = 21.5 * 1609.34;
+  const title = resolveWorkoutDisplayTitle({
+    title: "Saturday Long run 19.6 miles",
+    workoutType: "LongRun",
+    estimatedDistanceInMeters: LR_21_5_MI,
+    dayAssigned: "Saturday",
+    planId: "plan-1",
+  });
+  assert.equal(title, "Saturday Long run 21.5 miles");
+});
+
 test("displayWorkoutListTitle preserves race titles", () => {
   const title = displayWorkoutListTitle({
     title: "Race — Boston Marathon",

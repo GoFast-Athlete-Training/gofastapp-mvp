@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
@@ -49,6 +49,7 @@ import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
 import { buildRunResultStatus } from "@/lib/training/run-result-status";
 import {
   deriveSessionStatus,
+  showFindMissingGarminForStatus,
 } from "@/lib/training/session-status";
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
@@ -449,6 +450,8 @@ export default function TrainingPlanDayPreviewPage() {
         })
       : null;
   const isActionableWorkout = dayStatus === "today";
+  const showFindMissingGarmin =
+    canMatchWorkout && showFindMissingGarminForStatus(dayStatus);
   const showTodaysWorkoutHeader =
     (sourceHome && isActionableWorkout) || isCalendarToday;
 
@@ -800,7 +803,7 @@ export default function TrainingPlanDayPreviewPage() {
                 </div>
               ) : null}
 
-              {!isLogged && showMatchPanel && canMatchWorkout && workoutId ? (
+              {!isLogged && showMatchPanel && showFindMissingGarmin && workoutId ? (
                 <div id="match-garmin-panel" className="space-y-4">
                   {dayStatus === "missed" || dayStatus === "skipped" ? (
                     <WorkoutSkipActions
@@ -835,7 +838,7 @@ export default function TrainingPlanDayPreviewPage() {
                   Review run
                 </Link>
               ) : null}
-              {!isLogged && canMatchWorkout ? (
+              {!isLogged && canMatchWorkout && dayStatus !== "upcoming" ? (
                 <p className="text-sm text-gray-700 leading-relaxed">
                   After your run, sync Garmin Connect — GoFast should link the activity to this
                   workout automatically.
@@ -858,14 +861,23 @@ export default function TrainingPlanDayPreviewPage() {
                   disabled={openingWorkout || !canOpenWorkout || workoutLoading || !!workoutError}
                   className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
                 >
-                  {openingWorkout ? "Opening…" : "Open workout details"}
+                  {openingWorkout ? "Opening…" : "Details"}
                 </button>
               ) : null}
-              {!isLogged && canMatchWorkout ? (
+              {!isLogged && workoutId && dateKey ? (
+                <Link
+                  href={`/training/schedule-run?date=${encodeURIComponent(dateKey)}&workoutId=${encodeURIComponent(workoutId)}`}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-sky-600 bg-white py-3 text-sm font-semibold text-sky-900 hover:bg-sky-50"
+                >
+                  <Clock className="h-4 w-4 shrink-0" aria-hidden />
+                  Set start time
+                </Link>
+              ) : null}
+              {!isLogged && showFindMissingGarmin ? (
                 <button
                   type="button"
                   onClick={openMatchPanel}
-                  className="w-full rounded-xl border border-sky-200 bg-white py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
+                  className="w-full text-left text-sm font-medium text-sky-800 hover:text-sky-950 underline-offset-2 hover:underline"
                 >
                   Find missing Garmin activity
                 </button>

@@ -73,6 +73,11 @@ export function deriveSessionStatus(params: {
   return "today";
 }
 
+/** Manual Garmin match is only useful after a missed/skipped planned day. */
+export function showFindMissingGarminForStatus(status: SessionStatus | null): boolean {
+  return status === "missed" || status === "skipped";
+}
+
 export function sessionStatusLabel(status: SessionStatus): string {
   switch (status) {
     case "completed":

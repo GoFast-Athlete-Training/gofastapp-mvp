@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, CalendarClock, MessageCircle, MoreHorizontal, Users } from "lucide-react";
+import { BookOpen, CalendarClock, Clock, MessageCircle, MoreHorizontal, Users } from "lucide-react";
 import api from "@/lib/api";
 import type { ScheduledRunJson } from "@/app/api/training/schedule-run/route";
 import { onAuthStateChanged } from "firebase/auth";
@@ -18,6 +18,7 @@ import {
   deriveSessionStatus,
   sessionStatusBadgeClass,
   sessionStatusLabel,
+  showFindMissingGarminForStatus,
 } from "@/lib/training/session-status";
 import {
   currentTrainingWeekNumber,
@@ -121,8 +122,9 @@ function effectiveWeeksForPlanHub(p: PlanDetailHub): number {
 function planDayMilesDisplay(meters: number | null | undefined): string {
   if (meters == null || !Number.isFinite(meters) || meters <= 0) return "—";
   const mi = meters / 1609.34;
-  if (mi >= 10) return `${Math.round(mi)} mi`;
-  return `${mi.toFixed(1)} mi`;
+  const rounded =
+    Math.abs(mi - Math.round(mi)) < 0.06 ? Math.round(mi) : Math.round(mi * 10) / 10;
+  return `${rounded} mi`;
 }
 
 function formatSecPerMile(sec: number | null | undefined): string {
@@ -597,6 +599,9 @@ export default function TrainingHubPage() {
         title: focusPlanDay.title,
       })
     : null;
+  const showFindMissingGarmin =
+    Boolean(focusPlanDay && !focusPlanDay.matchedActivityId) &&
+    showFindMissingGarminForStatus(focusStatus);
   const focusHydrated = focusPlanDay
     ? hydratePlanButSwapIfExecuted(focusPlanDay)
     : null;
@@ -1280,13 +1285,15 @@ export default function TrainingHubPage() {
                             : ""}
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
-                          {focusHydrated && !focusPlanDay.matchedActivityId ? (
+                          {focusHydrated &&
+                          !focusPlanDay.matchedActivityId &&
+                          focusStatus !== "upcoming" ? (
                             <p className="w-full text-sm text-gray-700 leading-relaxed">
                               After your run, sync Garmin Connect — GoFast should link the activity
                               to this workout automatically.
                             </p>
                           ) : null}
-                          {focusHydrated && !focusPlanDay.matchedActivityId ? (
+                          {showFindMissingGarmin ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -1297,7 +1304,7 @@ export default function TrainingHubPage() {
                                     ?.scrollIntoView({ behavior: "smooth", block: "start" });
                                 });
                               }}
-                              className="inline-flex justify-center rounded-xl border border-sky-200 bg-white px-6 py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
+                              className="w-full text-left text-sm font-medium text-sky-800 hover:text-sky-950 underline-offset-2 hover:underline sm:w-auto"
                             >
                               Find missing Garmin activity
                             </button>
@@ -1308,7 +1315,7 @@ export default function TrainingHubPage() {
                             disabled={pushingGarmin}
                             className="inline-flex justify-center rounded-xl border-2 border-orange-300 bg-white px-6 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
                           >
-                            Open session
+                            Details
                           </button>
                           {focusIsToday ? (
                             <button
@@ -1326,9 +1333,10 @@ export default function TrainingHubPage() {
                                 ? `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}&workoutId=${encodeURIComponent(prescribeIdForHydrated(focusHydrated))}`
                                 : `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}`
                             }
-                            className="inline-flex justify-center rounded-xl border-2 border-sky-600 bg-white px-5 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-50"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-sky-600 bg-white px-5 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-50"
                           >
-                            Schedule this run
+                            <Clock className="h-4 w-4 shrink-0" aria-hidden />
+                            Set start time
                           </Link>
                         </div>
                         {focusIsToday && garminPushMessage ? (
@@ -1338,7 +1346,8 @@ export default function TrainingHubPage() {
                         ) : null}
                         {focusHydrated &&
                         !focusPlanDay.matchedActivityId &&
-                        showMatchPanel ? (
+                        showMatchPanel &&
+                        showFindMissingGarmin ? (
                           <div id="match-garmin-panel" className="mt-4 space-y-4">
                             {focusHydrated.kind === "executed" ? (
                               <WorkoutSkipActions
