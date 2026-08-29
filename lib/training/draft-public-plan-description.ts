@@ -26,16 +26,17 @@ async function callOpenAiDraft(facts: PublicPlanDescriptionFacts): Promise<strin
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) return null;
 
-  const systemPrompt = `You write a short intro blurb for a runner's public training plan page on GoFast.
+  const systemPrompt = `You write a short intro blurb for a runner's own public training plan page on GoFast.
 
 Output rules:
 - Return ONLY plain text — no markdown, no JSON, no bullet lists.
 - Exactly 2–4 short sentences.
-- First person ("I'm…") or light host voice is fine.
+- First person only ("I'm building toward…", "This is my…"). The athlete is sharing their own build — NOT coaching or guiding anyone.
+- NEVER use coach voice: no "I'm excited to guide you", "we'll get you ready", "together we'll", "I'll help you", or "you'll achieve".
 - This appears under the plan title on the public page. Race name, distance, weeks, and goal time already show elsewhere — weave them in naturally but do not repeat metadata as a dry list.
 - Mention goal time, tempo and interval workouts, long run rhythm, and progression only when supported by the facts payload.
 - Do NOT invent races, finish times, workout types, or schedule details not in the payload.
-- Warm, direct tone — what followers should know about this build.`;
+- Warm, direct tone — what this athlete is chasing in their own words.`;
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {

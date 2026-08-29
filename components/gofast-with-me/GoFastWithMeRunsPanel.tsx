@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, ExternalLink, Plus, Route } from 'lucide-react';
+import { Calendar, ExternalLink, Route } from 'lucide-react';
 import api from '@/lib/api';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 import { athleteCommunityPath } from '@/lib/gofast-with-me/athlete-community-routes';
@@ -12,9 +12,16 @@ type Props = {
   publicSlug: string;
   /** Compact block for Runs & Training — no page header or plan footer. */
   embedded?: boolean;
+  /** Show host-without-plan links when there is no active plan week picker. */
+  showNoPlanFallback?: boolean;
 };
 
-export default function GoFastWithMeRunsPanel({ athleteId, publicSlug, embedded = false }: Props) {
+export default function GoFastWithMeRunsPanel({
+  athleteId,
+  publicSlug,
+  embedded = false,
+  showNoPlanFallback = false,
+}: Props) {
   const [hub, setHub] = useState<ContainerHubPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,22 +91,6 @@ export default function GoFastWithMeRunsPanel({ athleteId, publicSlug, embedded 
           </Link>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/host-a-run"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-          >
-            <Plus className="h-4 w-4" />
-            Host a public run
-          </Link>
-          <Link
-            href="/build-a-run"
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-          >
-            Build a run
-          </Link>
-        </div>
-
         {loading ? (
           <p className="text-sm text-gray-500">Loading upcoming runs…</p>
         ) : runs.length > 0 ? (
@@ -127,10 +118,24 @@ export default function GoFastWithMeRunsPanel({ athleteId, publicSlug, embedded 
           </ul>
         ) : (
           <p className="text-sm text-gray-600 rounded-lg border border-dashed border-orange-200 bg-white/60 p-4">
-            No upcoming hosted runs yet. Create one to invite your community — e.g. a Saturday long
-            run your followers can join.
+            {showNoPlanFallback
+              ? 'No upcoming hosted runs yet. Host without a plan below, or pick a workout from your plan above.'
+              : 'No upcoming hosted runs yet. Pick a workout above to invite followers — e.g. a Saturday long run.'}
           </p>
         )}
+
+        {showNoPlanFallback ? (
+          <p className="text-xs text-gray-500 pt-1 border-t border-orange-100">
+            No plan this week?{' '}
+            <Link href="/host-a-run" className="font-semibold text-orange-700 hover:underline">
+              Host a public run
+            </Link>
+            {' · '}
+            <Link href="/build-a-run" className="font-semibold text-gray-700 hover:underline">
+              Build a run
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       {!embedded ? (

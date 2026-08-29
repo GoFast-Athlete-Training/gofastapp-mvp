@@ -177,19 +177,12 @@ export default function GoFastWithMeSetupPanel({
         setReviewTitle(planTitle);
         setEditingReviewTitle(false);
         setPublishReviewOpen(true);
-        if (!description.trim()) {
-          void draftDescription();
-        }
         return;
       }
       setSaving(true);
       setError(null);
       try {
-        let desc = description.trim();
-        if (!desc) {
-          const drafted = await draftDescription();
-          desc = drafted?.trim() ?? '';
-        }
+        const desc = description.trim();
         await api.post('/public-training-plans', {
           sourceTrainingPlanId: plan.planId,
           description: desc || null,
@@ -256,12 +249,7 @@ export default function GoFastWithMeSetupPanel({
   };
 
   const handleConfirmPublish = async () => {
-    let intro = description.trim();
-    if (!intro) {
-      const drafted = await draftDescription();
-      intro = drafted?.trim() ?? '';
-    }
-    await publishPlan(reviewTitle, intro);
+    await publishPlan(reviewTitle, description.trim());
   };
 
   if (loading) {
@@ -362,7 +350,7 @@ export default function GoFastWithMeSetupPanel({
                 maxLength={4000}
                 disabled={drafting}
                 className="w-full rounded-lg border border-stone-300 p-3 text-sm bg-white disabled:opacity-60"
-                placeholder="We can draft this from your plan when you go public — edit anything you want changed."
+                placeholder="What are you building toward? Optional — weeks and goal already show below."
               />
               <div className="flex flex-wrap items-center gap-3">
                 <button
@@ -532,7 +520,7 @@ function PublishReviewPanel({
           maxLength={4000}
           disabled={drafting}
           className="w-full rounded-lg border border-stone-300 p-3 text-sm bg-white disabled:opacity-60"
-          placeholder="We draft this from your plan — edit anything you want changed."
+          placeholder="What are you building toward? Optional — use Regenerate draft if you want AI help."
         />
         {drafting ? (
           <p className="text-[11px] text-gray-500">Drafting from your plan…</p>
