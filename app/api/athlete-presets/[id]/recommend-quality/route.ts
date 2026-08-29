@@ -8,7 +8,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * POST /api/athlete-presets/[id]/recommend-quality
- * AI-pick catalogue IDs from persisted preset + athlete profile. Falls back to local scorer.
+ * AI creates 3–4 new athlete-owned catalogue workouts complementing existing staff catalogue.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
@@ -27,19 +27,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const templateSeedIds = Array.isArray(body.templateSeedIds)
-      ? body.templateSeedIds.filter((x): x is string => typeof x === "string")
-      : undefined;
-
     const result = await recommendQualityCatalogueForPreset({
       presetId: id,
       athleteId: auth.athlete.id,
       workoutType: wtRaw,
-      templateSeedIds,
     });
 
     return NextResponse.json({
-      catalogueIds: result.catalogueIds,
+      created: result.created,
       source: result.source,
     });
   } catch (e: unknown) {

@@ -1,27 +1,48 @@
 /**
- * AI quality catalogue recommender — uses persisted athlete preset + catalogue rows.
- * Falls back to local name/volume scorer when OpenAI fails.
+ * AI quality catalogue recommender — creates 3–4 new athlete-owned workouts
+ * that complement the existing staff + athlete catalogue (catalogue-aware).
  */
 
 import { prisma } from "@/lib/prisma";
-import { CATALOGUE_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
 import {
-  recommendQualityCatalogueIds,
-  type CatalogueRecommendRow,
-} from "@/lib/training/recommend-quality-catalogue";
+  athleteCatalogueBrowseSelect,
+  createAthleteCatalogueWorkout,
+} from "@/lib/training/athlete-catalogue-create";
+import { normalizeCatalogueAiFields } from "@/lib/training/catalogue-ai-parse";
 import type { WeeklyVolumeBand } from "@/lib/training/weekly-volume-key";
 
 export type RecommendQualityInput = {
   presetId: string;
   athleteId: string;
   workoutType: "Tempo" | "Intervals";
-  templateSeedIds?: string[];
+};
+
+export type RecommendQualityCreatedItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  workoutType: string;
+  workBaseReps: number | null;
+  workBaseRepMeters: number | null;
+  ownerAthleteId: string | null;
+  recoveryDistanceMeters: number | null;
+  recoveryDurationSeconds: number | null;
+  warmupMiles: number | null;
+  cooldownMiles: number | null;
+  warmupPaceOffsetSecPerMile: number | null;
+  cooldownPaceOffsetSecPerMile: number | null;
+  workBaseMiles: number | null;
+  workPaceOffsetSecPerMile: number | null;
+  workBasePaceOffsetSecPerMile: number | null;
 };
 
 export type RecommendQualityResult = {
-  catalogueIds: string[];
-  source: "ai" | "fallback";
+  created: RecommendQualityCreatedItem[];
+  source: "ai";
 };
+
+const RECOMMEND_CREATE_COUNT = 4;
+const RECOMMEND_CREATE_COUNT_CONSERVATIVE = 3;
 
 function overviewField(overview: unknown, key: string): unknown {
   if (overview == null || typeof overview !== "object" || Array.isArray(overview)) {
@@ -40,59 +61,48 @@ function extractJsonObject(text: string): unknown {
   return JSON.parse(body.slice(start, end + 1));
 }
 
-function targetPickCount(
+function targetCreateCount(
   weeklyVolumeBand: WeeklyVolumeBand | null | undefined,
-  progressionAggressiveness: string | null | undefined,
-  templateSeedIds: string[]
+  progressionAggressiveness: string | null | undefined
 ): number {
   const band = weeklyVolumeBand;
   const agg = (progressionAggressiveness ?? "MODERATE").toUpperCase();
-
-  if (band === "ELITE" || agg === "AMBITIOUS") return CATALOGUE_ROTATION_SLOTS;
-  if (band === "FINISH" || agg === "CONSERVATIVE") {
-    const templateLen = templateSeedIds.filter(Boolean).length;
-    return Math.min(CATALOGUE_ROTATION_SLOTS, Math.max(4, templateLen || 4));
-  }
-  const templateLen = templateSeedIds.filter(Boolean).length;
-  return Math.min(CATALOGUE_ROTATION_SLOTS, Math.max(templateLen || 6, 6));
+  if (band === "FINISH" || agg === "CONSERVATIVE") return RECOMMEND_CREATE_COUNT_CONSERVATIVE;
+  return RECOMMEND_CREATE_COUNT;
 }
 
-async function loadTemplateSeedIds(
-  sourcePresetId: string | null,
+function normalizeProposedEntry(
+  raw: Record<string, unknown>,
   workoutType: "Tempo" | "Intervals"
-): Promise<string[]> {
-  if (!sourcePresetId) return [];
+): { name: string; parsedFields: Record<string, unknown> } | null {
+  const name = typeof raw.name === "string" ? raw.name.trim() : "";
+  if (!name) return null;
 
-  const source = await prisma.training_plan_preset.findUnique({
-    where: { id: sourcePresetId },
-    select: {
-      tempoConfig: {
-        select: {
-          positions: {
-            orderBy: { cyclePosition: "asc" },
-            select: { catalogueWorkoutId: true },
-          },
-        },
-      },
-      intervalsConfig: {
-        select: {
-          positions: {
-            orderBy: { cyclePosition: "asc" },
-            select: { catalogueWorkoutId: true },
-          },
-        },
-      },
-    },
+  const payload =
+    raw.draftCataloguePayload && typeof raw.draftCataloguePayload === "object"
+      ? (raw.draftCataloguePayload as Record<string, unknown>)
+      : { ...raw };
+
+  delete payload.id;
+  delete payload.ownerAthleteId;
+
+  const merged = normalizeCatalogueAiFields({
+    ...payload,
+    name,
+    workoutType,
+    description:
+      typeof raw.description === "string"
+        ? raw.description.trim() || null
+        : typeof payload.description === "string"
+          ? payload.description
+          : null,
   });
 
-  const positions =
-    workoutType === "Tempo"
-      ? source?.tempoConfig?.positions
-      : source?.intervalsConfig?.positions;
+  if (Array.isArray(raw.trainingIntent) && raw.trainingIntent.length) {
+    merged.trainingIntent = raw.trainingIntent;
+  }
 
-  return (positions ?? [])
-    .map((p) => p.catalogueWorkoutId?.trim())
-    .filter((id): id is string => Boolean(id));
+  return { name, parsedFields: merged };
 }
 
 export async function recommendQualityCatalogueForPreset(
@@ -111,7 +121,6 @@ export async function recommendQualityCatalogueForPreset(
       minWeeklyMiles: true,
       maxWeeklyMiles: true,
       raceDateSnapshot: true,
-      sourcePresetId: true,
       sourcePreset: { select: { targetDistanceLabel: true } },
       athlete: {
         select: {
@@ -138,9 +147,7 @@ export async function recommendQualityCatalogueForPreset(
       ? (overviewField(overview, "progressionAggressiveness") as string)
       : "MODERATE");
 
-  const templateSeedIds =
-    input.templateSeedIds?.filter(Boolean) ??
-    (await loadTemplateSeedIds(preset.sourcePresetId, input.workoutType));
+  const createCount = targetCreateCount(weeklyVolumeBand, progressionAggressiveness);
 
   const catalogueRows = await prisma.workout_catalogue.findMany({
     where: {
@@ -148,43 +155,12 @@ export async function recommendQualityCatalogueForPreset(
       OR: [{ ownerAthleteId: null }, { ownerAthleteId: input.athleteId }],
     },
     orderBy: [{ ownerAthleteId: "asc" }, { name: "asc" }],
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      workBaseReps: true,
-      workBaseRepMeters: true,
-      workBaseMiles: true,
-      warmupMiles: true,
-      cooldownMiles: true,
-    },
+    select: athleteCatalogueBrowseSelect,
   });
 
-  const catalogue: CatalogueRecommendRow[] = catalogueRows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    description: r.description,
-    workBaseReps: r.workBaseReps,
-    workBaseRepMeters: r.workBaseRepMeters,
-  }));
-
-  const fallbackInput = {
-    catalogue,
-    templateSeedIds,
-    weeklyVolumeBand,
-    progressionAggressiveness,
-  };
-
-  const fallbackIds = recommendQualityCatalogueIds(fallbackInput);
-  const targetCount = targetPickCount(
-    weeklyVolumeBand,
-    progressionAggressiveness,
-    templateSeedIds
-  );
-
   const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey || catalogue.length === 0) {
-    return { catalogueIds: fallbackIds, source: "fallback" };
+  if (!apiKey) {
+    throw new Error("AI recommendations are unavailable — try creating your own workout below");
   }
 
   let goalTime: string | null = null;
@@ -194,28 +170,43 @@ export async function recommendQualityCatalogueForPreset(
         athleteId: input.athleteId,
         raceDate: preset.raceDateSnapshot,
       },
-      select: { goalTime: true, distanceLabel: true, goalDistance: true },
+      select: { goalTime: true, distanceLabel: true },
       orderBy: { updatedAt: "desc" },
     });
     goalTime = race?.goalTime?.trim() || null;
   }
 
-  const raceDistanceLabel =
-    preset.sourcePreset?.targetDistanceLabel?.trim() || null;
+  const raceDistanceLabel = preset.sourcePreset?.targetDistanceLabel?.trim() || null;
 
-  const systemPrompt = `You are a running coach selecting quality workouts from a catalogue for an athlete's training preset.
+  const systemPrompt = `You are a running coach creating NEW workout catalogue entries for an athlete's training preset.
 
-Given the athlete profile and catalogue list, return JSON: { "catalogueIds": string[] }
+The athlete will mix these with existing staff catalogue workouts — do NOT duplicate names or structures already in the catalogue list.
+
+Output JSON:
+{
+  "proposedEntries": [
+    {
+      "name": string,
+      "description": string | null,
+      "rationale": string,
+      "draftCataloguePayload": { ... full catalogue row fields ... }
+    }
+  ],
+  "warnings": string[]
+}
 
 Rules:
-- Pick ${targetCount} to ${CATALOGUE_ROTATION_SLOTS} workouts (prefer ${targetCount} for conservative/finish bands; up to ${CATALOGUE_ROTATION_SLOTS} for elite/ambitious).
-- catalogueIds must be exact IDs from the provided catalogue only.
-- Prefer template seed IDs when they fit the athlete; add variety for ambitious/elite athletes (e.g. 2-1-2 tempo, rolling 400s, longer sustained work).
-- Match workoutType "${input.workoutType}" only — every ID must be from that list.
-- Do not invent IDs.`;
+- Propose exactly ${createCount} NEW ${input.workoutType} workouts tailored to the athlete profile.
+- draftCataloguePayload must use catalogue ai-parse field conventions (warmupMiles, workBaseMiles, workBaseReps, segmentPaceDist, pace offsets in sec/mi vs 5K, etc.).
+- workoutType must be "${input.workoutType}" for every entry.
+- Do NOT invent database IDs. Do NOT copy existing catalogue names verbatim.
+- Complement gaps in the catalogue — e.g. if staff has steady tempo and rolling 400s, propose 2-1-2 tempo, longer sustained blocks, or pyramid intervals the athlete doesn't already have.
+- Elite/ambitious athletes can get more aggressive structures; finish/conservative athletes get simpler progressions.
+- paceAnchor: "currentBuildup" unless marathon-pace tempo is clearly appropriate.`;
 
   const userPayload = {
     workoutType: input.workoutType,
+    targetCount: createCount,
     athlete: {
       trainingHistory: preset.trainingHistory,
       fitnessPhase: preset.fitnessPhase,
@@ -236,64 +227,102 @@ Rules:
         max: preset.maxWeeklyMiles,
       },
     },
-    templateSeedIds,
-    catalogue: catalogueRows.map((c) => ({
-      id: c.id,
+    existingCatalogue: catalogueRows.map((c) => ({
       name: c.name,
       description: c.description,
+      isStaff: c.ownerAthleteId == null,
       workBaseReps: c.workBaseReps,
       workBaseRepMeters: c.workBaseRepMeters,
       workBaseMiles: c.workBaseMiles,
       warmupMiles: c.warmupMiles,
       cooldownMiles: c.cooldownMiles,
+      warmupPaceOffsetSecPerMile: c.warmupPaceOffsetSecPerMile,
+      cooldownPaceOffsetSecPerMile: c.cooldownPaceOffsetSecPerMile,
+      workPaceOffsetSecPerMile: c.workPaceOffsetSecPerMile,
+      workBasePaceOffsetSecPerMile: c.workBasePaceOffsetSecPerMile,
     })),
   };
 
-  try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: JSON.stringify(userPayload, null, 2) },
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-      }),
-    });
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: JSON.stringify(userPayload, null, 2) },
+      ],
+      temperature: 0.4,
+      response_format: { type: "json_object" },
+    }),
+  });
 
-    if (!res.ok) {
-      console.error(
-        "recommendQualityCatalogueForPreset OpenAI HTTP",
-        res.status,
-        await res.text()
-      );
-      return { catalogueIds: fallbackIds, source: "fallback" };
-    }
-
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = data.choices?.[0]?.message?.content ?? "";
-    const parsed = extractJsonObject(content) as { catalogueIds?: unknown };
-    const validIds = new Set(catalogue.map((c) => c.id));
-    const rawIds = Array.isArray(parsed.catalogueIds) ? parsed.catalogueIds : [];
-    const filtered = rawIds
-      .filter((id): id is string => typeof id === "string" && validIds.has(id))
-      .slice(0, CATALOGUE_ROTATION_SLOTS);
-
-    if (filtered.length === 0) {
-      return { catalogueIds: fallbackIds, source: "fallback" };
-    }
-
-    return { catalogueIds: filtered, source: "ai" };
-  } catch (e) {
-    console.error("recommendQualityCatalogueForPreset", e);
-    return { catalogueIds: fallbackIds, source: "fallback" };
+  if (!res.ok) {
+    console.error(
+      "recommendQualityCatalogueForPreset OpenAI HTTP",
+      res.status,
+      await res.text()
+    );
+    throw new Error("Could not generate recommendations — try again or create your own");
   }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = data.choices?.[0]?.message?.content ?? "";
+  const parsed = extractJsonObject(content) as { proposedEntries?: unknown[] };
+  const rawEntries = Array.isArray(parsed.proposedEntries) ? parsed.proposedEntries : [];
+
+  const normalized = rawEntries
+    .filter((e): e is Record<string, unknown> => e != null && typeof e === "object")
+    .map((e) => normalizeProposedEntry(e, input.workoutType))
+    .filter((e): e is { name: string; parsedFields: Record<string, unknown> } => e != null)
+    .slice(0, createCount);
+
+  if (normalized.length === 0) {
+    throw new Error("AI did not return valid workouts — try again or create your own");
+  }
+
+  const existingNames = new Set(
+    catalogueRows
+      .filter((c) => c.ownerAthleteId === input.athleteId)
+      .map((c) => c.name.toLowerCase())
+  );
+
+  const created: RecommendQualityCreatedItem[] = [];
+
+  for (const entry of normalized) {
+    let name = entry.name;
+    let suffix = 2;
+    while (existingNames.has(name.toLowerCase())) {
+      name = `${entry.name} (${suffix})`;
+      suffix += 1;
+    }
+    existingNames.add(name.toLowerCase());
+
+    try {
+      const item = await createAthleteCatalogueWorkout({
+        athleteId: input.athleteId,
+        name,
+        description:
+          typeof entry.parsedFields.description === "string"
+            ? entry.parsedFields.description
+            : null,
+        workoutType: input.workoutType,
+        parsedFields: { ...entry.parsedFields, name },
+      });
+      created.push(item);
+    } catch (e) {
+      console.error("recommendQualityCatalogueForPreset create failed", name, e);
+    }
+  }
+
+  if (created.length === 0) {
+    throw new Error("Could not save recommended workouts — try creating your own");
+  }
+
+  return { created, source: "ai" };
 }

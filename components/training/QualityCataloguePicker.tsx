@@ -2,30 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+import { AthleteCatalogueEditForm } from "@/components/training/AthleteCatalogueEditForm";
+import type { QualityCatalogueItem } from "@/components/training/quality-catalogue-types";
 import { CATALOGUE_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
 import {
   isRecommendedCatalogueId,
-  type CatalogueRecommendRow,
 } from "@/lib/training/recommend-quality-catalogue";
 import {
   catalogueDetailLines,
   catalogueHasDetails,
 } from "@/lib/training/catalogue-details-format";
 import type { WeeklyVolumeBand } from "@/lib/training/weekly-volume-key";
-
-export type QualityCatalogueItem = CatalogueRecommendRow & {
-  ownerAthleteId?: string | null;
-  workoutType?: string | null;
-  warmupMiles?: number | null;
-  warmupPaceOffsetSecPerMile?: number | null;
-  cooldownMiles?: number | null;
-  cooldownPaceOffsetSecPerMile?: number | null;
-  workBaseMiles?: number | null;
-  workPaceOffsetSecPerMile?: number | null;
-  workBasePaceOffsetSecPerMile?: number | null;
-  recoveryDistanceMeters?: number | null;
-  recoveryDurationSeconds?: number | null;
-};
 
 type Props = {
   presetId: string;
@@ -54,7 +41,7 @@ function CatalogueDetailsBlock({ item }: { item: QualityCatalogueItem }) {
 export function QualityCataloguePicker({
   presetId,
   workoutType,
-  templateSeedIds,
+  templateSeedIds: _templateSeedIds,
   weeklyVolumeBand: _weeklyVolumeBand,
   progressionAggressiveness: _progressionAggressiveness,
   initialSelectedIds,
@@ -73,11 +60,10 @@ export function QualityCataloguePicker({
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
 
   const [showCreate, setShowCreate] = useState(false);
-  const [createName, setCreateName] = useState("");
   const [createDescription, setCreateDescription] = useState("");
-  const [parsedFields, setParsedFields] = useState<Record<string, unknown> | null>(null);
+  const [aiPrefill, setAiPrefill] = useState<Record<string, unknown> | null>(null);
+  const [catalogueDraftKey, setCatalogueDraftKey] = useState(0);
   const [parsing, setParsing] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const loadCatalogue = useCallback(async () => {
@@ -138,7 +124,14 @@ export function QualityCataloguePicker({
     });
   }, []);
 
-  const applyRecommended = useCallback(async () => {
+  function appendCatalogueItem(item: QualityCatalogueItem) {
+    setCatalogue((prev) => {
+      const next = [...prev.filter((c) => c.id !== item.id), item];
+      return next.sort((a, b) => a.name.localeCompare(b.name));
+    });
+  }
+
+  const recommendForMe = useCallback(async () => {
     setRecommending(true);
     setRecommendError(null);
     try {
@@ -149,37 +142,40 @@ export function QualityCataloguePicker({
           "Content-Type": "application/json",
           ...athleteBearerFetchHeaders(token),
         },
-        body: JSON.stringify({
-          workoutType,
-          templateSeedIds,
-        }),
+        body: JSON.stringify({ workoutType }),
       });
       const data = (await res.json()) as {
-        catalogueIds?: string[];
+        created?: QualityCatalogueItem[];
         error?: string;
       };
-      if (!res.ok || !Array.isArray(data.catalogueIds)) {
-        throw new Error(data.error ?? "Could not get recommendations");
+      if (!res.ok || !Array.isArray(data.created) || data.created.length === 0) {
+        throw new Error(data.error ?? "Could not generate recommendations");
       }
-      const valid = data.catalogueIds.filter((id) => catalogue.some((c) => c.id === id));
-      setRecommendedIds(valid);
-      setSelectedIds(valid.slice(0, CATALOGUE_ROTATION_SLOTS));
+      const newIds = data.created.map((c) => c.id);
+      setCatalogue((prev) => {
+        const byId = new Map(prev.map((c) => [c.id, c]));
+        for (const item of data.created!) {
+          byId.set(item.id, item);
+        }
+        return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+      });
+      setRecommendedIds((prev) => [...new Set([...prev, ...newIds])]);
     } catch (e) {
-      setRecommendError(e instanceof Error ? e.message : "Could not get recommendations");
+      setRecommendError(e instanceof Error ? e.message : "Could not generate recommendations");
     } finally {
       setRecommending(false);
     }
-  }, [catalogue, getToken, presetId, templateSeedIds, workoutType]);
+  }, [getToken, presetId, workoutType]);
 
-  async function handleParse() {
+  async function runGenerateEntry() {
     const description = createDescription.trim();
     if (!description) {
-      setCreateError("Paste your workout structure (e.g. 1mi WU / 2mi tempo @ +30 / 1mi CD)");
+      setCreateError("Describe your workout first");
       return;
     }
     setParsing(true);
     setCreateError(null);
-    setParsedFields(null);
+    setAiPrefill(null);
     try {
       const token = await getToken();
       const res = await fetch("/api/workouts/athlete-catalogue/ai-parse", {
@@ -199,11 +195,8 @@ export function QualityCataloguePicker({
       if (!res.ok || !data.fields) {
         throw new Error(data.details ?? data.error ?? "Could not parse workout");
       }
-      setParsedFields(data.fields);
-      const parsedName = typeof data.fields.name === "string" ? data.fields.name.trim() : "";
-      if (parsedName && !createName.trim()) {
-        setCreateName(parsedName);
-      }
+      setAiPrefill(data.fields);
+      setCatalogueDraftKey((k) => k + 1);
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : "Could not parse workout");
     } finally {
@@ -211,93 +204,25 @@ export function QualityCataloguePicker({
     }
   }
 
-  async function handleCreate() {
-    const name = createName.trim();
-    if (!name) {
-      setCreateError("Name your workout");
-      return;
-    }
-    if (!parsedFields) {
-      setCreateError("Parse your workout description first");
-      return;
-    }
-    setCreating(true);
+  function clearCreateState() {
+    setShowCreate(false);
     setCreateError(null);
-    try {
-      const token = await getToken();
-      const res = await fetch("/api/workouts/athlete-catalogue", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...athleteBearerFetchHeaders(token),
-        },
-        body: JSON.stringify({
-          name,
-          description: createDescription.trim() || null,
-          workoutType,
-          parsedFields,
-        }),
-      });
-      const data = (await res.json()) as {
-        item?: QualityCatalogueItem;
-        error?: string;
-      };
-      if (!res.ok || !data.item) {
-        throw new Error(data.error ?? "Could not create workout");
-      }
-      const item = data.item;
-      setCatalogue((prev) => {
-        const next = [...prev.filter((c) => c.id !== item.id), item];
-        return next.sort((a, b) => a.name.localeCompare(b.name));
-      });
-      setSelectedIds((prev) => {
-        if (prev.includes(item.id)) return prev;
-        if (prev.length >= CATALOGUE_ROTATION_SLOTS) return prev;
-        return [...prev, item.id];
-      });
-      setCreateName("");
-      setCreateDescription("");
-      setParsedFields(null);
-      setShowCreate(false);
-    } catch (e) {
-      setCreateError(e instanceof Error ? e.message : "Could not create workout");
-    } finally {
-      setCreating(false);
-    }
+    setCreateDescription("");
+    setAiPrefill(null);
+  }
+
+  function handleSavedItem(item: QualityCatalogueItem) {
+    appendCatalogueItem(item);
+    setSelectedIds((prev) => {
+      if (prev.includes(item.id)) return prev;
+      if (prev.length >= CATALOGUE_ROTATION_SLOTS) return prev;
+      return [...prev, item.id];
+    });
+    clearCreateState();
   }
 
   const atMax = selectedIds.length >= CATALOGUE_ROTATION_SLOTS;
   const typeLabel = workoutType === "Tempo" ? "tempo" : "interval";
-  const previewItem: QualityCatalogueItem | null = parsedFields
-    ? {
-        id: "preview",
-        name: createName.trim() || "Preview",
-        workoutType,
-        warmupMiles: parsedFields.warmupMiles as number | null | undefined,
-        warmupPaceOffsetSecPerMile: parsedFields.warmupPaceOffsetSecPerMile as
-          | number
-          | null
-          | undefined,
-        cooldownMiles: parsedFields.cooldownMiles as number | null | undefined,
-        cooldownPaceOffsetSecPerMile: parsedFields.cooldownPaceOffsetSecPerMile as
-          | number
-          | null
-          | undefined,
-        workBaseMiles: parsedFields.workBaseMiles as number | null | undefined,
-        workPaceOffsetSecPerMile: parsedFields.workPaceOffsetSecPerMile as
-          | number
-          | null
-          | undefined,
-        workBaseReps: parsedFields.workBaseReps as number | null | undefined,
-        workBaseRepMeters: parsedFields.workBaseRepMeters as number | null | undefined,
-        workBasePaceOffsetSecPerMile: parsedFields.workBasePaceOffsetSecPerMile as
-          | number
-          | null
-          | undefined,
-        recoveryDistanceMeters: parsedFields.recoveryDistanceMeters as number | null | undefined,
-        recoveryDurationSeconds: parsedFields.recoveryDurationSeconds as number | null | undefined,
-      }
-    : null;
 
   if (loading) {
     return <p className="text-sm text-gray-600">Loading workout catalogue…</p>;
@@ -311,7 +236,7 @@ export function QualityCataloguePicker({
     <div className="space-y-4">
       <p className="text-sm text-gray-600">
         Select the {typeLabel} workouts you want in your plan — up to {CATALOGUE_ROTATION_SLOTS}.
-        Don&apos;t see what you want? Create your own below.
+        Pick from the catalogue below, get AI recommendations, or create your own.
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -320,22 +245,24 @@ export function QualityCataloguePicker({
         </p>
         <button
           type="button"
-          disabled={recommending || catalogue.length === 0}
-          onClick={() => void applyRecommended()}
-          className="text-xs font-semibold text-orange-700 hover:text-orange-900 disabled:opacity-60"
+          disabled={recommending}
+          onClick={() => void recommendForMe()}
+          className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
         >
-          {recommending
-            ? "Finding recommendations…"
-            : recommendedIds.length > 0
-              ? `Use recommended (${recommendedIds.length})`
-              : "Use recommended"}
+          {recommending ? "Creating recommendations…" : "Recommend some workouts for me"}
         </button>
       </div>
       {recommendError ? <p className="text-sm text-red-700">{recommendError}</p> : null}
+      {recommendedIds.length > 0 ? (
+        <p className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs text-purple-900">
+          {recommendedIds.length} AI-recommended workout{recommendedIds.length === 1 ? "" : "s"} added
+          to your catalogue (badge: Recommended). Mix with staff workouts — check the ones you want.
+        </p>
+      ) : null}
 
       {catalogue.length === 0 ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          No {typeLabel} workouts in the catalogue yet — create your own below.
+          No {typeLabel} workouts in the catalogue yet — use Recommend or create your own below.
         </p>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
@@ -369,7 +296,7 @@ export function QualityCataloguePicker({
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-gray-900">{item.name}</span>
                     {recommended ? (
-                      <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-800">
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-800">
                         Recommended
                       </span>
                     ) : null}
@@ -415,7 +342,7 @@ export function QualityCataloguePicker({
             onClick={() => {
               setShowCreate(true);
               setCreateError(null);
-              setParsedFields(null);
+              setAiPrefill(null);
             }}
             className="text-sm font-semibold text-orange-700 hover:text-orange-900"
           >
@@ -423,76 +350,68 @@ export function QualityCataloguePicker({
           </button>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm font-medium text-gray-900">Create your own {typeLabel} workout</p>
-            <p className="text-xs text-gray-600">
-              Paste like a coach would — e.g. &quot;1mi WU easy, 2mi tempo @ threshold, 1mi CD&quot;
-              or &quot;6×800 @ 5K with 400m jog&quot;.
-            </p>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">
-                Workout description
-              </label>
-              <textarea
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-mono"
-                rows={4}
-                value={createDescription}
-                onChange={(e) => {
-                  setCreateDescription(e.target.value);
-                  setParsedFields(null);
-                }}
-                placeholder={
-                  workoutType === "Tempo"
-                    ? "2mi tempo @ threshold, 1mi WU / 1mi CD"
-                    : "6×800 @ 5K pace, 400m jog, 1.5mi WU / 1mi CD"
-                }
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Name</label>
-              <input
-                type="text"
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                placeholder={`My ${workoutType === "Tempo" ? "tempo" : "interval"} workout`}
-              />
-            </div>
-            {previewItem && catalogueHasDetails(previewItem) ? (
-              <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2">
-                <p className="text-xs font-semibold text-sky-900">Parsed structure</p>
-                <CatalogueDetailsBlock item={previewItem} />
-              </div>
-            ) : null}
-            {createError ? <p className="text-sm text-red-700">{createError}</p> : null}
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={parsing || !createDescription.trim()}
-                onClick={() => void handleParse()}
-                className="rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-50 disabled:opacity-60"
-              >
-                {parsing ? "Parsing…" : "Parse workout"}
-              </button>
-              <button
-                type="button"
-                disabled={creating || !parsedFields}
-                onClick={() => void handleCreate()}
-                className="rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
-              >
-                {creating ? "Adding…" : "Add to catalogue"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCreate(false);
-                  setCreateError(null);
-                  setParsedFields(null);
-                }}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800"
-              >
-                Cancel
-              </button>
-            </div>
+            {!aiPrefill ? (
+              <>
+                <p className="text-sm font-medium text-gray-900">Create your own {typeLabel} workout</p>
+                <p className="text-xs text-gray-600">
+                  You already have workout text — AI parses it into structured catalogue fields. Review
+                  and save.
+                </p>
+                <textarea
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-mono"
+                  rows={4}
+                  value={createDescription}
+                  onChange={(e) => setCreateDescription(e.target.value)}
+                  placeholder={
+                    workoutType === "Tempo"
+                      ? 'e.g. "Tempo run. 1 mile easy warmup, 2 miles at threshold + 30 sec/mi, 1 mile cooldown."'
+                      : 'e.g. "6×800 @ 5K pace, 400m jog, 1.5mi WU / 1mi CD"'
+                  }
+                />
+                {createError ? <p className="text-sm text-red-700">{createError}</p> : null}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={parsing || !createDescription.trim()}
+                    onClick={() => void runGenerateEntry()}
+                    className="rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
+                  >
+                    {parsing ? "Generating…" : "Generate entry"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearCreateState}
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs text-purple-900">
+                  Entry pre-filled below — review and save.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAiPrefill(null);
+                    setCreateError(null);
+                  }}
+                  className="text-xs font-semibold text-gray-600 hover:text-gray-900"
+                >
+                  Start over
+                </button>
+                <AthleteCatalogueEditForm
+                  key={`draft-${catalogueDraftKey}`}
+                  workoutType={workoutType}
+                  aiPrefill={aiPrefill}
+                  getToken={getToken}
+                  onCancel={clearCreateState}
+                  onSaved={handleSavedItem}
+                />
+              </>
+            )}
           </div>
         )}
       </div>
@@ -514,3 +433,5 @@ export function QualityCataloguePicker({
     </div>
   );
 }
+
+export type { QualityCatalogueItem } from "@/components/training/quality-catalogue-types";
