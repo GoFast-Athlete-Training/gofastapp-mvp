@@ -38,6 +38,46 @@ export default function AthleteCommunityFeed({ items, hostFirstName, emptyMessag
   return (
     <section className="space-y-3" aria-label="Community feed">
       {items.map((item) => {
+        if (item.kind === 'workout') {
+          const { story } = item;
+          const distance = formatTrainingDistance(story.distanceMiles);
+          const duration = formatTrainingDuration(story.durationSeconds);
+          const stats = [distance, duration].filter(Boolean).join(' · ');
+          const headline = story.publicTitle?.trim() || story.plannedTitle;
+          return (
+            <article
+              key={item.id}
+              className="rounded-2xl border border-orange-200 bg-white p-4 shadow-sm overflow-hidden"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wide text-orange-800">
+                {communityFeedItemLabel(item.kind)} from {hostFirstName}
+              </p>
+              {story.workoutPhotoUrl ? (
+                <img
+                  src={story.workoutPhotoUrl}
+                  alt=""
+                  className="mt-3 -mx-4 w-[calc(100%+2rem)] max-h-72 object-cover"
+                />
+              ) : null}
+              <h3 className="mt-2 text-base font-semibold text-gray-900">{headline}</h3>
+              {story.howFeltLabel ? (
+                <p className="mt-1 text-sm font-medium text-orange-900">{story.howFeltLabel}</p>
+              ) : null}
+              {story.reflection ? (
+                <p className="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{story.reflection}</p>
+              ) : null}
+              {stats ? <p className="mt-2 text-xs text-gray-500">{stats}</p> : null}
+              {story.plannedTitle && story.publicTitle ? (
+                <p className="mt-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                  Planned: {story.plannedTitle}
+                  {story.planName ? ` · ${story.planName}` : ''}
+                </p>
+              ) : null}
+              <p className="mt-2 text-xs text-gray-400">{formatWhen(story.publishedAt)}</p>
+            </article>
+          );
+        }
+
         if (item.kind === 'activity') {
           const { post } = item;
           const { activity } = post;

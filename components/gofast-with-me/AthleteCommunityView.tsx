@@ -117,6 +117,7 @@ export default function AthleteCommunityView({ handle }: Props) {
       updateMessages,
       tips: community.tips,
       runRoutes: community.runRoutes ?? [],
+      workoutStories: community.workoutStories ?? [],
       activityPosts: community.activityPosts ?? [],
       upcomingRuns: community.upcomingRuns,
     });

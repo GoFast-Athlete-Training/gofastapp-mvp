@@ -42,7 +42,7 @@ test('composeCommunityFeed merges and sorts reverse-chronologically', () => {
       {
         id: 'r1',
         title: 'Saturday long run',
-        date: '2026-08-20T08:00:00.000Z',
+        date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
         meetUpPoint: 'Memorial',
         gorunPath: '/gorun/r1',
       },
@@ -53,6 +53,40 @@ test('composeCommunityFeed merges and sorts reverse-chronologically', () => {
   assert.equal(feed[0]?.kind, 'run');
   assert.equal(feed[1]?.kind, 'tip');
   assert.equal(feed[2]?.kind, 'dailylog');
+});
+
+test('composeCommunityFeed includes published workout stories', () => {
+  const feed = composeCommunityFeed({
+    updateMessages: [],
+    tips: [],
+    runRoutes: [],
+    upcomingRuns: [],
+    activityPosts: [],
+    workoutStories: [
+      {
+        id: 'w1',
+        publicTitle: 'Legs were junk but I finished',
+        howFeltRating: 2,
+        howFeltLabel: 'Heavy',
+        reflection: 'Showed up anyway.',
+        workoutPhotoUrl: null,
+        publishedAt: '2026-08-17T10:00:00.000Z',
+        workoutType: 'EasyRun',
+        plannedTitle: 'Easy 6',
+        planName: 'Marathon Block',
+        distanceMiles: 6.1,
+        durationSeconds: 3300,
+        workoutDate: '2026-08-17T06:00:00.000Z',
+      },
+    ],
+  });
+
+  assert.equal(feed.length, 1);
+  assert.equal(feed[0]?.kind, 'workout');
+  if (feed[0]?.kind === 'workout') {
+    assert.equal(feed[0].story.publicTitle, 'Legs were junk but I finished');
+    assert.equal(feed[0].story.howFeltLabel, 'Heavy');
+  }
 });
 
 test('composeCommunityFeed includes published activity posts only via input', () => {

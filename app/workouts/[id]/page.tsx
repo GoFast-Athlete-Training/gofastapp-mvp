@@ -68,6 +68,7 @@ import { formatPaceTargetRangeDisplay } from "@/lib/training/pace-comparison-dis
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
 import PaceForPacePanel from "@/components/training/PaceForPacePanel";
 import WorkoutSkipActions from "@/components/training/WorkoutSkipActions";
+import WorkoutCommunityStoryCard from "@/components/gofast-with-me/WorkoutCommunityStoryCard";
 import {
   computeWorkoutPerformanceAnalysis,
   type PhaseAwareLapRow,
@@ -1292,6 +1293,16 @@ export default function WorkoutDetailPage() {
   }, [quickOrderIds, defaultSegmentOrderIds]);
 
   const isLogged = Boolean(workout?.matchedActivityId ?? workout?.matched_activity);
+  const showCommunityStory = useMemo(() => {
+    if (!workout) return false;
+    if (isLogged) return true;
+    if (workout.skippedAt) return true;
+    if (workout.date) {
+      const d = new Date(workout.date);
+      if (!Number.isNaN(d.getTime()) && d.getTime() < Date.now()) return true;
+    }
+    return false;
+  }, [workout, isLogged]);
   const segmentDisplayGroups = useMemo(() => {
     const ordered = isLogged ? sortedSegments : getQuickOrderedSegments();
     return groupSegmentsInDisplayOrder(ordered);
@@ -2158,6 +2169,14 @@ export default function WorkoutDetailPage() {
               />
             </div>
           </div>
+        ) : null}
+
+        {showCommunityStory && workout ? (
+          <WorkoutCommunityStoryCard
+            workoutId={workout.id}
+            plannedTitle={workoutListTitle(workout)}
+            visible={showCommunityStory}
+          />
         ) : null}
 
         {isLogged ? (

@@ -309,26 +309,43 @@ export default function ActivityDetailPage() {
                 </div>
 
                 {athleteId ? (
-                  <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-5 mb-6">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <h2 className="text-sm font-semibold text-orange-900">GoFast With Me hub</h2>
-                        <p className="mt-1 text-sm text-orange-800/90">
-                          {hubPost?.isPublished
-                            ? 'This activity is on your member feed.'
-                            : 'Share a photo and caption so followers see this workout.'}
+                  matched ? (
+                    <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-5 mb-6">
+                      <h2 className="text-sm font-semibold text-orange-900">GoFast With Me</h2>
+                      <p className="mt-1 text-sm text-orange-800/90">
+                        Tell your followers how this session felt from your workout page — title,
+                        reflection, and photo live on the build, not the raw activity.
+                      </p>
+                      <Link
+                        href={`/workouts/${encodeURIComponent(matched.id)}`}
+                        className="mt-3 inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+                      >
+                        Open workout &amp; share story
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-5 mb-6">
+                      <h2 className="text-sm font-semibold text-gray-800">GoFast With Me</h2>
+                      <p className="mt-1 text-sm text-gray-600">
+                        Link this activity to a plan workout first, then share your story from the
+                        workout page.
+                      </p>
+                      {hubPost?.isPublished ? (
+                        <p className="mt-2 text-xs text-gray-500">
+                          Legacy activity post is still published — use Remove from hub below if
+                          needed.
                         </p>
-                      </div>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => setShareOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+                        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                       >
                         <Share2 className="h-4 w-4" aria-hidden />
-                        {hubPost?.isPublished ? 'Edit hub post' : 'Share to hub'}
+                        {hubPost?.isPublished ? 'Manage legacy activity post' : 'Legacy activity share'}
                       </button>
                     </div>
-                  </div>
+                  )
                 ) : null}
 
                 {matched ? (

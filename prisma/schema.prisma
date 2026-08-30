@@ -2579,6 +2579,16 @@ model workouts {
   /// Free-text note from athlete about the run context.
   runContextNote                    String?             @db.Text
   runContextUpdatedAt               DateTime?
+  /// Athlete-authored title for GoFast With Me community feed (not catalogue/Garmin name).
+  publicTitle                       String?
+  /// 1–5 felt scale for community story (same storage as race howFeltRating).
+  howFeltRating                     Int?
+  /// Long-form reflection for followers on the community feed.
+  reflection                        String?             @db.Text
+  /// Photo URL for community feed card (Vercel Blob).
+  workoutPhotoUrl                   String?
+  /// When set, this workout story is visible on the athlete community feed.
+  communityPublishedAt              DateTime?
   /// AI-generated pre-workout coach guidance (materialize + GET fallback; cached).
   prescriptionNarrative             String?
   /// Public share path slug for /mytrainingruns/[slug] (e.g. acole842719); set when athlete creates a join link

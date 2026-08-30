@@ -1,9 +1,10 @@
 import type { AthleteTipPayload } from '@/lib/gofast-with-me/athlete-tips';
 import type { AthleteRunRoutePayload } from '@/lib/gofast-with-me/athlete-run-routes';
 import type { ActivityPostPayload } from '@/lib/gofast-with-me/activity-posts';
+import type { WorkoutStoryPayload } from '@/lib/gofast-with-me/workout-stories';
 import type { ContainerHubMessage } from '@/lib/gofast-with-me/container-hub-service';
 
-export type CommunityFeedItemKind = 'dailylog' | 'tip' | 'myrunroute' | 'run' | 'activity';
+export type CommunityFeedItemKind = 'dailylog' | 'tip' | 'myrunroute' | 'run' | 'activity' | 'workout';
 
 export type CommunityFeedDailyLogItem = {
   kind: 'dailylog';
@@ -47,12 +48,20 @@ export type CommunityFeedActivityItem = {
   post: ActivityPostPayload;
 };
 
+export type CommunityFeedWorkoutItem = {
+  kind: 'workout';
+  id: string;
+  sortAt: string;
+  story: WorkoutStoryPayload;
+};
+
 export type CommunityFeedItem =
   | CommunityFeedDailyLogItem
   | CommunityFeedTipItem
   | CommunityFeedMyRunRouteItem
   | CommunityFeedRunItem
-  | CommunityFeedActivityItem;
+  | CommunityFeedActivityItem
+  | CommunityFeedWorkoutItem;
 
 /** @deprecated use CommunityFeedDailyLogItem */
 export type CommunityFeedUpdateItem = CommunityFeedDailyLogItem;
@@ -61,6 +70,7 @@ export type ComposeCommunityFeedInput = {
   updateMessages: ContainerHubMessage[];
   tips: AthleteTipPayload[];
   runRoutes: AthleteRunRoutePayload[];
+  workoutStories?: WorkoutStoryPayload[];
   activityPosts: ActivityPostPayload[];
   upcomingRuns: {
     id: string;
@@ -81,9 +91,19 @@ function formatDuration(seconds: number | null): string | null {
   return `${m}m`;
 }
 
-/** Merge activity posts, daily logs, tips, and runs into one reverse-chronological feed. */
+/** Merge workout stories, daily logs, tips, runs, and legacy activity posts into one reverse-chronological feed. */
 export function composeCommunityFeed(input: ComposeCommunityFeedInput): CommunityFeedItem[] {
   const items: CommunityFeedItem[] = [];
+
+  for (const story of input.workoutStories ?? []) {
+    const sortAt = story.publishedAt || story.workoutDate || new Date(0).toISOString();
+    items.push({
+      kind: 'workout',
+      id: `workout-${story.id}`,
+      sortAt,
+      story,
+    });
+  }
 
   for (const post of input.activityPosts) {
     const sortAt = post.publishedAt || post.activity.startTime;
@@ -155,6 +175,8 @@ export function communityFeedItemLabel(kind: CommunityFeedItemKind): string {
       return 'Run';
     case 'activity':
       return 'Activity';
+    case 'workout':
+      return 'Workout';
     default:
       return 'Post';
   }
