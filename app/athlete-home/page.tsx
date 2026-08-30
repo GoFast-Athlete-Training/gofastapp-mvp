@@ -987,13 +987,15 @@ export default function AthleteHomePage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-w-0">
         <AthleteSidebar />
 
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-6xl mx-auto px-6 py-8">
+        <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             <div className="mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome back, {athlete.firstName}!</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
+                Welcome back, {athlete.firstName}!
+              </h1>
               <p className="text-gray-600 text-sm">Here&apos;s your training at a glance</p>
             </div>
 

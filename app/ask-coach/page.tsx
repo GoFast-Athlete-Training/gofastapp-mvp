@@ -52,9 +52,9 @@ export default function AskCoachPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-w-0">
         <AthleteSidebar />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
           <div className="max-w-3xl mx-auto px-6 py-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Ask Reiki</h1>
             <p className="text-gray-600 text-sm mb-2">Your AI-powered coach assistant</p>
