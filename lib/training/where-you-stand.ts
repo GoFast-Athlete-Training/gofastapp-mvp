@@ -112,10 +112,11 @@ function bestPaceRow(
 
   for (const row of candidates) {
     const beat = computeBeatSec(row);
+    if (beat == null) continue;
     const nudge = nudgeSecPerMileFromBeat(beat);
     if (nudge <= 0) continue;
     if (!best || beat > best.beat || (beat === best.beat && nudge > best.nudge)) {
-      best = { row, beat: beat ?? 0, nudge };
+      best = { row, beat, nudge };
     }
   }
 
