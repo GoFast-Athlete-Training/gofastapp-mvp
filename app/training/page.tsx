@@ -1257,7 +1257,7 @@ export default function TrainingHubPage() {
                               )}
                               className="inline-flex justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                             >
-                              Review run
+                              See your run
                             </Link>
                           ) : null}
                         </div>

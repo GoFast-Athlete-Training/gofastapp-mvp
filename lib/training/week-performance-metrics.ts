@@ -19,8 +19,21 @@ export type WeekPerformanceRow = {
   date: Date | null;
   estimatedDistanceInMeters: number | null;
   actualDistanceMeters: number | null;
+  /** Avg lap pace delta for structured comparison; null when no lap deltas written. */
   paceDeltaSecPerMile: number | null;
 };
+
+function avgLapPaceDeltaFromSegments(
+  segments: Array<{ segment_laps: Array<{ paceDeltaSecPerMile: number | null }> }>
+): number | null {
+  const deltas = segments.flatMap((s) =>
+    s.segment_laps
+      .map((l) => l.paceDeltaSecPerMile)
+      .filter((d): d is number => d != null && Number.isFinite(d))
+  );
+  if (deltas.length === 0) return null;
+  return Math.round(deltas.reduce((a, b) => a + b, 0) / deltas.length);
+}
 
 function isoDateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -171,9 +184,25 @@ export async function loadWeekPerformanceSnapshot(params: {
       date: true,
       estimatedDistanceInMeters: true,
       actualDistanceMeters: true,
-      paceDeltaSecPerMile: true,
+      segments: {
+        select: {
+          segment_laps: {
+            select: { paceDeltaSecPerMile: true },
+          },
+        },
+      },
     },
   });
 
-  return computeWeekPerformanceMetrics(rows);
+  const metricRows: WeekPerformanceRow[] = rows.map((w) => ({
+    workoutType: w.workoutType,
+    matchedActivityId: w.matchedActivityId,
+    skippedAt: w.skippedAt,
+    date: w.date,
+    estimatedDistanceInMeters: w.estimatedDistanceInMeters,
+    actualDistanceMeters: w.actualDistanceMeters,
+    paceDeltaSecPerMile: avgLapPaceDeltaFromSegments(w.segments),
+  }));
+
+  return computeWeekPerformanceMetrics(metricRows);
 }

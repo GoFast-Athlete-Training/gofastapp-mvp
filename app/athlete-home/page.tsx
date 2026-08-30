@@ -1785,6 +1785,12 @@ export default function AthleteHomePage() {
                 >
                   Open Training Hub →
                 </Link>
+                <Link
+                  href="/performance"
+                  className="mt-1 ml-0 sm:ml-3 inline-block text-sm font-semibold text-orange-700 hover:text-orange-800"
+                >
+                  Full performance →
+                </Link>
               </div>
             ) : null}
 

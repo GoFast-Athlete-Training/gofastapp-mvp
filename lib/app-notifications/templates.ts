@@ -101,7 +101,7 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
     title: 'Great workout!',
     body: ({ workoutTitle }) => {
       const title = typeof workoutTitle === 'string' ? workoutTitle : 'Workout';
-      return `${title} complete — check your pace breakdown.`;
+      return `${title} logged — see your run.`;
     },
   },
   'activity.synced': {

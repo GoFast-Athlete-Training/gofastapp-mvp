@@ -2,41 +2,60 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import TopNav from "@/components/shared/TopNav";
-import AthleteSidebar from "@/components/athlete/AthleteSidebar";
-import { auth } from "@/lib/firebase";
-import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
-import type { PaceForPaceStatus } from "@/lib/training/pace-for-pace-status";
-import { paceForPaceStatusLabel } from "@/lib/training/pace-for-pace-status";
+import AthleteAppShell from "@/components/athlete/AthleteAppShell";
+import {
+  PerformancePaceAnchors,
+  PerformanceWeekSummary,
+} from "@/components/training/PerformanceTabPanels";
+import type { PendingFiveKConfirmation } from "@/lib/training/performance-summary";
+import type { WeekPerformanceSnapshot } from "@/lib/training/week-performance-types";
 
 type HistoryItem = {
   id: string;
-  activityId: string | null;
   title: string;
-  workoutType: string;
-  planName: string | null;
   date: string | null;
-  activityName: string | null;
-  distanceMeters: number | null;
-  durationSeconds: number | null;
-  avgPaceSecPerMile: number | null;
-  avgHeartRate: number | null;
-  plannedDistanceMeters: number | null;
+  workoutType: string;
+  actualAvgPaceSecPerMile: number | null;
+  actualDistanceMeters: number | null;
+  actualDurationSeconds: number | null;
   paceDeltaSecPerMile: number | null;
-  segmentExecutionStatus: string | null;
+  vsPlanBadge: string | null;
+  vsPlanMessage: string | null;
+  prescribedPaceDisplay: string | null;
+  hasLapDeltas: boolean;
+  segmentComparisonCount: number;
+  paceForPaceStatus: string | null;
+  paceForPaceStatusLabel?: string | null;
   executionHeadline: string | null;
-  paceForPaceStatus: PaceForPaceStatus;
-  paceForPaceStatusLabel: string;
-  paceForPaceMessage: string | null;
-  priorSameTypePaceDeltaSecPerMile: number | null;
+  executionSummary: string | null;
+  executionStatus: string | null;
+  executionStatusLabel: string | null;
+  executionStatusReason: string | null;
+  canCompareWholeRun: boolean;
+  canCompareSegments: boolean;
+  canCompare: boolean;
+  hasSegmentComparison: boolean;
+  hasExecutionAnalysis: boolean;
+  hasPerformanceAnalysis: boolean;
 };
 
-function formatSecPerMile(sec: number | null): string {
-  if (sec == null || !Number.isFinite(sec) || sec <= 0) return "—";
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
+type PerformanceSummaryResponse = {
+  planId: string | null;
+  planName: string | null;
+  weekNumber: number | null;
+  weekPerformance: WeekPerformanceSnapshot | null;
+  currentFiveKPace: string | null;
+  pendingFiveKConfirmations: PendingFiveKConfirmation[];
+};
+
+function formatPace(secPerMile: number | null): string {
+  if (secPerMile == null || !Number.isFinite(secPerMile)) return "—";
+  const m = Math.floor(secPerMile / 60);
+  const s = Math.round(secPerMile % 60);
   return `${m}:${String(s).padStart(2, "0")}/mi`;
 }
 
@@ -44,7 +63,6 @@ function formatDate(iso: string | null): string {
   if (!iso) return "—";
   try {
     return new Date(iso).toLocaleDateString(undefined, {
-      weekday: "short",
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -54,74 +72,54 @@ function formatDate(iso: string | null): string {
   }
 }
 
-function statusBadgeClass(status: PaceForPaceStatus): string {
+function formatDistance(meters: number | null): string {
+  if (meters == null || meters <= 0) return "—";
+  return `${(meters / 1609.34).toFixed(2)} mi`;
+}
+
+function formatDuration(sec: number | null): string {
+  if (sec == null || sec <= 0) return "—";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m} min`;
+}
+
+function paceForPaceStatusLabel(status: string | null): string {
   switch (status) {
-    case "PACE_FOR_PACE_AVAILABLE":
-      return "bg-emerald-100 text-emerald-900";
-    case "PACE_FOR_PACE_FAILED":
-      return "bg-red-100 text-red-900";
-    case "UNMATCHED":
-      return "bg-amber-100 text-amber-900";
-    case "MATCHED_ANALYSIS_NOT_GENERATED":
-      return "bg-sky-100 text-sky-900";
-    case "NO_STRUCTURED_PACE_TARGETS":
-      return "bg-neutral-100 text-neutral-700";
+    case "ready":
+      return "Splits ready";
+    case "needs_laps":
+      return "Needs lap data";
+    case "needs_analysis":
+      return "Run analysis";
     default:
-      return "bg-neutral-100 text-neutral-700";
+      return status ?? "—";
   }
 }
 
 export default function PerformancePage() {
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <TopNav />
-      <div className="flex flex-1 overflow-hidden min-w-0">
-        <AthleteSidebar />
-        <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Performance</h1>
-              <p className="text-gray-600 leading-relaxed max-w-3xl">
-                Analysis for matched plan workouts — Pace for Pace, execution, and repair actions.
-                For your full activity log (matched and unmatched), open{" "}
-                <Link href="/activities" className="font-medium text-orange-600 hover:text-orange-700">
-                  Activity
-                </Link>
-                . For today&apos;s plan, open{" "}
-                <Link href="/training" className="font-medium text-orange-600 hover:text-orange-700">
-                  Train
-                </Link>
-                .
-              </p>
-            </div>
-            <PerformanceHistoryTable />
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function PerformanceHistoryTable() {
+  const router = useRouter();
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<HistoryItem[]>([]);
-  const [rerunningId, setRerunningId] = useState<string | null>(null);
-  const [rowError, setRowError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<PerformanceSummaryResponse | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setRowError(null);
+    setError(null);
     try {
-      const u = auth.currentUser;
-      if (!u) return;
-      const token = await u.getIdToken();
-      const res = await fetch("/api/performance/history?limit=50", {
-        headers: athleteBearerFetchHeaders(token),
-      });
-      const json = (await res.json()) as { items?: HistoryItem[] };
-      if (res.ok && Array.isArray(json.items)) {
-        setItems(json.items);
-      }
+      const [historyRes, summaryRes] = await Promise.all([
+        api.get<{ items?: HistoryItem[] }>("/performance/history"),
+        api.get<PerformanceSummaryResponse>("/performance/summary"),
+      ]);
+      setItems(Array.isArray(historyRes.data?.items) ? historyRes.data.items : []);
+      setSummary(summaryRes.data ?? null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load performance");
+      setItems([]);
+      setSummary(null);
     } finally {
       setLoading(false);
     }
@@ -129,167 +127,121 @@ function PerformanceHistoryTable() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      setAuthReady(!!user);
-      if (!user) setLoading(false);
+      setAuthReady(true);
+      if (!user) {
+        router.replace("/signup");
+        return;
+      }
+      void load();
     });
     return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    if (!authReady) return;
-    void load();
-  }, [authReady, load]);
-
-  const handleRerun = async (item: HistoryItem) => {
-    setRerunningId(item.id);
-    setRowError(null);
-    try {
-      const res = await api.post<{
-        ok: boolean;
-        message?: string;
-        paceForPaceStatus?: PaceForPaceStatus;
-      }>("/training/pace-for-pace", {
-        workoutId: item.id,
-        activityId: item.activityId ?? undefined,
-      });
-      if (!res.data?.ok) {
-        setRowError(res.data?.message ?? "Pace for Pace failed.");
-      }
-      await load();
-    } catch (e: unknown) {
-      setRowError(e instanceof Error ? e.message : "Pace for Pace failed.");
-    } finally {
-      setRerunningId(null);
-    }
-  };
-
-  if (!authReady) {
-    return <p className="text-sm text-gray-500">Checking your session…</p>;
-  }
-
-  if (loading) {
-    return <p className="text-sm text-gray-500">Loading performance history…</p>;
-  }
-
-  if (items.length === 0) {
-    return (
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <p className="text-sm text-gray-600">
-          No matched workouts yet. After Garmin sync and a completed planned workout, rows appear
-          here.
-        </p>
-      </section>
-    );
-  }
+  }, [load, router]);
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      {rowError ? (
-        <div className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {rowError}
+    <AthleteAppShell>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Performance</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Weekly rollup and recent runs — tap a row to see your workout.
+          </p>
         </div>
-      ) : null}
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-600">
-              <th className="px-4 py-3 font-semibold">Date</th>
-              <th className="px-4 py-3 font-semibold">Workout</th>
-              <th className="px-4 py-3 font-semibold">Actual</th>
-              <th className="px-4 py-3 font-semibold">Pace for Pace</th>
-              <th className="px-4 py-3 font-semibold">Execution</th>
-              <th className="px-4 py-3 font-semibold">Trend</th>
-              <th className="px-4 py-3 font-semibold">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id} className="border-b border-gray-100 align-top">
-                <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                  {formatDate(item.date)}
-                </td>
-                <td className="px-4 py-3 min-w-[12rem]">
-                  <p className="font-medium text-gray-900">{item.title}</p>
-                  <p className="text-xs text-gray-500">{item.workoutType}</p>
-                  {item.planName ? (
-                    <p className="text-xs text-gray-500">{item.planName}</p>
-                  ) : null}
-                  {item.activityName ? (
-                    <p className="mt-1 text-xs text-gray-600">{item.activityName}</p>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3 tabular-nums text-gray-700">
-                  <div>
-                    {item.distanceMeters != null
-                      ? `${(item.distanceMeters / 1609.34).toFixed(2)} mi`
-                      : "—"}
-                  </div>
-                  <div>{formatSecPerMile(item.avgPaceSecPerMile)}</div>
-                  <div>
-                    {item.durationSeconds != null
-                      ? `${Math.round(item.durationSeconds / 60)} min`
-                      : "—"}
-                  </div>
-                  <div>{item.avgHeartRate != null ? `${item.avgHeartRate} bpm` : "—"}</div>
-                </td>
-                <td className="px-4 py-3 min-w-[10rem]">
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(item.paceForPaceStatus)}`}
-                  >
-                    {item.paceForPaceStatusLabel ||
-                      paceForPaceStatusLabel(item.paceForPaceStatus)}
-                  </span>
-                  {item.paceForPaceMessage ? (
-                    <p className="mt-2 text-xs text-gray-600">{item.paceForPaceMessage}</p>
-                  ) : null}
-                  {item.segmentExecutionStatus ? (
-                    <p className="mt-1 text-xs text-gray-500">{item.segmentExecutionStatus}</p>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3 text-gray-700">
-                  {item.vsPlanMessage ?? "—"}
-                  {item.paceDeltaSecPerMile != null ? (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Δ {item.paceDeltaSecPerMile > 0 ? "+" : ""}
-                      {item.paceDeltaSecPerMile} sec/mi
-                    </p>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3 text-gray-700">
-                  {item.priorSameTypePaceDeltaSecPerMile != null ? (
-                    <span className="text-xs tabular-nums">
-                      prev {item.workoutType}: {item.priorSameTypePaceDeltaSecPerMile > 0 ? "+" : ""}
-                      {item.priorSameTypePaceDeltaSecPerMile} sec/mi
-                    </span>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex flex-col gap-2">
-                    <Link
-                      href={`/workouts/${item.id}`}
-                      className="text-orange-600 hover:text-orange-700 font-semibold"
-                    >
-                      Open
-                    </Link>
-                    {item.paceForPaceStatus !== "PACE_FOR_PACE_AVAILABLE" ? (
-                      <button
-                        type="button"
-                        disabled={rerunningId === item.id}
-                        onClick={() => void handleRerun(item)}
-                        className="text-left text-violet-700 hover:text-violet-900 font-semibold disabled:opacity-50"
-                      >
-                        {rerunningId === item.id ? "Running…" : "Re-run Pace for Pace"}
-                      </button>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+        {loading && !authReady ? (
+          <p className="text-gray-500">Loading…</p>
+        ) : error ? (
+          <p className="text-red-600">{error}</p>
+        ) : (
+          <>
+            {summary?.weekPerformance && summary.weekPerformance.sessionsPlanned > 0 ? (
+              <PerformanceWeekSummary
+                weekPerformance={summary.weekPerformance}
+                planName={summary.planName}
+                weekNumber={summary.weekNumber}
+              />
+            ) : summary?.planId ? (
+              <section className="rounded-xl border border-gray-200 bg-gray-50 px-5 py-4 mb-6 text-sm text-gray-600">
+                No scheduled sessions this week yet.
+              </section>
+            ) : null}
+
+            <PerformancePaceAnchors
+              currentFiveKPace={summary?.currentFiveKPace ?? null}
+              pendingFiveKConfirmations={summary?.pendingFiveKConfirmations ?? []}
+              onConfirmed={() => void load()}
+            />
+
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600 mb-3">
+                Recent runs
+              </h2>
+              {items.length === 0 ? (
+                <p className="text-gray-500 text-sm">
+                  No matched workouts yet. Complete a planned run and sync Garmin to see history
+                  here.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3">Workout</th>
+                        <th className="px-4 py-3">Actual pace</th>
+                        <th className="px-4 py-3">Splits</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {items.map((item) => (
+                        <tr
+                          key={item.id}
+                          className="hover:bg-orange-50/50 cursor-pointer"
+                          onClick={() => router.push(`/workouts/${item.id}`)}
+                        >
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                            {formatDate(item.date)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-900">{item.title}</p>
+                            <p className="text-xs text-gray-500">
+                              {item.workoutType}
+                              {item.actualDistanceMeters != null
+                                ? ` · ${formatDistance(item.actualDistanceMeters)}`
+                                : ""}
+                              {item.actualDurationSeconds != null
+                                ? ` · ${formatDuration(item.actualDurationSeconds)}`
+                                : ""}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 tabular-nums text-gray-800">
+                            {formatPace(item.actualAvgPaceSecPerMile)}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {item.vsPlanMessage ??
+                              (item.hasLapDeltas
+                                ? `${item.segmentComparisonCount} lap${item.segmentComparisonCount === 1 ? "" : "s"} compared`
+                                : paceForPaceStatusLabel(item.paceForPaceStatus))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="mt-3 text-xs text-gray-500">
+                Need lap splits? Open a run and use &ldquo;Look at my metrics&rdquo; on the workout
+                page.
+              </p>
+              <Link
+                href="/activities"
+                className="mt-4 inline-block text-sm font-semibold text-orange-700 hover:text-orange-800"
+              >
+                All activities →
+              </Link>
+            </section>
+          </>
+        )}
       </div>
-    </section>
+    </AthleteAppShell>
   );
 }

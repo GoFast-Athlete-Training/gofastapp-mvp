@@ -46,7 +46,12 @@ export async function handlePermissionChange(
       return { success: false, error: 'Athlete not found' };
     }
 
-    const token = athlete.garmin_access_token?.trim();
+    const athleteGarmin = await prisma.athlete.findUnique({
+      where: { id: athlete.id },
+      select: { garmin_access_token: true, garmin_scope: true },
+    });
+
+    const token = athleteGarmin?.garmin_access_token?.trim();
     if (!token) {
       console.warn(`⚠️ No access token for athlete ${athlete.id}; cannot fetch permissions`);
       return { success: false, error: 'No Garmin access token' };
@@ -76,7 +81,7 @@ export async function handlePermissionChange(
         garmin_scope:
           Array.isArray(scopesFromWebhook) && scopesFromWebhook.length > 0
             ? scopesFromWebhook.join(' ')
-            : athlete.garmin_scope,
+            : athleteGarmin?.garmin_scope,
         garmin_last_sync_at: new Date(),
       },
     });

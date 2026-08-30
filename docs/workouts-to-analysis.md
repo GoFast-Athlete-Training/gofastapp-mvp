@@ -57,6 +57,19 @@ Not called from GET. GET formats Splits from lap deltas already written.
 
 **Fail open:** translator could not aim (shape mismatch, OPEN bookends) → say why; do not substitute a summary headline.
 
+## Just finished vs Performance tab
+
+Two lanes — do not mix copy or deeplinks.
+
+| Lane | When | Surfaces | Job |
+|------|------|----------|-----|
+| **Just finished** | Seconds after Garmin match | Push (`workout.complete`), workout emerald card, plan day, home “Review run” | Congrats + *this run* (totals, splits CTA, tap to `/workouts/{id}`) |
+| **Performance** | Anytime / end of week | `/performance` tab, mobile Performance tab | Weekly rollup + last runs + optional 5K confirm — **not** the push notification job |
+
+**Canonical tap target:** planned run → `/workouts/{workoutId}`; unmatched activity → `/activities/{activityId}`.
+
+5K pace: suggest on workout after interval/race match; athlete confirms via `POST /api/training/workout/[id]/confirm-five-k-pace` — never auto-write on match.
+
 ## Pace delta convention
 
 `paceDeltaSecPerMile = prescribedMid − actual` (positive = faster than prescribed band midpoint).

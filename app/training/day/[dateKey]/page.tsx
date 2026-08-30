@@ -835,7 +835,7 @@ export default function TrainingPlanDayPreviewPage() {
                   href={workoutDetailPathWithBackHref(workoutId, hubBackHref)}
                   className="block w-full text-center rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                 >
-                  Review run
+                  See your run
                 </Link>
               ) : null}
               {!isLogged && canMatchWorkout && dayStatus !== "upcoming" ? (
