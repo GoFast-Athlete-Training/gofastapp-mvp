@@ -71,8 +71,9 @@ test("interval workout without detail is completion_only", () => {
   assert.equal(analysis.analysisMode, "completion_only");
   assert.equal(analysis.canJudgeTargetPace, false);
   assert.equal(requiresDetailForTargetAnalysis("Intervals"), true);
-  assert.match(analysis.completionOnlyMessage ?? "", /Nice work/);
-  assert.match(analysis.completionOnlyMessage ?? "", /6\.21 mi/);
+  assert.equal(analysis.requiresPaceForPaceAnalysis, true);
+  assert.match(analysis.paceForPaceError ?? "", /Garmin activity detail is required/);
+  assert.equal(analysis.scorecard.workEffort, null);
 });
 
 test("interval workout with work segment actuals uses rep pace not whole run", () => {
@@ -302,7 +303,7 @@ test("interval with detail and alignment failure shows explicit completion messa
   });
 
   assert.equal(analysis.analysisMode, "completion_only");
-  assert.match(analysis.completionOnlyMessage ?? "", /Garmin detail is available/);
+  assert.match(analysis.paceForPaceError ?? analysis.completionOnlyMessage ?? "", /Garmin detail is available/);
   assert.match(analysis.completionOnlyMessage ?? "", /8/);
   assert.match(analysis.completionOnlyMessage ?? "", /12/);
 });
@@ -440,7 +441,7 @@ test("easy run with segment laps reaches detail with mile splits", () => {
   });
 
   assert.equal(analysis.analysisMode, "detail");
-  assert.equal(analysis.lapSource, "auto");
+  assert.equal(analysis.lapSource, "step");
   assert.ok(analysis.phaseAwareLaps.length >= 2);
   assert.equal(analysis.canJudgeTargetPace, true);
   assert.ok(analysis.executionHeadline?.includes("on target"));
@@ -457,7 +458,7 @@ test("easy run with segment laps reaches detail with mile splits", () => {
   assert.notEqual(comparison.actualPaceSecPerMile, null);
 });
 
-test("long run with segment laps uses auto lap source", () => {
+test("long run with segment laps uses auto lap source for single-block prescription", () => {
   const analysis = computeWorkoutPerformanceAnalysis({
     workoutType: "LongRun",
     targetPaceSecPerMile: 540,
@@ -551,4 +552,162 @@ test("formatCompletionOnlyMessage builds distance and duration copy", () => {
     }),
     "Nice work — you completed 6.21 mi in 48 min."
   );
+});
+
+test("easy run with matched whole-run pace shows Pace for Pace without segment bolt", () => {
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "Easy",
+    targetPaceSecPerMile: 540,
+    targetPaceSecPerMileHigh: 570,
+    paceDeltaSecPerMile: 10,
+    actualAvgPaceSecPerMile: 530,
+    actualDistanceMeters: 8000,
+    actualDurationSeconds: 3600,
+    matchedActivityId: "act-easy",
+    matched_activity: { detailData: null, hydratedAt: null },
+    segments: [
+      {
+        id: "easy-1",
+        title: "Easy",
+        stepOrder: 1,
+        targets: [{ type: "PACE", valueLow: 335, valueHigh: 354 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [],
+      },
+    ],
+  });
+
+  assert.equal(analysis.requiresPaceForPaceAnalysis, true);
+  assert.equal(analysis.requiresSegmentLevelPaceForPace, false);
+  assert.equal(analysis.analysisMode, "detail");
+  assert.equal(analysis.scorecard.workEffort?.summary, "Pace faster than target");
+  assert.equal(analysis.paceForPaceError, null);
+});
+
+test("regular long run with matched whole-run pace shows Pace for Pace", () => {
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "LongRun",
+    targetPaceSecPerMile: 480,
+    targetPaceSecPerMileHigh: 510,
+    paceDeltaSecPerMile: -15,
+    actualAvgPaceSecPerMile: 520,
+    actualDistanceMeters: 16093,
+    actualDurationSeconds: 7920,
+    matchedActivityId: "act-lr",
+    matched_activity: { detailData: null, hydratedAt: null },
+    segments: [
+      {
+        id: "lr-1",
+        title: "Long Run",
+        stepOrder: 1,
+        targets: [{ type: "PACE", valueLow: 298, valueHigh: 317 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [],
+      },
+    ],
+  });
+
+  assert.equal(analysis.requiresPaceForPaceAnalysis, true);
+  assert.equal(analysis.requiresSegmentLevelPaceForPace, false);
+  assert.equal(analysis.analysisMode, "detail");
+  assert.equal(analysis.scorecard.workEffort?.summary, "Pace slower than target");
+});
+
+test("long run with MP without segment actuals does not use whole-run pace as Pace for Pace", () => {
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "LongRun",
+    targetPaceSecPerMile: 443,
+    targetPaceSecPerMileHigh: 453,
+    paceDeltaSecPerMile: 20,
+    actualAvgPaceSecPerMile: 443,
+    actualDistanceMeters: 33000,
+    actualDurationSeconds: 9060,
+    estimatedDistanceInMeters: 31500,
+    completedActivityDetailJson: null,
+    matchedActivityId: "act-lr-mp",
+    matched_activity: { detailData: null, hydratedAt: null },
+    segments: [
+      {
+        id: "lr-wu",
+        title: "Warmup",
+        stepOrder: 1,
+        targets: null,
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [],
+      },
+      {
+        id: "lr-mp",
+        title: "Goal marathon pace",
+        stepOrder: 2,
+        targets: [{ type: "PACE", valueLow: 275, valueHigh: 281 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [],
+      },
+      {
+        id: "lr-easy",
+        title: "Long Run",
+        stepOrder: 3,
+        targets: [{ type: "PACE", valueLow: 310, valueHigh: 320 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [],
+      },
+    ],
+  });
+
+  assert.equal(analysis.requiresPaceForPaceAnalysis, true);
+  assert.equal(analysis.requiresSegmentLevelPaceForPace, true);
+  assert.equal(analysis.analysisMode, "completion_only");
+  assert.equal(analysis.scorecard.workEffort, null);
+  assert.match(analysis.paceForPaceError ?? "", /Garmin activity detail is required/);
+  assert.equal(analysis.scorecard.workSegmentDeltas.length, 0);
+});
+
+test("long run with MP and aligned segment actuals shows work segment comparison", () => {
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "LongRun",
+    targetPaceSecPerMile: 443,
+    targetPaceSecPerMileHigh: 453,
+    paceDeltaSecPerMile: 5,
+    actualAvgPaceSecPerMile: 438,
+    actualDistanceMeters: 33000,
+    actualDurationSeconds: 9060,
+    estimatedDistanceInMeters: 31500,
+    completedActivityDetailJson: { laps: [] },
+    matchedActivityId: "act-lr-mp",
+    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    segmentExecutionStatus: "ALIGNED",
+    segments: [
+      {
+        id: "lr-mp",
+        title: "Goal marathon pace",
+        stepOrder: 2,
+        targets: [{ type: "PACE", valueLow: 275, valueHigh: 281 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 438,
+        actualDurationSeconds: 3600,
+        actualDistanceMiles: 8.2,
+        segment_laps: [{ lapIndex: 0, avgPaceSecPerMile: 438 }],
+      },
+    ],
+  });
+
+  assert.equal(analysis.analysisMode, "detail");
+  assert.equal(analysis.requiresPaceForPaceAnalysis, true);
+  assert.ok(analysis.scorecard.workSegmentDeltas.length > 0);
+  assert.equal(analysis.paceForPaceError, null);
 });

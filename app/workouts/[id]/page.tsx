@@ -66,6 +66,7 @@ import {
 import { formatPlanDateDisplay, localYmd } from "@/lib/training/plan-utils";
 import { formatPaceTargetRangeDisplay } from "@/lib/training/pace-comparison-display";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
+import PaceForPacePanel from "@/components/training/PaceForPacePanel";
 import WorkoutSkipActions from "@/components/training/WorkoutSkipActions";
 import {
   computeWorkoutPerformanceAnalysis,
@@ -944,6 +945,8 @@ export default function WorkoutDetailPage() {
   const [showCreatedBanner, setShowCreatedBanner] = useState(false);
   const [garminToast, setGarminToast] = useState<string | null>(null);
   const [showMatchPanel, setShowMatchPanel] = useState(false);
+  const [resolvedPerformanceAnalysis, setResolvedPerformanceAnalysis] =
+    useState<ReturnType<typeof computeWorkoutPerformanceAnalysis> | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [savingEdits, setSavingEdits] = useState(false);
@@ -1005,8 +1008,8 @@ export default function WorkoutDetailPage() {
     });
   }, [workout, sortedSegments]);
 
-  const phaseAwareLaps = performanceAnalysis?.phaseAwareLaps ?? [];
-  const scorecard = performanceAnalysis?.scorecard ?? null;
+  const displayAnalysis = resolvedPerformanceAnalysis ?? performanceAnalysis;
+  const scorecard = displayAnalysis?.scorecard ?? null;
 
   const simpleBackHref = useMemo(
     () => parseBackHrefParam(searchParams),
@@ -2081,7 +2084,7 @@ export default function WorkoutDetailPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-emerald-800">
-                  Scorecard
+                  Activity summary
                 </p>
                 <h2 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900">
                   {workoutListTitle(workout)}
@@ -2118,12 +2121,6 @@ export default function WorkoutDetailPage() {
               ) : null}
             </div>
 
-            {scorecard?.completionOnlyMessage ? (
-              <p className="mt-4 text-sm font-medium text-gray-900">
-                {scorecard.completionOnlyMessage}
-              </p>
-            ) : null}
-
             <dl className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
                 <dt className="text-xs font-medium text-gray-500">Total miles</dt>
@@ -2142,20 +2139,6 @@ export default function WorkoutDetailPage() {
                 ) : null}
               </div>
 
-              {scorecard?.workEffort ? (
-                <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
-                  <dt className="text-xs font-medium text-gray-500">Work effort</dt>
-                  <dd className="mt-1 text-sm font-semibold text-gray-900">
-                    {scorecard.workEffort.summary ?? "—"}
-                  </dd>
-                  {scorecard.workEffort.workAvgPaceSecPerMile != null ? (
-                    <dd className="mt-1 text-xs text-gray-600 tabular-nums">
-                      Avg work pace {formatSecPerMile(scorecard.workEffort.workAvgPaceSecPerMile)}
-                    </dd>
-                  ) : null}
-                </div>
-              ) : null}
-
               {workout.actualDurationSeconds != null && workout.actualDurationSeconds > 0 ? (
                 <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
                   <dt className="text-xs font-medium text-gray-500">Duration</dt>
@@ -2166,52 +2149,14 @@ export default function WorkoutDetailPage() {
               ) : null}
             </dl>
 
-            {scorecard && scorecard.workSegmentDeltas.length > 0 ? (
-              <WorkSegmentDeltaList rows={scorecard.workSegmentDeltas} />
-            ) : null}
-
-            {phaseAwareLaps.length > 0 ? (
-              <div className="mt-6">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-2">
-                  Lap splits
-                </h3>
-                <div className="overflow-x-auto rounded-xl border border-emerald-100 bg-white/90">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-emerald-100 bg-emerald-50/80 text-left text-xs uppercase tracking-wide text-gray-600">
-                        <th className="py-2 pl-3 pr-2 font-medium">Lap</th>
-                        <th className="py-2 px-2 font-medium">Phase</th>
-                        <th className="py-2 px-2 font-medium">Pace</th>
-                        <th className="py-2 px-2 font-medium">HR</th>
-                        <th className="py-2 pl-2 pr-3 font-medium">Vs plan pace</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {phaseAwareLaps.map((lap) => (
-                        <tr
-                          key={`${lap.lapOrder}-${lap.lapIndex}-${lap.segmentId}`}
-                          className={`border-t border-emerald-50 ${lapRowToneClass(lap.vsPlanTone)}`}
-                        >
-                          <td className="py-2 pl-3 pr-2 tabular-nums font-medium text-gray-900">
-                            {lap.lapOrder}
-                          </td>
-                          <td className="py-2 px-2 text-gray-800">{phaseDisplayLabel(lap.phase)}</td>
-                          <td className="py-2 px-2 tabular-nums">
-                            {formatSecPerMile(lap.paceSecPerMile) ?? "—"}
-                          </td>
-                          <td className="py-2 px-2 tabular-nums">
-                            {lap.avgHr != null ? `${lap.avgHr}` : "—"}
-                          </td>
-                          <td className="py-2 pl-2 pr-3 tabular-nums text-gray-800">
-                            {lap.vsPlanPaceLabel}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : null}
+            <div className="mt-6">
+              <PaceForPacePanel
+                workoutId={workout.id}
+                matchedActivityId={workout.matchedActivityId}
+                performanceAnalysis={displayAnalysis}
+                onAnalysisUpdated={setResolvedPerformanceAnalysis}
+              />
+            </div>
           </div>
         ) : null}
 

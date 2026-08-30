@@ -14,7 +14,8 @@ import {
 import { normalizeGarminMatchText } from "./garmin-activity-match-helpers";
 import { ymdFromDate } from "./plan-utils";
 import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
-import { isWorkSegmentTitle, requiresDetailForTargetAnalysis } from "./workout-performance-analysis";
+import { requiresDetailForTargetAnalysis } from "./workout-performance-analysis";
+import { requiresSegmentLevelPaceForPace, workoutHasPacedWorkSegments } from "./workout-paced-segments";
 import { sendAppNotification } from "@/lib/app-notifications/send";
 /** Max sec/mi faster than prescribed easy pace before we skip aerobic HR credit (target − actual). */
 export const EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE = 15;
@@ -145,20 +146,6 @@ function hrTargetMidpointBpmFromTargets(targets: unknown): number | null {
     return Math.round(low);
   }
   return null;
-}
-
-function workoutHasPacedWorkSegments(
-  segments: {
-    title: string;
-    targets: unknown;
-    paceTargetEncodingVersion: number;
-  }[]
-): boolean {
-  return segments.some(
-    (seg) =>
-      isWorkSegmentTitle(seg.title) &&
-      paceTargetSecPerMileFromSegment(seg.targets, seg.paceTargetEncodingVersion) != null
-  );
 }
 
 async function applyMatchCreditsFromWorkoutRow(params: {
@@ -444,9 +431,17 @@ async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<vo
     if (result.ok && result.status === "ALIGNED") {
       const typed = await prisma.workouts.findUnique({
         where: { id: workout.id },
-        select: { workoutType: true },
+        select: {
+          workoutType: true,
+          segments: {
+            select: { title: true, targets: true, paceTargetEncodingVersion: true },
+          },
+        },
       });
-      if (typed && requiresDetailForTargetAnalysis(typed.workoutType)) {
+      if (
+        typed &&
+        requiresSegmentLevelPaceForPace(typed.workoutType, typed.segments)
+      ) {
         await runPostAnalyzeMatchFollowups(activity.id);
       }
     }
@@ -554,8 +549,9 @@ export async function applyActivityToWorkout(params: {
     console.warn("activity detail/segment persist after match:", detailErr);
   }
 
-  const deferFollowupsToSegmentAnalyze = requiresDetailForTargetAnalysis(
-    workout.workoutType
+  const deferFollowupsToSegmentAnalyze = requiresSegmentLevelPaceForPace(
+    workout.workoutType,
+    workout.segments
   );
   if (!deferFollowupsToSegmentAnalyze) {
     await applyMatchCreditsFromWorkoutRow({ workout, activity });
