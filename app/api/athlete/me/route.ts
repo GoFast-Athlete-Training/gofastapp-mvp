@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
-import { deleteAthleteAccount, getAthleteByFirebaseId } from "@/lib/domain-athlete";
+import { deleteAthleteAccount } from "@/lib/domain-athlete";
+import { prisma } from "@/lib/prisma";
 import { touchAthleteLastSeen } from "@/lib/touch-athlete-last-seen";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 
@@ -15,7 +16,10 @@ export async function GET(request: Request) {
 
   try {
     const decoded = await adminAuth.verifyIdToken(authHeader.substring(7));
-    const athlete = await getAthleteByFirebaseId(decoded.uid);
+    const athlete = await prisma.athlete.findUnique({
+      where: { firebaseId: decoded.uid },
+      select: { id: true },
+    });
     if (!athlete) {
       return NextResponse.json({ success: false, error: "Athlete not found" }, { status: 404 });
     }
