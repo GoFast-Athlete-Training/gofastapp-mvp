@@ -87,7 +87,7 @@ export function derivePaceForPaceStatus(
   if (hasPaceForPaceComparison(perf, workout)) {
     return {
       status: "PACE_FOR_PACE_AVAILABLE",
-      message: perf.executionHeadline ?? perf.scorecard.workEffort?.summary,
+      message: perf.executionHeadline ?? perf.scorecard.workEffort?.summary ?? null,
       failureReason: null,
     };
   }
