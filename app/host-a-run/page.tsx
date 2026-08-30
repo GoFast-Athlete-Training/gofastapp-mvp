@@ -68,9 +68,9 @@ export default function HostARunPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-w-0">
         <AthleteSidebar />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
             <Link
               href="/gorun"

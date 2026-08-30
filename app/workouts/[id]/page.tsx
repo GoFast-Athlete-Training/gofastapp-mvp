@@ -1818,9 +1818,9 @@ export default function WorkoutDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <TopNav />
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-w-0">
           <AthleteSidebar />
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto" />
@@ -1836,9 +1836,9 @@ export default function WorkoutDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <TopNav />
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-w-0">
           <AthleteSidebar />
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
               <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
                 <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -1989,9 +1989,9 @@ export default function WorkoutDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-w-0">
         <AthleteSidebar />
-        <main className="flex-1 overflow-y-auto relative">
+        <main className="flex-1 overflow-y-auto relative min-w-0 pb-24 lg:pb-0">
       {/* Post-create success */}
       {showCreatedBanner && (
         <div

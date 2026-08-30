@@ -67,20 +67,20 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
           </div>
 
           {/* Right: Home, Workouts, Settings, Profile & Actions */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Home Icon */}
+          <div className="flex items-center gap-1 sm:gap-3">
+            {/* Home — desktop/top redundancy; mobile uses bottom nav */}
             <Link
               href="/athlete-home"
-              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
+              className="hidden sm:inline-flex p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
               title="Home"
             >
               <Home className="h-5 w-5" />
             </Link>
 
-            {/* Performance / workout log hub */}
+            {/* Performance / workout log hub — also in mobile More menu */}
             <Link
               href="/performance"
-              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
+              className="hidden sm:inline-flex p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
               title="Performance"
             >
               <Calendar className="h-5 w-5" />

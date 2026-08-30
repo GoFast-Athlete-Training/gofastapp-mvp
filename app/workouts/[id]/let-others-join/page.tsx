@@ -56,9 +56,9 @@ export default function BuildARunPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <TopNav />
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-w-0">
           <AthleteSidebar />
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
             <div className="max-w-4xl mx-auto px-4 py-12 text-center">
               <div className="animate-spin rounded-full h-10 w-10 border-2 border-orange-500 border-t-transparent mx-auto" />
             </div>
@@ -72,9 +72,9 @@ export default function BuildARunPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <TopNav />
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-w-0">
           <AthleteSidebar />
-          <main className="flex-1 overflow-y-auto px-4 py-8">
+          <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0 px-4 py-8">
             <p className="text-red-700">{loadError || "Workout not found"}</p>
             <Link href="/workouts" className="mt-4 inline-block text-sky-700 font-medium">
               Back to workouts
@@ -88,9 +88,9 @@ export default function BuildARunPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-w-0">
         <AthleteSidebar />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
             <button
               type="button"
