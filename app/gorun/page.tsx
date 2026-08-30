@@ -6,15 +6,7 @@ import Link from 'next/link';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import TopNav from '@/components/shared/TopNav';
 import api from '@/lib/api';
-import { MapPin, Calendar, Clock, Trophy, HelpCircle } from 'lucide-react';
-
-type HubRunRow = {
-  id: string;
-  title: string;
-  date: string;
-  city: string;
-  runClub?: { slug: string; name: string } | null;
-};
+import { MapPin, Calendar, Clock } from 'lucide-react';
 
 interface Run {
   id: string;
@@ -49,9 +41,6 @@ function GoRunPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [runs, setRuns] = useState<Run[]>([]);
-  const [myGoingRuns, setMyGoingRuns] = useState<HubRunRow[]>([]);
-  const [myPastRuns, setMyPastRuns] = useState<HubRunRow[]>([]);
-  const [confirmingRunId, setConfirmingRunId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [cityFilter, setCityFilter] = useState<string>('');
   const [dayFilter, setDayFilter] = useState<string>('');
@@ -75,8 +64,6 @@ function GoRunPageContent() {
     const athleteId = LocalStorageAPI.getAthleteId();
     if (!athleteId) {
       console.warn('// REDIRECT DISABLED: /signup');
-      setMyGoingRuns([]);
-      setMyPastRuns([]);
       setRuns([]);
       setAvailableCities([]);
       setAvailableDays([]);
@@ -97,28 +84,10 @@ function GoRunPageContent() {
         params.append('runClubSlug', runClubSlug);
       }
 
-      const [runsRes, goingRes, pastRes] = await Promise.allSettled([
-        api.get(`/runs?${params.toString()}`),
-        api.get('/me/my-going-runs'),
-        api.get('/me/my-past-runs'),
-      ]);
+      const runsRes = await api.get(`/runs?${params.toString()}`);
 
-      if (goingRes.status === 'fulfilled') {
-        const list = goingRes.value.data?.runs;
-        setMyGoingRuns(Array.isArray(list) ? list : []);
-      } else {
-        setMyGoingRuns([]);
-      }
-
-      if (pastRes.status === 'fulfilled') {
-        const list = pastRes.value.data?.runs;
-        setMyPastRuns(Array.isArray(list) ? list : []);
-      } else {
-        setMyPastRuns([]);
-      }
-
-      if (runsRes.status === 'fulfilled' && runsRes.value.data?.success) {
-        const fetchedRuns = runsRes.value.data.runs || [];
+      if (runsRes.data?.success) {
+        const fetchedRuns = runsRes.data.runs || [];
         setRuns(fetchedRuns);
 
         const cities: string[] = [...new Set(fetchedRuns.map((r: Run) => r.citySlug))].sort() as string[];
@@ -140,13 +109,6 @@ function GoRunPageContent() {
         setAvailableDays(sortedDays);
       } else {
         setRuns([]);
-        if (runsRes.status === 'rejected') {
-          console.error('Error fetching runs:', runsRes.reason);
-          const err = runsRes.reason as { response?: { status?: number } };
-          if (err?.response?.status === 401) {
-            console.warn('// REDIRECT DISABLED: /signup');
-          }
-        }
       }
     } catch (error: unknown) {
       console.error('Error loading run hub:', error);
@@ -178,29 +140,6 @@ function GoRunPageContent() {
     );
   }
 
-  const formatHubRunDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-
-  const confirmIRan = async (runId: string, runClubSlug?: string | null) => {
-    setConfirmingRunId(runId);
-    try {
-      await api.post(`/runs/${runId}/checkin`, {});
-      if (runClubSlug) {
-        router.push(`/runclub/${runClubSlug}`);
-        return;
-      }
-      router.push('/runner');
-    } catch (e) {
-      console.error('Run hub: check-in failed', e);
-    } finally {
-      setConfirmingRunId(null);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNav />
@@ -208,14 +147,14 @@ function GoRunPageContent() {
         <div className="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Discover runs</h1>
-            <p className="text-gray-600">Find club runs near you. Your loyalty door is on Runner.</p>
+            <p className="text-gray-600">Find runs near you — club, hosted, and crew meetups.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
               href="/runner"
               className="inline-flex items-center justify-center shrink-0 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
             >
-              Runner →
+              My run agenda →
             </Link>
             <Link
               href="/host-a-run"
@@ -224,92 +163,6 @@ function GoRunPageContent() {
               Host a public run
             </Link>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <section aria-labelledby="your-runs-heading" className="min-w-0 flex flex-col">
-            <h2 id="your-runs-heading" className="text-lg font-bold text-sky-900 mb-3">
-              Upcoming runs
-            </h2>
-            {myGoingRuns.length > 0 ? (
-              <div className="space-y-4 flex-1">
-                {myGoingRuns.map((r) => (
-                  <div
-                    key={r.id}
-                    className="rounded-xl border-2 border-sky-200 bg-sky-50/80 p-5 shadow-sm flex flex-col gap-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">You&apos;re going</p>
-                      <p className="mt-1 font-semibold text-gray-900 leading-snug">{r.title}</p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {formatHubRunDate(r.date)}
-                        {r.city ? ` · ${r.city}` : ''}
-                      </p>
-                    </div>
-                    <Link
-                      href={r.runClub?.slug ? `/runclub/${r.runClub.slug}` : `/gorun/${r.id}`}
-                      className="inline-flex shrink-0 items-center justify-center rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-sky-700"
-                    >
-                      {r.runClub?.slug ? 'Club home →' : 'Run details →'}
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border-2 border-dashed border-sky-200 bg-sky-50/40 p-6 text-center flex-1 flex flex-col justify-center">
-                <p className="text-gray-700 font-medium">No upcoming runs yet</p>
-                <p className="text-sm text-gray-600 mt-1">Find a meetup and RSVP — it&apos;ll show up here.</p>
-                <a
-                  href="#discover"
-                  className="mt-4 inline-flex items-center justify-center rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-sky-700"
-                >
-                  Discover runs →
-                </a>
-              </div>
-            )}
-          </section>
-
-          <section aria-labelledby="did-you-run-heading" className="min-w-0 flex flex-col">
-            <h2 id="did-you-run-heading" className="text-lg font-bold text-orange-900 mb-1 flex items-center gap-2">
-              <HelpCircle className="h-5 w-5 text-orange-600 shrink-0" aria-hidden />
-              Did you show up?
-            </h2>
-            <p className="text-sm text-gray-600 mb-3">Within 24h after a run you RSVPed for — confirm you were there.</p>
-            {myPastRuns.length > 0 ? (
-              <div className="space-y-4 flex-1">
-                {myPastRuns.map((r) => (
-                  <div
-                    key={r.id}
-                    className="rounded-xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm flex flex-col gap-3"
-                  >
-                    <div className="flex gap-3 min-w-0">
-                      <Trophy className="h-9 w-9 shrink-0 text-orange-500" aria-hidden />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-900 leading-snug">{r.title}</p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {formatHubRunDate(r.date)}
-                          {r.city ? ` · ${r.city}` : ''}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={confirmingRunId !== null}
-                      onClick={() => void confirmIRan(r.id, r.runClub?.slug)}
-                      className="inline-flex shrink-0 items-center justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-60"
-                    >
-                      {confirmingRunId === r.id ? 'Saving…' : 'Were you there? →'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border-2 border-dashed border-orange-200 bg-orange-50/40 p-6 text-center flex-1 flex flex-col justify-center">
-                <p className="text-gray-700 font-medium">Nothing waiting for you</p>
-                <p className="text-sm text-gray-600 mt-1">When a run you RSVPed for just finished, confirm here — then head to your club.</p>
-              </div>
-            )}
-          </section>
         </div>
 
         {/* RunClub Filter Banner */}
