@@ -27,7 +27,7 @@ export default function GoFastWithMePlanStripSection({
     <div className="space-y-3">
       <div className="px-1">
         <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-          Join me
+          My Training
         </h2>
         <p className="text-xs text-gray-500 mt-1">
           {isHost

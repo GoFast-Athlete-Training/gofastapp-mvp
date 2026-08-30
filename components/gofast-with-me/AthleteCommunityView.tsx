@@ -15,11 +15,8 @@ import {
   parseAthleteCommunitySection,
 } from '@/lib/gofast-with-me/athlete-community-routes';
 import { applyFollowerPreviewMode } from '@/lib/gofast-with-me/athlete-community-access';
-import { composeCommunityFeed } from '@/lib/gofast-with-me/community-feed';
 import TopNav from '@/components/shared/TopNav';
-import AthleteCommunityFeed from '@/components/gofast-with-me/AthleteCommunityFeed';
-import AthleteCommunityDurableChrome from '@/components/gofast-with-me/AthleteCommunityDurableChrome';
-import AthleteCommunityHubStubs from '@/components/gofast-with-me/AthleteCommunityHubStubs';
+import AthleteCommunitySections from '@/components/gofast-with-me/AthleteCommunitySections';
 import AthleteCommunityProfilePanel from '@/components/gofast-with-me/AthleteCommunityProfilePanel';
 import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
 
@@ -106,22 +103,6 @@ export default function AthleteCommunityView({ handle }: Props) {
   }, [community, handle]);
 
   const firstName = community?.host.firstName?.trim() || displayName;
-  const updateMessages = useMemo(
-    () => community?.messages.filter((m) => m.topic === 'updates') ?? [],
-    [community?.messages]
-  );
-
-  const feedItems = useMemo(() => {
-    if (!community) return [];
-    return composeCommunityFeed({
-      updateMessages,
-      tips: community.tips,
-      runRoutes: community.runRoutes ?? [],
-      workoutStories: community.workoutStories ?? [],
-      activityPosts: community.activityPosts ?? [],
-      upcomingRuns: community.upcomingRuns,
-    });
-  }, [community, updateMessages]);
 
   const handleFollow = async () => {
     setActionLoading(true);
@@ -227,7 +208,7 @@ export default function AthleteCommunityView({ handle }: Props) {
       <TopNav showBack backUrl={publicLandingUrl} backLabel="Public page" />
 
       <header className="bg-white shadow-sm border-b shrink-0">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {profileTrigger}
 
@@ -292,7 +273,7 @@ export default function AthleteCommunityView({ handle }: Props) {
         </div>
       </header>
 
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-24">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24">
         {error ? (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {error}
@@ -314,7 +295,7 @@ export default function AthleteCommunityView({ handle }: Props) {
                 className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
               >
                 <X className="h-4 w-4" aria-hidden />
-                Back to feed
+                Back to hub
               </button>
             </div>
             <GoFastWithMeHubFeed
@@ -330,26 +311,12 @@ export default function AthleteCommunityView({ handle }: Props) {
           </div>
         ) : (
           <div className="space-y-6">
-            <AthleteCommunityDurableChrome
+            <AthleteCommunitySections
               community={community}
               firstName={firstName}
               displayAsOwner={displayAsOwner}
+              previewFollower={previewFollower}
               hasTrainingFor={hasTrainingFor}
-            />
-
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">Feed</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Activities, daily logs, tips, and runs from {firstName}.
-              </p>
-            </div>
-
-            <AthleteCommunityFeed items={feedItems} hostFirstName={firstName} />
-
-            <AthleteCommunityHubStubs
-              community={community}
-              firstName={firstName}
-              displayAsOwner={displayAsOwner}
             />
 
             {!displayAsOwner && !displayAsFollower && !previewFollower ? (
@@ -396,7 +363,7 @@ export default function AthleteCommunityView({ handle }: Props) {
 
       {!chatterOpen ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-          <div className="max-w-2xl mx-auto px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={openChatter}

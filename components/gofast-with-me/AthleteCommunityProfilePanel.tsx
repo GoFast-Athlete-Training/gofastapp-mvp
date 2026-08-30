@@ -80,7 +80,7 @@ export default function AthleteCommunityProfilePanel({
           />
         ) : (
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-gray-900">Join me</h2>
+            <h2 className="text-lg font-bold text-gray-900">My Training</h2>
             <p className="text-sm text-gray-600 mt-2">
               {displayAsOwner
                 ? 'Publish your plan in Runs & Training so followers can train with you here.'

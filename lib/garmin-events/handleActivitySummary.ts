@@ -13,6 +13,7 @@ import { promoteUnmatchedRunningActivityToWorkout } from '../training/promote-ac
 import { tryMatchActivityToBikeWorkout } from '../training/match-activity-to-bike-workout';
 import { isCyclingActivityType } from '../training/activity-type-sets';
 import { sendAppNotification } from '../app-notifications/send';
+import { isGenericGarminActivityName } from './generic-activity-names';
 
 function generateId(): string {
   const timestamp = Date.now().toString(36);
@@ -111,6 +112,15 @@ export async function handleActivitySummary(
       }
 
       if (await activityExists(sourceActivityId)) {
+        skipped++;
+        continue;
+      }
+
+      if (isGenericGarminActivityName(activity.activityName)) {
+        console.warn('⚠️ Skipped generic Garmin sample activity', {
+          sourceActivityId,
+          activityName: activity.activityName,
+        });
         skipped++;
         continue;
       }

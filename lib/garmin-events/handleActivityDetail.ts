@@ -17,6 +17,7 @@ import { tryMatchActivityToTrainingWorkout } from "../training/match-activity-to
 import { tryMatchActivityToBikeWorkout } from "../training/match-activity-to-bike-workout";
 import { promoteUnmatchedRunningActivityToWorkout } from "../training/promote-activity-to-workout";
 import { extractActivityRouteFromDetail } from "../training/activity-route-from-detail";
+import { isGenericGarminActivityName } from "./generic-activity-names";
 
 function detailPersistData(detail: object) {
   const route = extractActivityRouteFromDetail(detail);
@@ -267,6 +268,17 @@ export async function handleActivityDetail(
             : typeof detail.activityName === "string"
               ? detail.activityName
               : undefined;
+
+        if (isGenericGarminActivityName(activityName)) {
+          console.warn("⚠️ Detail fallback skipped: generic Garmin sample activity", {
+            activityIds: ids,
+            sourceActivityId,
+            activityName,
+          });
+          skipped++;
+          continue;
+        }
+
         const now = new Date();
 
         const created = await prisma.athlete_activities.create({

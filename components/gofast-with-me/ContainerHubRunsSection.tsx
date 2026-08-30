@@ -14,11 +14,11 @@ export default function ContainerHubRunsSection({ runs, hostFirstName, isHost }:
   return (
     <section id="goruns" className="space-y-4">
       <div className="px-1">
-        <h2 className="text-lg font-bold text-gray-900">Runs</h2>
+        <h2 className="text-lg font-bold text-gray-900">Join Me on a Run</h2>
         <p className="text-sm text-gray-500 mt-1">
           {isHost
-            ? 'Runs you are hosting for your audience — followers RSVP through GoRun.'
-            : `Join ${hostFirstName} in real life — RSVP to upcoming hosted runs.`}
+            ? 'Hosted runs followers can join — RSVPs go through GoRun.'
+            : `Join ${hostFirstName} on an upcoming hosted run.`}
         </p>
       </div>
 
@@ -60,17 +60,9 @@ export default function ContainerHubRunsSection({ runs, hostFirstName, isHost }:
         <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5">
           <p className="text-sm text-gray-600">
             {isHost
-              ? 'No upcoming hosted runs yet. Create one from Runs in your studio to invite followers.'
-              : `${hostFirstName} has not scheduled a joinable run yet.`}
+              ? 'No hosted runs available yet.'
+              : 'No hosted runs available yet.'}
           </p>
-          {isHost ? (
-            <Link
-              href="/gofast-with-others"
-              className="mt-3 inline-flex rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-            >
-              Open studio — Runs
-            </Link>
-          ) : null}
         </div>
       )}
     </section>
