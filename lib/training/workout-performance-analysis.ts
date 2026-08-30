@@ -887,7 +887,7 @@ export function computeWorkoutPerformanceAnalysis(
     hasSegmentLaps,
   });
 
-  let analysisMode: AnalysisMode;
+  let analysisMode: AnalysisMode = "completion_only";
   if (hasPrescribedSegmentComparison || canCompareWholeRun || hasSegmentLaps || hasSegmentActuals) {
     analysisMode = "detail";
   } else if (
