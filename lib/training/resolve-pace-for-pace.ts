@@ -8,6 +8,7 @@ import { tryMatchActivityToTrainingWorkout } from "./match-activity-to-workout";
 import {
   loadWorkoutForAnalysis,
   resolveWorkoutIdFromActivity,
+  type LoadedWorkoutForAnalysis,
 } from "./load-workout-analysis";
 import {
   derivePaceForPaceStatus,
@@ -36,10 +37,8 @@ export type ResolvePaceForPaceResult =
       activityId: string | null;
       paceForPaceStatus: PaceForPaceStatus;
       message: string | null;
-      performanceAnalysis: Awaited<
-        ReturnType<typeof loadWorkoutForAnalysis>
-      >["performanceAnalysis"];
-      workout: Awaited<ReturnType<typeof loadWorkoutForAnalysis>>["workout"];
+      performanceAnalysis: LoadedWorkoutForAnalysis["performanceAnalysis"];
+      workout: LoadedWorkoutForAnalysis["workout"];
     }
   | {
       ok: false;
@@ -70,7 +69,9 @@ async function loadMatchCandidatesForWorkout(params: {
   });
   if (!workout) return [];
 
-  const { start, end } = workoutMatchCandidateUtcRange(workout.date);
+  const range = workoutMatchCandidateUtcRange(workout.date);
+  if (!range) return [];
+  const { start, end } = range;
   const activities = await prisma.athlete_activities.findMany({
     where: {
       athleteId: params.athleteId,

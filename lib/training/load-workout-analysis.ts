@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import {
   computeWorkoutPerformanceAnalysis,
   type PerformanceAnalysisWorkoutInput,
@@ -33,18 +34,20 @@ const workoutAnalysisInclude = {
   },
 } as const;
 
-export type LoadedWorkoutForAnalysis = Awaited<
-  ReturnType<typeof loadWorkoutForAnalysis>
->;
+export type WorkoutWithAnalysis = Prisma.workoutsGetPayload<{
+  include: typeof workoutAnalysisInclude;
+}>;
+
+export type LoadedWorkoutForAnalysis = {
+  workout: WorkoutWithAnalysis;
+  analysisInput: PerformanceAnalysisWorkoutInput;
+  performanceAnalysis: WorkoutPerformanceAnalysis;
+};
 
 export async function loadWorkoutForAnalysis(params: {
   workoutId: string;
   athleteId: string;
-}): Promise<{
-  workout: NonNullable<Awaited<ReturnType<typeof prisma.workouts.findFirst>>>;
-  analysisInput: PerformanceAnalysisWorkoutInput;
-  performanceAnalysis: WorkoutPerformanceAnalysis;
-} | null> {
+}): Promise<LoadedWorkoutForAnalysis | null> {
   const workout = await prisma.workouts.findFirst({
     where: { id: params.workoutId, athleteId: params.athleteId },
     include: workoutAnalysisInclude,
