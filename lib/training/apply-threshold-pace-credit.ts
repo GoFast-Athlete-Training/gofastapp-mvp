@@ -6,7 +6,13 @@
 import { prisma } from "@/lib/prisma";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 
-const MAX_ADJUST_SEC_PER_WORKOUT = 12;
+import {
+  ADAPTIVE_PERFORMANCE_CONFIG,
+} from "@/lib/training/adaptive-performance-config";
+
+const MAX_ADJUST_SEC_PER_WORKOUT =
+  ADAPTIVE_PERFORMANCE_CONFIG.paceNudgeBands[ADAPTIVE_PERFORMANCE_CONFIG.paceNudgeBands.length - 1]
+    .nudgeSecPerMile;
 /** Minimum cushion: threshold pace must be at least this many sec/mi slower than stored 5K. */
 export const MIN_THRESHOLD_ABOVE_FIVEK_SEC = 10;
 

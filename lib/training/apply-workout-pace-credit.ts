@@ -8,7 +8,11 @@ import { prisma } from "@/lib/prisma";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { syncAthleteFiveKPaceToActivePlan } from "@/lib/training/plan-lifecycle";
 
-const MAX_ADJUST_SEC = 10;
+import {
+  ADAPTIVE_PERFORMANCE_CONFIG,
+} from "@/lib/training/adaptive-performance-config";
+
+const MAX_ADJUST_SEC = ADAPTIVE_PERFORMANCE_CONFIG.paceNudgeBands[2].nudgeSecPerMile;
 
 function secondsPerMileToPaceString(sec: number): string {
   const minutes = Math.floor(sec / 60);

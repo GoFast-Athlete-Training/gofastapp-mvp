@@ -4,18 +4,11 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { formatCompanyUser } from '@/lib/format-company-user';
-
-// CORS headers for GoFastCompany HQ
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://gofasthq.gofastcrushgoals.com',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-};
+import { companyAdminCorsHeaders } from '@/lib/company-admin-cors';
 
 // Handle OPTIONS preflight request
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+export async function OPTIONS(request: Request) {
+  return NextResponse.json({}, { headers: companyAdminCorsHeaders(request) });
 }
 
 /**
@@ -25,6 +18,7 @@ export async function OPTIONS() {
  * Called by GoFastCompany HQ for user management.
  */
 export async function GET(request: Request) {
+  const corsHeaders = companyAdminCorsHeaders(request);
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {

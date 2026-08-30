@@ -51,11 +51,11 @@ Not called from GET. GET formats Splits from lap deltas already written.
 
 **Show:** total time, avg HR, average pace, **Your splits** (pace + delta per lap), reflection + photo.
 
-**Fail — no detailData (exact copy):**
+**Fail — no lap deltas (soft empty):**
 
-> We failed to get your activity detail and can't show your pace deltas. Please contact app support.
+> Splits aren't available for this run.
 
-**Fail open:** translator could not aim (shape mismatch, OPEN bookends) → say why; do not substitute a summary headline.
+Do not show **Look at my metrics** or contact-support copy on the athlete-facing workout page. Repair stays an admin/hidden path if needed later.
 
 ## Just finished vs Performance tab
 

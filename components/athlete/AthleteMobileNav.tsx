@@ -134,7 +134,7 @@ export default function AthleteMobileNav() {
                         ? 'bg-sky-100 text-sky-900 border border-sky-300'
                         : 'bg-orange-50 text-orange-700 border border-orange-200'
                       : item.id === 'gwm'
-                        ? 'text-sky-800 bg-sky-50 border border-sky-200'
+                        ? 'text-gray-800 hover:bg-gray-50 border border-transparent'
                         : 'text-gray-800 hover:bg-gray-50 border border-transparent'
                   }`}
                 >

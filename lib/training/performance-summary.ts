@@ -1,27 +1,31 @@
 /**
- * Performance tab rollup — active plan week snapshot + pending 5K confirmations.
+ * Performance tab rollup — active plan week snapshot + Where you stand.
  */
 
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
-import {
-  computeFiveKPaceSuggestion,
-  type FiveKPaceSuggestion,
-} from "@/lib/training/workout-pace-performance";
+import { metersToMiles } from "@/lib/pace-utils";
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
 } from "@/lib/training/plan-utils";
+import { buildPlanWeekCards } from "@/lib/training/plan-week-cards";
+import { deriveSessionStatus, sessionStatusLabel } from "@/lib/training/session-status";
 import { loadWeekPerformanceSnapshot } from "@/lib/training/week-performance-metrics";
 import type { WeekPerformanceSnapshot } from "@/lib/training/week-performance-types";
+import {
+  loadWhereYouStandSnapshot,
+  type WhereYouStandSnapshot,
+} from "@/lib/training/where-you-stand";
 
-export type PendingFiveKConfirmation = {
-  workoutId: string;
+export type PerformanceWeekDay = {
+  workoutId: string | null;
+  dateKey: string;
   title: string;
-  date: string | null;
   workoutType: string;
-  suggestion: FiveKPaceSuggestion;
+  status: string;
+  statusLabel: string;
+  paceDeltaSecPerMile: number | null;
 };
 
 export type PerformanceSummary = {
@@ -29,118 +33,129 @@ export type PerformanceSummary = {
   planName: string | null;
   weekNumber: number | null;
   weekPerformance: WeekPerformanceSnapshot | null;
+  weekDays: PerformanceWeekDay[];
+  whereYouStand: WhereYouStandSnapshot | null;
+  /** @deprecated Use whereYouStand.fiveK */
   currentFiveKPace: string | null;
-  pendingFiveKConfirmations: PendingFiveKConfirmation[];
 };
 
 export async function loadPerformanceSummary(
   athleteId: string
 ): Promise<PerformanceSummary> {
-  const [athlete, activePlan] = await Promise.all([
-    prisma.athlete.findUnique({
-      where: { id: athleteId },
-      select: { fiveKPace: true },
-    }),
-    prisma.training_plans.findFirst({
-      where: { athleteId, lifecycleStatus: TrainingPlanLifecycle.ACTIVE },
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        startDate: true,
-        totalWeeks: true,
-        race_registry: { select: { raceDate: true } },
-      },
-    }),
-  ]);
+  const athlete = await prisma.athlete.findUnique({
+    where: { id: athleteId },
+    select: { fiveKPace: true },
+  });
 
-  let weekPerformance: WeekPerformanceSnapshot | null = null;
-  let weekNumber: number | null = null;
-
-  if (activePlan) {
-    const effectiveWeeks = effectiveTrainingWeekCount(
-      activePlan.startDate,
-      activePlan.totalWeeks,
-      activePlan.race_registry?.raceDate ?? null
-    );
-    weekNumber = currentTrainingWeekNumber(activePlan.startDate, effectiveWeeks);
-    weekPerformance = await loadWeekPerformanceSnapshot({
-      planId: activePlan.id,
-      athleteId,
-      planStartDate: activePlan.startDate,
-      weekNumber,
-      storedTotalWeeks: activePlan.totalWeeks,
-      raceDate: activePlan.race_registry?.raceDate ?? null,
-    });
-  }
-
-  let currentFiveKSecPerMile: number | null = null;
-  try {
-    if (athlete?.fiveKPace?.trim()) {
-      currentFiveKSecPerMile = parsePaceToSecondsPerMile(athlete.fiveKPace.trim());
-    }
-  } catch {
-    currentFiveKSecPerMile = null;
-  }
-
-  const pendingRows = await prisma.workouts.findMany({
-    where: {
-      athleteId,
-      matchedActivityId: { not: null },
-      workoutType: { in: ["Intervals", "Race"] },
-      creditedFiveKPaceSecPerMile: { not: null },
-    },
-    orderBy: [{ date: "desc" }, { updatedAt: "desc" }],
-    take: 10,
+  const activePlan = await prisma.training_plans.findFirst({
+    where: { athleteId, lifecycleStatus: TrainingPlanLifecycle.ACTIVE },
+    orderBy: { updatedAt: "desc" },
     select: {
       id: true,
-      title: true,
-      date: true,
-      workoutType: true,
-      actualAvgPaceSecPerMile: true,
-      paceDeltaSecPerMile: true,
-      creditedFiveKPaceSecPerMile: true,
-      workout_catalogue: {
-        select: { workBasePaceOffsetSecPerMile: true },
-      },
-      segments: {
-        select: {
-          segment_laps: { select: { paceDeltaSecPerMile: true } },
-        },
+      name: true,
+      startDate: true,
+      totalWeeks: true,
+      planSchedule: true,
+      goalRaceTime: true,
+      race_registry: {
+        select: { raceDate: true, name: true, distanceMeters: true },
       },
     },
   });
 
-  const pendingFiveKConfirmations: PendingFiveKConfirmation[] = [];
-  for (const row of pendingRows) {
-    const lapDeltas = row.segments.flatMap((s) =>
-      s.segment_laps
-        .map((l) => l.paceDeltaSecPerMile)
-        .filter((d): d is number => d != null && Number.isFinite(d))
+  let weekPerformance: WeekPerformanceSnapshot | null = null;
+  let weekNumber: number | null = null;
+  let weekDays: PerformanceWeekDay[] = [];
+  let whereYouStand: WhereYouStandSnapshot | null = null;
+
+  if (activePlan) {
+    const race = activePlan.race_registry;
+    const raceDistanceMiles =
+      race?.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
+        ? metersToMiles(Number(race.distanceMeters))
+        : null;
+
+    const effectiveWeeks = effectiveTrainingWeekCount(
+      activePlan.startDate,
+      activePlan.totalWeeks,
+      race?.raceDate ?? null
     );
-    const avgLapDelta =
-      lapDeltas.length > 0
-        ? Math.round(lapDeltas.reduce((a, b) => a + b, 0) / lapDeltas.length)
-        : row.paceDeltaSecPerMile;
+    weekNumber = currentTrainingWeekNumber(activePlan.startDate, effectiveWeeks);
 
-    const suggestion = computeFiveKPaceSuggestion({
-      workoutType: row.workoutType,
-      paceSecPerMile: row.actualAvgPaceSecPerMile,
-      paceDeltaSecPerMile: avgLapDelta,
-      currentFiveKSecPerMile,
-      intervalsCatalogueOffsetSecPerMile:
-        row.workout_catalogue?.workBasePaceOffsetSecPerMile ?? null,
-    });
+    const [wp, cards, stand] = await Promise.all([
+      loadWeekPerformanceSnapshot({
+        planId: activePlan.id,
+        athleteId,
+        planStartDate: activePlan.startDate,
+        weekNumber,
+        storedTotalWeeks: activePlan.totalWeeks,
+        raceDate: race?.raceDate ?? null,
+      }),
+      buildPlanWeekCards({
+        planId: activePlan.id,
+        athleteId,
+        planStartDate: activePlan.startDate,
+        planSchedule: activePlan.planSchedule,
+        weekNumber,
+        storedTotalWeeks: activePlan.totalWeeks,
+        raceDate: race?.raceDate ?? null,
+        raceName: race?.name ?? null,
+        raceDistanceMiles,
+      }),
+      loadWhereYouStandSnapshot({
+        athleteId,
+        planId: activePlan.id,
+        planStartDate: activePlan.startDate,
+        weekNumber,
+        storedTotalWeeks: activePlan.totalWeeks,
+        raceDate: race?.raceDate ?? null,
+        raceDistanceMiles,
+        raceName: race?.name ?? null,
+        goalRaceTime: activePlan.goalRaceTime,
+      }),
+    ]);
 
-    if (suggestion.eligible && suggestion.suggestedFiveKSecPerMile != null) {
-      pendingFiveKConfirmations.push({
-        workoutId: row.id,
-        title: row.title,
-        date: row.date?.toISOString() ?? null,
-        workoutType: row.workoutType,
-        suggestion,
+    weekPerformance = wp;
+    whereYouStand = stand;
+
+    const workoutIds = cards
+      .map((c) => c.workoutId)
+      .filter((id): id is string => id != null);
+
+    const paceDeltaByWorkoutId = new Map<string, number | null>();
+    if (workoutIds.length > 0) {
+      const instances = await prisma.workouts.findMany({
+        where: { id: { in: workoutIds }, athleteId },
+        select: { id: true, paceDeltaSecPerMile: true },
       });
+      for (const w of instances) {
+        paceDeltaByWorkoutId.set(w.id, w.paceDeltaSecPerMile);
+      }
     }
+
+    weekDays = cards
+      .filter((c) => c.workoutType !== "Rest" && c.title !== "Rest")
+      .map((c) => {
+        const status = deriveSessionStatus({
+          dateKey: c.dateKey,
+          matchedActivityId: c.matchedActivityId,
+          skippedAt: c.skippedAt,
+          workoutType: c.workoutType,
+          title: c.title,
+        });
+        return {
+          workoutId: c.workoutId,
+          dateKey: c.dateKey,
+          title: c.title,
+          workoutType: c.workoutType,
+          status,
+          statusLabel: sessionStatusLabel(status),
+          paceDeltaSecPerMile:
+            c.workoutId != null
+              ? paceDeltaByWorkoutId.get(c.workoutId) ?? null
+              : null,
+        };
+      });
   }
 
   return {
@@ -148,7 +163,8 @@ export async function loadPerformanceSummary(
     planName: activePlan?.name ?? null,
     weekNumber,
     weekPerformance,
+    weekDays,
+    whereYouStand,
     currentFiveKPace: athlete?.fiveKPace ?? null,
-    pendingFiveKConfirmations,
   };
 }

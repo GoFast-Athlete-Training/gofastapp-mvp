@@ -107,7 +107,7 @@ export function derivePaceForPaceStatus(
   const reason =
     perf.paceForPaceError ??
     perf.completionOnlyMessage ??
-    "Look at my metrics to generate your splits.";
+    "Splits aren't available.";
 
   return {
     status: "MATCHED_ANALYSIS_NOT_GENERATED",

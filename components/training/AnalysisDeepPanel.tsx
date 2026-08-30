@@ -172,10 +172,8 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
       </div>
 
       <PaceForPacePanel
-        workoutId={workout.id}
         matchedActivityId={workout.matchedActivityId}
         performanceAnalysis={performanceAnalysis}
-        onAnalysisUpdated={setPerformanceAnalysis}
       />
 
       <div className="flex flex-wrap gap-2">

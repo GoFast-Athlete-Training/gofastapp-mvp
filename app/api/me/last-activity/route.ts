@@ -1,10 +1,29 @@
+/**
+ * GET /api/me/last-activity — newest real session (not junk Sample Activity when real runs exist).
+ */
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
 
-/** GET /api/me/last-activity — most recent synced activity by start time (chronological last run) */
+const GENERIC_NAME_RE = /^(sample|sample activity)$/i;
+
+function isRealSession(row: {
+  distance: number | null;
+  duration: number | null;
+}): boolean {
+  const hasDistance = row.distance != null && row.distance > 0;
+  const hasDuration = row.duration != null && row.duration > 0;
+  return hasDistance || hasDuration;
+}
+
+function isGenericName(name: string | null | undefined): boolean {
+  const raw = name?.trim();
+  if (!raw) return true;
+  return GENERIC_NAME_RE.test(raw);
+}
+
 export async function GET(_request: Request) {
   const auth = await requireAthleteFromBearer(_request);
   if ("error" in auth) {
@@ -12,12 +31,13 @@ export async function GET(_request: Request) {
   }
 
   try {
-    const row = await prisma.athlete_activities.findFirst({
+    const rows = await prisma.athlete_activities.findMany({
       where: {
         athleteId: auth.athlete.id,
         startTime: { not: null },
       },
       orderBy: { startTime: "desc" },
+      take: 20,
       select: {
         id: true,
         activityName: true,
@@ -28,6 +48,10 @@ export async function GET(_request: Request) {
         matched_workout: { select: { id: true } },
       },
     });
+
+    const realSessions = rows.filter(isRealSession);
+    const nonGeneric = realSessions.filter((r) => !isGenericName(r.activityName));
+    const row = nonGeneric[0] ?? realSessions[0] ?? rows[0] ?? null;
 
     if (!row) {
       return NextResponse.json({ activity: null });

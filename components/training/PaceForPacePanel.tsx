@@ -1,15 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import api from "@/lib/api";
 import type {
   PhaseAwareLapRow,
   WorkoutPerformanceAnalysis,
 } from "@/lib/training/workout-performance-analysis";
-import {
-  formatPaceTargetRangeDisplay,
-} from "@/lib/training/pace-comparison-display";
-import { NO_DETAIL_SUPPORT_MESSAGE } from "@/lib/training/workout-pace-analyzer";
+import { formatPaceTargetRangeDisplay } from "@/lib/training/pace-comparison-display";
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
   if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
@@ -82,68 +77,16 @@ function SplitBar({ lap }: { lap: PhaseAwareLapRow }) {
 }
 
 type Props = {
-  workoutId: string;
   matchedActivityId?: string | null;
   performanceAnalysis: WorkoutPerformanceAnalysis | null;
-  onAnalysisUpdated?: (analysis: WorkoutPerformanceAnalysis) => void;
 };
 
 export default function PaceForPacePanel({
-  workoutId,
   matchedActivityId,
   performanceAnalysis,
-  onAnalysisUpdated,
 }: Props) {
-  const [analysis, setAnalysis] = useState(performanceAnalysis);
-  const [resolving, setResolving] = useState(false);
-  const [resolveError, setResolveError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setAnalysis(performanceAnalysis);
-  }, [performanceAnalysis]);
-
-  const current = analysis ?? performanceAnalysis;
-  const available = hasLapPaceDeltas(current);
-  const showOffRamp = !available && Boolean(matchedActivityId);
-  const laps = current?.phaseAwareLaps ?? [];
-
-  const handleResolve = useCallback(async () => {
-    setResolving(true);
-    setResolveError(null);
-    try {
-      const res = await api.post<{
-        ok: boolean;
-        message?: string;
-        performanceAnalysis?: WorkoutPerformanceAnalysis;
-      }>("/training/pace-for-pace", {
-        workoutId,
-        activityId: matchedActivityId ?? undefined,
-      });
-      if (!res.data?.ok || !res.data.performanceAnalysis) {
-        setResolveError(res.data?.message ?? NO_DETAIL_SUPPORT_MESSAGE);
-        return;
-      }
-      setAnalysis(res.data.performanceAnalysis);
-      onAnalysisUpdated?.(res.data.performanceAnalysis);
-    } catch (e: unknown) {
-      const msg =
-        e &&
-        typeof e === "object" &&
-        "response" in e &&
-        e.response &&
-        typeof e.response === "object" &&
-        "data" in e.response &&
-        e.response.data &&
-        typeof e.response.data === "object" &&
-        "message" in e.response.data &&
-        typeof (e.response.data as { message: unknown }).message === "string"
-          ? (e.response.data as { message: string }).message
-          : NO_DETAIL_SUPPORT_MESSAGE;
-      setResolveError(msg);
-    } finally {
-      setResolving(false);
-    }
-  }, [workoutId, matchedActivityId, onAnalysisUpdated]);
+  const available = hasLapPaceDeltas(performanceAnalysis);
+  const laps = performanceAnalysis?.phaseAwareLaps ?? [];
 
   if (!matchedActivityId) {
     return (
@@ -169,28 +112,9 @@ export default function PaceForPacePanel({
           </ul>
         </>
       ) : (
-        <>
-          {(current?.paceForPaceError ?? current?.completionOnlyMessage) ? (
-            <p className="mt-3 text-sm text-amber-900">
-              {current?.paceForPaceError ?? current?.completionOnlyMessage}
-            </p>
-          ) : (
-            <p className="mt-3 text-sm text-violet-900">
-              Splits have not been generated for this run yet.
-            </p>
-          )}
-          {resolveError ? <p className="mt-2 text-sm text-red-700">{resolveError}</p> : null}
-          {showOffRamp ? (
-            <button
-              type="button"
-              onClick={() => void handleResolve()}
-              disabled={resolving}
-              className="mt-4 inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-60"
-            >
-              {resolving ? "Analyzing…" : "Look at my metrics"}
-            </button>
-          ) : null}
-        </>
+        <p className="mt-3 text-sm text-violet-900/90">
+          Splits aren&apos;t available for this run.
+        </p>
       )}
     </div>
   );

@@ -16,8 +16,7 @@ import {
   storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
 
-export const NO_DETAIL_SUPPORT_MESSAGE =
-  "We failed to get your activity detail and can't show your pace deltas. Please contact app support.";
+export const NO_DETAIL_SUPPORT_MESSAGE = "Splits aren't available.";
 
 export type PlannedSegmentRow = {
   id: string;

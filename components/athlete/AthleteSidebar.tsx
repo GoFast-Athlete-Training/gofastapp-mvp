@@ -32,7 +32,12 @@ function healthHubMatch(p: string | null): boolean {
 
 function activityHubMatch(p: string | null): boolean {
   if (!p) return false;
-  return p === "/activities" || p.startsWith("/activities/");
+  return (
+    p === "/activities" ||
+    p.startsWith("/activities/") ||
+    p === "/workouts" ||
+    p.startsWith("/workouts/")
+  );
 }
 
 function performanceHubMatch(p: string | null): boolean {
@@ -160,7 +165,7 @@ export default function AthleteSidebar() {
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-semibold transition-colors ${
                     active
                       ? "bg-sky-100 text-sky-900 border border-sky-300 shadow-sm"
-                      : "text-sky-800 bg-sky-50 border border-sky-200 hover:bg-sky-100"
+                      : "text-gray-700 hover:bg-gray-100 border border-transparent"
                   }`}
                 >
                   <Icon className="h-5 w-5 shrink-0" />

@@ -361,11 +361,8 @@ export function RunHistoryPanel({ rows }: { rows: ActivitySummaryRow[] }) {
 export function AnalysisPanel({ workout }: { workout: LastLoggedWorkout }) {
   const hasPace = workout.paceDeltaSecPerMile != null && Number.isFinite(workout.paceDeltaSecPerMile);
   const hasHr = workout.hrDeltaBpm != null && Number.isFinite(workout.hrDeltaBpm);
-  const hasCredit =
-    workout.creditedFiveKPaceSecPerMile != null &&
-    workout.creditedFiveKPaceSecPerMile > 0;
 
-  if (!hasPace && !hasHr && !hasCredit) {
+  if (!hasPace && !hasHr) {
     return null;
   }
 
@@ -409,16 +406,6 @@ export function AnalysisPanel({ workout }: { workout: LastLoggedWorkout }) {
               : workout.hrDeltaBpm! < 0
                 ? `${Math.abs(workout.hrDeltaBpm!)} bpm above the zone midpoint`
                 : "Right on the zone midpoint"}
-          </p>
-        ) : null}
-        {hasCredit ? (
-          <p className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-emerald-950">
-            <span className="font-semibold">5K pace signal: </span>
-            this effort implies about{" "}
-            <span className="font-bold tabular-nums">
-              {formatSecPerMileDisplay(workout.creditedFiveKPaceSecPerMile)}
-            </span>{" "}
-            /mi at 5K — open the workout to confirm if you want to update your anchor.
           </p>
         ) : null}
       </div>

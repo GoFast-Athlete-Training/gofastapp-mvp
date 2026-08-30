@@ -3,22 +3,17 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Activity, Flag, Share2, LineChart } from "lucide-react";
+import { ArrowLeft, Activity, Flag } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import ActivityRouteMap from "@/components/activities/ActivityRouteMap";
+import ActivityAddStuffPanel from "@/components/activities/ActivityAddStuffPanel";
 import MarkActivityAsRaceSheet from "@/components/races/MarkActivityAsRaceSheet";
-import ShareActivityToHubSheet from "@/components/activities/ShareActivityToHubSheet";
 import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import type { ActivityPostOwnerPayload } from "@/lib/gofast-with-me/activity-posts";
 import { metersToMiDisplay } from "@/lib/training/workout-preview-payload";
-import {
-  formatPaceTargetRangeDisplay,
-  paceRangeDeltaMessage,
-  singleTargetPaceDeltaMessage,
-} from "@/lib/training/pace-comparison-display";
 
 type ActivityPayload = {
   id: string;
@@ -50,28 +45,6 @@ type DerivedLapPayload = {
   avgHeartRate: number | null;
 };
 
-type MatchedWorkoutPayload = {
-  id: string;
-  title: string;
-  workoutType: string;
-  actualDistanceMeters: number | null;
-  actualAvgPaceSecPerMile: number | null;
-  actualDurationSeconds: number | null;
-  paceDeltaSecPerMile: number | null;
-  targetPaceSecPerMile: number | null;
-  targetPaceSecPerMileHigh: number | null;
-  hrDeltaBpm: number | null;
-  creditedFiveKPaceSecPerMile: number | null;
-  segments: Array<{
-    id: string;
-    stepOrder: number;
-    title: string;
-    actualPaceSecPerMile: number | null;
-    actualDistanceMiles: number | null;
-    actualDurationSeconds: number | null;
-  }>;
-};
-
 function formatSecPerMile(sec: number | null | undefined): string {
   if (sec == null || !Number.isFinite(sec) || sec <= 0) return "—";
   const m = Math.floor(sec / 60);
@@ -92,11 +65,9 @@ export default function ActivityDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityPayload | null>(null);
-  const [matched, setMatched] = useState<MatchedWorkoutPayload | null>(null);
   const [derivedLaps, setDerivedLaps] = useState<DerivedLapPayload[]>([]);
   const [hasDetail, setHasDetail] = useState(false);
   const [markRaceOpen, setMarkRaceOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const [hubPost, setHubPost] = useState<ActivityPostOwnerPayload | null>(null);
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -116,7 +87,6 @@ export default function ActivityDetailPage() {
       });
       const json = (await res.json()) as {
         activity?: ActivityPayload;
-        matchedWorkout?: MatchedWorkoutPayload | null;
         derivedLaps?: DerivedLapPayload[];
         hasDetail?: boolean;
         error?: string;
@@ -124,19 +94,16 @@ export default function ActivityDetailPage() {
       if (!res.ok) {
         setError(json.error || "Could not load activity");
         setActivity(null);
-        setMatched(null);
         setDerivedLaps([]);
         setHasDetail(false);
         return;
       }
       setActivity(json.activity ?? null);
-      setMatched(json.matchedWorkout ?? null);
       setDerivedLaps(json.derivedLaps ?? []);
       setHasDetail(json.hasDetail ?? false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load activity");
       setActivity(null);
-      setMatched(null);
     } finally {
       setLoading(false);
     }
@@ -218,13 +185,10 @@ export default function ActivityDetailPage() {
       (activity?.startLatitude != null && activity?.startLongitude != null)
   );
 
-  const segWithActuals =
-    matched?.segments?.filter(
-      (s) =>
-        s.actualPaceSecPerMile != null ||
-        s.actualDistanceMiles != null ||
-        s.actualDurationSeconds != null
-    ) ?? [];
+  const activityLabel =
+    activity?.activityName?.trim() ||
+    activity?.activityType?.replace(/_/g, " ") ||
+    "Activity";
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -351,6 +315,16 @@ export default function ActivityDetailPage() {
                   </div>
                 ) : null}
 
+                {athleteId ? (
+                  <ActivityAddStuffPanel
+                    athleteId={athleteId}
+                    activityId={activityId}
+                    activityLabel={activityLabel}
+                    existingPost={hubPost}
+                    onPublished={(post) => setHubPost(post)}
+                  />
+                ) : null}
+
                 <div className="mb-8">
                   <h2 className="text-base font-semibold text-gray-900 mb-3">Laps</h2>
                   {hasDetail && derivedLaps.length > 0 ? (
@@ -394,140 +368,6 @@ export default function ActivityDetailPage() {
                   )}
                 </div>
 
-                {athleteId ? (
-                  matched ? (
-                    <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-5 mb-6">
-                      <h2 className="text-sm font-semibold text-orange-900">GoFast With Me</h2>
-                      <p className="mt-1 text-sm text-orange-800/90">
-                        Tell your followers how this session felt from your workout page — title,
-                        reflection, and photo live on the build, not the raw activity.
-                      </p>
-                      <Link
-                        href={`/workouts/${encodeURIComponent(matched.id)}`}
-                        className="mt-3 inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-                      >
-                        Open workout &amp; share story
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-5 mb-6">
-                      <h2 className="text-sm font-semibold text-gray-800">GoFast With Me</h2>
-                      <p className="mt-1 text-sm text-gray-600">
-                        Link this activity to a plan workout first, then share your story from the
-                        workout page.
-                      </p>
-                      {hubPost?.isPublished ? (
-                        <p className="mt-2 text-xs text-gray-500">
-                          Legacy activity post is still published — use Remove from hub below if
-                          needed.
-                        </p>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => setShareOpen(true)}
-                        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                      >
-                        <Share2 className="h-4 w-4" aria-hidden />
-                        {hubPost?.isPublished ? 'Manage legacy activity post' : 'Legacy activity share'}
-                      </button>
-                    </div>
-                  )
-                ) : null}
-
-                {matched ? (
-                  <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-6 mb-6">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-emerald-900 mb-1">
-                      Linked plan workout
-                    </h2>
-                    <p className="text-lg font-bold text-gray-900">{matched.title}</p>
-                    <p className="text-sm text-gray-600 capitalize mb-4">
-                      {String(matched.workoutType).toLowerCase()}
-                    </p>
-                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      {matched.targetPaceSecPerMile != null ? (
-                        <div>
-                          <dt className="text-gray-500">Target pace</dt>
-                          <dd className="font-medium text-gray-900 tabular-nums">
-                            {formatPaceTargetRangeDisplay(
-                              matched.targetPaceSecPerMile,
-                              matched.targetPaceSecPerMileHigh
-                            ) ?? formatSecPerMile(matched.targetPaceSecPerMile)}
-                          </dd>
-                        </div>
-                      ) : null}
-                      {matched.actualAvgPaceSecPerMile != null ? (
-                        <div>
-                          <dt className="text-gray-500">Your pace</dt>
-                          <dd className="font-medium text-gray-900 tabular-nums">
-                            {formatSecPerMile(matched.actualAvgPaceSecPerMile)}
-                          </dd>
-                        </div>
-                      ) : null}
-                      {matched.paceDeltaSecPerMile != null ||
-                      matched.actualAvgPaceSecPerMile != null ? (
-                        <div className="sm:col-span-2">
-                          <dt className="text-gray-500">Vs plan</dt>
-                          <dd className="font-medium text-gray-900">
-                            {matched.targetPaceSecPerMile != null &&
-                            matched.targetPaceSecPerMileHigh != null &&
-                            matched.targetPaceSecPerMileHigh !== matched.targetPaceSecPerMile &&
-                            matched.actualAvgPaceSecPerMile != null
-                              ? paceRangeDeltaMessage(
-                                  matched.actualAvgPaceSecPerMile,
-                                  matched.targetPaceSecPerMile,
-                                  matched.targetPaceSecPerMileHigh
-                                ) ?? "—"
-                              : singleTargetPaceDeltaMessage(matched.paceDeltaSecPerMile) ?? "—"}
-                          </dd>
-                        </div>
-                      ) : null}
-                      {matched.hrDeltaBpm != null ? (
-                        <div>
-                          <dt className="text-gray-500">Vs target HR</dt>
-                          <dd className="font-medium text-gray-900">
-                            {matched.hrDeltaBpm > 0
-                              ? `${matched.hrDeltaBpm} bpm under zone`
-                              : matched.hrDeltaBpm < 0
-                                ? `${Math.abs(matched.hrDeltaBpm)} bpm above zone`
-                                : "On target"}
-                          </dd>
-                        </div>
-                      ) : null}
-                      {matched.creditedFiveKPaceSecPerMile != null &&
-                      matched.creditedFiveKPaceSecPerMile > 0 ? (
-                        <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-white/80 px-3 py-2">
-                          <dt className="text-gray-500 text-xs">Implied 5K pace (credit signal)</dt>
-                          <dd className="font-semibold text-emerald-950 tabular-nums">
-                            {formatSecPerMile(matched.creditedFiveKPaceSecPerMile)}
-                          </dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                    <Link
-                      href={`/workouts/${matched.id}`}
-                      className="mt-4 inline-block text-sm font-semibold text-orange-600 hover:text-orange-700"
-                    >
-                      Open workout →
-                    </Link>
-                    <Link
-                      href={`/performance`}
-                      className="mt-2 ml-4 inline-flex items-center gap-1 text-sm font-semibold text-violet-700 hover:text-violet-800"
-                    >
-                      <LineChart className="h-4 w-4" aria-hidden />
-                      Performance analysis
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5 mb-6">
-                    <h2 className="text-sm font-semibold text-gray-900 mb-1">No plan match</h2>
-                    <p className="text-sm text-gray-600">
-                      This activity isn&apos;t linked to a scheduled workout yet. If it was an easy
-                      day or a one-off, that&apos;s normal. Tempo or interval workouts from your plan usually
-                      match automatically when the date and Garmin workout line up.
-                    </p>
-                  </div>
-                )}
-
                 <div className="rounded-xl border border-gray-200 bg-white p-5 mb-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex items-start gap-3">
@@ -552,37 +392,6 @@ export default function ActivityDetailPage() {
                     </button>
                   </div>
                 </div>
-
-                {segWithActuals.length > 0 ? (
-                  <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                    <h2 className="text-base font-semibold text-gray-900 mb-3">
-                      Segment actuals (from laps)
-                    </h2>
-                    <ul className="space-y-3">
-                      {segWithActuals.map((s) => (
-                        <li
-                          key={s.id}
-                          className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm"
-                        >
-                          <span className="font-medium text-gray-900">
-                            {s.stepOrder}. {s.title}
-                          </span>
-                          <div className="mt-1 text-gray-700 space-x-3">
-                            {s.actualPaceSecPerMile != null ? (
-                              <span>Pace {formatSecPerMile(s.actualPaceSecPerMile)}</span>
-                            ) : null}
-                            {s.actualDistanceMiles != null ? (
-                              <span>{s.actualDistanceMiles.toFixed(2)} mi</span>
-                            ) : null}
-                            {s.actualDurationSeconds != null ? (
-                              <span>{Math.round(s.actualDurationSeconds / 60)} min</span>
-                            ) : null}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
 
                 <div className="rounded-xl border border-red-100 bg-red-50/40 p-5">
                   <h2 className="text-sm font-semibold text-red-900">Remove from GoFast</h2>
@@ -609,28 +418,8 @@ export default function ActivityDetailPage() {
         onClose={() => setMarkRaceOpen(false)}
         activityId={activityId}
         durationSeconds={activity?.duration ?? null}
-        activityLabel={
-          activity?.activityName?.trim() ||
-          activity?.activityType?.replace(/_/g, " ") ||
-          "Activity"
-        }
+        activityLabel={activityLabel}
       />
-
-      {shareOpen && athleteId && activity ? (
-        <ShareActivityToHubSheet
-          athleteId={athleteId}
-          activityId={activityId}
-          activityLabel={
-            activity.activityName?.trim() ||
-            activity.activityType?.replace(/_/g, " ") ||
-            "Activity"
-          }
-          hasMatchedWorkout={Boolean(matched)}
-          existingPost={hubPost}
-          onClose={() => setShareOpen(false)}
-          onPublished={(post) => setHubPost(post)}
-        />
-      ) : null}
     </div>
   );
 }

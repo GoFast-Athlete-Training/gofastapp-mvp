@@ -66,9 +66,7 @@ import {
 import { formatPlanDateDisplay, localYmd } from "@/lib/training/plan-utils";
 import { formatPaceTargetRangeDisplay } from "@/lib/training/pace-comparison-display";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
-import PaceForPacePanel from "@/components/training/PaceForPacePanel";
 import WorkoutSkipActions from "@/components/training/WorkoutSkipActions";
-import WorkoutCommunityStoryCard from "@/components/gofast-with-me/WorkoutCommunityStoryCard";
 import {
   computeWorkoutPerformanceAnalysis,
   type PhaseAwareLapRow,
@@ -76,10 +74,9 @@ import {
 } from "@/lib/training/workout-performance-analysis";
 import {
   TempoGoalBenchmarkPanel,
-  WorkoutFiveKConfirmPanel,
 } from "@/components/training/WorkoutGoalPacePanel";
+import { CompletedWorkoutResults } from "@/components/training/CompletedWorkoutResults";
 import type { TempoPrescriptionGoalBenchmark } from "@/lib/training/goal-threshold-from-mp";
-import type { WorkoutPerformanceSignals } from "@/lib/training/workout-pace-performance";
 
 interface WorkoutSegmentLap {
   lapIndex: number;
@@ -930,8 +927,6 @@ export default function WorkoutDetailPage() {
   const workoutId = params.id as string;
 
   const [workout, setWorkout] = useState<Workout | null>(null);
-  const [performanceSignals, setPerformanceSignals] =
-    useState<WorkoutPerformanceSignals | null>(null);
   const [loading, setLoading] = useState(true);
   const [pushing, setPushing] = useState(false);
   const [copyRepushing, setCopyRepushing] = useState(false);
@@ -946,8 +941,6 @@ export default function WorkoutDetailPage() {
   const [showCreatedBanner, setShowCreatedBanner] = useState(false);
   const [garminToast, setGarminToast] = useState<string | null>(null);
   const [showMatchPanel, setShowMatchPanel] = useState(false);
-  const [resolvedPerformanceAnalysis, setResolvedPerformanceAnalysis] =
-    useState<ReturnType<typeof computeWorkoutPerformanceAnalysis> | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [savingEdits, setSavingEdits] = useState(false);
@@ -1009,8 +1002,7 @@ export default function WorkoutDetailPage() {
     });
   }, [workout, sortedSegments]);
 
-  const displayAnalysis = resolvedPerformanceAnalysis ?? performanceAnalysis;
-  const scorecard = displayAnalysis?.scorecard ?? null;
+  const displayAnalysis = performanceAnalysis;
 
   const simpleBackHref = useMemo(
     () => parseBackHrefParam(searchParams),
@@ -1293,16 +1285,6 @@ export default function WorkoutDetailPage() {
   }, [quickOrderIds, defaultSegmentOrderIds]);
 
   const isLogged = Boolean(workout?.matchedActivityId ?? workout?.matched_activity);
-  const showCommunityStory = useMemo(() => {
-    if (!workout) return false;
-    if (isLogged) return true;
-    if (workout.skippedAt) return true;
-    if (workout.date) {
-      const d = new Date(workout.date);
-      if (!Number.isNaN(d.getTime()) && d.getTime() < Date.now()) return true;
-    }
-    return false;
-  }, [workout, isLogged]);
   const segmentDisplayGroups = useMemo(() => {
     const ordered = isLogged ? sortedSegments : getQuickOrderedSegments();
     return groupSegmentsInDisplayOrder(ordered);
@@ -1495,12 +1477,10 @@ export default function WorkoutDetailPage() {
     try {
       const response = await api.get<{
         workout: Workout;
-        performanceSignals?: WorkoutPerformanceSignals;
       }>(`/training/workout/${workoutId}`);
       const w = response.data?.workout;
       if (w) {
         setWorkout(w);
-        setPerformanceSignals(response.data?.performanceSignals ?? null);
       } else {
         setPushStatus({
           success: false,
@@ -1979,13 +1959,6 @@ export default function WorkoutDetailPage() {
   const weekAndDateLine = [weekLineDisplay, dateLineDisplay].filter(Boolean).join(" · ");
   const showStandaloneCopyAction = !workout.planId;
 
-  const distanceBadgeClass =
-    scorecard?.totalMiles.status === "on_plan"
-      ? "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200"
-      : scorecard?.totalMiles.status === "over"
-        ? "bg-sky-100 text-sky-900 ring-1 ring-sky-200"
-        : "bg-amber-100 text-amber-900 ring-1 ring-amber-200";
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
@@ -2091,109 +2064,25 @@ export default function WorkoutDetailPage() {
         ) : null}
 
         {isLogged && (workout.matchedActivityId || workout.matched_activity) ? (
-          <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-6 sm:p-8 mb-6 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-emerald-800">
-                  Activity summary
+          <>
+            <CompletedWorkoutResults
+              workout={workout}
+              performanceAnalysis={displayAnalysis}
+            />
+            {workoutId ? (
+              <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5">
+                <p className="mb-2 text-xs font-semibold uppercase text-gray-500">
+                  Not the right run?
                 </p>
-                <h2 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900">
-                  {workoutListTitle(workout)}
-                </h2>
-                {workout.matched_activity ? (
-                  <p className="mt-2 text-sm text-gray-700">
-                    <span className="font-medium text-gray-900">
-                      {workout.matched_activity.activityName?.trim() || "Run"}
-                    </span>
-                    {workout.matched_activity.startTime ? (
-                      <>
-                        {" "}
-                        ·{" "}
-                        {new Date(workout.matched_activity.startTime).toLocaleString(undefined, {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </>
-                    ) : null}
-                  </p>
-                ) : null}
-              </div>
-              {scorecard?.totalMiles.status !== "unknown" && scorecard ? (
-                <div className="shrink-0">
-                  <span
-                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${distanceBadgeClass}`}
-                  >
-                    {scorecard.totalMiles.badge}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-
-            <dl className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
-                <dt className="text-xs font-medium text-gray-500">Total miles</dt>
-                <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
-                  {scorecard?.totalMiles.actualMiles != null
-                    ? `${scorecard.totalMiles.actualMiles.toFixed(2)} mi`
-                    : "—"}
-                </dd>
-                {scorecard?.totalMiles.plannedMiles != null ? (
-                  <dd className="mt-1 text-xs text-gray-600 tabular-nums">
-                    Planned {scorecard.totalMiles.plannedMiles.toFixed(1)} mi
-                  </dd>
-                ) : null}
-                {scorecard?.totalMiles.message ? (
-                  <dd className="mt-1 text-xs text-gray-600">{scorecard.totalMiles.message}</dd>
-                ) : null}
-              </div>
-
-              {workout.actualDurationSeconds != null && workout.actualDurationSeconds > 0 ? (
-                <div className="rounded-xl border border-emerald-100 bg-white/80 px-4 py-3">
-                  <dt className="text-xs font-medium text-gray-500">Duration</dt>
-                  <dd className="mt-1 text-sm font-semibold text-gray-900 tabular-nums">
-                    {Math.round(workout.actualDurationSeconds / 60)} min
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
-
-            <div className="mt-6">
-              <PaceForPacePanel
-                workoutId={workout.id}
-                matchedActivityId={workout.matchedActivityId}
-                performanceAnalysis={displayAnalysis}
-                onAnalysisUpdated={setResolvedPerformanceAnalysis}
-              />
-            </div>
-
-            {workout.matchedActivityId ? (
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link
-                  href={`/activities/${encodeURIComponent(workout.matchedActivityId)}`}
-                  className="inline-flex items-center rounded-xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50"
-                >
-                  View activity →
-                </Link>
-                <Link
-                  href="/performance"
-                  className="inline-flex items-center rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-100"
-                >
-                  Performance analysis →
-                </Link>
+                <WorkoutActivityMatchPanel
+                  workoutId={workoutId}
+                  workoutTitle={workout.title}
+                  plannedDistanceMeters={workout.estimatedDistanceInMeters ?? null}
+                  onMatched={fetchWorkout}
+                />
               </div>
             ) : null}
-          </div>
-        ) : null}
-
-        {showCommunityStory && workout ? (
-          <WorkoutCommunityStoryCard
-            workoutId={workout.id}
-            plannedTitle={workoutListTitle(workout)}
-            visible={showCommunityStory}
-          />
+          </>
         ) : null}
 
         {isLogged ? (
@@ -3306,12 +3195,6 @@ export default function WorkoutDetailPage() {
             goalRacePaceSecPerMile={workout.goalRacePaceSecPerMile}
           />
         ) : null}
-
-        <WorkoutFiveKConfirmPanel
-          workoutId={workout.id}
-          performanceSignals={performanceSignals}
-          onConfirmed={() => void fetchWorkout()}
-        />
 
         {(planDayMi != null || structuredMiLine !== "") && (
           <div className="bg-white rounded-lg border border-gray-200 p-5 mb-6">
