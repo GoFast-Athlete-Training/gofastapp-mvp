@@ -1364,10 +1364,10 @@ export default function AthleteHomePage() {
                     <p className="text-gray-600 text-sm mt-1">Log a run or check your week in Training Hub.</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Link
-                        href="/performance"
+                        href="/activities"
                         className="text-sm font-semibold text-orange-600 hover:text-orange-700"
                       >
-                        Performance →
+                        Activity →
                       </Link>
                       <Link href="/training" className="text-sm font-semibold text-gray-700 hover:text-gray-900">
                         Training Hub →
@@ -1678,6 +1678,9 @@ export default function AthleteHomePage() {
                     <Link href="/profile#goal" className="hover:underline">
                       Goal
                     </Link>
+                    <Link href="/activities" className="hover:underline">
+                      Activity
+                    </Link>
                     <Link href="/performance" className="hover:underline">
                       Performance
                     </Link>
@@ -1793,7 +1796,7 @@ export default function AthleteHomePage() {
                       Latest run
                     </p>
                     <Link
-                      href="/performance"
+                      href="/activities"
                       className="text-xs font-semibold text-orange-600 hover:text-orange-700"
                     >
                       See all →

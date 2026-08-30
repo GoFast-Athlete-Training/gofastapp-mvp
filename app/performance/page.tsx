@@ -81,8 +81,12 @@ export default function PerformancePage() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">            <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Performance</h1>
               <p className="text-gray-600 leading-relaxed max-w-3xl">
-                Inspect recent completed workouts, Pace for Pace state, and re-run analysis on
-                historical activities without needing a new run. For today&apos;s plan, open{" "}
+                Analysis for matched plan workouts — Pace for Pace, execution, and repair actions.
+                For your full activity log (matched and unmatched), open{" "}
+                <Link href="/activities" className="font-medium text-orange-600 hover:text-orange-700">
+                  Activity
+                </Link>
+                . For today&apos;s plan, open{" "}
                 <Link href="/training" className="font-medium text-orange-600 hover:text-orange-700">
                   Train
                 </Link>
@@ -243,7 +247,7 @@ function PerformanceHistoryTable() {
                   ) : null}
                 </td>
                 <td className="px-4 py-3 text-gray-700">
-                  {item.executionHeadline ?? "—"}
+                  {item.vsPlanMessage ?? "—"}
                   {item.paceDeltaSecPerMile != null ? (
                     <p className="mt-1 text-xs text-gray-500">
                       Δ {item.paceDeltaSecPerMile > 0 ? "+" : ""}

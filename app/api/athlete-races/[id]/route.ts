@@ -6,6 +6,7 @@ import {
   clearPrimaryAthleteRace,
   setPrimaryAthleteRace,
 } from "@/lib/athlete-primary-race";
+import { alignAthleteGoalSnap } from "@/lib/align-athlete-goal-snap";
 import {
   getAthleteRaceById,
   removeAthleteRaceWithSideEffects,
@@ -96,6 +97,7 @@ export async function PATCH(
         athleteId: athlete!.id,
         athleteRaceId: id,
       });
+      await alignAthleteGoalSnap(athlete!.id);
       return NextResponse.json({ athleteRace, signup: athleteRace });
     }
 
@@ -104,6 +106,7 @@ export async function PATCH(
         athleteId: athlete!.id,
         athleteRaceId: id,
       });
+      await alignAthleteGoalSnap(athlete!.id);
       return NextResponse.json({ athleteRace, signup: athleteRace });
     }
 

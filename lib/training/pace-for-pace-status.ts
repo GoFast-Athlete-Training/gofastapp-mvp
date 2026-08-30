@@ -1,15 +1,13 @@
 /**
- * Explicit Pace for Pace state for UI and observability.
- * Canon: every workout is prescribed — never return NO_STRUCTURED_PACE_TARGETS for eligibility.
+ * Explicit Splits state for UI and observability.
  */
 
 import {
-  buildWorkSegmentDeltas,
   computeWorkoutPerformanceAnalysis,
   type PerformanceAnalysisWorkoutInput,
   type WorkoutPerformanceAnalysis,
 } from "./workout-performance-analysis";
-import { workoutHasPacedWorkSegments } from "./workout-paced-segments";
+import { workoutHasLapPaceDeltas } from "./workout-pace-analyzer";
 
 export type PaceForPaceStatus =
   | "UNMATCHED"
@@ -22,7 +20,6 @@ export type PaceForPaceStatus =
 export type PaceForPaceStatusResult = {
   status: PaceForPaceStatus;
   message: string | null;
-  /** When status is PACE_FOR_PACE_FAILED or MATCHED_ANALYSIS_NOT_GENERATED */
   failureReason: string | null;
 };
 
@@ -30,26 +27,11 @@ export type PaceForPaceStatusInput = PerformanceAnalysisWorkoutInput & {
   matchedActivityId?: string | null;
 };
 
-function hasPaceForPaceComparison(
+function hasSplitsComparison(
   analysis: WorkoutPerformanceAnalysis,
   workout: PaceForPaceStatusInput
 ): boolean {
-  if ((analysis.scorecard.workSegmentDeltas?.length ?? 0) > 0) return true;
-  if (analysis.scorecard.workEffort?.summary) return true;
-  if (
-    workout.targetPaceSecPerMile != null &&
-    workout.actualAvgPaceSecPerMile != null &&
-    !analysis.requiresSegmentLevelPaceForPace
-  ) {
-    return true;
-  }
-  if (analysis.phaseAwareLaps.some((lap) => lap.phase === "work" && lap.paceSecPerMile != null)) {
-    return true;
-  }
-  return (
-    analysis.canJudgeTargetPace &&
-    (analysis.workSegmentActual?.segments.some((s) => s.actualPaceSecPerMile != null) ?? false)
-  );
+  return workoutHasLapPaceDeltas(workout.segments);
 }
 
 export function derivePaceForPaceStatus(
@@ -84,10 +66,18 @@ export function derivePaceForPaceStatus(
     };
   }
 
-  if (hasPaceForPaceComparison(perf, workout)) {
+  if (hasSplitsComparison(perf, workout)) {
+    const deltaCount = workout.segments.reduce(
+      (n, s) =>
+        n +
+        (s.segment_laps?.filter(
+          (l) => l.paceDeltaSecPerMile != null && Number.isFinite(l.paceDeltaSecPerMile)
+        ).length ?? 0),
+      0
+    );
     return {
       status: "PACE_FOR_PACE_AVAILABLE",
-      message: perf.executionHeadline ?? perf.scorecard.workEffort?.summary ?? null,
+      message: deltaCount > 0 ? `${deltaCount} split${deltaCount === 1 ? "" : "s"} analyzed` : null,
       failureReason: null,
     };
   }
@@ -117,7 +107,7 @@ export function derivePaceForPaceStatus(
   const reason =
     perf.paceForPaceError ??
     perf.completionOnlyMessage ??
-    "Pace for Pace analysis has not been generated for this activity yet.";
+    "Look at my metrics to generate your splits.";
 
   return {
     status: "MATCHED_ANALYSIS_NOT_GENERATED",
@@ -131,11 +121,11 @@ export function paceForPaceStatusLabel(status: PaceForPaceStatus): string {
     case "UNMATCHED":
       return "Unmatched";
     case "MATCHED_ANALYSIS_NOT_GENERATED":
-      return "Analysis not generated";
+      return "Needs analysis";
     case "PACE_FOR_PACE_AVAILABLE":
-      return "Pace for Pace available";
+      return "Splits available";
     case "PACE_FOR_PACE_FAILED":
-      return "Pace for Pace failed";
+      return "Analysis failed";
     case "NO_STRUCTURED_PACE_TARGETS":
       return "No structured pace targets";
     default:
@@ -150,6 +140,3 @@ export function shouldShowPaceForPaceOffRamp(status: PaceForPaceStatus): boolean
     status === "PACE_FOR_PACE_FAILED"
   );
 }
-
-/** Re-export for tests */
-export { workoutHasPacedWorkSegments, buildWorkSegmentDeltas };

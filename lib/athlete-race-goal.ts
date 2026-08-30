@@ -4,6 +4,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
+import { alignAthleteGoalSnap } from "@/lib/align-athlete-goal-snap";
 import {
   deriveGoalPaces,
   metersToMiles,
@@ -150,7 +151,7 @@ export async function getAthleteRaceGoalById(athleteId: string, athleteRaceId: s
   return row ? serializeGoalFromAthleteRace(row) : null;
 }
 
-/** Primary Goal race: ACTIVE plan terminal, else explicit isPrimaryRace. */
+/** Primary Goal race: explicit isPrimaryRace first; plan terminal is fallback only. */
 export async function getPrimaryAthleteRaceForAthlete(athleteId: string) {
   const [primaryRow, activePlan] = await Promise.all([
     prisma.athlete_races.findFirst({
@@ -164,6 +165,8 @@ export async function getPrimaryAthleteRaceForAthlete(athleteId: string) {
     }),
   ]);
 
+  if (primaryRow) return primaryRow;
+
   if (activePlan?.athleteRaceId) {
     const planRace = await prisma.athlete_races.findFirst({
       where: { id: activePlan.athleteRaceId, athleteId },
@@ -171,8 +174,6 @@ export async function getPrimaryAthleteRaceForAthlete(athleteId: string) {
     });
     if (planRace) return planRace;
   }
-
-  if (primaryRow) return primaryRow;
 
   return null;
 }
@@ -333,6 +334,10 @@ export async function updateRaceGoal(
     },
     select: athleteRaceGoalSelect,
   });
+
+  if (updated.isPrimaryRace) {
+    await alignAthleteGoalSnap(athleteId);
+  }
 
   return serializeGoalFromAthleteRace(updated);
 }

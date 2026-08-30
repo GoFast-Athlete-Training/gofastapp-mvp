@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, Heart, LayoutDashboard, MapPin, Trophy, Users } from "lucide-react";
+import { Activity, Heart, LayoutDashboard, LineChart, MapPin, Trophy, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import AthleteMobileNav from "@/components/athlete/AthleteMobileNav";
 
@@ -28,6 +28,11 @@ function planHubMatch(p: string | null): boolean {
 /** Logged work, metrics, full workout log */
 function healthHubMatch(p: string | null): boolean {
   return !!p && (p === "/health" || p.startsWith("/health/"));
+}
+
+function activityHubMatch(p: string | null): boolean {
+  if (!p) return false;
+  return p === "/activities" || p.startsWith("/activities/");
 }
 
 function performanceHubMatch(p: string | null): boolean {
@@ -71,9 +76,15 @@ const primaryNavItems: NavItem[] = [
     match: healthHubMatch,
   },
   {
+    label: "Activity",
+    href: "/activities",
+    icon: Activity,
+    match: activityHubMatch,
+  },
+  {
     label: "Performance",
     href: "/performance",
-    icon: Activity,
+    icon: LineChart,
     match: performanceHubMatch,
   },
 ];

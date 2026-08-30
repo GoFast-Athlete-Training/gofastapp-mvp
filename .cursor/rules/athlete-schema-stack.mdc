@@ -1,0 +1,26 @@
+---
+description: Athlete schema changes require stack-wide Prisma + Cloud Run sidecar sync
+alwaysApply: true
+---
+
+# Athlete schema stack
+
+Changing `Athlete` (add/drop/rename column) is a **stack change**, not a Vercel-only migrate.
+
+## Required steps
+
+1. Prisma migrate on Neon (never `db push --accept-data-loss` in prod).
+2. Audit all `prisma.athlete.findUnique` / `findMany` — **use explicit `select`**; full-row reads are banned on machine paths.
+3. Rebuild **Cloud Run** `garmin-activity-detail-ingest` so `prisma generate` runs on current `schema.prisma`.
+4. Smoke `/api/athlete/me` and sidecar `/health`.
+
+## Sidecar lookup
+
+`getAthleteByGarminUserId` → `select: { id: true }` only unless a handler truly needs more.
+
+## Goal race snap
+
+- Boolean: `athlete_races.isPrimaryRace` (goal race flag).
+- Athlete strings (login hydrate only): `goalRaceName`, `goalRaceTime`.
+- **Only** [`lib/align-athlete-goal-snap.ts`](lib/align-athlete-goal-snap.ts) writes those Athlete columns.
+- Do not reintroduce `primaryGoalNameSnapshot` or other dropped Athlete goal caches.

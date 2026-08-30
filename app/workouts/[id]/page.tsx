@@ -2168,6 +2168,23 @@ export default function WorkoutDetailPage() {
                 onAnalysisUpdated={setResolvedPerformanceAnalysis}
               />
             </div>
+
+            {workout.matchedActivityId ? (
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href={`/activities/${encodeURIComponent(workout.matchedActivityId)}`}
+                  className="inline-flex items-center rounded-xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50"
+                >
+                  View activity →
+                </Link>
+                <Link
+                  href="/performance"
+                  className="inline-flex items-center rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-100"
+                >
+                  Performance analysis →
+                </Link>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

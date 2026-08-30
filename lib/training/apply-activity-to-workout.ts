@@ -15,7 +15,7 @@ import { normalizeGarminMatchText } from "./garmin-activity-match-helpers";
 import { ymdFromDate } from "./plan-utils";
 import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
 import { requiresDetailForTargetAnalysis } from "./workout-performance-analysis";
-import { requiresSegmentLevelPaceForPace, workoutHasPacedWorkSegments } from "./workout-paced-segments";
+import { requiresSegmentLevelPaceForPace } from "./workout-paced-segments";
 import { sendAppNotification } from "@/lib/app-notifications/send";
 /** Max sec/mi faster than prescribed easy pace before we skip aerobic HR credit (target − actual). */
 export const EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE = 15;
@@ -470,15 +470,8 @@ export async function applyActivityToWorkout(params: {
     targetSecPerMileHigh: targetPaceSecPerMileHigh,
   } = pickMainPaceTargetSecPerMile(workout.segments);
 
-  const hasPacedWorkSegments = workoutHasPacedWorkSegments(workout.segments);
-
-  let paceDeltaSecPerMile: number | null = null;
-  let evaluationEligible = false;
-
-  if (!hasPacedWorkSegments && targetPaceSecPerMile != null && paceSecPerMile != null) {
-    paceDeltaSecPerMile = targetPaceSecPerMile - paceSecPerMile;
-    evaluationEligible = true;
-  }
+  const paceDeltaSecPerMile: number | null = null;
+  const evaluationEligible = false;
 
   let hrDeltaBpm: number | null = null;
   const hrTargetMid = pickMainHrTargetBpm(workout.segments);

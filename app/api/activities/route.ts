@@ -3,38 +3,52 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 import { prisma } from '@/lib/prisma';
+import {
+  activityHistoryInclude,
+  buildActivityHistoryWhere,
+  decodeActivityHistoryCursor,
+  encodeActivityHistoryCursor,
+  mapActivityHistoryRow,
+  parseActivityHistoryDate,
+  parseActivityHistoryFilter,
+  parseActivityHistoryLimit,
+} from '@/lib/activities/activity-history';
 
 /**
  * GET /api/activities
  *
- * Returns the authenticated athlete's activity stream (from athlete_activities).
- * Used by the /activities page as the single source of truth for the list.
+ * Canonical authenticated activity history stream.
+ * Query: limit, cursor, from, to, filter=all|unmatched
  */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const limitRaw = searchParams.get('limit');
-    const take = Math.min(
-      200,
-      Math.max(1, limitRaw ? parseInt(limitRaw, 10) || 200 : 200)
-    );
+    const limit = parseActivityHistoryLimit(searchParams.get('limit'));
+    const filter = parseActivityHistoryFilter(searchParams.get('filter'));
+    const from = parseActivityHistoryDate(searchParams.get('from'));
+    const to = parseActivityHistoryDate(searchParams.get('to'));
+    const cursor = decodeActivityHistoryCursor(searchParams.get('cursor'));
 
     const auth = await requireAthleteFromBearer(request);
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-    const { athlete } = auth;
 
-    const activities = await prisma.athlete_activities.findMany({
-      where: {
-        athleteId: athlete.id,
-      },
-      orderBy: { startTime: 'desc' },
-      take,
+    const rows = await prisma.athlete_activities.findMany({
+      where: buildActivityHistoryWhere({
+        athleteId: auth.athlete.id,
+        filter,
+        from,
+        to,
+        cursor,
+      }),
+      orderBy: [{ startTime: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
       select: {
         id: true,
         sourceActivityId: true,
         source: true,
+        ingestionStatus: true,
         activityType: true,
         activityName: true,
         startTime: true,
@@ -44,16 +58,30 @@ export async function GET(request: Request) {
         averageSpeed: true,
         averageHeartRate: true,
         elevationGain: true,
+        ...activityHistoryInclude,
       },
     });
 
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const items = pageRows.map((row) => mapActivityHistoryRow(row));
+    const lastRow = pageRows[pageRows.length - 1];
+    const nextCursor =
+      hasMore && lastRow?.startTime ? encodeActivityHistoryCursor(lastRow) : null;
+
     return NextResponse.json({
-      activities,
+      items,
+      activities: items,
+      nextCursor,
+      hasMore,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ GET /api/activities:', error);
     return NextResponse.json(
-      { error: 'Failed to load activities', details: error.message },
+      {
+        error: 'Failed to load activities',
+        details: error instanceof Error ? error.message : 'Unknown',
+      },
       { status: 500 }
     );
   }

@@ -11,6 +11,12 @@ import {
   derivePaceForPaceStatus,
   paceForPaceStatusLabel,
 } from "@/lib/training/pace-for-pace-status";
+import {
+  formatPaceTargetRangeDisplay,
+  paceVsTargetBadgeText,
+  paceVsTargetLabel,
+} from "@/lib/training/pace-comparison-display";
+import { workoutHasLapPaceDeltas } from "@/lib/training/workout-pace-analyzer";
 
 const METERS_PER_MILE = 1609.34;
 
@@ -70,6 +76,7 @@ export async function GET(request: NextRequest) {
   }
 
   const items = rows.map((w, index) => {
+    const activity = w.matched_activity;
     const analysisInput: PerformanceAnalysisWorkoutInput = {
       workoutType: w.workoutType,
       targetPaceSecPerMile: w.targetPaceSecPerMile,
@@ -101,12 +108,49 @@ export async function GET(request: NextRequest) {
     const performanceAnalysis = computeWorkoutPerformanceAnalysis(analysisInput);
     const statusResult = derivePaceForPaceStatus(analysisInput, performanceAnalysis);
 
+    const avgPace =
+      w.actualAvgPaceSecPerMile ?? speedMpsToSecPerMile(activity?.averageSpeed);
+    const prescribedPaceDisplay = formatPaceTargetRangeDisplay(
+      w.targetPaceSecPerMile,
+      w.targetPaceSecPerMileHigh
+    );
+
+    const lapDeltas = w.segments.flatMap((s) =>
+      (s.segment_laps ?? [])
+        .map((l) => l.paceDeltaSecPerMile)
+        .filter((d): d is number => d != null && Number.isFinite(d))
+    );
+    const avgLapDelta =
+      lapDeltas.length > 0
+        ? Math.round(lapDeltas.reduce((a, b) => a + b, 0) / lapDeltas.length)
+        : null;
+
+    const vsPlanLabel =
+      avgLapDelta != null
+        ? paceVsTargetLabel(avgPace, w.targetPaceSecPerMile, w.targetPaceSecPerMileHigh)
+        : "unknown";
+    const vsPlanMessage =
+      statusResult.status === "PACE_FOR_PACE_AVAILABLE" && lapDeltas.length > 0
+        ? `${lapDeltas.length} split${lapDeltas.length === 1 ? "" : "s"} · avg Δ ${avgLapDelta! > 0 ? "+" : ""}${avgLapDelta}s/mi`
+        : statusResult.failureReason ?? statusResult.message;
+    const vsPlanBadge =
+      statusResult.status === "PACE_FOR_PACE_AVAILABLE"
+        ? paceVsTargetBadgeText(vsPlanLabel)
+        : statusResult.status === "PACE_FOR_PACE_FAILED"
+          ? "Analysis failed"
+          : statusResult.status === "MATCHED_ANALYSIS_NOT_GENERATED"
+            ? "Needs analysis"
+            : paceForPaceStatusLabel(statusResult.status);
+
     const sameTypeRows = byType.get(w.workoutType) ?? [];
     const priorSameType = sameTypeRows
       .slice(sameTypeRows.indexOf(w) + 1)
-      .find((r) => r.paceDeltaSecPerMile != null);
+      .find((r) =>
+        r.segments.some((s) =>
+          (s.segment_laps ?? []).some((l) => l.paceDeltaSecPerMile != null)
+        )
+      );
 
-    const activity = w.matched_activity;
     const dateIso =
       w.date?.toISOString() ??
       activity?.startTime?.toISOString() ??
@@ -123,17 +167,36 @@ export async function GET(request: NextRequest) {
       ingestionStatus: activity?.ingestionStatus ?? null,
       distanceMeters: w.actualDistanceMeters ?? activity?.distance ?? null,
       durationSeconds: w.actualDurationSeconds ?? activity?.duration ?? null,
-      avgPaceSecPerMile:
-        w.actualAvgPaceSecPerMile ?? speedMpsToSecPerMile(activity?.averageSpeed),
+      avgPaceSecPerMile: avgPace,
       avgHeartRate: w.actualAverageHeartRate ?? activity?.averageHeartRate ?? null,
       plannedDistanceMeters: w.estimatedDistanceInMeters,
-      paceDeltaSecPerMile: w.paceDeltaSecPerMile,
+      targetPaceSecPerMile: w.targetPaceSecPerMile,
+      targetPaceSecPerMileHigh: w.targetPaceSecPerMileHigh,
+      prescribedPaceDisplay,
+      paceDeltaSecPerMile: avgLapDelta,
+      hasLapDeltas: workoutHasLapPaceDeltas(w.segments),
       segmentExecutionStatus: w.segmentExecutionStatus,
-      executionHeadline: performanceAnalysis.executionHeadline,
+      segmentComparisonCount: lapDeltas.length,
+      executionHeadline: null,
+      vsPlanBadge,
+      vsPlanMessage:
+        statusResult.status === "PACE_FOR_PACE_AVAILABLE"
+          ? vsPlanMessage
+          : statusResult.failureReason ?? statusResult.message,
       paceForPaceStatus: statusResult.status,
-      paceForPaceStatusLabel: paceForPaceStatusLabel(statusResult.status),
-      paceForPaceMessage: statusResult.message,
-      priorSameTypePaceDeltaSecPerMile: priorSameType?.paceDeltaSecPerMile ?? null,
+      priorSameTypePaceDeltaSecPerMile:
+        priorSameType != null
+          ? (() => {
+              const deltas = priorSameType.segments.flatMap((s) =>
+                (s.segment_laps ?? [])
+                  .map((l) => l.paceDeltaSecPerMile)
+                  .filter((d): d is number => d != null && Number.isFinite(d))
+              );
+              return deltas.length > 0
+                ? Math.round(deltas.reduce((a, b) => a + b, 0) / deltas.length)
+                : null;
+            })()
+          : null,
       index,
     };
   });

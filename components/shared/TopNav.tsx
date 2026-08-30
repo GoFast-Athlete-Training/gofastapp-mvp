@@ -7,7 +7,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
-import { Home, Settings, Calendar, Wallet, Footprints } from 'lucide-react';
+import { Home, Settings, Wallet, Footprints, Activity, LineChart } from 'lucide-react';
 
 interface TopNavProps {
   showBack?: boolean;
@@ -83,7 +83,16 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
               className="hidden sm:inline-flex p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
               title="Performance"
             >
-              <Calendar className="h-5 w-5" />
+              <LineChart className="h-5 w-5" />
+            </Link>
+
+            {/* Activity history */}
+            <Link
+              href="/activities"
+              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
+              title="Activity"
+            >
+              <Activity className="h-5 w-5" />
             </Link>
 
             <Suspense

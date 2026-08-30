@@ -1,5 +1,5 @@
 /**
- * Explicit Pace for Pace resolve: match + segment bolt + analysis.
+ * Explicit Splits resolve: match + lap parse + pace analyzer.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -19,6 +19,10 @@ import {
   workoutMatchCandidateUtcRange,
 } from "./workout-activity-match-candidates";
 import { RUNNING_ACTIVITY_TYPES } from "./activity-type-sets";
+import {
+  analyzeWorkoutPaceDeltas,
+  NO_DETAIL_SUPPORT_MESSAGE,
+} from "./workout-pace-analyzer";
 
 const LOG_PREFIX = "PACE_FOR_PACE";
 
@@ -212,12 +216,6 @@ export async function resolvePaceForPace(params: {
     };
   }
 
-  console.log(`${LOG_PREFIX} prescribed segments`, {
-    workoutId,
-    segmentCount: loaded.workout.segments.length,
-    titles: loaded.workout.segments.map((s) => s.title),
-  });
-
   const activity = await prisma.athlete_activities.findFirst({
     where: { id: activityId, athleteId: params.athleteId },
     select: { id: true, detailData: true, hydratedAt: true },
@@ -254,7 +252,7 @@ export async function resolvePaceForPace(params: {
     return {
       ok: false,
       code: "NO_DETAIL",
-      message: "Garmin activity detail is required for Pace for Pace analysis.",
+      message: NO_DETAIL_SUPPORT_MESSAGE,
       workoutId,
       activityId,
     };
@@ -271,11 +269,34 @@ export async function resolvePaceForPace(params: {
     result: parseResult,
   });
 
-  if (!parseResult.ok) {
+  if (!parseResult.ok && parseResult.status !== "NO_LAPS") {
     return {
       ok: false,
       code: "SEGMENT_PARSE_FAILED",
       message: parseResult.message,
+      workoutId,
+      activityId,
+    };
+  }
+
+  const analyzeResult = await analyzeWorkoutPaceDeltas({ workoutId, activityId });
+  console.log(`${LOG_PREFIX} pace analyzer`, { workoutId, activityId, analyzeResult });
+
+  if (!analyzeResult.ok) {
+    return {
+      ok: false,
+      code: "SEGMENT_PARSE_FAILED",
+      message: analyzeResult.message,
+      workoutId,
+      activityId,
+    };
+  }
+
+  if (analyzeResult.deltasWritten === 0) {
+    return {
+      ok: false,
+      code: "SEGMENT_PARSE_FAILED",
+      message: "Could not compute pace deltas for these laps.",
       workoutId,
       activityId,
     };
@@ -307,20 +328,13 @@ export async function resolvePaceForPace(params: {
   });
 
   if (statusResult.status !== "PACE_FOR_PACE_AVAILABLE") {
-    const hasWholeRun =
-      loaded.workout.targetPaceSecPerMile != null &&
-      loaded.workout.actualAvgPaceSecPerMile != null &&
-      !loaded.performanceAnalysis.requiresSegmentLevelPaceForPace;
-
-    if (!hasWholeRun) {
-      return {
-        ok: false,
-        code: "SEGMENT_PARSE_FAILED",
-        message: statusResult.failureReason ?? statusResult.message ?? "Pace for Pace unavailable.",
-        workoutId,
-        activityId,
-      };
-    }
+    return {
+      ok: false,
+      code: "SEGMENT_PARSE_FAILED",
+      message: statusResult.failureReason ?? statusResult.message ?? "Splits unavailable.",
+      workoutId,
+      activityId,
+    };
   }
 
   return {

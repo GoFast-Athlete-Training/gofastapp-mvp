@@ -3,73 +3,81 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import type {
+  PhaseAwareLapRow,
   WorkoutPerformanceAnalysis,
-  WorkSegmentDelta,
 } from "@/lib/training/workout-performance-analysis";
 import {
   formatPaceTargetRangeDisplay,
-  paceVsTargetBadgeText,
 } from "@/lib/training/pace-comparison-display";
+import { NO_DETAIL_SUPPORT_MESSAGE } from "@/lib/training/workout-pace-analyzer";
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
   if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
-  return `${m}:${String(s).padStart(2, "0")} /mi`;
+  return `${m}:${String(s).padStart(2, "0")}/mi`;
 }
 
-function hasPaceForPaceResult(analysis: WorkoutPerformanceAnalysis | null): boolean {
+function formatDeltaSecPerMile(delta: number | null | undefined): string {
+  if (delta == null || !Number.isFinite(delta)) return "—";
+  const rounded = Math.round(delta);
+  if (rounded === 0) return "on band";
+  const abs = Math.abs(rounded);
+  return rounded > 0 ? `${abs}s faster` : `${abs}s slower`;
+}
+
+function hasLapPaceDeltas(analysis: WorkoutPerformanceAnalysis | null): boolean {
   if (!analysis) return false;
-  if ((analysis.scorecard.workSegmentDeltas?.length ?? 0) > 0) return true;
-  if (analysis.scorecard.workEffort?.summary) return true;
-  if (analysis.executionHeadline) return true;
-  if (
-    analysis.canJudgeTargetPace &&
-    analysis.phaseAwareLaps.some((lap) => lap.phase === "work" && lap.paceSecPerMile != null)
-  ) {
-    return true;
-  }
-  return false;
+  return analysis.phaseAwareLaps.some(
+    (lap) => lap.paceDeltaSecPerMile != null && Number.isFinite(lap.paceDeltaSecPerMile)
+  );
 }
 
-function WorkSegmentDeltaList({ rows }: { rows: WorkSegmentDelta[] }) {
+function phaseLabel(phase: PhaseAwareLapRow["phase"]): string {
+  switch (phase) {
+    case "warmup":
+      return "Warmup";
+    case "work":
+      return "Work";
+    case "recovery":
+      return "Recovery";
+    case "cooldown":
+      return "Cooldown";
+  }
+}
+
+function SplitBar({ lap }: { lap: PhaseAwareLapRow }) {
+  const pace = formatSecPerMile(lap.paceSecPerMile);
+  const prescribed =
+    lap.targetPaceSecPerMile != null
+      ? formatPaceTargetRangeDisplay(lap.targetPaceSecPerMile, lap.targetPaceSecPerMileHigh)
+      : "OPEN";
+  const delta = formatDeltaSecPerMile(lap.paceDeltaSecPerMile);
+  const barWidth =
+    lap.paceSecPerMile != null
+      ? `${Math.min(100, Math.max(18, 600 / lap.paceSecPerMile))}%`
+      : "24%";
+
   return (
-    <ul className="mt-3 space-y-2">
-      {rows.map((row) => (
-        <li
-          key={row.segmentId}
-          className="rounded-xl border border-violet-200 bg-white px-4 py-3 text-sm text-gray-800"
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="font-semibold text-gray-900">
-              {row.stepOrder}. {row.title}
-            </span>
-            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-900">
-              {paceVsTargetBadgeText(row.vsTargetLabel)}
-            </span>
-          </div>
-          <div className="mt-2 space-y-1 text-xs text-gray-600">
-            {row.targetPaceSecPerMile != null ? (
-              <p>
-                Planned:{" "}
-                {formatPaceTargetRangeDisplay(
-                  row.targetPaceSecPerMile,
-                  row.targetPaceSecPerMileHigh
-                ) ?? formatSecPerMile(row.targetPaceSecPerMile)}
-              </p>
-            ) : null}
-            {row.actualPaceSecPerMile != null ? (
-              <p className="text-sm font-medium tabular-nums text-gray-900">
-                Actual: {formatSecPerMile(row.actualPaceSecPerMile)}
-              </p>
-            ) : null}
-            {row.deltaDisplay !== "—" ? (
-              <p className="font-medium text-gray-800">{row.deltaDisplay}</p>
-            ) : null}
-          </div>
-        </li>
-      ))}
-    </ul>
+    <li className="rounded-xl border border-violet-200 bg-white px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+        <span className="font-semibold text-gray-900">
+          {phaseLabel(lap.phase)}
+          {lap.segmentTitle ? ` · ${lap.segmentTitle}` : ""}
+        </span>
+        <span className="tabular-nums text-gray-800">{pace ?? "—"}</span>
+      </div>
+      <div className="mt-2 h-2 rounded-full bg-violet-100">
+        <div
+          className="h-2 rounded-full bg-violet-600 transition-all"
+          style={{ width: barWidth }}
+        />
+      </div>
+      <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-gray-600">
+        <span>Prescribed: {prescribed ?? "OPEN"}</span>
+        <span className="font-medium text-violet-900">{delta}</span>
+      </div>
+    </li>
   );
 }
 
@@ -95,8 +103,9 @@ export default function PaceForPacePanel({
   }, [performanceAnalysis]);
 
   const current = analysis ?? performanceAnalysis;
-  const available = hasPaceForPaceResult(current);
+  const available = hasLapPaceDeltas(current);
   const showOffRamp = !available && Boolean(matchedActivityId);
+  const laps = current?.phaseAwareLaps ?? [];
 
   const handleResolve = useCallback(async () => {
     setResolving(true);
@@ -111,7 +120,7 @@ export default function PaceForPacePanel({
         activityId: matchedActivityId ?? undefined,
       });
       if (!res.data?.ok || !res.data.performanceAnalysis) {
-        setResolveError(res.data?.message ?? "Pace for Pace could not be generated.");
+        setResolveError(res.data?.message ?? NO_DETAIL_SUPPORT_MESSAGE);
         return;
       }
       setAnalysis(res.data.performanceAnalysis);
@@ -129,7 +138,7 @@ export default function PaceForPacePanel({
         "message" in e.response.data &&
         typeof (e.response.data as { message: unknown }).message === "string"
           ? (e.response.data as { message: string }).message
-          : "Could not generate Pace for Pace.";
+          : NO_DETAIL_SUPPORT_MESSAGE;
       setResolveError(msg);
     } finally {
       setResolving(false);
@@ -139,26 +148,25 @@ export default function PaceForPacePanel({
   if (!matchedActivityId) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-        Link a Garmin activity to see Pace for Pace.
+        Link a Garmin activity to see your splits.
       </div>
     );
   }
 
   return (
     <div className="rounded-2xl border-2 border-violet-300 bg-violet-50/60 p-5">
-      <p className="text-xs font-bold uppercase tracking-widest text-violet-900">Pace for Pace</p>
+      <p className="text-xs font-bold uppercase tracking-widest text-violet-900">Your splits</p>
 
       {available ? (
         <>
-          {current?.executionHeadline ? (
-            <p className="mt-2 text-sm font-medium text-violet-950">{current.executionHeadline}</p>
-          ) : null}
-          {current?.scorecard.workEffort?.summary ? (
-            <p className="mt-1 text-sm text-violet-900">{current.scorecard.workEffort.summary}</p>
-          ) : null}
-          {(current?.scorecard.workSegmentDeltas?.length ?? 0) > 0 ? (
-            <WorkSegmentDeltaList rows={current!.scorecard.workSegmentDeltas} />
-          ) : null}
+          <p className="mt-2 text-sm text-violet-950">
+            Prescribed vs actual pace for each lap.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {laps.map((lap) => (
+              <SplitBar key={`${lap.segmentId}-${lap.lapIndex}`} lap={lap} />
+            ))}
+          </ul>
         </>
       ) : (
         <>
@@ -168,7 +176,7 @@ export default function PaceForPacePanel({
             </p>
           ) : (
             <p className="mt-3 text-sm text-violet-900">
-              Structured comparison has not been generated for this run yet.
+              Splits have not been generated for this run yet.
             </p>
           )}
           {resolveError ? <p className="mt-2 text-sm text-red-700">{resolveError}</p> : null}
@@ -179,7 +187,7 @@ export default function PaceForPacePanel({
               disabled={resolving}
               className="mt-4 inline-flex items-center justify-center rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-60"
             >
-              {resolving ? "Generating…" : "See your Pace for Pace"}
+              {resolving ? "Analyzing…" : "Look at my metrics"}
             </button>
           ) : null}
         </>

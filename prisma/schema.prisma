@@ -117,6 +117,10 @@ model Athlete {
   runClubId               String?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
+  /// Login hydrate — copied from isPrimaryRace athlete_races row by align service only.
+  goalRaceName            String?
+  /// Login hydrate — copied from primary athlete_races.goalTime by align service only.
+  goalRaceTime            String?
   /// Last app bootstrap (GET /api/athlete/me or POST /api/athlete/create)
   lastSeenAt              DateTime?
   /// Rolling 90d avg weekly miles from athlete_activities — populated by cron, not computed on read.
@@ -2676,6 +2680,12 @@ model workout_segment_laps {
   avgHeartRate        Int?
   distanceMiles       Float?
   durationSeconds     Int?
+  /// Prescribed pace band low (sec/mi) stamped by pace analyzer; null = OPEN.
+  prescribedPaceMinSecPerMile  Int?
+  /// Prescribed pace band high (sec/mi) stamped by pace analyzer.
+  prescribedPaceMaxSecPerMile  Int?
+  /// prescribedMid − actual; positive = faster than prescribed. Written only by pace analyzer.
+  paceDeltaSecPerMile Int?
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   activity            athlete_activities  @relation(fields: [activityId], references: [id], onDelete: Cascade)

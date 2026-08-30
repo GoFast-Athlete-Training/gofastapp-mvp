@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Activity, Flag, Share2 } from "lucide-react";
+import { ArrowLeft, Activity, Flag, Share2, LineChart } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
+import ActivityRouteMap from "@/components/activities/ActivityRouteMap";
 import MarkActivityAsRaceSheet from "@/components/races/MarkActivityAsRaceSheet";
 import ShareActivityToHubSheet from "@/components/activities/ShareActivityToHubSheet";
 import { auth } from "@/lib/firebase";
@@ -34,6 +35,19 @@ type ActivityPayload = {
   steps: number | null;
   ingestionStatus: string;
   source: string;
+  summaryPolyline?: string | null;
+  startLatitude?: number | null;
+  startLongitude?: number | null;
+  endLatitude?: number | null;
+  endLongitude?: number | null;
+};
+
+type DerivedLapPayload = {
+  lapIndex: number;
+  durationSeconds: number;
+  distanceMiles: number | null;
+  avgPaceSecPerMile: number | null;
+  avgHeartRate: number | null;
 };
 
 type MatchedWorkoutPayload = {
@@ -79,6 +93,8 @@ export default function ActivityDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityPayload | null>(null);
   const [matched, setMatched] = useState<MatchedWorkoutPayload | null>(null);
+  const [derivedLaps, setDerivedLaps] = useState<DerivedLapPayload[]>([]);
+  const [hasDetail, setHasDetail] = useState(false);
   const [markRaceOpen, setMarkRaceOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [hubPost, setHubPost] = useState<ActivityPostOwnerPayload | null>(null);
@@ -101,16 +117,22 @@ export default function ActivityDetailPage() {
       const json = (await res.json()) as {
         activity?: ActivityPayload;
         matchedWorkout?: MatchedWorkoutPayload | null;
+        derivedLaps?: DerivedLapPayload[];
+        hasDetail?: boolean;
         error?: string;
       };
       if (!res.ok) {
         setError(json.error || "Could not load activity");
         setActivity(null);
         setMatched(null);
+        setDerivedLaps([]);
+        setHasDetail(false);
         return;
       }
       setActivity(json.activity ?? null);
       setMatched(json.matchedWorkout ?? null);
+      setDerivedLaps(json.derivedLaps ?? []);
+      setHasDetail(json.hasDetail ?? false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load activity");
       setActivity(null);
@@ -187,6 +209,14 @@ export default function ActivityDetailPage() {
     activity?.duration != null && activity.duration > 0
       ? Math.round(activity.duration / 60)
       : null;
+
+  const isRun =
+    activity?.activityType != null &&
+    /run|jog|walk|trail|track/i.test(activity.activityType);
+  const hasRoute = Boolean(
+    activity?.summaryPolyline ||
+      (activity?.startLatitude != null && activity?.startLongitude != null)
+  );
 
   const segWithActuals =
     matched?.segments?.filter(
@@ -308,6 +338,62 @@ export default function ActivityDetailPage() {
                   ) : null}
                 </div>
 
+                {hasRoute && activity ? (
+                  <div className="mb-8">
+                    <h2 className="text-base font-semibold text-gray-900 mb-3">Route</h2>
+                    <ActivityRouteMap
+                      summaryPolyline={activity.summaryPolyline ?? null}
+                      startLatitude={activity.startLatitude}
+                      startLongitude={activity.startLongitude}
+                      endLatitude={activity.endLatitude}
+                      endLongitude={activity.endLongitude}
+                    />
+                  </div>
+                ) : null}
+
+                <div className="mb-8">
+                  <h2 className="text-base font-semibold text-gray-900 mb-3">Laps</h2>
+                  {hasDetail && derivedLaps.length > 0 ? (
+                    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                      <div className="grid grid-cols-5 gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2 text-[11px] font-semibold uppercase text-gray-500">
+                        <span>Lap</span>
+                        <span>Time</span>
+                        <span>Dist</span>
+                        <span className="col-span-2">Pace</span>
+                      </div>
+                      {derivedLaps.map((lap) => (
+                        <div
+                          key={lap.lapIndex}
+                          className="grid grid-cols-5 gap-2 border-b border-gray-100 px-4 py-2 text-sm last:border-b-0"
+                        >
+                          <span className="font-medium text-gray-900">{lap.lapIndex}</span>
+                          <span className="tabular-nums text-gray-700">
+                            {lap.durationSeconds > 0
+                              ? `${Math.floor(lap.durationSeconds / 60)}:${String(
+                                  Math.round(lap.durationSeconds % 60)
+                                ).padStart(2, "0")}`
+                              : "—"}
+                          </span>
+                          <span className="tabular-nums text-gray-700">
+                            {lap.distanceMiles != null ? `${lap.distanceMiles.toFixed(2)} mi` : "—"}
+                          </span>
+                          <span className="col-span-2 tabular-nums text-gray-700">
+                            {lap.avgPaceSecPerMile != null && isRun
+                              ? formatSecPerMile(lap.avgPaceSecPerMile)
+                              : "—"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-4 text-sm text-gray-600">
+                      {hasDetail
+                        ? "No lap data in this activity."
+                        : "Waiting on Garmin detail sync for lap breakdown…"}
+                    </div>
+                  )}
+                </div>
+
                 {athleteId ? (
                   matched ? (
                     <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-5 mb-6">
@@ -422,6 +508,13 @@ export default function ActivityDetailPage() {
                       className="mt-4 inline-block text-sm font-semibold text-orange-600 hover:text-orange-700"
                     >
                       Open workout →
+                    </Link>
+                    <Link
+                      href={`/performance`}
+                      className="mt-2 ml-4 inline-flex items-center gap-1 text-sm font-semibold text-violet-700 hover:text-violet-800"
+                    >
+                      <LineChart className="h-4 w-4" aria-hidden />
+                      Performance analysis
                     </Link>
                   </div>
                 ) : (

@@ -210,6 +210,7 @@ export async function disconnectGarmin(athleteId: string) {
 export async function getAthleteByGarminUserId(garminUserId: string) {
   return prisma.athlete.findUnique({
     where: { garmin_user_id: garminUserId },
+    select: { id: true },
   });
 }
 
