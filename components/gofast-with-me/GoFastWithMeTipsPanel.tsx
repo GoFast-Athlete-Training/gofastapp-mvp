@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ExternalLink, Lightbulb, PenLine, Sparkles, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
-import type { AthleteTipMediaType, AthleteTipPayload } from '@/lib/gofast-with-me/athlete-tips';
+import type { AthleteTipMediaType, AthleteTipPayload, AthleteTipSeriesItem } from '@/lib/gofast-with-me/athlete-tips';
 import TipMediaPicker from '@/components/gofast-with-me/TipMediaPicker';
 
 type Props = {
@@ -16,6 +16,9 @@ type TipComposeMode = 'ai' | 'manual';
 type TipDraft = {
   title: string;
   body: string;
+  takeaway: string;
+  seriesTitle: string;
+  seriesItems: AthleteTipSeriesItem[];
   sortOrder: string;
   showOnLanding: boolean;
   showOnFeed: boolean;
@@ -26,6 +29,9 @@ type TipDraft = {
 const EMPTY_DRAFT: TipDraft = {
   title: '',
   body: '',
+  takeaway: '',
+  seriesTitle: '',
+  seriesItems: [],
   sortOrder: '0',
   showOnLanding: true,
   showOnFeed: true,
@@ -37,6 +43,9 @@ function tipPayloadToDraft(tip: AthleteTipPayload): TipDraft {
   return {
     title: tip.title,
     body: tip.body,
+    takeaway: tip.takeaway ?? '',
+    seriesTitle: tip.tipSeries?.title ?? '',
+    seriesItems: tip.tipSeries?.tips ?? [],
     sortOrder: String(tip.sortOrder),
     showOnLanding: tip.showOnLanding,
     showOnFeed: tip.showOnFeed,
@@ -46,9 +55,24 @@ function tipPayloadToDraft(tip: AthleteTipPayload): TipDraft {
 }
 
 function draftToApiBody(draft: TipDraft) {
+  const seriesTips = draft.seriesItems
+    .map((item) => ({
+      title: item.title.trim(),
+      body: item.body.trim(),
+    }))
+    .filter((item) => item.title || item.body);
+
   return {
     title: draft.title,
     body: draft.body,
+    takeaway: draft.takeaway.trim() || null,
+    tipSeries:
+      seriesTips.length > 0 || draft.seriesTitle.trim()
+        ? {
+            title: draft.seriesTitle.trim() || null,
+            tips: seriesTips,
+          }
+        : null,
     sortOrder: Number(draft.sortOrder) || 0,
     showOnLanding: draft.showOnLanding,
     showOnFeed: draft.showOnFeed,
@@ -334,16 +358,101 @@ export default function GoFastWithMeTipsPanel({ athleteId, liveUrl }: Props) {
           </div>
 
           <label className="block">
-            <span className="text-xs font-semibold text-gray-700">Body</span>
+            <span className="text-xs font-semibold text-gray-700">The Big Idea</span>
             <textarea
               value={draft.body}
               onChange={(e) => setDraft((prev) => ({ ...prev, body: e.target.value }))}
               rows={6}
               maxLength={8000}
               className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm"
-              placeholder="Share a practical tip your followers can come back to..."
+              placeholder="Share the core insight your followers can come back to..."
             />
           </label>
+
+          <label className="block">
+            <span className="text-xs font-semibold text-gray-700">The Takeaway (optional)</span>
+            <textarea
+              value={draft.takeaway}
+              onChange={(e) => setDraft((prev) => ({ ...prev, takeaway: e.target.value }))}
+              rows={3}
+              maxLength={2000}
+              className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm"
+              placeholder="One line they should remember — sleep 8 hours, fuel within 30 minutes, etc."
+            />
+          </label>
+
+          <fieldset className="space-y-3 rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+            <legend className="px-1 text-xs font-semibold text-gray-700">Tip series (optional)</legend>
+            <label className="block">
+              <span className="text-xs text-gray-600">Series title</span>
+              <input
+                value={draft.seriesTitle}
+                onChange={(e) => setDraft((prev) => ({ ...prev, seriesTitle: e.target.value }))}
+                maxLength={120}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white"
+                placeholder="Three fueling mistakes to avoid"
+              />
+            </label>
+            <div className="space-y-2">
+              {draft.seriesItems.map((item, index) => (
+                <div key={index} className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                  <input
+                    value={item.title}
+                    onChange={(e) =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        seriesItems: prev.seriesItems.map((row, i) =>
+                          i === index ? { ...row, title: e.target.value } : row
+                        ),
+                      }))
+                    }
+                    maxLength={120}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold"
+                    placeholder={`Item ${index + 1} title`}
+                  />
+                  <textarea
+                    value={item.body}
+                    onChange={(e) =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        seriesItems: prev.seriesItems.map((row, i) =>
+                          i === index ? { ...row, body: e.target.value } : row
+                        ),
+                      }))
+                    }
+                    rows={3}
+                    maxLength={4000}
+                    className="w-full rounded-lg border border-gray-300 p-3 text-sm"
+                    placeholder="Short explanation"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        seriesItems: prev.seriesItems.filter((_, i) => i !== index),
+                      }))
+                    }
+                    className="text-xs font-semibold text-red-600 hover:underline"
+                  >
+                    Remove item
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setDraft((prev) => ({
+                  ...prev,
+                  seriesItems: [...prev.seriesItems, { title: '', body: '' }],
+                }))
+              }
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Add series item
+            </button>
+          </fieldset>
 
           <TipMediaPicker
             mediaUrl={draft.mediaUrl}
@@ -546,6 +655,17 @@ function TipEditorCard({
         rows={5}
         maxLength={8000}
         className="w-full rounded-lg border border-gray-300 p-3 text-sm"
+        aria-label="The Big Idea"
+      />
+
+      <textarea
+        value={draft.takeaway}
+        onChange={(e) => setDraft((prev) => ({ ...prev, takeaway: e.target.value }))}
+        rows={2}
+        maxLength={2000}
+        className="w-full rounded-lg border border-orange-200 bg-orange-50/40 p-3 text-sm"
+        placeholder="The Takeaway (optional)"
+        aria-label="The Takeaway"
       />
 
       <TipMediaPicker

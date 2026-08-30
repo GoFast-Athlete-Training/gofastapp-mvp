@@ -34,6 +34,10 @@ import {
   type WorkoutStoryPayload,
 } from '@/lib/gofast-with-me/workout-stories';
 import {
+  listRecentAthleteActivities,
+  type RecentAthleteActivityPayload,
+} from '@/lib/gofast-with-me/recent-athlete-activities';
+import {
   listPublicInstagramMedia,
   type AthleteInstagramMediaPayload,
 } from '@/lib/gofast-with-me/instagram-hydration';
@@ -106,6 +110,7 @@ export type ContainerHubPayload = {
   instagramMedia: AthleteInstagramMediaPayload[];
   workoutStories: WorkoutStoryPayload[];
   activityPosts: ActivityPostPayload[];
+  recentActivities: RecentAthleteActivityPayload[];
 };
 
 export type AthleteCommunityPayload = ContainerHubPayload & {
@@ -305,7 +310,18 @@ export async function loadAthleteCommunityForHost(
   const handle = host.gofastHandle?.trim();
   const publicPage = handle ? await loadPublicAthletePage(handle) : null;
 
-  const [memberRows, memberCount, publishedPlan, messageRows, tips, runRoutes, instagramMedia, workoutStories, activityPosts] =
+  const [
+    memberRows,
+    memberCount,
+    publishedPlan,
+    messageRows,
+    tips,
+    runRoutes,
+    instagramMedia,
+    workoutStories,
+    activityPosts,
+    recentActivities,
+  ] =
     await Promise.all([
     prisma.gofast_container_memberships.findMany({
       where: { containerAthleteId: host.id },
@@ -339,6 +355,7 @@ export async function loadAthleteCommunityForHost(
     listPublicInstagramMedia(host.id, 5),
     listPublishedWorkoutStories(host.id, 20),
     listPublishedActivityPosts(host.id, 20),
+    listRecentAthleteActivities(host.id, 5),
   ]);
 
   return {
@@ -377,6 +394,7 @@ export async function loadAthleteCommunityForHost(
     instagramMedia,
     workoutStories,
     activityPosts,
+    recentActivities,
   };
 }
 

@@ -74,4 +74,27 @@ describe('mapAthleteTip', () => {
     assert.equal(out.mediaUrl, null);
     assert.equal(out.mediaType, null);
   });
+
+  it('maps takeaway and tip series', () => {
+    const out = mapAthleteTip({
+      id: 't1',
+      title: 'Tip',
+      body: 'Big idea',
+      takeaway: 'Remember this',
+      tipSeries: { title: 'Series', tips: [{ title: 'One', body: 'First' }] },
+      mediaUrl: null,
+      mediaType: null,
+      sortOrder: 0,
+      isPublished: true,
+      showOnLanding: true,
+      showOnFeed: true,
+      publishedAt: new Date('2026-08-01T00:00:00.000Z'),
+      createdAt: new Date('2026-08-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+    });
+    assert.equal(out.takeaway, 'Remember this');
+    assert.equal(out.bigIdea, 'Big idea');
+    assert.equal(out.tipSeries?.title, 'Series');
+    assert.equal(out.tipSeries?.tips.length, 1);
+  });
 });

@@ -413,7 +413,12 @@ model athlete_tips {
   id          String    @id @default(cuid())
   athleteId   String
   title       String
+  /// The Big Idea — long-form tip content.
   body        String    @db.Text
+  /// Optional short actionable takeaway.
+  takeaway    String?   @db.Text
+  /// Optional structured series: { title?: string, tips: { title: string, body: string }[] }
+  tipSeries   Json?
   /// Optional Vercel Blob URL for tip image or short video.
   mediaUrl    String?
   /// `image` | `video` when mediaUrl is set.

@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
@@ -8,6 +9,7 @@ import {
   listAthleteTipsForOwner,
   mapAthleteTip,
   normalizeTipInput,
+  tipSeriesToJson,
 } from '@/lib/gofast-with-me/athlete-tips';
 
 const MAX_TITLE = 120;
@@ -90,6 +92,8 @@ export async function POST(
         athleteId,
         title: input.title,
         body: input.body,
+        takeaway: input.takeaway,
+        tipSeries: input.tipSeries ? tipSeriesToJson(input.tipSeries) : Prisma.JsonNull,
         mediaUrl: input.mediaUrl,
         mediaType: input.mediaType,
         sortOrder: input.sortOrder,

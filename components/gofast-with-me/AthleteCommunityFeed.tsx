@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { CommunityFeedItem } from '@/lib/gofast-with-me/community-feed';
+import { AthleteTipStructuredCard } from '@/components/gofast-with-me/AthleteTipStructuredCard';
 import {
   communityFeedItemLabel,
   formatTrainingDistance,
@@ -135,26 +136,10 @@ export default function AthleteCommunityFeed({ items, hostFirstName, emptyMessag
         if (item.kind === 'tip') {
           const tip = item.tip;
           return (
-            <article
-              key={item.id}
-              className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
-            >
-              <p className="text-[10px] font-bold uppercase tracking-wide text-sky-700">
-                {communityFeedItemLabel(item.kind)}
-              </p>
-              <h3 className="mt-1 text-base font-semibold text-gray-900">{tip.title}</h3>
-              <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap line-clamp-6">
-                {tip.body}
-              </p>
-              {tip.mediaUrl ? (
-                <img
-                  src={tip.mediaUrl}
-                  alt=""
-                  className="mt-3 max-h-48 w-full rounded-xl object-cover"
-                />
-              ) : null}
+            <div key={item.id}>
+              <AthleteTipStructuredCard tip={tip} />
               <p className="mt-2 text-xs text-gray-400">{formatWhen(item.sortAt)}</p>
-            </article>
+            </div>
           );
         }
 

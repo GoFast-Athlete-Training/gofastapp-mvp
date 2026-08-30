@@ -1,5 +1,6 @@
 import type { AthleteTipPayload } from '@/lib/gofast-with-me/athlete-tips';
 import { AthleteInstagramHandleLink } from '@/components/gofast-with-me/TipMediaPicker';
+import { AthleteTipStructuredCard } from '@/components/gofast-with-me/AthleteTipStructuredCard';
 
 type Props = {
   tips: AthleteTipPayload[];
@@ -30,39 +31,7 @@ export default function AthleteTipsSection({
       {tips.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2">
           {tips.map((tip) => (
-            <article key={tip.id} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-              {tip.mediaUrl ? (
-                <div className="border-b border-gray-100 bg-gray-50">
-                  {tip.mediaType === 'video' ? (
-                    <video
-                      src={tip.mediaUrl}
-                      controls
-                      playsInline
-                      className="aspect-video w-full bg-black object-cover"
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={tip.mediaUrl}
-                      alt=""
-                      className="aspect-video w-full object-cover"
-                    />
-                  )}
-                </div>
-              ) : null}
-              <div className="p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-orange-700">Tip</p>
-                <h3 className="mt-1 text-base font-bold text-gray-900">{tip.title}</h3>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                  {tip.body}
-                </p>
-                {tip.publishedAt ? (
-                  <p className="mt-3 text-xs text-gray-400">
-                    Published {new Date(tip.publishedAt).toLocaleDateString()}
-                  </p>
-                ) : null}
-              </div>
-            </article>
+            <AthleteTipStructuredCard key={tip.id} tip={tip} />
           ))}
         </div>
       ) : (

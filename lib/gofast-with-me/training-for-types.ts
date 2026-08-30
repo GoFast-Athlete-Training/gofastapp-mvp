@@ -21,6 +21,7 @@ export type GoFastWithMeChasingGoal = {
   raceCity: string | null;
   raceState: string | null;
   raceDistanceLabel: string | null;
+  raceLogoUrl?: string | null;
 };
 
 export type GoFastWithMeTrainingFor = {
