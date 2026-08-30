@@ -5,6 +5,9 @@ import {
   finalizePaidCommitment,
   getCommitmentById,
 } from "@/lib/sponsorship/commitment-service";
+import {
+  finishSponsorshipForCommitment,
+} from "@/lib/sponsorship/sponsorship-service";
 import { loadPaymentIntentDetails } from "@/lib/sponsorship/payment-intent-details";
 import {
   SponsorCommitmentPaymentLifecycle,
@@ -125,6 +128,8 @@ export async function handleBrandPartnershipChargeRefunded(
       updatedAt: new Date(),
     },
   });
+
+  await finishSponsorshipForCommitment(sponsorCommitmentId, new Date(), "refund");
 
   return { handled: true };
 }

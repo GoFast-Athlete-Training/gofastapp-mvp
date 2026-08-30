@@ -191,6 +191,7 @@ model Athlete {
   athlete_activity_posts      athlete_activity_posts[]
   athlete_instagram_media     athlete_instagram_media[]
   sponsorship_candidate sponsorship_candidates?
+  sponsorships                sponsorships[]
 }
 
 enum SponsorshipCandidateType {
@@ -227,6 +228,12 @@ enum SponsorCommitmentPaymentLifecycle {
   FAILED
 }
 
+enum SponsorshipDeliveryStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+}
+
 /// Athlete (or future surface) eligible for Brand Partnerships inventory.
 model sponsorship_candidates {
   id                 String                     @id @default(uuid())
@@ -243,8 +250,9 @@ model sponsorship_candidates {
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
 
-  athlete     Athlete               @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  commitments sponsor_commitments[]
+  athlete      Athlete               @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  commitments  sponsor_commitments[]
+  sponsorships sponsorships[]
 
   @@index([status])
   @@index([candidateType, status])
@@ -286,8 +294,9 @@ model sponsor_commitments {
   createdAt               DateTime                       @default(now())
   updatedAt               DateTime                       @updatedAt
 
-  candidate sponsorship_candidates @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  payments  sponsor_commitment_payments[]
+  candidate   sponsorship_candidates @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  payments    sponsor_commitment_payments[]
+  sponsorship sponsorships?
 
   @@index([candidateId, status])
   @@index([candidateId, startsAt, endsAt])
@@ -295,6 +304,37 @@ model sponsor_commitments {
   @@index([paymentStatus])
   @@index([brandId])
   @@map("sponsor_commitments")
+}
+
+/// Live ad hydration spawned from a paid sponsor_commitment receipt.
+model sponsorships {
+  id                   String                    @id @default(uuid())
+  sponsorCommitmentId  String                    @unique
+  candidateId          String
+  athleteId            String
+  brandId              String
+  name                 String?
+  brandLogoUrlSnapshot String?
+  creativeUrl          String?
+  ctaUrl               String?
+  cpmAmount            Int                       @default(0)
+  cpmUsed              Int                       @default(0)
+  startsAt             DateTime
+  endsAt               DateTime
+  status               SponsorshipDeliveryStatus @default(SCHEDULED)
+  finishedAt           DateTime?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  commitment sponsor_commitments    @relation(fields: [sponsorCommitmentId], references: [id], onDelete: Cascade)
+  candidate  sponsorship_candidates @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  athlete    Athlete                @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId, status])
+  @@index([candidateId, status])
+  @@index([status, endsAt])
+  @@index([brandId])
+  @@map("sponsorships")
 }
 
 /// Commitment-scoped payment/transaction record (mirrors run_program_registration_success_payments).

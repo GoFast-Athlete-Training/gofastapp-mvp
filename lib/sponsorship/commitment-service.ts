@@ -14,6 +14,11 @@ import {
   validateCandidatePurchaseIdentity,
 } from "@/lib/sponsorship/candidate-service";
 import {
+  getActiveSponsorshipSnapshotForAthlete,
+  listAthleteSponsorshipHistory as listAthleteSponsorshipHistoryFromService,
+  spawnSponsorshipFromPaidCommitment,
+} from "@/lib/sponsorship/sponsorship-service";
+import {
   SponsorCommitmentPaymentStatus,
   SponsorCommitmentStatus,
   type sponsor_commitments,
@@ -69,53 +74,7 @@ export type ActiveCommitmentSnapshot = {
   endsAt: string;
 };
 
-export type AthleteSponsorshipHistoryRow = {
-  commitmentId: string;
-  brandNameSnapshot: string | null;
-  brandLogoUrlSnapshot: string | null;
-  creativeUrl: string | null;
-  ctaUrl: string | null;
-  startsAt: string;
-  endsAt: string;
-  status: SponsorCommitmentStatus;
-  paymentStatus: SponsorCommitmentPaymentStatus;
-  amountPaidCents: number | null;
-  athleteShareCents: number | null;
-  paidAt: string | null;
-};
-
-export function mapSponsorshipHistoryRow(
-  row: Pick<
-    sponsor_commitments,
-    | "id"
-    | "brandNameSnapshot"
-    | "brandLogoUrlSnapshot"
-    | "creativeUrl"
-    | "ctaUrl"
-    | "startsAt"
-    | "endsAt"
-    | "status"
-    | "paymentStatus"
-    | "amountPaidCents"
-    | "athleteShareCents"
-    | "paidAt"
-  >,
-): AthleteSponsorshipHistoryRow {
-  return {
-    commitmentId: row.id,
-    brandNameSnapshot: row.brandNameSnapshot,
-    brandLogoUrlSnapshot: row.brandLogoUrlSnapshot,
-    creativeUrl: row.creativeUrl,
-    ctaUrl: row.ctaUrl,
-    startsAt: row.startsAt.toISOString(),
-    endsAt: row.endsAt.toISOString(),
-    status: row.status,
-    paymentStatus: row.paymentStatus,
-    amountPaidCents: row.amountPaidCents,
-    athleteShareCents: row.athleteShareCents,
-    paidAt: row.paidAt?.toISOString() ?? null,
-  };
-}
+export type { AthleteSponsorshipHistoryRow } from "@/lib/sponsorship/sponsorship-service";
 
 function deriveRuntimeStatus(
   startsAt: Date,
@@ -270,6 +229,7 @@ export async function finalizePaidCommitment(
   }
 
   if (existing.paymentStatus === SponsorCommitmentPaymentStatus.PAID) {
+    await spawnSponsorshipFromPaidCommitment(existing, input.paidAt ?? new Date());
     return { commitment: existing, newlyActivated: false };
   }
 
@@ -314,6 +274,8 @@ export async function finalizePaidCommitment(
       transferredAt: input.stripeTransferId ? paidAt : null,
     });
   }
+
+  await spawnSponsorshipFromPaidCommitment(updated, paidAt);
 
   await notifyAthleteOfNewSponsorship(updated);
 
@@ -452,91 +414,29 @@ export async function getActiveCommitmentSnapshotForAthlete(
   athleteId: string,
   now = new Date(),
 ): Promise<ActiveCommitmentSnapshot | null> {
-  const candidate = await prisma.sponsorship_candidates.findFirst({
-    where: { athleteId },
-    select: { id: true },
-  });
-  if (!candidate) return null;
-
-  const commitment = await prisma.sponsor_commitments.findFirst({
-    where: {
-      candidateId: candidate.id,
-      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
-      startsAt: { lte: now },
-      endsAt: { gt: now },
-      status: {
-        in: [SponsorCommitmentStatus.SCHEDULED, SponsorCommitmentStatus.ACTIVE],
-      },
-    },
-    orderBy: [{ startsAt: "desc" }],
-  });
-
-  if (!commitment || (!commitment.creativeUrl?.trim() && !commitment.ctaUrl?.trim())) {
-    return null;
-  }
+  const snapshot = await getActiveSponsorshipSnapshotForAthlete(athleteId, now);
+  if (!snapshot) return null;
 
   return {
-    commitmentId: commitment.id,
-    brandNameSnapshot: commitment.brandNameSnapshot,
-    brandLogoUrlSnapshot: commitment.brandLogoUrlSnapshot,
-    creativeUrl: commitment.creativeUrl,
-    ctaUrl: commitment.ctaUrl,
-    startsAt: commitment.startsAt.toISOString(),
-    endsAt: commitment.endsAt.toISOString(),
+    commitmentId: snapshot.commitmentId,
+    brandNameSnapshot: snapshot.brandNameSnapshot,
+    brandLogoUrlSnapshot: snapshot.brandLogoUrlSnapshot,
+    creativeUrl: snapshot.creativeUrl,
+    ctaUrl: snapshot.ctaUrl,
+    startsAt: snapshot.startsAt,
+    endsAt: snapshot.endsAt,
   };
 }
 
 export async function listAthleteSponsorshipHistory(
   athleteId: string,
-): Promise<AthleteSponsorshipHistoryRow[]> {
-  const candidate = await prisma.sponsorship_candidates.findFirst({
-    where: { athleteId },
-    select: { id: true },
-  });
-  if (!candidate) return [];
-
-  const rows = await prisma.sponsor_commitments.findMany({
-    where: {
-      candidateId: candidate.id,
-      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
-    },
-    orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
-  });
-
-  return rows.map(mapSponsorshipHistoryRow);
+) {
+  return listAthleteSponsorshipHistoryFromService(athleteId);
 }
 
-export async function expireEndedSponsorCommitments(now = new Date()): Promise<number> {
-  const result = await prisma.sponsor_commitments.updateMany({
-    where: {
-      endsAt: { lte: now },
-      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
-      status: {
-        in: [SponsorCommitmentStatus.SCHEDULED, SponsorCommitmentStatus.ACTIVE],
-      },
-    },
-    data: {
-      status: SponsorCommitmentStatus.EXPIRED,
-      updatedAt: now,
-    },
-  });
-  return result.count;
-}
-
-export async function activateStartedSponsorCommitments(now = new Date()): Promise<number> {
-  const result = await prisma.sponsor_commitments.updateMany({
-    where: {
-      startsAt: { lte: now },
-      endsAt: { gt: now },
-      paymentStatus: SponsorCommitmentPaymentStatus.PAID,
-      status: SponsorCommitmentStatus.SCHEDULED,
-    },
-    data: {
-      status: SponsorCommitmentStatus.ACTIVE,
-      updatedAt: now,
-    },
-  });
-  return result.count;
-}
+export {
+  activateStartedSponsorCommitments,
+  expireEndedSponsorCommitments,
+} from "@/lib/sponsorship/sponsorship-service";
 
 export { deriveRuntimeStatus, AthletePayoutSetupRequiredError };
