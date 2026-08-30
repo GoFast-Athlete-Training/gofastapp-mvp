@@ -9,7 +9,7 @@ import {
   emailContactability,
   isExternallyContactableEmail,
 } from '@/lib/athlete-contact-email';
-import { touchAthleteLastSeen } from '@/lib/touch-athlete-last-seen';
+import { touchAthleteLastSeenIfStale } from '@/lib/touch-athlete-last-seen';
 
 export async function POST(request: Request) {
   try {
@@ -286,7 +286,10 @@ export async function POST(request: Request) {
         profileComplete: !!(athlete.firstName && athlete.lastName),
       });
     } else {
-      void touchAthleteLastSeen(athlete.id);
+      await touchAthleteLastSeenIfStale(
+        athlete.id,
+        (athlete as { lastSeenAt?: Date | null }).lastSeenAt ?? null
+      );
     }
 
     // Return athlete id + firebase mapping for the client bootstrap flow

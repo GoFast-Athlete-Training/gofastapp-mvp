@@ -2,7 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
-import { getAthleteById, updateAthlete } from '@/lib/domain-athlete';
+import { getAthleteById, getAthleteProfileById, updateAthlete } from '@/lib/domain-athlete';
+import { isPrismaPoolTimeout } from '@/lib/touch-athlete-last-seen';
 import { syncAthleteFiveKPaceToActivePlan } from '@/lib/training/plan-lifecycle';
 import { buildAthleteForClient } from '@/lib/athlete-for-client';
 import { buildLeaderContext } from '@/lib/run-club-leader-context';
@@ -31,9 +32,15 @@ export async function GET(
 
     let athlete;
     try {
-      athlete = await getAthleteById(id);
+      athlete = await getAthleteProfileById(id);
     } catch (err) {
       console.error('Prisma error:', err);
+      if (isPrismaPoolTimeout(err)) {
+        return NextResponse.json(
+          { error: 'Database busy, try again', retryable: true },
+          { status: 503 }
+        );
+      }
       return NextResponse.json({ error: 'DB error' }, { status: 500 });
     }
 

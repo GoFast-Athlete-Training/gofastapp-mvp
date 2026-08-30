@@ -1,5 +1,6 @@
 import { adminAuth } from './firebaseAdmin';
 import { disconnectGarmin } from './domain-garmin';
+import { ATHLETE_PROFILE_SELECT } from './athlete-for-client';
 import { prisma } from './prisma';
 import { normalizeAthleteMemberships } from './normalize-prisma';
 
@@ -13,6 +14,13 @@ function generateId(): string {
 export async function getAthleteById(athleteId: string) {
   return prisma.athlete.findUnique({
     where: { id: athleteId },
+  });
+}
+
+export async function getAthleteProfileById(athleteId: string) {
+  return prisma.athlete.findUnique({
+    where: { id: athleteId },
+    select: ATHLETE_PROFILE_SELECT,
   });
 }
 
