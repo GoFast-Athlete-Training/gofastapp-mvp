@@ -9,6 +9,16 @@ PROJECT="${GOFAST_GCP_PROJECT:-gofast-497201}"
 REGION="${GOFAST_GCP_REGION:-us-east4}"
 SERVICE="garmin-activity-detail-ingest"
 
+if command -v mise >/dev/null 2>&1; then
+  MISE_PYTHON="$(mise which python@3.12 2>/dev/null || true)"
+  if [[ -z "$MISE_PYTHON" && -x "$HOME/.local/share/mise/installs/python/3.12.14/bin/python3" ]]; then
+    MISE_PYTHON="$HOME/.local/share/mise/installs/python/3.12.14/bin/python3"
+  fi
+  if [[ -n "$MISE_PYTHON" ]]; then
+    export CLOUDSDK_PYTHON="$MISE_PYTHON"
+  fi
+fi
+
 if ! command -v gcloud >/dev/null 2>&1; then
   echo "gcloud CLI not found. Install: https://cloud.google.com/sdk/docs/install"
   echo "Or use GCP Console → Cloud Run → $SERVICE → Deploy from source"
