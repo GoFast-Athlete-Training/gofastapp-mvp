@@ -20,6 +20,12 @@ export async function POST(request: Request) {
 
     // Extract onboarding intent from request body; assign CLUB_LEADER role so front door routes to /leader
     const onboardingIntent = body.onboardingIntent as 'CLUB_LEADER' | 'ATHLETE' | undefined;
+    const acquisitionInviteToken =
+      typeof body.acquisitionInviteToken === 'string'
+        ? body.acquisitionInviteToken.trim()
+        : typeof body.acquisitionInvite === 'string'
+          ? body.acquisitionInvite.trim()
+          : undefined;
     if (onboardingIntent === 'CLUB_LEADER') {
       console.log('🎯 ATHLETE CREATE: Club leader intent detected – will set role to CLUB_LEADER after upsert');
     }
@@ -284,6 +290,8 @@ export async function POST(request: Request) {
         lastName: athlete.lastName,
         isPrivateRelayEmail: emailContactability(athlete.email) === 'apple_relay',
         profileComplete: !!(athlete.firstName && athlete.lastName),
+        ...(acquisitionInviteToken ? { acquisitionInviteToken } : {}),
+        companyId: company.id,
       });
     } else {
       await touchAthleteLastSeenIfStale(
