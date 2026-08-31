@@ -26,10 +26,18 @@ if ! command -v gcloud >/dev/null 2>&1; then
   exit 1
 fi
 
+TAG="$(git rev-parse --short HEAD 2>/dev/null || echo latest)"
+IMAGE="gcr.io/${PROJECT}/${SERVICE}:${TAG}"
+
+echo "Building $IMAGE from Dockerfile.garmin-activity-detail-ingest..."
+gcloud builds submit . \
+  --config scripts/cloudbuild-garmin-activity-detail-ingest.yaml \
+  --substitutions="_IMAGE=${IMAGE}" \
+  --project "$PROJECT"
+
 echo "Deploying $SERVICE to $REGION (project $PROJECT)..."
 gcloud run deploy "$SERVICE" \
-  --source . \
-  --dockerfile Dockerfile.garmin-activity-detail-ingest \
+  --image "$IMAGE" \
   --region "$REGION" \
   --project "$PROJECT" \
   --allow-unauthenticated
