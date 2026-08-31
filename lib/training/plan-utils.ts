@@ -236,6 +236,16 @@ export function currentTrainingWeekNumber(
   return Math.min(Math.max(rawWeek, 1), totalWeeks);
 }
 
+/** Performance tab reflects the previous completed plan week (min week 1). */
+export function performanceReflectionWeekNumber(
+  planStartRaw: Date | string,
+  totalWeeks: number,
+  now: Date = new Date()
+): number {
+  const current = currentTrainingWeekNumber(planStartRaw, totalWeeks, now);
+  return Math.max(1, current - 1);
+}
+
 /**
  * 1-based training week index for a calendar day (`YYYY-MM-DD`) vs plan start (Mon–Sun weeks, UTC).
  * Clamps to [1, totalWeeks].

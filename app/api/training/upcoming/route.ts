@@ -3,9 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { planScheduleDaysForWeek } from "@/lib/training/plan-schedule";
-import { loadCatalogueTitleByIdFromPlanSchedule } from "@/lib/training/catalogue-title-map";
-import { mergePlanDayTitle } from "@/lib/training/workout-display-title";
+import { buildPlanWeekCards } from "@/lib/training/plan-week-cards";
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -102,16 +100,11 @@ export async function GET(request: NextRequest) {
           distanceMeters: terminal.distanceMeters,
         }
       : null;
-    type Acc = {
-      dateKey: string;
-      title: string;
-      workoutType: string;
-      estimatedDistanceInMeters: number;
-      isPlanSession: true;
-    };
-    const planByDate = new Map<string, Acc>();
     let planWeekNumber: number | null = null;
     let planTotalWeeks: number | null = null;
+    let workoutTodayDone = false;
+    const merged: UpcomingSessionJson[] = [];
+    const planKeysSet = new Set<string>();
 
     if (
       plan &&
@@ -132,203 +125,61 @@ export async function GET(request: NextRequest) {
       planWeekNumber = startWeek;
       planTotalWeeks = effectiveWeeks;
 
-      const catalogueTitleById = await loadCatalogueTitleByIdFromPlanSchedule(
-        plan.planSchedule
-      );
+      const raceDistanceMiles =
+        race?.distanceMeters != null &&
+        Number.isFinite(Number(race.distanceMeters))
+          ? metersToMiles(Number(race.distanceMeters))
+          : null;
 
-      for (
-        let weekNum = startWeek;
-        weekNum <= effectiveWeeks;
-        weekNum++
-      ) {
-        const weekDays = planScheduleDaysForWeek({
+      for (let weekNum = startWeek; weekNum <= effectiveWeeks; weekNum++) {
+        const cards = await buildPlanWeekCards({
+          planId: plan.id,
+          athleteId: athlete.id,
           planStartDate: plan.startDate,
           planSchedule: plan.planSchedule,
           weekNumber: weekNum,
+          storedTotalWeeks: plan.totalWeeks,
           raceDate: race?.raceDate ?? null,
           raceName: race?.name ?? null,
-          raceDistanceMiles:
-            race?.distanceMeters != null &&
-            Number.isFinite(Number(race.distanceMeters))
-              ? metersToMiles(Number(race.distanceMeters))
-              : null,
-          totalWeeks: effectiveWeeks,
-          catalogueTitleById,
+          raceDistanceMiles,
         });
 
-        for (const d of weekDays) {
-          if (d.dateKey < todayKey) continue;
-          if (!planByDate.has(d.dateKey)) {
-            planByDate.set(d.dateKey, {
-              dateKey: d.dateKey,
-              title: d.title,
-              workoutType: d.workoutType,
-              estimatedDistanceInMeters: d.estimatedDistanceInMeters,
-              isPlanSession: true,
-            });
-          }
+        if (weekNum === startWeek) {
+          const todayCard = cards.find((c) => c.dateKey === todayKey);
+          workoutTodayDone = Boolean(
+            todayCard?.workoutId && todayCard?.matchedActivityId
+          );
         }
 
-        const futureSlotCount = [...planByDate.keys()].length;
-        if (futureSlotCount >= limit) {
-          break;
+        for (const c of cards) {
+          if (c.dateKey < todayKey) continue;
+          if (planKeysSet.has(c.dateKey)) continue;
+          planKeysSet.add(c.dateKey);
+
+          const workoutId = c.workoutId;
+          const plannedWorkoutId = c.plannedWorkoutId;
+          merged.push({
+            id:
+              workoutId ??
+              (plannedWorkoutId ? `plan-${plannedWorkoutId}` : `plan-${c.dateKey}`),
+            title: c.title,
+            workoutType: c.workoutType,
+            date: `${c.dateKey}T12:00:00.000Z`,
+            matchedActivityId: c.matchedActivityId,
+            skippedAt: c.skippedAt,
+            skipReason: c.skipReason,
+            paceDeltaSecPerMile: null,
+            segments: undefined,
+            workoutId,
+            isPlanSession: true,
+            hasScheduledTime: false,
+            estimatedDistanceInMeters: c.estimatedDistanceInMeters,
+          });
         }
+
+        if (merged.length >= limit) break;
       }
     }
-
-    const planDateKeys = [...planByDate.keys()].sort();
-    type MaterializedPlanDay = {
-      plannedWorkoutId: string | null;
-      workoutId: string | null;
-      title: string;
-      workoutType: string;
-      matchedActivityId: string | null;
-      skippedAt: string | null;
-      skipReason: string | null;
-      paceDeltaSecPerMile: number | null;
-      estimatedDistanceInMeters: number | null;
-      segments: { stepOrder: number; targets: unknown }[];
-    };
-    const materializedByKey = new Map<string, MaterializedPlanDay>();
-
-    if (plan && planDateKeys.length > 0) {
-      const minKey = planDateKeys[0]!;
-      const maxKey = planDateKeys[planDateKeys.length - 1]!;
-      const gte = utcStartOfDayFromKey(minKey);
-      const lt = utcNextDayStartFromKey(maxKey);
-
-      const [plannedRows, legacyRows] = await Promise.all([
-        prisma.planned_workouts.findMany({
-          where: {
-            athleteId: athlete.id,
-            planId: plan.id,
-            date: { gte, lt },
-          },
-          include: {
-            segments: { orderBy: { stepOrder: "asc" } },
-          },
-        }),
-        prisma.workouts.findMany({
-          where: {
-            athleteId: athlete.id,
-            planId: plan.id,
-            date: { gte, lt },
-          },
-          include: {
-            segments: { orderBy: { stepOrder: "asc" } },
-          },
-        }),
-      ]);
-
-      const plannedIds = plannedRows.map((p) => p.id);
-      const spawnedInstances =
-        plannedIds.length > 0
-          ? await prisma.workouts.findMany({
-              where: {
-                athleteId: athlete.id,
-                OR: [
-                  { id: { in: plannedIds } },
-                  { plannedWorkoutId: { in: plannedIds } },
-                ],
-              },
-              orderBy: { updatedAt: "desc" },
-            })
-          : [];
-
-      const instanceByPlannedId = new Map<
-        string,
-        (typeof spawnedInstances)[number]
-      >();
-      for (const inst of spawnedInstances) {
-        let plannedKey: string | null = null;
-        if (plannedIds.includes(inst.id)) {
-          plannedKey = inst.id;
-        } else if (
-          inst.plannedWorkoutId &&
-          plannedIds.includes(inst.plannedWorkoutId)
-        ) {
-          plannedKey = inst.plannedWorkoutId;
-        }
-        if (plannedKey && !instanceByPlannedId.has(plannedKey)) {
-          instanceByPlannedId.set(plannedKey, inst);
-        }
-      }
-
-      for (const w of plannedRows) {
-        if (!w.date) continue;
-        const key = ymdFromDate(utcDateOnly(w.date));
-        const instance = instanceByPlannedId.get(w.id);
-        materializedByKey.set(key, {
-          plannedWorkoutId: w.id,
-          workoutId: instance?.id ?? null,
-          title: w.title,
-          workoutType: w.workoutType,
-          matchedActivityId: instance?.matchedActivityId ?? null,
-          skippedAt: instance?.skippedAt?.toISOString() ?? null,
-          skipReason: instance?.skipReason ?? null,
-          paceDeltaSecPerMile: instance?.paceDeltaSecPerMile ?? null,
-          estimatedDistanceInMeters: w.estimatedDistanceInMeters,
-          segments: w.segments.map((s) => ({
-            stepOrder: s.stepOrder,
-            targets: s.targets as unknown,
-          })),
-        });
-      }
-
-      // Legacy plan workouts: merge match/skip onto an existing plan day only (leftover instances).
-      for (const w of legacyRows) {
-        if (!w.date) continue;
-        const key = ymdFromDate(utcDateOnly(w.date));
-        const existing = materializedByKey.get(key);
-        if (!existing) continue;
-        if (existing.workoutId) continue;
-        if (!w.matchedActivityId && !w.skippedAt) continue;
-        materializedByKey.set(key, {
-          ...existing,
-          workoutId: w.id,
-          matchedActivityId: w.matchedActivityId,
-          skippedAt: w.skippedAt?.toISOString() ?? null,
-          skipReason: w.skipReason ?? null,
-          paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,
-        });
-      }
-    }
-
-    const merged: UpcomingSessionJson[] = [];
-
-    for (const dateKey of planDateKeys) {
-      const slot = planByDate.get(dateKey)!;
-      const row = materializedByKey.get(dateKey);
-      const workoutId = row?.workoutId ?? null;
-      const plannedWorkoutId = row?.plannedWorkoutId ?? null;
-      const workoutType = row?.workoutType ?? slot.workoutType;
-      const estimatedDistanceInMeters =
-        row?.estimatedDistanceInMeters ?? slot.estimatedDistanceInMeters;
-      merged.push({
-        id:
-          workoutId ??
-          (plannedWorkoutId ? `plan-${plannedWorkoutId}` : `plan-${dateKey}`),
-        title: mergePlanDayTitle({
-          rowTitle: row?.title,
-          scheduleTitle: slot.title,
-          workoutType,
-          estimatedDistanceInMeters,
-        }),
-        workoutType,
-        date: `${dateKey}T12:00:00.000Z`,
-        matchedActivityId: row?.matchedActivityId ?? null,
-        skippedAt: row?.skippedAt ?? null,
-        skipReason: row?.skipReason ?? null,
-        paceDeltaSecPerMile: row?.paceDeltaSecPerMile ?? null,
-        segments: row?.segments,
-        workoutId,
-        isPlanSession: true,
-        hasScheduledTime: false,
-        estimatedDistanceInMeters,
-      });
-    }
-
-    const planKeysSet = new Set(planByDate.keys());
     const todayStart = utcStartOfDayFromKey(todayKey);
 
     const standalone = await prisma.workouts.findMany({
@@ -394,7 +245,7 @@ export async function GET(request: NextRequest) {
         }
       : null;
 
-    return NextResponse.json({ sessions, activePlanSummary });
+    return NextResponse.json({ sessions, activePlanSummary, workoutTodayDone });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to load upcoming";
     console.error("GET /api/training/upcoming", e);

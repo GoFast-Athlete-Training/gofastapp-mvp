@@ -6,7 +6,7 @@ import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
 import {
-  currentTrainingWeekNumber,
+  performanceReflectionWeekNumber,
   effectiveTrainingWeekCount,
 } from "@/lib/training/plan-utils";
 import { buildPlanWeekCards } from "@/lib/training/plan-week-cards";
@@ -17,6 +17,7 @@ import {
   loadWhereYouStandSnapshot,
   type WhereYouStandSnapshot,
 } from "@/lib/training/where-you-stand";
+import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
 
 export type PerformanceWeekDay = {
   workoutId: string | null;
@@ -60,6 +61,14 @@ export async function loadPerformanceSummary(
       race_registry: {
         select: { raceDate: true, name: true, distanceMeters: true },
       },
+      athlete_race: {
+        select: {
+          name: true,
+          raceDate: true,
+          distanceMeters: true,
+          distanceLabel: true,
+        },
+      },
     },
   });
 
@@ -69,18 +78,23 @@ export async function loadPerformanceSummary(
   let whereYouStand: WhereYouStandSnapshot | null = null;
 
   if (activePlan) {
-    const race = activePlan.race_registry;
+    const terminal = resolvePlanTerminalRaceDisplay(activePlan);
+    const raceDate = terminal?.raceDate ?? activePlan.race_registry?.raceDate ?? null;
+    const raceName = terminal?.name ?? activePlan.race_registry?.name ?? null;
     const raceDistanceMiles =
-      race?.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
-        ? metersToMiles(Number(race.distanceMeters))
-        : null;
+      terminal?.distanceMeters != null && Number.isFinite(Number(terminal.distanceMeters))
+        ? metersToMiles(Number(terminal.distanceMeters))
+        : activePlan.race_registry?.distanceMeters != null &&
+            Number.isFinite(Number(activePlan.race_registry.distanceMeters))
+          ? metersToMiles(Number(activePlan.race_registry.distanceMeters))
+          : null;
 
     const effectiveWeeks = effectiveTrainingWeekCount(
       activePlan.startDate,
       activePlan.totalWeeks,
-      race?.raceDate ?? null
+      raceDate
     );
-    weekNumber = currentTrainingWeekNumber(activePlan.startDate, effectiveWeeks);
+    weekNumber = performanceReflectionWeekNumber(activePlan.startDate, effectiveWeeks);
 
     const [wp, cards, stand] = await Promise.all([
       loadWeekPerformanceSnapshot({
@@ -89,7 +103,7 @@ export async function loadPerformanceSummary(
         planStartDate: activePlan.startDate,
         weekNumber,
         storedTotalWeeks: activePlan.totalWeeks,
-        raceDate: race?.raceDate ?? null,
+        raceDate,
       }),
       buildPlanWeekCards({
         planId: activePlan.id,
@@ -98,8 +112,8 @@ export async function loadPerformanceSummary(
         planSchedule: activePlan.planSchedule,
         weekNumber,
         storedTotalWeeks: activePlan.totalWeeks,
-        raceDate: race?.raceDate ?? null,
-        raceName: race?.name ?? null,
+        raceDate,
+        raceName,
         raceDistanceMiles,
       }),
       loadWhereYouStandSnapshot({
@@ -108,9 +122,9 @@ export async function loadPerformanceSummary(
         planStartDate: activePlan.startDate,
         weekNumber,
         storedTotalWeeks: activePlan.totalWeeks,
-        raceDate: race?.raceDate ?? null,
+        raceDate,
         raceDistanceMiles,
-        raceName: race?.name ?? null,
+        raceName,
         goalRaceTime: activePlan.goalRaceTime,
       }),
     ]);
@@ -135,6 +149,7 @@ export async function loadPerformanceSummary(
 
     weekDays = cards
       .filter((c) => c.workoutType !== "Rest" && c.title !== "Rest")
+      .filter((c) => c.matchedActivityId != null)
       .map((c) => {
         const status = deriveSessionStatus({
           dateKey: c.dateKey,
