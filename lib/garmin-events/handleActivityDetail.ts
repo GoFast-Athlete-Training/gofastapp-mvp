@@ -19,6 +19,97 @@ import { promoteUnmatchedRunningActivityToWorkout } from "../training/promote-ac
 import { extractActivityRouteFromDetail } from "../training/activity-route-from-detail";
 import { isGenericGarminActivityName } from "./generic-activity-names";
 
+function safeStartTime(value: Date | null | undefined): Date | undefined {
+  if (value == null) return undefined;
+  if (Number.isNaN(value.getTime())) return undefined;
+  return value;
+}
+
+function logDetailPrismaError(
+  error: unknown,
+  context: { activityIds: string[]; garminUserId?: string | number }
+): void {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    console.error("❌ Error processing activity detail:", {
+      code: error.code,
+      meta: error.meta,
+      message: error.message,
+      activityIds: context.activityIds,
+      garminUserId: context.garminUserId ?? "(none)",
+    });
+    return;
+  }
+  console.error("❌ Error processing activity detail:", {
+    message: error instanceof Error ? error.message : String(error),
+    activityIds: context.activityIds,
+    garminUserId: context.garminUserId ?? "(none)",
+  });
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+async function findActivityRowForDetailIds(
+  ids: string[],
+  athleteId?: string
+): Promise<{ id: string; activityType: string | null } | null> {
+  const row = await prisma.athlete_activities.findFirst({
+    where: {
+      ...(athleteId ? { athleteId } : {}),
+      sourceActivityId: { in: ids },
+    },
+    select: { id: true, activityType: true },
+  });
+  if (row) return row;
+
+  if (!athleteId) return null;
+
+  return prisma.athlete_activities.findFirst({
+    where: { sourceActivityId: { in: ids } },
+    select: { id: true, activityType: true },
+  });
+}
+
+/** Update detail columns on an existing row; retry without athlete scope if needed. */
+async function persistDetailOnExistingRows(
+  ids: string[],
+  detail: object,
+  athleteId?: string
+): Promise<{ id: string; activityType: string | null } | null> {
+  let updateResult = await prisma.athlete_activities.updateMany({
+    where: {
+      ...(athleteId ? { athleteId } : {}),
+      sourceActivityId: { in: ids },
+    },
+    data: detailPersistData(detail),
+  });
+
+  if (updateResult.count === 0 && athleteId) {
+    updateResult = await prisma.athlete_activities.updateMany({
+      where: { sourceActivityId: { in: ids } },
+      data: detailPersistData(detail),
+    });
+  }
+
+  if (updateResult.count === 0) {
+    return findActivityRowForDetailIds(ids, athleteId);
+  }
+
+  return findActivityRowForDetailIds(ids, athleteId);
+}
+
+async function runAfterDetailPersisted(
+  row: { id: string; activityType: string | null },
+  detail: object
+): Promise<void> {
+  await runPostIngestActivityMatching({
+    activityId: row.id,
+    activityType: row.activityType,
+  });
+  await runDetailHydrationPipeline(row.id, detail);
+}
+
 function detailPersistData(detail: object) {
   const route = extractActivityRouteFromDetail(detail);
   return {
@@ -174,8 +265,9 @@ export async function handleActivityDetail(
   let errors = 0;
 
   for (const detail of activityDetails) {
+    let ids: string[] = [];
     try {
-      const ids = activityIdCandidates(detail);
+      ids = activityIdCandidates(detail);
       if (ids.length === 0) {
         console.warn("⚠️ No activityId found in activity detail", {
           userId: userId || detail.userId || detail.summary?.userId || "(none)",
@@ -212,18 +304,9 @@ export async function handleActivityDetail(
           userId: garminUserId ?? "(none)",
           updateCount: updateResult.count,
         });
-        const row = await prisma.athlete_activities.findFirst({
-          where: {
-            ...(athlete ? { athleteId: athlete.id } : {}),
-            sourceActivityId: { in: ids },
-          },
-        });
+        const row = await findActivityRowForDetailIds(ids, athlete?.id);
         if (row) {
-          await runPostIngestActivityMatching({
-            activityId: row.id,
-            activityType: row.activityType,
-          });
-          await runDetailHydrationPipeline(row.id, detail as object);
+          await runAfterDetailPersisted(row, detail as object);
         }
         processed++;
       } else {
@@ -244,12 +327,28 @@ export async function handleActivityDetail(
         }
 
         if (await activityExists(sourceActivityId)) {
-          console.warn("⚠️ Detail fallback skipped: activity already exists", {
-            activityIds: ids,
-            sourceActivityId,
-            athleteId: resolvedAthlete.athleteId,
-          });
-          skipped++;
+          const existingRow = await persistDetailOnExistingRows(
+            ids,
+            detail as object,
+            resolvedAthlete.athleteId
+          );
+          if (existingRow) {
+            console.log("✅ Hydrated existing activity from detail fallback", {
+              activityIds: ids,
+              sourceActivityId,
+              athleteId: resolvedAthlete.athleteId,
+              rowId: existingRow.id,
+            });
+            await runAfterDetailPersisted(existingRow, detail as object);
+            processed++;
+          } else {
+            console.warn("⚠️ Detail fallback: activity exists but detail not written", {
+              activityIds: ids,
+              sourceActivityId,
+              athleteId: resolvedAthlete.athleteId,
+            });
+            skipped++;
+          }
           continue;
         }
 
@@ -280,54 +379,82 @@ export async function handleActivityDetail(
         }
 
         const now = new Date();
+        const startTime = safeStartTime(norm.startTime);
 
-        const created = await prisma.athlete_activities.create({
-          data: {
-            id: generateId(),
-            athleteId: resolvedAthlete.athleteId,
+        try {
+          const created = await prisma.athlete_activities.create({
+            data: {
+              id: generateId(),
+              athleteId: resolvedAthlete.athleteId,
+              sourceActivityId,
+              source: "garmin",
+              ingestionStatus: ingestionStatusForActivityType(activityType),
+              activityType,
+              activityName,
+              startTime,
+              duration: norm.duration,
+              distance: norm.distance,
+              calories: norm.calories,
+              averageSpeed: norm.averageSpeed,
+              averageHeartRate: norm.averageHeartRate,
+              maxHeartRate: norm.maxHeartRate,
+              elevationGain: norm.elevationGain,
+              averagePower: norm.averagePower,
+              steps: norm.steps,
+              summaryData: summary ? (summary as object) : Prisma.DbNull,
+              ...detailPersistData(detail as object),
+              updatedAt: now,
+            },
+          });
+
+          console.log("✅ Created activity from detail fallback", {
+            activityIds: ids,
             sourceActivityId,
-            source: "garmin",
-            ingestionStatus: ingestionStatusForActivityType(activityType),
+            athleteId: resolvedAthlete.athleteId,
+            athleteSource: resolvedAthlete.athleteSource,
+            garminUserId: garminUserId ?? "(none)",
+            ingestionStatus: created.ingestionStatus,
+          });
+
+          await runDetailHydrationPipeline(created.id, detail as object);
+          await runPostIngestActivityMatching({
+            activityId: created.id,
             activityType,
-            activityName,
-            startTime: norm.startTime,
-            duration: norm.duration,
-            distance: norm.distance,
-            calories: norm.calories,
-            averageSpeed: norm.averageSpeed,
-            averageHeartRate: norm.averageHeartRate,
-            maxHeartRate: norm.maxHeartRate,
-            elevationGain: norm.elevationGain,
-            averagePower: norm.averagePower,
-            steps: norm.steps,
-            summaryData: summary ? (summary as object) : Prisma.DbNull,
-            ...detailPersistData(detail as object),
-            updatedAt: now,
-          },
-        });
-
-        console.log("✅ Created activity from detail fallback", {
-          activityIds: ids,
-          sourceActivityId,
-          athleteId: resolvedAthlete.athleteId,
-          athleteSource: resolvedAthlete.athleteSource,
-          garminUserId: garminUserId ?? "(none)",
-          ingestionStatus: created.ingestionStatus,
-        });
-
-        await runDetailHydrationPipeline(created.id, detail as object);
-        await runPostIngestActivityMatching({
-          activityId: created.id,
-          activityType,
-        });
-        await tryMatchActivityToCityRun(created.id).catch((cityRunErr) => {
-          console.warn("tryMatchActivityToCityRun (detail fallback):", cityRunErr);
-        });
-        processed++;
+          });
+          await tryMatchActivityToCityRun(created.id).catch((cityRunErr) => {
+            console.warn("tryMatchActivityToCityRun (detail fallback):", cityRunErr);
+          });
+          processed++;
+        } catch (createErr) {
+          if (!isUniqueConstraintError(createErr)) {
+            throw createErr;
+          }
+          const existingRow = await persistDetailOnExistingRows(
+            ids,
+            detail as object,
+            resolvedAthlete.athleteId
+          );
+          if (!existingRow) {
+            throw createErr;
+          }
+          console.log("✅ Detail fallback create raced summary row — hydrated existing", {
+            activityIds: ids,
+            sourceActivityId,
+            rowId: existingRow.id,
+          });
+          await runAfterDetailPersisted(existingRow, detail as object);
+          await tryMatchActivityToCityRun(existingRow.id).catch((cityRunErr) => {
+            console.warn("tryMatchActivityToCityRun (detail fallback):", cityRunErr);
+          });
+          processed++;
+        }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       errors++;
-      console.error(`❌ Error processing activity detail:`, error);
+      logDetailPrismaError(error, {
+        activityIds: ids,
+        garminUserId: userId || detail.userId || detail.summary?.userId,
+      });
     }
   }
 

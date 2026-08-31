@@ -127,6 +127,9 @@ export async function handleActivitySummary(
 
       const now = new Date();
       const norm = normalizeActivityFields(activity);
+      const startTime = norm.startTime != null && !Number.isNaN(norm.startTime.getTime())
+        ? norm.startTime
+        : undefined;
 
       const created = await prisma.athlete_activities.create({
         data: {
@@ -137,7 +140,7 @@ export async function handleActivitySummary(
           ingestionStatus: 'RECEIVED',
           activityType: activity.activityType ?? undefined,
           activityName: activity.activityName ?? undefined,
-          startTime: norm.startTime,
+          startTime,
           duration: norm.duration,
           distance: norm.distance,
           calories: norm.calories,
