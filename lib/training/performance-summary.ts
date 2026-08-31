@@ -18,6 +18,7 @@ import {
   type WhereYouStandSnapshot,
 } from "@/lib/training/where-you-stand";
 import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
+import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
 
 export type PerformanceWeekDay = {
   workoutId: string | null;
@@ -59,16 +60,15 @@ export async function loadPerformanceSummary(
       planSchedule: true,
       goalRaceTime: true,
       race_registry: {
-        select: { raceDate: true, name: true, distanceMeters: true },
-      },
-      athlete_race: {
         select: {
-          name: true,
+          id: true,
           raceDate: true,
+          name: true,
           distanceMeters: true,
           distanceLabel: true,
         },
       },
+      athlete_race: { select: goalAthleteRaceSelect },
     },
   });
 
