@@ -64,25 +64,12 @@ const UNSUPPORTED_CITY_RUN_FIELDS = [
   "webText",
   "igPostText",
   "igPostGraphic",
+  "meetUpNote",
+  "workoutNarrative",
 ] as const;
-
-function buildWorkoutDescriptionHydration(workout: {
-  workoutType: string;
-  description: string | null;
-  workout_catalogue: { name: string } | null;
-}): string {
-  if (workout.description?.trim()) {
-    return workout.description.trim().slice(0, 2000);
-  }
-  const cat = workout.workout_catalogue?.name;
-  const base = `${workout.workoutType} workout${cat ? ` · ${cat}` : ""}`;
-  return base.slice(0, 2000);
-}
 
 type FromWorkoutBody = {
   workoutId?: string;
-  /** Public listing title (defaults to workout title server-side) */
-  title?: string | null;
   citySlug?: string;
   cityName?: string;
   state?: string;
@@ -95,21 +82,12 @@ type FromWorkoutBody = {
   startTimeHour?: number | string | null;
   startTimeMinute?: number | string | null;
   startTimePeriod?: string | null;
-  timezone?: string | null;
-  /** Public CityRun description (listing copy) */
-  description?: string | null;
-  postRunActivity?: string | null;
-  endPoint?: string | null;
-  endStreetAddress?: string | null;
-  endCity?: string | null;
-  endState?: string | null;
+  meetUpNote?: string | null;
+  workoutNarrative?: string | null;
   meetUpPlaceId?: string | null;
   meetUpLat?: number | string | null;
   meetUpLng?: number | string | null;
-  totalMiles?: number | string | null;
   stravaMapUrl?: string | null;
-  mapImageUrl?: string | null;
-  routePhotos?: string[] | null;
 };
 
 /**
@@ -127,7 +105,6 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as FromWorkoutBody;
     const {
       workoutId,
-      title: titleBody,
       citySlug,
       cityName,
       state,
@@ -140,20 +117,12 @@ export async function POST(request: NextRequest) {
       startTimeHour,
       startTimeMinute,
       startTimePeriod,
-      timezone,
-      description: listingDescription,
-      postRunActivity: postRunActivityBody,
-      endPoint,
-      endStreetAddress,
-      endCity,
-      endState,
+      meetUpNote,
+      workoutNarrative,
       meetUpPlaceId,
       meetUpLat,
       meetUpLng,
-      totalMiles: totalMilesBody,
       stravaMapUrl: stravaMapUrlBody,
-      mapImageUrl: mapImageUrlBody,
-      routePhotos: routePhotosBody,
     } = body;
 
     if (!workoutId?.trim()) {
@@ -165,21 +134,41 @@ export async function POST(request: NextRequest) {
     if (!meetUpPoint?.trim()) {
       return NextResponse.json({ error: "meetUpPoint is required" }, { status: 400 });
     }
-    if (!meetUpStreetAddress?.trim() || !meetUpCity?.trim() || !meetUpState?.trim()) {
+    if (!meetUpCity?.trim()) {
       return NextResponse.json(
-        {
-          error:
-            "Street address, city, and state are required. Pick a Google Places result or fill address fields.",
-        },
+        { error: "meetUpCity is required — pick a Google Places result." },
+        { status: 400 }
+      );
+    }
+
+    const parseHour = (v: number | string | null | undefined) => {
+      if (v == null || v === "") return null;
+      const n = typeof v === "string" ? parseInt(v, 10) : v;
+      return Number.isFinite(n) ? n : null;
+    };
+    const parseMinute = parseHour;
+
+    const parsedHour = parseHour(startTimeHour ?? null);
+    const parsedMinute = parseMinute(startTimeMinute ?? null);
+    const parsedPeriod = startTimePeriod?.trim().toUpperCase() || null;
+
+    if (
+      parsedHour == null ||
+      parsedHour < 1 ||
+      parsedHour > 12 ||
+      parsedMinute == null ||
+      parsedMinute < 0 ||
+      parsedMinute > 59 ||
+      (parsedPeriod !== "AM" && parsedPeriod !== "PM")
+    ) {
+      return NextResponse.json(
+        { error: "Start time is required (hour, minute, and AM/PM)." },
         { status: 400 }
       );
     }
 
     const workout = await prisma.workouts.findFirst({
       where: { id: workoutId.trim(), athleteId: athlete.id },
-      include: {
-        workout_catalogue: { select: { name: true } },
-      },
     });
 
     if (!workout) {
@@ -244,8 +233,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const finalTitle =
-      titleBody?.trim() || workout.title.trim();
+    const finalTitle = workout.title.trim();
 
     let runSlug: string | null = null;
     try {
@@ -257,31 +245,11 @@ export async function POST(request: NextRequest) {
       console.warn("[cityrun/from-workout] slug generation failed:", e);
     }
 
-    const workoutDescriptionHydrated = buildWorkoutDescriptionHydration(workout);
-
     const totalMilesFromWorkout =
       workout.estimatedDistanceInMeters != null &&
       workout.estimatedDistanceInMeters > 0
         ? workout.estimatedDistanceInMeters / 1609.34
         : null;
-
-    const parsedTotalMiles = (() => {
-      if (totalMilesBody == null || totalMilesBody === "") return totalMilesFromWorkout;
-      const n = typeof totalMilesBody === "string" ? parseFloat(totalMilesBody) : totalMilesBody;
-      return Number.isFinite(n) && n > 0 ? n : totalMilesFromWorkout;
-    })();
-
-    const routePhotosFiltered =
-      Array.isArray(routePhotosBody) && routePhotosBody.length > 0
-        ? routePhotosBody.map((u) => String(u).trim()).filter(Boolean).slice(0, 8)
-        : [];
-
-    const parseHour = (v: number | string | null | undefined) => {
-      if (v == null || v === "") return null;
-      const n = typeof v === "string" ? parseInt(v, 10) : v;
-      return Number.isFinite(n) ? n : null;
-    };
-    const parseMinute = parseHour;
 
     const latNum =
       meetUpLat != null && meetUpLat !== ""
@@ -296,6 +264,9 @@ export async function POST(request: NextRequest) {
     const meetUpLngFinal =
       lngNum != null && Number.isFinite(lngNum) ? lngNum : null;
 
+    const streetFallback =
+      meetUpStreetAddress?.trim() || meetUpPoint.trim();
+
     const createData: Record<string, unknown> = {
       id: generateId(),
       citySlug: finalCitySlug,
@@ -309,35 +280,34 @@ export async function POST(request: NextRequest) {
       ...WORKOUT_BACKED_CITY_RUN_VISIBILITY,
       dayOfWeek: null,
       date: runDateObj,
-      startTimeHour: parseHour(startTimeHour ?? null),
-      startTimeMinute: parseMinute(startTimeMinute ?? null),
-      startTimePeriod: startTimePeriod?.trim() || null,
-      timezone: timezone?.trim() || null,
+      startTimeHour: parsedHour,
+      startTimeMinute: parsedMinute,
+      startTimePeriod: parsedPeriod,
+      timezone: null,
       meetUpPoint: meetUpPoint.trim(),
-      meetUpStreetAddress: meetUpStreetAddress?.trim() || null,
+      meetUpStreetAddress: streetFallback,
       meetUpCity: meetUpCity?.trim() || cityName?.trim() || null,
       meetUpState: meetUpState?.trim() || state?.trim() || null,
       meetUpZip: meetUpZip?.trim() || null,
+      meetUpNote: meetUpNote?.trim() || null,
+      workoutNarrative: workoutNarrative?.trim() || null,
       routeNeighborhood: null,
       runType: null,
-      workoutDescription: workoutDescriptionHydrated,
+      workoutDescription: null,
       meetUpPlaceId: meetUpPlaceId?.trim() || null,
       meetUpLat: meetUpLatFinal,
       meetUpLng: meetUpLngFinal,
-      endPoint: endPoint?.trim() || null,
-      endStreetAddress: endStreetAddress?.trim() || null,
-      endCity: endCity?.trim() || null,
-      endState: endState?.trim() || null,
-      totalMiles: parsedTotalMiles,
+      endPoint: null,
+      endStreetAddress: null,
+      endCity: null,
+      endState: null,
+      totalMiles: totalMilesFromWorkout,
       pace: null,
       stravaMapUrl: stravaMapUrlBody?.trim() || null,
-      description: listingDescription?.trim() || null,
-      postRunActivity: postRunActivityBody?.trim() || null,
-      routePhotos:
-        routePhotosFiltered.length > 0
-          ? routePhotosFiltered
-          : Prisma.JsonNull,
-      mapImageUrl: mapImageUrlBody?.trim() || null,
+      description: null,
+      postRunActivity: null,
+      routePhotos: Prisma.JsonNull,
+      mapImageUrl: null,
       staffNotes: null,
       stravaEventUrl: null,
       stravaText: null,

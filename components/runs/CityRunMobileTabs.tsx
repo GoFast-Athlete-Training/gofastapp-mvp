@@ -156,6 +156,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
                 workoutId={props.run.workoutId}
                 workout={props.run.workout}
                 workoutDescription={props.run.workoutDescription}
+                workoutNarrative={props.run.workoutNarrative}
               />
             ) : null}
             <CityRunDetailsSection run={props.run} compact />

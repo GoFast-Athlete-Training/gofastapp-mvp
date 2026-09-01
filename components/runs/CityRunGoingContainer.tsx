@@ -81,6 +81,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
               workoutId={run.workoutId}
               workout={run.workout}
               workoutDescription={run.workoutDescription}
+              workoutNarrative={run.workoutNarrative}
             />
           ) : null}
 

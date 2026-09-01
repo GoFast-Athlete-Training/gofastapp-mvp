@@ -97,6 +97,9 @@ export default function CityRunDetailsSection({
             <MapPin className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
             <div>
               <div className="font-medium">{run.meetUpPoint}</div>
+              {run.meetUpNote ? (
+                <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{run.meetUpNote}</p>
+              ) : null}
               {(run.meetUpStreetAddress || run.meetUpCity) && (
                 <div className="text-sm text-gray-500">
                   {[run.meetUpStreetAddress, run.meetUpCity, run.meetUpState].filter(Boolean).join(', ')}

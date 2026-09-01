@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Athlete CityRun from workout — two-panel UX: workout context (read-only) + route / meet / time.
+ * Athlete CityRun from workout — workout context (read-only) + meetup + time + optional route.
  * POST /api/cityrun/from-workout.
  */
 
@@ -14,16 +14,22 @@ import {
   CheckCircle2,
   ExternalLink,
   MapPin,
-  Image as ImageIcon,
   ChevronDown,
   ChevronRight,
   Route,
 } from "lucide-react";
-import GooglePlacesAutocomplete from "@/components/RunCrew/GooglePlacesAutocomplete";
+import GooglePlacesAutocomplete, {
+  type GooglePlaceSelectedData,
+} from "@/components/RunCrew/GooglePlacesAutocomplete";
+import WorkoutStructurePreview from "@/components/training/WorkoutStructurePreview";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
-import { parseGoogleAddress, generateCitySlugFromParts } from "@/lib/parse-google-address";
+import type { WorkoutPreviewSegment } from "@/lib/training/workout-segment-preview";
+import {
+  parseGoogleAddressFromComponents,
+  generateCitySlugFromParts,
+} from "@/lib/parse-google-address";
 import { formatCalendarDate } from "@/lib/calendar-date";
 
 export type CreateCityRunFormWorkout = {
@@ -33,14 +39,7 @@ export type CreateCityRunFormWorkout = {
   description?: string | null;
   date?: string | null;
   estimatedDistanceInMeters?: number | null;
-  segments: Array<{
-    id: string;
-    stepOrder: number;
-    title: string;
-    durationType: string;
-    durationValue: number;
-    repeatCount?: number | null;
-  }>;
+  segments: WorkoutPreviewSegment[];
   city_runs?: Array<{ id: string; date: string | null; createdAt: string }>;
 };
 
@@ -56,20 +55,12 @@ export type CityRunFromWorkoutSuccess = {
 };
 
 const METERS_PER_MILE = 1609.34;
-const MAX_ROUTE_PHOTOS = 8;
 
 function formatPlannedMiles(meters: number | null | undefined): string | null {
   if (meters == null || meters <= 0 || !Number.isFinite(meters)) return null;
   const mi = meters / METERS_PER_MILE;
   const rounded = Math.round(mi * 10) / 10;
   return `${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)} mi planned`;
-}
-
-function initialTotalMilesString(meters: number | null | undefined): string {
-  if (meters == null || meters <= 0 || !Number.isFinite(meters)) return "";
-  const mi = meters / METERS_PER_MILE;
-  const rounded = Math.round(mi * 100) / 100;
-  return String(rounded);
 }
 
 function formatDateLabel(isoDate: string): string {
@@ -80,6 +71,31 @@ function formatDateLabel(isoDate: string): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatMeetupConfirmation(city: string, state: string): string {
+  const c = city.trim();
+  const s = state.trim().toUpperCase();
+  if (!c) return "";
+  if (s === "DC" || c.toLowerCase() === "dc") return `${c} · DC`;
+  if (s) return `${c}, ${s}`;
+  return c;
+}
+
+function hasValidStartTime(hour: string, minute: string, period: "AM" | "PM"): boolean {
+  const h = parseInt(hour, 10);
+  const m = parseInt(minute, 10);
+  return (
+    hour.trim() !== "" &&
+    minute.trim() !== "" &&
+    Number.isFinite(h) &&
+    h >= 1 &&
+    h <= 12 &&
+    Number.isFinite(m) &&
+    m >= 0 &&
+    m <= 59 &&
+    (period === "AM" || period === "PM")
+  );
 }
 
 export interface CreateCityRunFormProps {
@@ -97,15 +113,10 @@ export default function CreateCityRunForm({
   className = "",
   hideWorkoutSummary = false,
 }: CreateCityRunFormProps) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [postRunActivity, setPostRunActivity] = useState("");
-
   const [runDate, setRunDate] = useState("");
   const [startHour, setStartHour] = useState("");
   const [startMinute, setStartMinute] = useState("");
   const [startPeriod, setStartPeriod] = useState<"AM" | "PM">("AM");
-  const [timezone, setTimezone] = useState("");
 
   const [meetUpPoint, setMeetUpPoint] = useState("");
   const [meetUpStreetAddress, setMeetUpStreetAddress] = useState("");
@@ -115,18 +126,11 @@ export default function CreateCityRunForm({
   const [meetUpPlaceId, setMeetUpPlaceId] = useState<string | null>(null);
   const [meetUpLat, setMeetUpLat] = useState<number | null>(null);
   const [meetUpLng, setMeetUpLng] = useState<number | null>(null);
+  const [meetUpPlaceSet, setMeetUpPlaceSet] = useState(false);
 
-  const [endPointSameAsStart, setEndPointSameAsStart] = useState(true);
-  const [endPoint, setEndPoint] = useState("");
-  const [endStreetAddress, setEndStreetAddress] = useState("");
-  const [endCity, setEndCity] = useState("");
-  const [endState, setEndState] = useState("");
-
-  const [totalMiles, setTotalMiles] = useState("");
-
+  const [meetUpNote, setMeetUpNote] = useState("");
+  const [workoutNarrative, setWorkoutNarrative] = useState("");
   const [stravaMapUrl, setStravaMapUrl] = useState("");
-  const [mapImageUrl, setMapImageUrl] = useState("");
-  const [routePhotos, setRoutePhotos] = useState<string[]>([]);
 
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
 
@@ -136,27 +140,11 @@ export default function CreateCityRunForm({
   const [copiedField, setCopiedField] = useState<"rsvp" | "share" | "join" | null>(null);
 
   useEffect(() => {
-    setTitle(workout.title);
     const d = workout.date ? new Date(workout.date) : new Date();
     setRunDate(
       !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)
     );
-    setTotalMiles(initialTotalMilesString(workout.estimatedDistanceInMeters ?? null));
-  }, [workout.date, workout.id, workout.title, workout.estimatedDistanceInMeters]);
-
-  useEffect(() => {
-    if (!endPointSameAsStart) return;
-    setEndPoint(meetUpPoint);
-    setEndStreetAddress(meetUpStreetAddress);
-    setEndCity(meetUpCity);
-    setEndState(meetUpState);
-  }, [
-    endPointSameAsStart,
-    meetUpPoint,
-    meetUpStreetAddress,
-    meetUpCity,
-    meetUpState,
-  ]);
+  }, [workout.date, workout.id]);
 
   const headline = displayWorkoutListTitle({
     title: workout.title,
@@ -164,58 +152,48 @@ export default function CreateCityRunForm({
     estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
   });
 
-  const handleStartPlaceSelected = useCallback(
-    (placeData: { address: string; name: string; placeId: string; lat: number; lng: number }) => {
-      const parsed = parseGoogleAddress(placeData.address);
-      setMeetUpPoint(placeData.name || placeData.address);
-      setMeetUpStreetAddress(parsed.streetAddress || placeData.address);
-      setMeetUpCity(parsed.city || "");
-      setMeetUpState(parsed.state || "");
-      setMeetUpZip(parsed.zip || "");
-      setMeetUpPlaceId(placeData.placeId || null);
-      setMeetUpLat(placeData.lat);
-      setMeetUpLng(placeData.lng);
-    },
-    []
-  );
+  const handleStartPlaceSelected = useCallback((placeData: GooglePlaceSelectedData) => {
+    const parsed = parseGoogleAddressFromComponents(
+      placeData.address,
+      placeData.addressComponents
+    );
+    setMeetUpPoint(placeData.name || placeData.address);
+    setMeetUpStreetAddress(parsed.streetAddress || placeData.address);
+    setMeetUpCity(parsed.city || "");
+    setMeetUpState(parsed.state || "");
+    setMeetUpZip(parsed.zip || "");
+    setMeetUpPlaceId(placeData.placeId || null);
+    setMeetUpLat(placeData.lat);
+    setMeetUpLng(placeData.lng);
+    setMeetUpPlaceSet(true);
+  }, []);
 
-  const handleEndPlaceSelected = useCallback(
-    (placeData: { address: string; name: string; placeId: string; lat: number; lng: number }) => {
-      const parsed = parseGoogleAddress(placeData.address);
-      setEndPoint(placeData.name || placeData.address);
-      setEndStreetAddress(parsed.streetAddress || placeData.address);
-      setEndCity(parsed.city || "");
-      setEndState(parsed.state || "");
-    },
-    []
-  );
-
-  const effectiveTitle = (title.trim() || workout.title).trim();
+  const meetupConfirmation =
+    meetUpPlaceSet && meetUpCity.trim()
+      ? formatMeetupConfirmation(meetUpCity, meetUpState)
+      : null;
 
   const canSubmit =
     Boolean(meetUpPoint.trim()) &&
-    Boolean(meetUpStreetAddress.trim()) &&
     Boolean(meetUpCity.trim()) &&
-    Boolean(meetUpState.trim()) &&
-    (!endPointSameAsStart
-      ? Boolean(endPoint.trim() && endStreetAddress.trim() && endCity.trim() && endState.trim())
-      : true);
+    meetUpPlaceSet &&
+    hasValidStartTime(startHour, startMinute, startPeriod);
 
   const handleSubmit = async () => {
     if (!LocalStorageAPI.getAthleteId()) {
       setError("Sign in so we can verify it’s your workout.");
       return;
     }
-    if (!effectiveTitle) {
-      setError("Add a title for this public run.");
+    if (!meetUpPoint.trim() || !meetUpPlaceSet) {
+      setError("Choose a meetup spot from the search results.");
       return;
     }
-    if (!meetUpPoint.trim()) {
-      setError("Choose a start point (search with Google Places).");
+    if (!meetUpCity.trim()) {
+      setError("We need a city from your meetup pick — select a Places result.");
       return;
     }
-    if (!meetUpStreetAddress.trim() || !meetUpCity.trim() || !meetUpState.trim()) {
-      setError("Street address, city, and state are required — pick a Places result or fill them in.");
+    if (!hasValidStartTime(startHour, startMinute, startPeriod)) {
+      setError("Add a start time so people know when to meet you.");
       return;
     }
 
@@ -225,52 +203,32 @@ export default function CreateCityRunForm({
       return;
     }
 
-    if (!endPointSameAsStart) {
-      if (!endPoint.trim() || !endStreetAddress.trim() || !endCity.trim() || !endState.trim()) {
-        setError("Fill in end location, or check “Finish same as start”.");
-        return;
-      }
-    }
-
     setBusy(true);
     setError(null);
     try {
-      const hourNum =
-        startHour === "" ? undefined : Math.min(12, Math.max(1, parseInt(startHour, 10) || 0));
-      const minuteNum =
-        startMinute === "" ? undefined : Math.min(59, Math.max(0, parseInt(startMinute, 10) || 0));
-
-      const photos = routePhotos.map((u) => u.trim()).filter(Boolean).slice(0, MAX_ROUTE_PHOTOS);
+      const hourNum = Math.min(12, Math.max(1, parseInt(startHour, 10)));
+      const minuteNum = Math.min(59, Math.max(0, parseInt(startMinute, 10) || 0));
 
       const { data } = await api.post<CityRunFromWorkoutSuccess>("/cityrun/from-workout", {
         workoutId: workout.id,
-        title: effectiveTitle,
         citySlug,
         cityName: meetUpCity.trim(),
-        state: meetUpState.trim(),
+        state: meetUpState.trim() || undefined,
         date: runDate,
         meetUpPoint: meetUpPoint.trim(),
-        meetUpStreetAddress: meetUpStreetAddress.trim(),
+        meetUpStreetAddress: meetUpStreetAddress.trim() || meetUpPoint.trim(),
         meetUpCity: meetUpCity.trim(),
-        meetUpState: meetUpState.trim(),
+        meetUpState: meetUpState.trim() || undefined,
         meetUpZip: meetUpZip.trim() || undefined,
         meetUpPlaceId: meetUpPlaceId || undefined,
         meetUpLat: meetUpLat ?? undefined,
         meetUpLng: meetUpLng ?? undefined,
-        description: description.trim() || undefined,
-        postRunActivity: postRunActivity.trim() || undefined,
-        endPoint: endPointSameAsStart ? undefined : endPoint.trim() || undefined,
-        endStreetAddress: endPointSameAsStart ? undefined : endStreetAddress.trim() || undefined,
-        endCity: endPointSameAsStart ? undefined : endCity.trim() || undefined,
-        endState: endPointSameAsStart ? undefined : endState.trim() || undefined,
-        totalMiles: totalMiles.trim() ? parseFloat(totalMiles) : undefined,
+        meetUpNote: meetUpNote.trim() || undefined,
+        workoutNarrative: workoutNarrative.trim() || undefined,
         stravaMapUrl: stravaMapUrl.trim() || undefined,
-        mapImageUrl: mapImageUrl.trim() || undefined,
-        routePhotos: photos.length > 0 ? photos : undefined,
-        ...(hourNum != null && hourNum > 0 ? { startTimeHour: hourNum } : {}),
-        ...(minuteNum != null ? { startTimeMinute: minuteNum } : {}),
-        ...(startPeriod ? { startTimePeriod: startPeriod } : {}),
-        ...(timezone.trim() ? { timezone: timezone.trim() } : {}),
+        startTimeHour: hourNum,
+        startTimeMinute: minuteNum,
+        startTimePeriod: startPeriod,
       });
       if (data?.cityRunId && data?.path) {
         setSuccess(data);
@@ -446,24 +404,16 @@ export default function CreateCityRunForm({
         </p>
       ) : null}
       <p className="font-medium text-gray-900 text-base">{headline}</p>
-      {workout.description ? (
-        <p className="text-gray-600 text-sm mt-2 whitespace-pre-wrap">{workout.description}</p>
-      ) : null}
       {workout.segments.length > 0 ? (
         <div className="mt-4 border-t border-gray-100 pt-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Segments</p>
-          <ul className="text-sm text-gray-700 space-y-1.5">
-            {workout.segments.map((s) => (
-              <li key={s.id}>
-                <span className="font-medium text-gray-800">{s.title}</span>
-                <span className="text-gray-500">
-                  {" "}
-                  · {s.durationType === "DISTANCE" ? `${s.durationValue} mi` : `${s.durationValue} min`}
-                  {s.repeatCount != null && s.repeatCount > 1 ? ` ×${s.repeatCount}` : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Workout structure
+          </p>
+          <WorkoutStructurePreview
+            segments={workout.segments}
+            workoutType={workout.workoutType}
+            compact
+          />
         </div>
       ) : null}
     </div>
@@ -476,21 +426,9 @@ export default function CreateCityRunForm({
           <Route className="w-4 h-4 text-orange-500" />
           You add
         </p>
-        <p className="text-xs text-gray-500">Design a route, pick a meetup spot, and set a start time.</p>
-      </div>
-
-      <div>
-        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Design a route
-        </label>
-        <input
-          type="url"
-          value={stravaMapUrl}
-          onChange={(e) => setStravaMapUrl(e.target.value)}
-          placeholder="https://www.strava.com/routes/…"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-        />
-        <p className="text-xs text-gray-500 mt-1">Paste a Strava route link so the map shows on your invite.</p>
+        <p className="text-xs text-gray-500">
+          Pick a meetup and a start time. A route is optional.
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -500,17 +438,28 @@ export default function CreateCityRunForm({
         </label>
         <GooglePlacesAutocomplete
           value={meetUpPoint}
-          onChange={(e) => setMeetUpPoint(e.target.value)}
+          onChange={(e) => {
+            setMeetUpPoint(e.target.value);
+            setMeetUpPlaceSet(false);
+          }}
           onPlaceSelected={handleStartPlaceSelected}
           placeholder="Search for a location…"
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
         />
-        <p className="text-xs text-gray-500">Pick a result so we can list city and address correctly.</p>
+        {meetupConfirmation ? (
+          <p className="text-sm text-emerald-800 flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            {meetUpPoint.trim()}
+            {meetupConfirmation ? ` · ${meetupConfirmation}` : null}
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500">Pick a result so we can list city and address correctly.</p>
+        )}
       </div>
 
       <div>
         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Start time <span className="font-normal text-gray-400">(optional)</span>
+          Start time
         </label>
         <div className="flex gap-2 items-center flex-wrap">
           <input
@@ -521,6 +470,7 @@ export default function CreateCityRunForm({
             onChange={(e) => setStartHour(e.target.value)}
             className="w-14 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center"
             aria-label="Hour"
+            placeholder="6"
           />
           <span className="text-gray-400">:</span>
           <input
@@ -531,6 +481,7 @@ export default function CreateCityRunForm({
             onChange={(e) => setStartMinute(e.target.value)}
             className="w-14 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center"
             aria-label="Minute"
+            placeholder="00"
           />
           <select
             value={startPeriod}
@@ -542,6 +493,66 @@ export default function CreateCityRunForm({
             <option value="PM">PM</option>
           </select>
         </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Route <span className="font-normal text-gray-400">(optional)</span>
+        </label>
+        <input
+          type="url"
+          value={stravaMapUrl}
+          onChange={(e) => setStravaMapUrl(e.target.value)}
+          placeholder="https://www.strava.com/routes/…"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        />
+        <p className="text-xs text-gray-500 mt-1">Skip if you&apos;re looping the meetup.</p>
+      </div>
+
+      <div className="border-t border-gray-100 pt-2">
+        <button
+          type="button"
+          onClick={() => setMoreDetailsOpen((o) => !o)}
+          className="flex items-center gap-2 text-sm font-medium text-sky-800 hover:text-sky-950 w-full text-left py-1"
+          aria-expanded={moreDetailsOpen}
+        >
+          {moreDetailsOpen ? (
+            <ChevronDown className="w-4 h-4 shrink-0" />
+          ) : (
+            <ChevronRight className="w-4 h-4 shrink-0" />
+          )}
+          More details
+        </button>
+
+        {moreDetailsOpen ? (
+          <div className="mt-4 space-y-4 pl-0 sm:pl-1">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Meetup note <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              <textarea
+                value={meetUpNote}
+                onChange={(e) => setMeetUpNote(e.target.value)}
+                rows={2}
+                placeholder="E.g., We usually meet at the back of the parking lot."
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Workout narrative <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              <textarea
+                value={workoutNarrative}
+                onChange={(e) => setWorkoutNarrative(e.target.value)}
+                rows={2}
+                placeholder="E.g., Hey — this tempo is gonna be hard."
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {error ? (
@@ -566,261 +577,6 @@ export default function CreateCityRunForm({
         >
           {busy ? "Creating…" : "Create invite"}
         </button>
-      </div>
-
-      <div className="border-t border-gray-100 pt-2">
-        <button
-          type="button"
-          onClick={() => setMoreDetailsOpen((o) => !o)}
-          className="flex items-center gap-2 text-sm font-medium text-sky-800 hover:text-sky-950 w-full text-left py-1"
-          aria-expanded={moreDetailsOpen}
-        >
-          {moreDetailsOpen ? (
-            <ChevronDown className="w-4 h-4 shrink-0" />
-          ) : (
-            <ChevronRight className="w-4 h-4 shrink-0" />
-          )}
-          More details
-        </button>
-
-        {moreDetailsOpen ? (
-          <div className="mt-4 space-y-4 pl-0 sm:pl-1">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Title
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-              <p className="text-xs text-gray-500 mt-1">Defaults to your workout name.</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  value={runDate}
-                  onChange={(e) => setRunDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                  Timezone <span className="font-normal text-gray-400">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  placeholder="e.g. America/New_York"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Post-run activity <span className="font-normal text-gray-400">(optional)</span>
-              </label>
-              <textarea
-                value={postRunActivity}
-                onChange={(e) => setPostRunActivity(e.target.value)}
-                rows={2}
-                placeholder="E.g., Coffee nearby…"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div className="space-y-2 border-t border-gray-100 pt-4">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Start address</p>
-              <p className="text-xs text-gray-500">If Places didn’t fill everything, edit below.</p>
-              <input
-                type="text"
-                value={meetUpStreetAddress}
-                onChange={(e) => setMeetUpStreetAddress(e.target.value)}
-                placeholder="Street address"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  value={meetUpCity}
-                  onChange={(e) => setMeetUpCity(e.target.value)}
-                  placeholder="City"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-                <input
-                  type="text"
-                  value={meetUpState}
-                  maxLength={2}
-                  onChange={(e) => setMeetUpState(e.target.value.toUpperCase())}
-                  placeholder="State"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <input
-                type="text"
-                value={meetUpZip}
-                onChange={(e) => setMeetUpZip(e.target.value)}
-                placeholder="ZIP (optional)"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div className="border-t border-gray-100 pt-4 space-y-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={endPointSameAsStart}
-                  onChange={(e) => {
-                    const on = e.target.checked;
-                    setEndPointSameAsStart(on);
-                    if (!on) {
-                      setEndPoint("");
-                      setEndStreetAddress("");
-                      setEndCity("");
-                      setEndState("");
-                    }
-                  }}
-                  className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                />
-                <span className="text-sm font-medium text-gray-800">Finish same as start</span>
-              </label>
-
-              {!endPointSameAsStart ? (
-                <div className="space-y-3 pl-1">
-                  <GooglePlacesAutocomplete
-                    value={endPoint}
-                    onChange={(e) => setEndPoint(e.target.value)}
-                    onPlaceSelected={handleEndPlaceSelected}
-                    placeholder="Search end location…"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="text"
-                    value={endStreetAddress}
-                    onChange={(e) => setEndStreetAddress(e.target.value)}
-                    placeholder="End street address"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={endCity}
-                      onChange={(e) => setEndCity(e.target.value)}
-                      placeholder="End city"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    />
-                    <input
-                      type="text"
-                      value={endState}
-                      maxLength={2}
-                      onChange={(e) => setEndState(e.target.value.toUpperCase())}
-                      placeholder="End state"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Total miles
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min={0}
-                value={totalMiles}
-                onChange={(e) => setTotalMiles(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-              <p className="text-xs text-gray-500 mt-1">Pre-filled from your workout.</p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Map image URL <span className="font-normal text-gray-400">(optional)</span>
-              </label>
-              <input
-                type="url"
-                value={mapImageUrl}
-                onChange={(e) => setMapImageUrl(e.target.value)}
-                placeholder="Screenshot or image URL of your route"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-              {mapImageUrl.trim() ? (
-                <img
-                  src={mapImageUrl.trim()}
-                  alt="Map preview"
-                  className="mt-2 max-w-md rounded-lg border border-gray-200"
-                  onError={(ev) => {
-                    (ev.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              ) : null}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-                <ImageIcon className="w-3.5 h-3.5" />
-                Route photos <span className="font-normal text-gray-400">(optional, up to {MAX_ROUTE_PHOTOS})</span>
-              </label>
-              <div className="space-y-2">
-                {routePhotos.map((photo, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <input
-                      type="url"
-                      value={photo}
-                      onChange={(e) => {
-                        const next = [...routePhotos];
-                        next[idx] = e.target.value;
-                        setRoutePhotos(next);
-                      }}
-                      placeholder="Image URL"
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setRoutePhotos(routePhotos.filter((_, i) => i !== idx))}
-                      className="px-3 text-sm text-red-600 hover:bg-red-50 rounded-lg border border-red-100"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-                {routePhotos.length < MAX_ROUTE_PHOTOS ? (
-                  <button
-                    type="button"
-                    onClick={() => setRoutePhotos([...routePhotos, ""])}
-                    className="text-sm text-sky-700 font-medium hover:underline"
-                  >
-                    + Add photo URL
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );

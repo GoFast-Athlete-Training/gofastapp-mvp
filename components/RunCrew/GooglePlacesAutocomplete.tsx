@@ -33,16 +33,23 @@ const loadGoogleMaps = (apiKey: string): Promise<any> => {
   return loaderCache[apiKey];
 };
 
+export type GooglePlaceSelectedData = {
+  address: string;
+  name: string;
+  placeId: string;
+  lat: number;
+  lng: number;
+  addressComponents?: Array<{
+    long_name: string;
+    short_name: string;
+    types: string[];
+  }>;
+};
+
 interface GooglePlacesAutocompleteProps {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onPlaceSelected?: (placeData: {
-    address: string;
-    name: string;
-    placeId: string;
-    lat: number;
-    lng: number;
-  }) => void;
+  onPlaceSelected?: (placeData: GooglePlaceSelectedData) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -58,13 +65,34 @@ export default function GooglePlacesAutocomplete({
 }: GooglePlacesAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<any>(null);
-  const [autocompleteEnabled, setAutocompleteEnabled] = useState(false);
+  const onChangeRef = useRef(onChange);
+  const onPlaceSelectedRef = useRef(onPlaceSelected);
+  const [inputValue, setInputValue] = useState(value);
+  const isPlaceSelectedRef = useRef(false);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    onPlaceSelectedRef.current = onPlaceSelected;
+  }, [onPlaceSelected]);
+
+  useEffect(() => {
+    if (!isPlaceSelectedRef.current) {
+      setInputValue(value);
+    }
+    isPlaceSelectedRef.current = false;
+  }, [value]);
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      // No API key - just a regular input, no autocomplete
       console.warn('Google Maps API key missing. Address input will work without autocomplete.');
+      return;
+    }
+
+    if (!inputRef.current || autocompleteRef.current) {
       return;
     }
 
@@ -77,80 +105,81 @@ export default function GooglePlacesAutocomplete({
         try {
           autocompleteRef.current = new maps.places.Autocomplete(inputRef.current, {
             types: ['geocode', 'establishment'],
-            fields: ['formatted_address', 'geometry', 'name', 'place_id'],
+            fields: [
+              'formatted_address',
+              'geometry',
+              'name',
+              'place_id',
+              'address_components',
+            ],
           });
 
           autocompleteRef.current.addListener('place_changed', () => {
+            if (!isMounted || !inputRef.current) return;
+
             const place = autocompleteRef.current.getPlace();
 
-            // Only process if place has geometry (valid selection)
             if (place && place.geometry && place.formatted_address) {
-              const placeData = {
+              const placeData: GooglePlaceSelectedData = {
                 address: place.formatted_address,
-                name: place.name || place.formatted_address, // Use name, fallback to address
+                name: place.name || place.formatted_address,
                 placeId: place.place_id || '',
                 lat: place.geometry.location.lat(),
                 lng: place.geometry.location.lng(),
+                addressComponents: place.address_components ?? undefined,
               };
 
-              // Set input value to the place NAME (not address) - this is what user sees
               const displayValue = placeData.name;
-              
-              // Trigger onChange to update React state with the name
-              if (inputRef.current) {
-                const syntheticEvent = {
-                  target: { value: displayValue },
-                } as React.ChangeEvent<HTMLInputElement>;
-                onChange(syntheticEvent);
-              }
+              setInputValue(displayValue);
+              isPlaceSelectedRef.current = true;
 
-              // Call onPlaceSelected callback with full place data (name + address)
-              if (onPlaceSelected) {
-                onPlaceSelected(placeData);
-              }
+              const syntheticEvent = {
+                target: { value: displayValue },
+              } as React.ChangeEvent<HTMLInputElement>;
+              onChangeRef.current(syntheticEvent);
+
+              onPlaceSelectedRef.current?.(placeData);
             }
           });
-
-          setAutocompleteEnabled(true);
-        } catch (error: any) {
-          console.warn('Failed to initialize Google Places Autocomplete:', error?.message || error);
-          // Fallback: input still works, just without autocomplete
-          // This can happen if:
-          // - API key restrictions block this domain
-          // - Places API not enabled for this project
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn('Failed to initialize Google Places Autocomplete:', message);
         }
       })
-      .catch((error) => {
-        console.warn('Google Maps autocomplete unavailable:', error.message || error);
-        // Fallback: input still works, just without autocomplete
-        // Common errors:
-        // - RefererNotAllowedMapError: Domain not authorized in Google Cloud Console
-        // - Missing API key: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY not set
-        // - Network error: Failed to load Google Maps script
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn('Google Maps autocomplete unavailable:', message);
       });
 
     return () => {
       isMounted = false;
       if (autocompleteRef.current) {
         try {
-          (window as any).google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
-        } catch (e) {
+          (window as any).google?.maps?.event?.clearInstanceListeners(
+            autocompleteRef.current
+          );
+        } catch {
           // Ignore cleanup errors
         }
+        autocompleteRef.current = null;
       }
     };
-  }, [onChange, onPlaceSelected]);
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    onChange(e);
+  };
 
   return (
     <input
       ref={inputRef}
       type="text"
-      value={value}
-      onChange={onChange}
+      value={inputValue}
+      onChange={handleInputChange}
       placeholder={placeholder}
       className={className}
       disabled={disabled}
     />
   );
 }
-

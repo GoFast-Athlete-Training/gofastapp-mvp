@@ -1435,6 +1435,8 @@ model city_runs {
   meetUpPlaceId       String?
   meetUpLat           Float?
   meetUpLng           Float?
+  meetUpNote          String?              // Host note: how to find the meetup (e.g. "meet at the back")
+  workoutNarrative    String?              // Host note about this session (e.g. "this one's gonna be hard")
   totalMiles          Float?
   pace                String?
   stravaMapUrl        String?              // Public Strava route URL shown on the run page

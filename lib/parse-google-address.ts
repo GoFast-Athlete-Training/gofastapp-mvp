@@ -19,6 +19,65 @@ function normalizeCityState(
   return { city: city ?? null, state: state ?? null };
 }
 
+export type GoogleAddressComponent = {
+  long_name: string;
+  short_name: string;
+  types: string[];
+};
+
+function component(
+  components: GoogleAddressComponent[],
+  ...types: string[]
+): GoogleAddressComponent | undefined {
+  return components.find((c) => types.some((t) => c.types.includes(t)));
+}
+
+/** Prefer Google `address_components` over comma-splitting formatted_address. */
+export function parseGoogleAddressFromComponents(
+  formattedAddress: string,
+  components: GoogleAddressComponent[] | null | undefined
+): {
+  streetAddress: string;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  country: string | null;
+} {
+  if (!components?.length) {
+    return parseGoogleAddress(formattedAddress);
+  }
+
+  const streetNumber = component(components, 'street_number')?.long_name ?? '';
+  const route = component(components, 'route')?.long_name ?? '';
+  const streetFromParts = [streetNumber, route].filter(Boolean).join(' ').trim();
+
+  const locality =
+    component(
+      components,
+      'locality',
+      'postal_town',
+      'sublocality',
+      'sublocality_level_1',
+      'neighborhood'
+    )?.long_name ?? null;
+
+  const admin1 = component(components, 'administrative_area_level_1');
+  const stateShort = admin1?.short_name?.trim() || admin1?.long_name?.trim() || null;
+  const postalCode = component(components, 'postal_code')?.long_name?.trim() || null;
+  const country = component(components, 'country')?.long_name?.trim() || null;
+
+  const normalized = normalizeCityState(locality, stateShort);
+  const fallback = parseGoogleAddress(formattedAddress);
+
+  return {
+    streetAddress: streetFromParts || fallback.streetAddress || formattedAddress,
+    city: normalized.city || fallback.city,
+    state: normalized.state ?? fallback.state,
+    zip: postalCode || fallback.zip,
+    country: country || fallback.country,
+  };
+}
+
 export function parseGoogleAddress(formattedAddress: string): {
   streetAddress: string;
   city: string | null;

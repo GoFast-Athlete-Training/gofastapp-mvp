@@ -78,6 +78,8 @@ export interface CityRunWorkoutSegment {
   durationType: string;
   durationValue: number;
   repeatCount?: number | null;
+  targets?: unknown;
+  paceTargetEncodingVersion?: number | null;
 }
 
 export interface CityRunWorkoutSummary {
@@ -117,6 +119,8 @@ export interface CityRunDetails {
   mapImageUrl?: string | null;
   runType?: string | null;
   workoutDescription?: string | null;
+  meetUpNote?: string | null;
+  workoutNarrative?: string | null;
   workoutId?: string | null;
   workout?: CityRunWorkoutSummary | null;
   runClub?: RunClub | null;

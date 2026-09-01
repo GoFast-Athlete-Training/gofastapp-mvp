@@ -2,20 +2,15 @@
 
 import Link from 'next/link';
 import { Activity } from 'lucide-react';
+import WorkoutStructurePreview from '@/components/training/WorkoutStructurePreview';
+import type { WorkoutPreviewSegment } from '@/lib/training/workout-segment-preview';
 import type { CityRunWorkoutSummary } from '@/components/runs/city-run-types';
 
 export type PlannedWorkoutSummary = {
   id: string;
   title?: string | null;
   workoutType?: string | null;
-  segments?: Array<{
-    id: string;
-    stepOrder: number;
-    title: string;
-    durationType: string;
-    durationValue: number;
-    repeatCount?: number | null;
-  }>;
+  segments?: WorkoutPreviewSegment[];
 };
 
 type CityRunWorkoutCardProps = {
@@ -23,36 +18,11 @@ type CityRunWorkoutCardProps = {
   workout?: CityRunWorkoutSummary | null;
   plannedWorkout?: PlannedWorkoutSummary | null;
   workoutDescription?: string | null;
+  workoutNarrative?: string | null;
 };
 
-function SegmentList({
-  segments,
-}: {
-  segments: Array<{
-    id: string;
-    title: string;
-    durationType: string;
-    durationValue: number;
-    repeatCount?: number | null;
-  }>;
-}) {
-  return (
-    <ul className="mt-3 space-y-1.5 text-sm text-gray-700 border-t border-gray-100 pt-3">
-      {segments.map((s) => (
-        <li key={s.id}>
-          <span className="font-medium text-gray-800">{s.title}</span>
-          <span className="text-gray-500">
-            {' '}
-            ·{' '}
-            {s.durationType === 'DISTANCE'
-              ? `${s.durationValue} mi`
-              : `${s.durationValue} min`}
-            {s.repeatCount != null && s.repeatCount > 1 ? ` ×${s.repeatCount}` : ''}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
+function segmentsHaveStructure(segments: WorkoutPreviewSegment[] | undefined): boolean {
+  return Boolean(segments?.length);
 }
 
 export default function CityRunWorkoutCard({
@@ -60,13 +30,32 @@ export default function CityRunWorkoutCard({
   workout,
   plannedWorkout,
   workoutDescription,
+  workoutNarrative,
 }: CityRunWorkoutCardProps) {
   const linkedId = workoutId || workout?.id || null;
-  const textOnly = workoutDescription?.trim() || workout?.description?.trim() || null;
+  const narrative = workoutNarrative?.trim() || null;
+  const legacyText = workoutDescription?.trim() || workout?.description?.trim() || null;
   const isGroupWorkout = workout?.scope === 'GROUP';
   const prescribe = plannedWorkout ?? null;
 
-  if (prescribe?.title || (prescribe?.segments && prescribe.segments.length > 0)) {
+  const renderStructure = (
+    segments: WorkoutPreviewSegment[] | undefined,
+    workoutType: string | null | undefined
+  ) => {
+    if (!segmentsHaveStructure(segments)) {
+      return legacyText ? (
+        <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">{legacyText}</p>
+      ) : null;
+    }
+    return (
+      <div className="mt-3 border-t border-gray-100 pt-3">
+        <WorkoutStructurePreview segments={segments!} workoutType={workoutType} compact />
+      </div>
+    );
+  };
+
+  if (prescribe?.title || segmentsHaveStructure(prescribe?.segments)) {
+    const p = prescribe!;
     return (
       <div className="rounded-xl border border-sky-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-2">
@@ -74,20 +63,19 @@ export default function CityRunWorkoutCard({
           <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             Workout
           </span>
-          {prescribe.workoutType ? (
+          {p.workoutType ? (
             <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-900">
-              {prescribe.workoutType}
+              {p.workoutType}
             </span>
           ) : null}
         </div>
-        {prescribe.title ? (
-          <p className="font-semibold text-gray-900">{prescribe.title}</p>
+        {p.title ? (
+          <p className="font-semibold text-gray-900">{p.title}</p>
         ) : null}
-        {prescribe.segments && prescribe.segments.length > 0 ? (
-          <SegmentList segments={prescribe.segments} />
-        ) : textOnly ? (
-          <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">{textOnly}</p>
+        {narrative ? (
+          <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap italic">{narrative}</p>
         ) : null}
+        {renderStructure(p.segments, p.workoutType)}
       </div>
     );
   }
@@ -109,11 +97,13 @@ export default function CityRunWorkoutCard({
         {workout?.title ? (
           <p className="font-semibold text-gray-900">{workout.title}</p>
         ) : null}
-        {workout?.segments && workout.segments.length > 0 ? (
-          <SegmentList segments={workout.segments} />
-        ) : textOnly ? (
-          <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">{textOnly}</p>
+        {narrative ? (
+          <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap italic">{narrative}</p>
         ) : null}
+        {renderStructure(
+          workout?.segments as WorkoutPreviewSegment[] | undefined,
+          workout?.workoutType
+        )}
         {!isGroupWorkout ? (
           <Link
             href={`/workouts/${linkedId}`}
@@ -126,13 +116,18 @@ export default function CityRunWorkoutCard({
     );
   }
 
-  if (textOnly) {
+  if (narrative || legacyText) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
           Workout notes
         </p>
-        <p className="text-sm text-gray-700 whitespace-pre-wrap">{textOnly}</p>
+        {narrative ? (
+          <p className="text-sm text-gray-700 whitespace-pre-wrap italic">{narrative}</p>
+        ) : null}
+        {legacyText ? (
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{legacyText}</p>
+        ) : null}
       </div>
     );
   }
