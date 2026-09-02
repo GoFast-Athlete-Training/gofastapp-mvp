@@ -108,6 +108,24 @@ export async function GET(
               stravaUrl: true,
             },
           },
+          plannedWorkout: {
+            select: {
+              id: true,
+              title: true,
+              workoutType: true,
+              segments: {
+                orderBy: { stepOrder: 'asc' as const },
+                select: {
+                  id: true,
+                  stepOrder: true,
+                  title: true,
+                  durationType: true,
+                  durationValue: true,
+                  repeatCount: true,
+                },
+              },
+            },
+          },
           city_run_rsvps: {
             include: {
               Athlete: {
@@ -138,6 +156,24 @@ export async function GET(
               name: true,
               logoUrl: true,
               city: true,
+            },
+          },
+          plannedWorkout: {
+            select: {
+              id: true,
+              title: true,
+              workoutType: true,
+              segments: {
+                orderBy: { stepOrder: 'asc' as const },
+                select: {
+                  id: true,
+                  stepOrder: true,
+                  title: true,
+                  durationType: true,
+                  durationValue: true,
+                  repeatCount: true,
+                },
+              },
             },
           },
           city_run_rsvps: {

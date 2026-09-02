@@ -122,11 +122,33 @@ export interface CityRunDetails {
   workoutDescription?: string | null;
   meetUpNote?: string | null;
   workoutId?: string | null;
+  plannedWorkoutId?: string | null;
+  plannedWorkout?: {
+    id: string;
+    title?: string | null;
+    workoutType?: string | null;
+    segments?: CityRunWorkoutSegment[];
+  } | null;
   workout?: CityRunWorkoutSummary | null;
   runClub?: RunClub | null;
   runCrew?: RunCrew | null;
   rsvps?: CityRunRsvp[];
   currentRSVP?: string | null;
+}
+
+export function runHasWorkoutContent(run: {
+  plannedWorkoutId?: string | null;
+  plannedWorkout?: { id?: string; title?: string | null } | null;
+  workoutId?: string | null;
+  workout?: CityRunWorkoutSummary | null;
+  workoutDescription?: string | null;
+}): boolean {
+  return (
+    Boolean(run.plannedWorkoutId || run.plannedWorkout) ||
+    Boolean(run.workoutId || run.workout) ||
+    Boolean(run.workout?.workoutNarrative?.trim()) ||
+    Boolean(run.workoutDescription?.trim())
+  );
 }
 
 export interface PostRunRun {

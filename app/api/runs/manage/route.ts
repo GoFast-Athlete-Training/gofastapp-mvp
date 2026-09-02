@@ -24,6 +24,7 @@ function isMissingPostRunActivityColumn(error: any) {
  * - pastOnly: "true" = only runs with startDate before today (for adding photos, etc.)
  * - upcomingOnly: default "true"; "false" = return all runs (no date filter)
  * - runClubId: filter to runs for this run_clubs.id (when set, no default date filter unless pastOnly/upcomingOnly)
+ * - runType: track | trail | neighborhood | park
  */
 function getStartOfTodayUTC() {
   const d = new Date();
@@ -51,6 +52,7 @@ export async function GET(request: Request) {
     const pastOnly = searchParams.get('pastOnly') === 'true';
     const upcomingOnly = searchParams.get('upcomingOnly') !== 'false';
     const runClubIdFilter = searchParams.get('runClubId')?.trim();
+    const runTypeFilter = searchParams.get('runType')?.trim().toLowerCase();
 
     const where: any = {};
     if (workflowStatus && ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'].includes(workflowStatus)) {
@@ -58,6 +60,9 @@ export async function GET(request: Request) {
     }
     if (runClubIdFilter) {
       where.runClubId = runClubIdFilter;
+    }
+    if (runTypeFilter && ['track', 'trail', 'neighborhood', 'park'].includes(runTypeFilter)) {
+      where.runType = runTypeFilter;
     }
     const startOfToday = getStartOfTodayUTC();
     if (pastOnly) {
@@ -99,6 +104,7 @@ export async function GET(request: Request) {
           postRunActivity: true,
           routeNeighborhood: true,
           runType: true,
+          plannedWorkoutId: true,
           workoutDescription: true,
           routePhotos: true,
           mapImageUrl: true,
@@ -162,6 +168,7 @@ export async function GET(request: Request) {
           published: true,
           routeNeighborhood: true,
           runType: true,
+          plannedWorkoutId: true,
           workoutDescription: true,
           routePhotos: true,
           mapImageUrl: true,

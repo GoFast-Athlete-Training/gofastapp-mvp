@@ -7,8 +7,8 @@ import CityRunDetailsSection, { CityRunGoingBanner } from '@/components/runs/Cit
 import CityRunMobileTabs from '@/components/runs/CityRunMobileTabs';
 import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
 import CityRunRunDayCompanion from '@/components/runs/CityRunRunDayCompanion';
-import CityRunWorkoutCard from '@/components/runs/CityRunWorkoutCard';
-import { isRunPast, type CityRunDetails, type CityRunRsvp } from '@/components/runs/city-run-types';
+import CityRunWorkoutCard, { type PlannedWorkoutSummary } from '@/components/runs/CityRunWorkoutCard';
+import { isRunPast, runHasWorkoutContent, type CityRunDetails, type CityRunRsvp } from '@/components/runs/city-run-types';
 import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
 
 interface Props {
@@ -51,10 +51,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
     }
   };
 
-  const hasWorkout =
-    Boolean(run.workoutId || run.workout) ||
-    Boolean(run.workout?.workoutNarrative?.trim()) ||
-    Boolean(run.workoutDescription?.trim());
+  const hasWorkout = runHasWorkoutContent(run);
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -82,6 +79,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
             <CityRunWorkoutCard
               workoutId={run.workoutId}
               workout={run.workout}
+              plannedWorkout={run.plannedWorkout as PlannedWorkoutSummary | null | undefined}
               workoutDescription={run.workoutDescription}
             />
           ) : null}

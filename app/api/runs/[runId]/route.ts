@@ -489,6 +489,7 @@ export async function GET(
         meetUpNote: run.meetUpNote ?? null,
         directionsText: run.directionsText ?? null,
         workoutId: run.workoutId ?? null,
+        plannedWorkoutId: run.plannedWorkoutId ?? null,
         workout: run.workout
           ? {
               id: run.workout.id,
@@ -498,6 +499,14 @@ export async function GET(
               workoutNarrative: run.workout.workoutNarrative ?? null,
               scope: run.workout.scope ?? null,
               segments: run.workout.segments ?? [],
+            }
+          : null,
+        plannedWorkout: run.plannedWorkout
+          ? {
+              id: run.plannedWorkout.id,
+              title: run.plannedWorkout.title,
+              workoutType: run.plannedWorkout.workoutType ?? null,
+              segments: run.plannedWorkout.segments ?? [],
             }
           : null,
         locationId: run.locationId ?? null,

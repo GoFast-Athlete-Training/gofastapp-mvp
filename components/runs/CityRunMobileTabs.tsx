@@ -11,7 +11,7 @@ import CityRunDetailsSection, {
 } from '@/components/runs/CityRunDetailsSection';
 import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
 import CityRunRunDayCompanion from '@/components/runs/CityRunRunDayCompanion';
-import CityRunWorkoutCard from '@/components/runs/CityRunWorkoutCard';
+import CityRunWorkoutCard, { type PlannedWorkoutSummary } from '@/components/runs/CityRunWorkoutCard';
 import {
   CityRunPostRunCrewSection,
   CityRunPostRunPhotosSection,
@@ -23,6 +23,7 @@ import type {
   CityRunRsvp,
   PostRunRun,
 } from '@/components/runs/city-run-types';
+import { runHasWorkoutContent } from '@/components/runs/city-run-types';
 import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
 
 type PreRsvpMobileProps = {
@@ -93,10 +94,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
 
   if (props.mode === 'pre-rsvp') {
     const isSeries = props.run.runSeriesId != null;
-    const hasWorkout =
-      Boolean(props.run.workoutId || props.run.workout) ||
-      Boolean(props.run.workout?.workoutNarrative?.trim()) ||
-      Boolean(props.run.workoutDescription?.trim());
+    const hasWorkout = runHasWorkoutContent(props.run);
     return (
       <MobileHubTabs
         tabs={[...PRE_RSVP_TABS]}
@@ -115,6 +113,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
               <CityRunWorkoutCard
                 workoutId={props.run.workoutId}
                 workout={props.run.workout}
+                plannedWorkout={props.run.plannedWorkout as PlannedWorkoutSummary | null | undefined}
                 workoutDescription={props.run.workoutDescription}
               />
             ) : null}
@@ -141,10 +140,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
   }
 
   if (props.mode === 'going') {
-    const hasWorkout =
-      Boolean(props.run.workoutId || props.run.workout) ||
-      Boolean(props.run.workout?.workoutNarrative?.trim()) ||
-      Boolean(props.run.workoutDescription?.trim());
+    const hasWorkout = runHasWorkoutContent(props.run);
     const socialRun = hasSocialRunLifecycle(props.run);
 
     return (
@@ -167,6 +163,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
               <CityRunWorkoutCard
                 workoutId={props.run.workoutId}
                 workout={props.run.workout}
+                plannedWorkout={props.run.plannedWorkout as PlannedWorkoutSummary | null | undefined}
                 workoutDescription={props.run.workoutDescription}
               />
             ) : null}
