@@ -32,7 +32,8 @@ export type SegmentSnapshotSource =
   | "standalone_workout_post"
   | "garmin_push"
   | "group_workout_create"
-  | "club_planned_workout";
+  | "club_planned_workout"
+  | "run_planned_workout";
 
 export function goalBenchmarkFromSegmentSnapshot(
   snapshot: unknown
