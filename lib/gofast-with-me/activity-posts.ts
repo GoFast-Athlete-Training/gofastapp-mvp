@@ -46,7 +46,7 @@ const activityPostInclude = {
       distance: true,
       duration: true,
       activityType: true,
-      matched_workout: {
+      garmin_detail_workout: {
         select: {
           title: true,
           workoutType: true,
@@ -66,7 +66,7 @@ type ActivityPostRow = Awaited<
     distance: number | null;
     duration: number | null;
     activityType: string | null;
-    matched_workout: {
+    garmin_detail_workout: {
       title: string;
       workoutType: string;
       training_plans: { name: string } | null;
@@ -95,11 +95,11 @@ function mapMatchedWorkout(
   activity: ActivityPostRow['activity'],
   showMatchedWorkout: boolean
 ): ActivityPostMatchedWorkout | null {
-  if (!showMatchedWorkout || !activity.matched_workout) return null;
+  if (!showMatchedWorkout || !activity.garmin_detail_workout) return null;
   return {
-    title: activity.matched_workout.title,
-    workoutType: activity.matched_workout.workoutType,
-    planName: activity.matched_workout.training_plans?.name ?? null,
+    title: activity.garmin_detail_workout.title,
+    workoutType: activity.garmin_detail_workout.workoutType,
+    planName: activity.garmin_detail_workout.training_plans?.name ?? null,
   };
 }
 

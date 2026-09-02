@@ -78,7 +78,7 @@ function mapRow(row: {
   startLongitude: number | null;
   endLatitude: number | null;
   endLongitude: number | null;
-  matched_workout: {
+  garmin_detail_workout: {
     id: string;
     title: string;
     workoutType: string;
@@ -89,7 +89,7 @@ function mapRow(row: {
     training_plans: { name: string } | null;
   } | null;
 }): RecentAthleteActivityPayload {
-  const matched = row.matched_workout;
+  const matched = row.garmin_detail_workout;
   return {
     id: row.id,
     activityName: row.activityName,
@@ -140,7 +140,7 @@ export async function listRecentAthleteActivities(
       startLongitude: true,
       endLatitude: true,
       endLongitude: true,
-      matched_workout: {
+      garmin_detail_workout: {
         select: {
           id: true,
           title: true,

@@ -6,6 +6,7 @@ import CityRunWorkoutCard from '@/components/runs/CityRunWorkoutCard';
 import { formatCalendarDate } from '@/lib/calendar-date';
 import { formatRunTime } from '@/utils/formatTime';
 import type { RunnerAgendaItem } from '@/lib/runner/runner-agenda';
+import { workoutHasActuals } from '@/lib/training/workout-has-actuals';
 
 function milesLabel(meters: number | null | undefined): string | null {
   if (meters == null || meters <= 0) return null;
@@ -28,7 +29,7 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
     day: 'numeric',
   });
 
-  const planComplete = Boolean(plan?.garminDetailActivityId);
+  const planComplete = plan != null && workoutHasActuals(plan);
   const planHref =
     planComplete && plan?.workoutId
       ? `/workouts/${plan.workoutId}?back=/runner`

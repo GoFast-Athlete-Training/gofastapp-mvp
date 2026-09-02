@@ -204,7 +204,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         averageSpeed: true,
         ingestionStatus: true,
         summaryData: true,
-        matched_workout: {
+        garmin_detail_workout: {
           select: { id: true, title: true, planId: true, date: true, weekNumber: true },
         },
       },
@@ -236,8 +236,8 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         averageSpeed: a.averageSpeed,
         ingestionStatus: a.ingestionStatus,
         summaryData: a.summaryData,
-        matchedWorkoutId: a.matched_workout?.id ?? null,
-        matchedWorkoutTitle: a.matched_workout?.title ?? null,
+        matchedWorkoutId: a.garmin_detail_workout?.id ?? null,
+        matchedWorkoutTitle: a.garmin_detail_workout?.title ?? null,
       })),
     });
 
@@ -265,7 +265,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
           score: c.score,
           conflict: conflictForCandidate({
             targetWorkout: matchTarget,
-            matchedWorkout: source?.matched_workout,
+            matchedWorkout: source?.garmin_detail_workout,
           }),
         });
       }),

@@ -37,7 +37,7 @@ test('buildActivityHistoryWhere adds unmatched filter', () => {
     cursor: null,
   });
   assert.deepEqual(where, {
-    AND: [{ athleteId: 'a1' }, { matched_workout: { is: null } }],
+    AND: [{ athleteId: 'a1' }, { garmin_detail_workout: { is: null } }],
   });
 });
 
@@ -56,7 +56,7 @@ test('mapActivityHistoryRow includes matched workout context', () => {
     averageSpeed: 2.7,
     averageHeartRate: 140,
     elevationGain: 50,
-    matched_workout: {
+    garmin_detail_workout: {
       id: 'w1',
       title: 'Easy 6',
       workoutType: 'EasyRun',

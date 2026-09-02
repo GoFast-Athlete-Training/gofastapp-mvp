@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma, WorkoutType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { parseOptionalWorkoutDate } from "@/lib/training/workout-date-parse";
@@ -24,24 +25,23 @@ function utcDayRangeFromYmd(dateStr: string): { gte: Date; lt: Date } | null {
 /** Map client sport chip → workoutType filter */
 function sportWorkoutTypeFilter(
   sport: string | null
-): { workoutType?: { in: string[] } | { notIn: string[] } } | Record<string, never> {
+): Pick<Prisma.workoutsWhereInput, "workoutType"> | Record<string, never> {
   if (!sport || sport === "all") return {};
-  const runTypes = [
-    "Easy",
-    "LongRun",
-    "Intervals",
-    "Tempo",
-    "SpeedDuration",
-    "Race",
+  const runTypes: WorkoutType[] = [
+    WorkoutType.Easy,
+    WorkoutType.LongRun,
+    WorkoutType.Intervals,
+    WorkoutType.Tempo,
+    WorkoutType.Race,
   ];
   if (sport === "run") return { workoutType: { in: runTypes } };
-  if (sport === "bike" || sport === "cycle") {
-    return { workoutType: { in: ["Bike", "Cycling", "Ride"] } };
+  if (sport === "bike" || sport === "cycle" || sport === "swim") {
+    // workouts.workoutType is run-only; bike/swim live on separate tables.
+    return { workoutType: { in: [] } };
   }
-  if (sport === "swim") return { workoutType: { in: ["Swim", "Swimming"] } };
   return {
     workoutType: {
-      notIn: [...runTypes, "Bike", "Cycling", "Ride", "Swim", "Swimming"],
+      notIn: runTypes,
     },
   };
 }

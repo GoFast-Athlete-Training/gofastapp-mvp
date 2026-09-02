@@ -45,7 +45,7 @@ export async function GET(_request: Request) {
         startTime: true,
         distance: true,
         duration: true,
-        matched_workout: { select: { id: true } },
+        garmin_detail_workout: { select: { id: true } },
       },
     });
 
@@ -57,12 +57,12 @@ export async function GET(_request: Request) {
       return NextResponse.json({ activity: null });
     }
 
-    const { matched_workout, ...rest } = row;
+    const { garmin_detail_workout, ...rest } = row;
     return NextResponse.json({
       activity: {
         ...rest,
         startTime: rest.startTime?.toISOString() ?? null,
-        linkedWorkoutId: matched_workout?.id ?? null,
+        linkedWorkoutId: garmin_detail_workout?.id ?? null,
       },
     });
   } catch (err: unknown) {

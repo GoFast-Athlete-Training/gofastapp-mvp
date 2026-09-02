@@ -30,7 +30,7 @@ export async function GET(
         athleteId: auth.athlete.id,
       },
       include: {
-        matched_workout: {
+        garmin_detail_workout: {
           include: {
             segments: { orderBy: { stepOrder: "asc" } },
             training_plans: {
@@ -45,7 +45,7 @@ export async function GET(
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    const { matched_workout, ...activityRow } = row;
+    const { garmin_detail_workout, ...activityRow } = row;
     const projected = projectActivityDetailResponse({
       ...activityRow,
       startTime: activityRow.startTime,
@@ -61,13 +61,13 @@ export async function GET(
       },
       derivedLaps: projected.derivedLaps,
       hasDetail: projected.hasDetail,
-      matchedWorkout: matched_workout
+      matchedWorkout: garmin_detail_workout
         ? {
-            ...matched_workout,
-            date: matched_workout.date?.toISOString() ?? null,
-            createdAt: matched_workout.createdAt.toISOString(),
-            updatedAt: matched_workout.updatedAt.toISOString(),
-            segments: matched_workout.segments.map((s) => ({
+            ...garmin_detail_workout,
+            date: garmin_detail_workout.date?.toISOString() ?? null,
+            createdAt: garmin_detail_workout.createdAt.toISOString(),
+            updatedAt: garmin_detail_workout.updatedAt.toISOString(),
+            segments: garmin_detail_workout.segments.map((s) => ({
               ...s,
               createdAt: s.createdAt.toISOString(),
               updatedAt: s.updatedAt.toISOString(),

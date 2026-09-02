@@ -45,7 +45,7 @@ type RawActivityRow = {
   averageSpeed: number | null;
   averageHeartRate: number | null;
   elevationGain: number | null;
-  matched_workout: {
+  garmin_detail_workout: {
     id: string;
     title: string;
     workoutType: string;
@@ -55,7 +55,7 @@ type RawActivityRow = {
 };
 
 export const activityHistoryInclude = {
-  matched_workout: {
+  garmin_detail_workout: {
     select: {
       id: true,
       title: true,
@@ -127,7 +127,7 @@ export function buildActivityHistoryWhere(params: {
   const and: Prisma.athlete_activitiesWhereInput[] = [{ athleteId: params.athleteId }];
 
   if (params.filter === 'unmatched') {
-    and.push({ matched_workout: { is: null } });
+    and.push({ garmin_detail_workout: { is: null } });
   }
 
   if (params.from || params.to) {
@@ -169,11 +169,11 @@ export function mapActivityHistoryRow(row: RawActivityRow): ActivityHistoryRow {
     averageSpeed: row.averageSpeed,
     averageHeartRate: row.averageHeartRate,
     elevationGain: row.elevationGain,
-    matchedWorkoutId: row.matched_workout?.id ?? null,
-    matchedWorkoutTitle: row.matched_workout?.title ?? null,
-    matchedWorkoutType: row.matched_workout?.workoutType ?? null,
-    matchedPlanName: row.matched_workout?.training_plans?.name ?? null,
-    communityPublishedAt: row.matched_workout?.communityPublishedAt?.toISOString() ?? null,
+    matchedWorkoutId: row.garmin_detail_workout?.id ?? null,
+    matchedWorkoutTitle: row.garmin_detail_workout?.title ?? null,
+    matchedWorkoutType: row.garmin_detail_workout?.workoutType ?? null,
+    matchedPlanName: row.garmin_detail_workout?.training_plans?.name ?? null,
+    communityPublishedAt: row.garmin_detail_workout?.communityPublishedAt?.toISOString() ?? null,
   };
 }
 
