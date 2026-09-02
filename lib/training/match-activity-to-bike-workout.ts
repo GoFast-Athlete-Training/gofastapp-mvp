@@ -91,7 +91,7 @@ export async function tryMatchActivityToBikeWorkout(
       where: {
         athleteId: activity.athleteId,
         garminWorkoutId,
-        matchedActivityId: null,
+        garminDetailActivityId: null,
       },
       include: bikeMatchInclude,
     });
@@ -103,7 +103,7 @@ export async function tryMatchActivityToBikeWorkout(
       where: {
         athleteId: activity.athleteId,
         date: { gte: start, lte: end },
-        matchedActivityId: null,
+        garminDetailActivityId: null,
       },
       orderBy: { date: "asc" },
       include: bikeMatchInclude,
@@ -133,7 +133,7 @@ export async function tryMatchActivityToBikeWorkout(
   await prisma.bike_workout.update({
     where: { id: candidate.id },
     data: {
-      matchedActivityId: activity.id,
+      garminDetailActivityId: activity.id,
       actualDurationSeconds: activity.duration ?? null,
       actualDistanceMeters: distanceMeters,
       actualAvgPowerWatts: actualAvgPower,

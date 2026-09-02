@@ -12,48 +12,14 @@ import { tryMatchActivityToCityRun } from '../cta-triggers/try-match-activity-to
 import { promoteUnmatchedRunningActivityToWorkout } from '../training/promote-activity-to-workout';
 import { tryMatchActivityToBikeWorkout } from '../training/match-activity-to-bike-workout';
 import { isCyclingActivityType } from '../training/activity-type-sets';
-import { sendAppNotification } from '../app-notifications/send';
+import { surfaceFinishedRunningActivity } from '../training/finish-workout-surfacing-push';
+
 import { isGenericGarminActivityName } from './generic-activity-names';
 
 function generateId(): string {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substring(2, 15);
   return `c${timestamp}${random}`;
-}
-
-async function sendActivitySyncedCongratsIfNeeded(params: {
-  activityId: string;
-  athleteId: string;
-  matchedWorkoutId?: string;
-}): Promise<void> {
-  if (params.matchedWorkoutId) {
-    const workout = await prisma.workouts.findUnique({
-      where: { id: params.matchedWorkoutId },
-      select: { planId: true },
-    });
-    if (workout?.planId != null) {
-      return;
-    }
-  }
-
-  try {
-    await sendAppNotification({
-      athleteId: params.athleteId,
-      templateKey: 'activity.synced',
-      objectType: 'athlete_activity',
-      objectId: params.activityId,
-      deeplink: `/activities/${params.activityId}`,
-      payload: {
-        activityId: params.activityId,
-        type: 'activity_synced',
-        screen: 'activity',
-        objectType: 'athlete_activity',
-        objectId: params.activityId,
-      },
-    });
-  } catch (err) {
-    console.error('activity_synced push:', err);
-  }
 }
 
 export interface ActivitySummary {
@@ -188,10 +154,10 @@ export async function handleActivitySummary(
         });
 
         if (!isCyclingActivityType(activity.activityType)) {
-          await sendActivitySyncedCongratsIfNeeded({
+          await surfaceFinishedRunningActivity({
             activityId: created.id,
             athleteId: athlete.id,
-            matchedWorkoutId: matchResult.workoutId,
+            matchApplied: matchResult.matched,
           });
         }
 

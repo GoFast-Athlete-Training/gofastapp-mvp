@@ -77,18 +77,18 @@ function SplitBar({ lap }: { lap: PhaseAwareLapRow }) {
 }
 
 type Props = {
-  matchedActivityId?: string | null;
+  garminDetailActivityId?: string | null;
   performanceAnalysis: WorkoutPerformanceAnalysis | null;
 };
 
 export default function PaceForPacePanel({
-  matchedActivityId,
+  garminDetailActivityId,
   performanceAnalysis,
 }: Props) {
   const available = hasLapPaceDeltas(performanceAnalysis);
   const laps = performanceAnalysis?.phaseAwareLaps ?? [];
 
-  if (!matchedActivityId) {
+  if (!garminDetailActivityId) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
         Link a Garmin activity to see your splits.

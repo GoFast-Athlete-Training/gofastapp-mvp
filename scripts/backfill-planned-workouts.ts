@@ -27,7 +27,7 @@ async function main() {
       athleteId: true,
       planId: true,
       date: true,
-      matchedActivityId: true,
+      garminDetailActivityId: true,
     },
     orderBy: [{ planId: "asc" }, { date: "asc" }],
   });
@@ -62,7 +62,7 @@ async function main() {
 
     if (existingPlanned) {
       skipped++;
-      if (!dryRun && row.matchedActivityId) {
+      if (!dryRun && row.garminDetailActivityId) {
         await prisma.workouts.update({
           where: { id: row.id },
           data: { plannedWorkoutId: existingPlanned.id },
@@ -85,7 +85,7 @@ async function main() {
       });
       materialized++;
 
-      if (row.matchedActivityId) {
+      if (row.garminDetailActivityId) {
         await prisma.workouts.update({
           where: { id: row.id },
           data: { plannedWorkoutId: result.plannedWorkoutId },

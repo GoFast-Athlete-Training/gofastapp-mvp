@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { buildPlanWeekCards } from "@/lib/training/plan-week-cards";
+import { workoutHasActuals } from "@/lib/training/workout-has-actuals";
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -34,13 +35,15 @@ export type UpcomingSessionJson = {
   title: string;
   workoutType: string;
   date: string;
-  matchedActivityId: string | null;
+  garminDetailActivityId: string | null;
   skippedAt: string | null;
   skipReason: string | null;
   /** target − actual sec/mi; positive = faster than prescribed */
   paceDeltaSecPerMile: number | null;
   segments: { stepOrder: number; targets: unknown }[] | undefined;
   workoutId: string | null;
+  /** Planned prescribe row id (canonical calendar key). */
+  plannedWorkoutId?: string | null;
   isPlanSession: boolean;
   estimatedDistanceInMeters: number | null;
   /** False for plan calendar days (date-only sentinel); true when date includes a real scheduled time. */
@@ -147,7 +150,9 @@ export async function GET(request: NextRequest) {
         if (weekNum === startWeek) {
           const todayCard = cards.find((c) => c.dateKey === todayKey);
           workoutTodayDone = Boolean(
-            todayCard?.workoutId && todayCard?.matchedActivityId
+            todayCard &&
+              (workoutHasActuals(todayCard) ||
+                (todayCard.workoutId != null && todayCard.skippedAt != null))
           );
         }
 
@@ -165,12 +170,13 @@ export async function GET(request: NextRequest) {
             title: c.title,
             workoutType: c.workoutType,
             date: `${c.dateKey}T12:00:00.000Z`,
-            matchedActivityId: c.matchedActivityId,
+            garminDetailActivityId: c.garminDetailActivityId,
             skippedAt: c.skippedAt,
             skipReason: c.skipReason,
             paceDeltaSecPerMile: null,
             segments: undefined,
             workoutId,
+            plannedWorkoutId,
             isPlanSession: true,
             hasScheduledTime: false,
             estimatedDistanceInMeters: c.estimatedDistanceInMeters,
@@ -204,7 +210,7 @@ export async function GET(request: NextRequest) {
         title: w.title,
         workoutType: w.workoutType,
         date: w.date.toISOString(),
-        matchedActivityId: w.matchedActivityId,
+        garminDetailActivityId: w.garminDetailActivityId,
         skippedAt: w.skippedAt?.toISOString() ?? null,
         skipReason: w.skipReason ?? null,
         paceDeltaSecPerMile: w.paceDeltaSecPerMile ?? null,

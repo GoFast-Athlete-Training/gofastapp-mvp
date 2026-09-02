@@ -6,6 +6,7 @@ import {
 } from '@/lib/city-run-clock';
 import { hasSocialRunLifecycle } from '@/lib/city-run-type';
 import { buildPlanWeekCards, type PlanDayCard } from '@/lib/training/plan-week-cards';
+import { workoutHasActuals } from '@/lib/training/workout-has-actuals';
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -232,7 +233,7 @@ export async function fetchRunnerAgendaForAthlete(
     });
 
     for (const card of weekCards) {
-      if (card.dateKey < todayKey && !card.matchedActivityId) continue;
+      if (card.dateKey < todayKey && !workoutHasActuals(card)) continue;
       if (card.workoutType === 'Rest') continue;
 
       const stamp = card.plannedWorkoutId
@@ -246,7 +247,8 @@ export async function fetchRunnerAgendaForAthlete(
         title: card.title,
         workoutType: card.workoutType,
         estimatedDistanceInMeters: card.estimatedDistanceInMeters || null,
-        matchedActivityId: card.matchedActivityId,
+        actualDistanceMeters: card.actualDistanceMeters ?? null,
+        actualDurationSeconds: card.actualDurationSeconds ?? null,
         cityRunId: stamp?.cityRunId ?? null,
         plannedWorkoutPreview: stamp
           ? {
@@ -288,7 +290,8 @@ export async function fetchRunnerAgendaForAthlete(
           title: card.title,
           workoutType: card.workoutType,
           estimatedDistanceInMeters: card.estimatedDistanceInMeters || null,
-          matchedActivityId: card.matchedActivityId,
+          actualDistanceMeters: card.actualDistanceMeters ?? null,
+          actualDurationSeconds: card.actualDurationSeconds ?? null,
           cityRunId: stamp?.cityRunId ?? null,
           plannedWorkoutPreview: stamp
             ? {
@@ -316,7 +319,8 @@ export async function fetchRunnerAgendaForAthlete(
       title: stamp.title,
       workoutType: String(stamp.workoutType),
       estimatedDistanceInMeters: stamp.estimatedDistanceInMeters,
-      matchedActivityId: null,
+      actualDistanceMeters: null,
+      actualDurationSeconds: null,
       cityRunId: stamp.cityRunId,
       plannedWorkoutPreview: {
         id: stamp.id,

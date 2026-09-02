@@ -17,7 +17,7 @@ export type UpcomingWorkoutRow = {
   title: string;
   workoutType: string;
   date: string | null;
-  matchedActivityId: string | null;
+  garminDetailActivityId: string | null;
   skippedAt?: string | null;
   skipReason?: string | null;
   paceDeltaSecPerMile?: number | null;
@@ -57,7 +57,7 @@ function mainPaceTargetLabel(segments: UpcomingWorkoutRow["segments"]): string |
 }
 
 function statusFor(w: UpcomingWorkoutRow): { label: string; className: string } {
-  if (w.matchedActivityId) {
+  if (w.garminDetailActivityId) {
     const p = w.paceDeltaSecPerMile;
     if (p != null && Number.isFinite(p)) {
       if (p > 5) return { label: "Completed · beat target", className: "bg-emerald-50 text-emerald-800" };
@@ -69,7 +69,7 @@ function statusFor(w: UpcomingWorkoutRow): { label: string; className: string } 
   const dateKey = w.date ? w.date.slice(0, 10) : "";
   const status = deriveSessionStatus({
     dateKey,
-    matchedActivityId: w.matchedActivityId,
+    garminDetailActivityId: w.garminDetailActivityId,
     skippedAt: w.skippedAt,
     workoutType: w.workoutType,
     title: w.title,

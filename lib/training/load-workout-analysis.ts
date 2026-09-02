@@ -17,7 +17,7 @@ const workoutAnalysisInclude = {
       segment_laps: { orderBy: { lapIndex: "asc" as const } },
     },
   },
-  matched_activity: {
+  garmin_detail_activity: {
     select: {
       id: true,
       activityName: true,
@@ -65,8 +65,8 @@ export async function loadWorkoutForAnalysis(params: {
     actualDurationSeconds: workout.actualDurationSeconds,
     estimatedDistanceInMeters: workout.estimatedDistanceInMeters,
     completedActivityDetailJson: workout.completedActivityDetailJson,
-    matchedActivityId: workout.matchedActivityId,
-    matched_activity: workout.matched_activity,
+    garminDetailActivityId: workout.garminDetailActivityId,
+    garmin_detail_activity: workout.garmin_detail_activity,
     segmentExecutionStatus: workout.segmentExecutionStatus,
     segmentExecutionLapCount: workout.segmentExecutionLapCount,
     segmentExecutionSegmentCount: workout.segmentExecutionSegmentCount,
@@ -99,7 +99,7 @@ export async function resolveWorkoutIdFromActivity(params: {
   if (!activity) return null;
 
   const linked = await prisma.workouts.findFirst({
-    where: { matchedActivityId: activity.id, athleteId: params.athleteId },
+    where: { garminDetailActivityId: activity.id, athleteId: params.athleteId },
     select: { id: true },
   });
   return linked?.id ?? null;

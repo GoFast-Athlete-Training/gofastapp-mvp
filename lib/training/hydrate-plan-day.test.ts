@@ -17,7 +17,7 @@ function day(partial: Partial<PlanDayCard> & Pick<PlanDayCard, "dateKey">): Plan
     workoutType: "Easy",
     phase: "base",
     estimatedDistanceInMeters: 5000,
-    matchedActivityId: null,
+    garminDetailActivityId: null,
     skippedAt: null,
     skipReason: null,
     actualDistanceMeters: null,
@@ -45,7 +45,7 @@ test("executed — same-id spawn (workouts.id = planned_workouts.id)", () => {
       dateKey: "2026-03-14",
       plannedWorkoutId: "plan-1",
       workoutId: "plan-1",
-      matchedActivityId: "act-1",
+      garminDetailActivityId: "act-1",
     })
   );
   assert.ok(result);
@@ -63,7 +63,7 @@ test("executed — legacy FK spawn (different instance id)", () => {
       dateKey: "2026-03-14",
       plannedWorkoutId: "plan-1",
       workoutId: "inst-1",
-      matchedActivityId: "act-1",
+      garminDetailActivityId: "act-1",
     })
   );
   assert.ok(result);

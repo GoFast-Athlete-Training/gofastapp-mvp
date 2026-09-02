@@ -11,6 +11,7 @@ import CityRunDetailsSection, {
   CityRunRsvpPanel,
   CityRunSeriesPanel,
 } from '@/components/runs/CityRunDetailsSection';
+import CityRunWorkoutCard from '@/components/runs/CityRunWorkoutCard';
 import CityRunPeopleSection, { CityRunGoingSummary } from '@/components/runs/CityRunPeopleSection';
 import api from '@/lib/api';
 import { auth } from '@/lib/firebase';
@@ -233,6 +234,10 @@ function CityRunPreRSVP({
   }, [run.date, run.startTimeHour, run.startTimeMinute, run.startTimePeriod, run.timezone]);
 
   const isSeries = run.runSeriesId != null;
+  const hasWorkout =
+    Boolean(run.workoutId || run.workout) ||
+    Boolean(run.workout?.workoutNarrative?.trim()) ||
+    Boolean(run.workoutDescription?.trim());
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -252,6 +257,13 @@ function CityRunPreRSVP({
         <div className="hidden lg:grid grid-cols-3 gap-6">
           <div className={`space-y-4 ${isSeries ? 'col-span-2' : 'col-span-2 order-2 lg:order-1'}`}>
             <CityRunDetailsSection run={run} showBackButton onBack={onBack} showHostCard />
+            {hasWorkout ? (
+              <CityRunWorkoutCard
+                workoutId={run.workoutId}
+                workout={run.workout}
+                workoutDescription={run.workoutDescription}
+              />
+            ) : null}
             {isSeries ? (
               <>
                 <CityRunGoingSummary count={going.length} />

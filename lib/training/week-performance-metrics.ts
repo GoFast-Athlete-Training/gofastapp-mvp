@@ -14,7 +14,7 @@ export type { WeekPerformanceSnapshot } from "@/lib/training/week-performance-ty
 
 export type WeekPerformanceRow = {
   workoutType: WorkoutType | string;
-  matchedActivityId: string | null;
+  garminDetailActivityId: string | null;
   skippedAt: Date | null;
   date: Date | null;
   estimatedDistanceInMeters: number | null;
@@ -48,20 +48,20 @@ export function computeWeekPerformanceMetrics(
   todayKey: string = localTodayKey()
 ): WeekPerformanceSnapshot {
   const sessionsPlanned = rows.length;
-  const matchedRows = rows.filter((w) => w.matchedActivityId != null);
+  const matchedRows = rows.filter((w) => w.garminDetailActivityId != null);
   const sessionsCompleted = matchedRows.length;
   const sessionsSkipped = rows.filter(
-    (w) => w.matchedActivityId == null && w.skippedAt != null
+    (w) => w.garminDetailActivityId == null && w.skippedAt != null
   ).length;
   const sessionsMissed = rows.filter((w) => {
-    if (w.matchedActivityId != null || w.skippedAt != null) return false;
+    if (w.garminDetailActivityId != null || w.skippedAt != null) return false;
     if (!w.date) return false;
     return isoDateKey(w.date) < todayKey;
   }).length;
 
   const structuredRows = rows.filter((w) => isStructuredWorkoutType(String(w.workoutType)));
   const structuredSessionsPlanned = structuredRows.length;
-  const structuredMatched = structuredRows.filter((w) => w.matchedActivityId != null);
+  const structuredMatched = structuredRows.filter((w) => w.garminDetailActivityId != null);
   const structuredSessionsCompleted = structuredMatched.length;
 
   const deltas = structuredMatched
@@ -110,10 +110,10 @@ export function computeWeekPerformanceMetrics(
         ? longRun.actualDistanceMeters
         : 0;
     longRunCompleted =
-      longRun.matchedActivityId != null && actual > 0;
+      longRun.garminDetailActivityId != null && actual > 0;
     if (planned > 0) {
       longRunCompletionRatio = Math.min(1, actual / planned);
-    } else if (longRun.matchedActivityId != null && actual > 0) {
+    } else if (longRun.garminDetailActivityId != null && actual > 0) {
       longRunCompletionRatio = 1;
     } else {
       longRunCompletionRatio = 0;
@@ -179,7 +179,7 @@ export async function loadWeekPerformanceSnapshot(params: {
     },
     select: {
       workoutType: true,
-      matchedActivityId: true,
+      garminDetailActivityId: true,
       skippedAt: true,
       date: true,
       estimatedDistanceInMeters: true,
@@ -196,7 +196,7 @@ export async function loadWeekPerformanceSnapshot(params: {
 
   const metricRows: WeekPerformanceRow[] = rows.map((w) => ({
     workoutType: w.workoutType,
-    matchedActivityId: w.matchedActivityId,
+    garminDetailActivityId: w.garminDetailActivityId,
     skippedAt: w.skippedAt,
     date: w.date,
     estimatedDistanceInMeters: w.estimatedDistanceInMeters,

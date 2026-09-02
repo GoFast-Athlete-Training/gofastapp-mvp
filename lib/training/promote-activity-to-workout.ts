@@ -63,7 +63,7 @@ export async function promoteUnmatchedRunningActivityToWorkout(
   }
 
   const existing = await prisma.workouts.findFirst({
-    where: { matchedActivityId: activity.id },
+    where: { garminDetailActivityId: activity.id },
     select: { id: true },
   });
   if (existing) {
@@ -181,7 +181,7 @@ export async function promoteUnmatchedRunningActivityToWorkout(
       planId: null,
       date: activity.startTime,
       catalogueWorkoutId: null,
-      matchedActivityId: activity.id,
+      garminDetailActivityId: activity.id,
       estimatedDistanceInMeters: distanceMeters,
       actualDistanceMeters: distanceMeters,
       actualAvgPaceSecPerMile: paceSecPerMile,

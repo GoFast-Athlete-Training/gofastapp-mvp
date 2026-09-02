@@ -65,7 +65,6 @@ const UNSUPPORTED_CITY_RUN_FIELDS = [
   "igPostText",
   "igPostGraphic",
   "meetUpNote",
-  "workoutNarrative",
 ] as const;
 
 type FromWorkoutBody = {
@@ -267,6 +266,17 @@ export async function POST(request: NextRequest) {
     const streetFallback =
       meetUpStreetAddress?.trim() || meetUpPoint.trim();
 
+    const narrativeTrimmed = workoutNarrative?.trim() || null;
+    if (narrativeTrimmed) {
+      await prisma.workouts.update({
+        where: { id: workout.id },
+        data: {
+          workoutNarrative: narrativeTrimmed,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
     const createData: Record<string, unknown> = {
       id: generateId(),
       citySlug: finalCitySlug,
@@ -290,7 +300,6 @@ export async function POST(request: NextRequest) {
       meetUpState: meetUpState?.trim() || state?.trim() || null,
       meetUpZip: meetUpZip?.trim() || null,
       meetUpNote: meetUpNote?.trim() || null,
-      workoutNarrative: workoutNarrative?.trim() || null,
       routeNeighborhood: null,
       runType: null,
       workoutDescription: null,

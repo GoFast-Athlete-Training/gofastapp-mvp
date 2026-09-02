@@ -49,7 +49,7 @@ const instanceDetailInclude = {
       segment_laps: { orderBy: { lapIndex: "asc" as const } },
     },
   },
-  matched_activity: {
+  garmin_detail_activity: {
     select: {
       id: true,
       activityName: true,
@@ -144,7 +144,7 @@ export async function loadPlannedWorkoutDetailForAthlete(params: {
     planCycleIndex: planned.planCycleIndex,
     garminWorkoutId: planned.garminWorkoutId,
     garminScheduleId: planned.garminScheduleId,
-    matchedActivityId: instance?.matchedActivityId ?? null,
+    garminDetailActivityId: instance?.garminDetailActivityId ?? null,
     skippedAt: instance?.skippedAt ?? null,
     skipReason: instance?.skipReason ?? null,
     actualDistanceMeters: instance?.actualDistanceMeters ?? null,
@@ -179,9 +179,9 @@ export async function loadPlannedWorkoutDetailForAthlete(params: {
     segments: prescribeSegments,
     workout_catalogue: planned.workout_catalogue,
     training_plans: planned.training_plans,
-    matched_activity: instance?.matched_activity ?? null,
+    garmin_detail_activity: instance?.garmin_detail_activity ?? null,
     city_runs: instance?.city_runs ?? [],
-    isPlannedOnly: !instance?.matchedActivityId,
+    isPlannedOnly: !instance?.garminDetailActivityId,
   };
 }
 

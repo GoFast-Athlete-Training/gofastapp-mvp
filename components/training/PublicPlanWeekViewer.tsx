@@ -30,7 +30,7 @@ function toPlanDayCard(day: PublicPlanWeek["days"][number]): PlanDayCard {
     phase: "",
     dayAssigned: day.dayAssigned,
     estimatedDistanceInMeters: day.estimatedDistanceInMeters,
-    matchedActivityId: null,
+    garminDetailActivityId: null,
     skippedAt: null,
     skipReason: null,
     actualDistanceMeters: null,

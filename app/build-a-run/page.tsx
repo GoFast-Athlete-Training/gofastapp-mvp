@@ -17,7 +17,7 @@ type LiteWorkout = {
   workoutType?: string | null;
   description?: string | null;
   date?: string | null;
-  matchedActivityId?: string | null;
+  garminDetailActivityId?: string | null;
   estimatedDistanceInMeters?: number | null;
   planId?: string | null;
   segments?: { length?: number };
@@ -296,7 +296,7 @@ function StandaloneRunsList() {
                       {segmentCount(workout) > 0
                         ? ` · ${segmentCount(workout)} segments`
                         : ""}
-                      {workout.matchedActivityId ? (
+                      {workout.garminDetailActivityId ? (
                         <span className="ml-2 text-emerald-700 font-medium">
                           Logged
                         </span>

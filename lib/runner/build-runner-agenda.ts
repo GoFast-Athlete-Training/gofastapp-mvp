@@ -1,3 +1,5 @@
+import { workoutHasActuals } from "@/lib/training/workout-has-actuals";
+
 export type RunnerPlannedWorkoutPreview = {
   id: string;
   title: string;
@@ -19,7 +21,8 @@ export type RunnerPlanSession = {
   title: string;
   workoutType: string;
   estimatedDistanceInMeters: number | null;
-  matchedActivityId: string | null;
+  actualDistanceMeters: number | null;
+  actualDurationSeconds: number | null;
   cityRunId: string | null;
   plannedWorkoutPreview: RunnerPlannedWorkoutPreview | null;
 };

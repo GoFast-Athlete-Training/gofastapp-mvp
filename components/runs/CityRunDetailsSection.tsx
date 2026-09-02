@@ -76,7 +76,9 @@ export default function CityRunDetailsSection({
           </div>
         ) : null}
 
-        <h1 className={`font-bold text-gray-900 mb-4 ${compact ? 'text-xl' : 'text-2xl'}`}>{run.title}</h1>
+        <h1 className={`font-bold text-gray-900 mb-4 ${compact ? 'text-xl' : 'text-2xl'}`}>
+          {run.workout?.title?.trim() || run.title}
+        </h1>
 
         <div className="space-y-2 sm:space-y-3 text-gray-700">
           <div className="flex items-center gap-2 sm:gap-3">

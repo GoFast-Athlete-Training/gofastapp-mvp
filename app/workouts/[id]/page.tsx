@@ -154,7 +154,7 @@ interface Workout {
   workout_catalogue?: WorkoutCatalogue | null;
   estimatedDistanceInMeters?: number | null;
   segments: WorkoutSegment[];
-  matchedActivityId?: string | null;
+  garminDetailActivityId?: string | null;
   skippedAt?: string | null;
   skipReason?: string | null;
   actualDistanceMeters?: number | null;
@@ -170,7 +170,7 @@ interface Workout {
   segmentExecutionStatus?: string | null;
   segmentExecutionLapCount?: number | null;
   segmentExecutionSegmentCount?: number | null;
-  matched_activity?: MatchedActivitySummary | null;
+  garmin_detail_activity?: MatchedActivitySummary | null;
   planId?: string | null;
   weekNumber?: number | null;
   dayAssigned?: string | null;
@@ -976,12 +976,12 @@ export default function WorkoutDetailPage() {
       actualDurationSeconds: workout.actualDurationSeconds ?? null,
       estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
       completedActivityDetailJson: workout.completedActivityDetailJson,
-      matchedActivityId: workout.matchedActivityId ?? null,
-      matched_activity: workout.matched_activity
+      garminDetailActivityId: workout.garminDetailActivityId ?? null,
+      garmin_detail_activity: workout.garmin_detail_activity
         ? {
-            detailData: workout.matched_activity.detailData,
-            hydratedAt: workout.matched_activity.hydratedAt
-              ? new Date(workout.matched_activity.hydratedAt)
+            detailData: workout.garmin_detail_activity.detailData,
+            hydratedAt: workout.garmin_detail_activity.hydratedAt
+              ? new Date(workout.garmin_detail_activity.hydratedAt)
               : null,
           }
         : null,
@@ -1284,7 +1284,7 @@ export default function WorkoutDetailPage() {
     return quickOrderIds.some((id, i) => id !== defaultSegmentOrderIds[i]);
   }, [quickOrderIds, defaultSegmentOrderIds]);
 
-  const isLogged = Boolean(workout?.matchedActivityId ?? workout?.matched_activity);
+  const isLogged = Boolean(workout?.garminDetailActivityId ?? workout?.garmin_detail_activity);
   const segmentDisplayGroups = useMemo(() => {
     const ordered = isLogged ? sortedSegments : getQuickOrderedSegments();
     return groupSegmentsInDisplayOrder(ordered);
@@ -2029,7 +2029,7 @@ export default function WorkoutDetailPage() {
                   ? String(workout.date).slice(0, 10)
                   : new Date().toISOString().slice(0, 10)
               }
-              matchedActivityId={workout.matchedActivityId}
+              garminDetailActivityId={workout.garminDetailActivityId}
               skippedAt={workout.skippedAt}
               workoutType={workout.workoutType}
               title={workout.title}
@@ -2063,7 +2063,7 @@ export default function WorkoutDetailPage() {
           </div>
         ) : null}
 
-        {isLogged && (workout.matchedActivityId || workout.matched_activity) ? (
+        {isLogged && (workout.garminDetailActivityId || workout.garmin_detail_activity) ? (
           <>
             <CompletedWorkoutResults
               workout={workout}

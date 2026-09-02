@@ -333,7 +333,7 @@ export async function loadWhereYouStandSnapshot(params: {
     where: {
       athleteId: params.athleteId,
       planId: params.planId,
-      matchedActivityId: { not: null },
+      garminDetailActivityId: { not: null },
       date: { gte, lte },
     },
     select: {

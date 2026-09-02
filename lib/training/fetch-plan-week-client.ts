@@ -17,7 +17,7 @@ export type PlanDayCard = {
   phase: string;
   dayAssigned?: string | null;
   estimatedDistanceInMeters: number;
-  matchedActivityId: string | null;
+  garminDetailActivityId: string | null;
   skippedAt: string | null;
   skipReason: string | null;
   actualDistanceMeters: number | null;

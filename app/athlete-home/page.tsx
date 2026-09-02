@@ -711,11 +711,11 @@ export default function AthleteHomePage() {
 
   const nextTrainingIncomplete =
     upcomingSessions.find(
-      (s: { matchedActivityId?: string | null; isPlanSession?: boolean }) =>
-        !s.matchedActivityId && s.isPlanSession
+      (s: { garminDetailActivityId?: string | null; isPlanSession?: boolean }) =>
+        !s.garminDetailActivityId && s.isPlanSession
     ) ??
     upcomingSessions.find(
-      (s: { matchedActivityId?: string | null }) => !s.matchedActivityId
+      (s: { garminDetailActivityId?: string | null }) => !s.garminDetailActivityId
     ) ??
     null;
   const nextTraining =
@@ -723,7 +723,7 @@ export default function AthleteHomePage() {
     upcomingSessions.find((s: { isPlanSession?: boolean }) => s.isPlanSession) ??
     upcomingSessions[0] ??
     null;
-  const nextTrainingComplete = Boolean(nextTraining?.matchedActivityId);
+  const nextTrainingComplete = Boolean(nextTraining?.garminDetailActivityId);
   const nextTrainingHref =
     nextTraining?.workoutId && String(nextTraining.workoutId).length > 0
       ? nextTrainingComplete
@@ -962,7 +962,7 @@ export default function AthleteHomePage() {
   let todayRunIcon = Footprints;
   let todayTypeLabel = 'Workout';
   let todayStoredTitleSubtitle: string | null = null;
-  const todayPlanComplete = Boolean(todayPlanDay?.matchedActivityId);
+  const todayPlanComplete = Boolean(todayPlanDay?.garminDetailActivityId);
   const todayPlanHref =
     todayPlanComplete && todayPlanDay?.workoutId
       ? `/workouts/${todayPlanDay.workoutId}?back=/training`
@@ -1323,13 +1323,13 @@ export default function AthleteHomePage() {
                             month: 'short',
                             day: 'numeric',
                           })}
-                          {todayPlanDay.matchedActivityId ? (
+                          {todayPlanDay.garminDetailActivityId ? (
                             <span className="ml-2 font-semibold text-emerald-700">· Complete</span>
                           ) : (
                             (() => {
                               const st = deriveSessionStatus({
                                 dateKey: todayPlanDay.dateKey,
-                                matchedActivityId: todayPlanDay.matchedActivityId,
+                                garminDetailActivityId: todayPlanDay.garminDetailActivityId,
                                 skippedAt: todayPlanDay.skippedAt,
                                 workoutType: todayPlanDay.workoutType,
                                 title: todayPlanDay.title,

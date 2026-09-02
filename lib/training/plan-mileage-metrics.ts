@@ -104,7 +104,7 @@ export async function loadPlanMileageSnapshot(params: {
     where: {
       planId: params.planId,
       athleteId: params.athleteId,
-      matchedActivityId: { not: null },
+      garminDetailActivityId: { not: null },
     },
     select: {
       date: true,

@@ -16,12 +16,12 @@ interface WorkoutDeep {
   title: string;
   workoutType: string;
   estimatedDistanceInMeters?: number | null;
-  matchedActivityId?: string | null;
+  garminDetailActivityId?: string | null;
   actualDistanceMeters?: number | null;
   actualDurationSeconds?: number | null;
   actualAvgPaceSecPerMile?: number | null;
   actualAverageHeartRate?: number | null;
-  matched_activity?: MatchedActivitySummary | null;
+  garmin_detail_activity?: MatchedActivitySummary | null;
 }
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
@@ -95,7 +95,7 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
     );
   }
 
-  const isLogged = Boolean(workout.matchedActivityId ?? workout.matched_activity);
+  const isLogged = Boolean(workout.garminDetailActivityId ?? workout.garmin_detail_activity);
   if (!isLogged) {
     return (
       <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
@@ -172,7 +172,7 @@ export default function AnalysisDeepPanel({ workoutId }: { workoutId: string }) 
       </div>
 
       <PaceForPacePanel
-        matchedActivityId={workout.matchedActivityId}
+        garminDetailActivityId={workout.garminDetailActivityId}
         performanceAnalysis={performanceAnalysis}
       />
 

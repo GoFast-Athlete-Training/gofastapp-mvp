@@ -40,8 +40,8 @@ test("interval workout without detail is completion_only", () => {
     actualDistanceMeters: 10000,
     actualDurationSeconds: 2880,
     completedActivityDetailJson: null,
-    matchedActivityId: "act1",
-    matched_activity: { detailData: null, hydratedAt: null },
+    garminDetailActivityId: "act1",
+    garmin_detail_activity: { detailData: null, hydratedAt: null },
     segments: [
       {
         id: "s1",
@@ -126,8 +126,8 @@ test("interval workout with work segment actuals uses rep pace not whole run", (
     paceDeltaSecPerMile: -30,
     actualAvgPaceSecPerMile: 520,
     completedActivityDetailJson: { laps: [] },
-    matchedActivityId: "act1",
-    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    garminDetailActivityId: "act1",
+    garmin_detail_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
     segments,
   });
 
@@ -196,8 +196,8 @@ test("interval with detail and work bolt surfaces detail despite non-1:1 warmup 
     actualDistanceMeters: 10000,
     actualDurationSeconds: 2880,
     completedActivityDetailJson: { laps: [] },
-    matchedActivityId: "act1",
-    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    garminDetailActivityId: "act1",
+    garmin_detail_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
     segments,
   });
 
@@ -258,8 +258,8 @@ test("interval 400x8 with eight laps on one work segment surfaces detail analysi
     actualDistanceMeters: 10000,
     actualDurationSeconds: 2880,
     completedActivityDetailJson: { laps: [] },
-    matchedActivityId: "act1",
-    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    garminDetailActivityId: "act1",
+    garmin_detail_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
     segmentExecutionStatus: "ALIGNED",
     segmentExecutionLapCount: 9,
     segmentExecutionSegmentCount: 2,
@@ -282,8 +282,8 @@ test("interval with detail and alignment failure shows explicit completion messa
     actualDistanceMeters: 10000,
     actualDurationSeconds: 2880,
     completedActivityDetailJson: { laps: [{ startTimeInSeconds: 1 }] },
-    matchedActivityId: "act1",
-    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    garminDetailActivityId: "act1",
+    garmin_detail_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
     segmentExecutionStatus: "ALIGNMENT_FAILED",
     segmentExecutionLapCount: 8,
     segmentExecutionSegmentCount: 12,
@@ -435,8 +435,8 @@ test("easy run with segment laps reaches detail with mile splits", () => {
     actualDistanceMeters: 4 * 1609.34,
     actualDurationSeconds: 3000,
     completedActivityDetailJson: { laps: [] },
-    matchedActivityId: "act1",
-    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    garminDetailActivityId: "act1",
+    garmin_detail_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
     segments,
   });
 
@@ -468,8 +468,8 @@ test("long run with segment laps uses auto lap source for single-block prescript
     actualDistanceMeters: 12 * 1609.34,
     actualDurationSeconds: 6000,
     completedActivityDetailJson: { laps: [] },
-    matchedActivityId: "act1",
-    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    garminDetailActivityId: "act1",
+    garmin_detail_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
     segments: [
       {
         id: "s1",
@@ -522,8 +522,8 @@ test("scorecard exposes total miles and work segment deltas", () => {
     actualDistanceMeters: 10000,
     estimatedDistanceInMeters: 10000,
     completedActivityDetailJson: { laps: [] },
-    matchedActivityId: "act1",
-    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    garminDetailActivityId: "act1",
+    garmin_detail_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
     segments: [
       {
         id: "s2",
@@ -563,8 +563,8 @@ test("easy run with matched whole-run pace shows Pace for Pace without segment b
     actualAvgPaceSecPerMile: 530,
     actualDistanceMeters: 8000,
     actualDurationSeconds: 3600,
-    matchedActivityId: "act-easy",
-    matched_activity: { detailData: null, hydratedAt: null },
+    garminDetailActivityId: "act-easy",
+    garmin_detail_activity: { detailData: null, hydratedAt: null },
     segments: [
       {
         id: "easy-1",
@@ -596,8 +596,8 @@ test("regular long run with matched whole-run pace shows Pace for Pace", () => {
     actualAvgPaceSecPerMile: 520,
     actualDistanceMeters: 16093,
     actualDurationSeconds: 7920,
-    matchedActivityId: "act-lr",
-    matched_activity: { detailData: null, hydratedAt: null },
+    garminDetailActivityId: "act-lr",
+    garmin_detail_activity: { detailData: null, hydratedAt: null },
     segments: [
       {
         id: "lr-1",
@@ -630,8 +630,8 @@ test("long run with MP without segment actuals does not use whole-run pace as Pa
     actualDurationSeconds: 9060,
     estimatedDistanceInMeters: 31500,
     completedActivityDetailJson: null,
-    matchedActivityId: "act-lr-mp",
-    matched_activity: { detailData: null, hydratedAt: null },
+    garminDetailActivityId: "act-lr-mp",
+    garmin_detail_activity: { detailData: null, hydratedAt: null },
     segments: [
       {
         id: "lr-wu",
@@ -688,8 +688,8 @@ test("long run with MP and aligned segment actuals shows work segment comparison
     actualDurationSeconds: 9060,
     estimatedDistanceInMeters: 31500,
     completedActivityDetailJson: { laps: [] },
-    matchedActivityId: "act-lr-mp",
-    matched_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    garminDetailActivityId: "act-lr-mp",
+    garmin_detail_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
     segmentExecutionStatus: "ALIGNED",
     segments: [
       {

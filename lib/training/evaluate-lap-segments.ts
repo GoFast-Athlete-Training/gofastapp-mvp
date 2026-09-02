@@ -100,7 +100,7 @@ export async function evaluateLapSegmentsAfterDetail(
   if (!activity?.detailData) return;
 
   const workout = await prisma.workouts.findFirst({
-    where: { matchedActivityId: athleteActivityId },
+    where: { garminDetailActivityId: athleteActivityId },
     include: { segments: { orderBy: { stepOrder: "asc" } } },
   });
   if (!workout?.segments?.length) return;

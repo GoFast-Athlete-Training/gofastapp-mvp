@@ -214,7 +214,7 @@ export default function TrainingPlanDayPreviewPage() {
   } | null>(null);
   const [logRaceOpen, setLogRaceOpen] = useState(false);
   const [showMatchPanel, setShowMatchPanel] = useState(false);
-  const [matchedActivityId, setMatchedActivityId] = useState<string | null>(null);
+  const [garminDetailActivityId, setMatchedActivityId] = useState<string | null>(null);
   const [skippedAt, setSkippedAt] = useState<string | null>(null);
   const [loggedActualDistanceMeters, setLoggedActualDistanceMeters] = useState<number | null>(
     null
@@ -320,7 +320,7 @@ export default function TrainingPlanDayPreviewPage() {
           raceDayPayload = pickWorkoutPayload(rawW);
           setWorkout(raceDayPayload);
           const rawRecord = rawW as Record<string, unknown>;
-          const mid = rawRecord.matchedActivityId;
+          const mid = rawRecord.garminDetailActivityId;
           setMatchedActivityId(typeof mid === "string" && mid.trim() ? mid.trim() : null);
           const skip = rawRecord.skippedAt;
           setSkippedAt(typeof skip === "string" && skip.trim() ? skip.trim() : null);
@@ -437,13 +437,13 @@ export default function TrainingPlanDayPreviewPage() {
     : dateKey ?? "";
   const canOpenWorkout = workoutId != null;
   const canMatchWorkout =
-    workoutId != null && !workoutLoading && !workoutError && matchedActivityId == null;
-  const isLogged = matchedActivityId != null;
+    workoutId != null && !workoutLoading && !workoutError && garminDetailActivityId == null;
+  const isLogged = garminDetailActivityId != null;
   const dayStatus =
     dateKey != null
       ? deriveSessionStatus({
           dateKey,
-          matchedActivityId,
+          garminDetailActivityId,
           skippedAt,
           workoutType: workout?.workoutType,
           title: workout?.title,
@@ -464,7 +464,7 @@ export default function TrainingPlanDayPreviewPage() {
   });
 
   useEffect(() => {
-    if (!authReady || loading || !matchedActivityId || !workoutId) return;
+    if (!authReady || loading || !garminDetailActivityId || !workoutId) return;
     const back =
       sourceSetup && planDetail
         ? `/training-setup/${planDetail.id}`
@@ -475,7 +475,7 @@ export default function TrainingPlanDayPreviewPage() {
   }, [
     authReady,
     loading,
-    matchedActivityId,
+    garminDetailActivityId,
     workoutId,
     sourceSetup,
     sourceHome,
@@ -809,7 +809,7 @@ export default function TrainingPlanDayPreviewPage() {
                     <WorkoutSkipActions
                       workoutId={workoutId}
                       dateKey={dateKey ?? ""}
-                      matchedActivityId={matchedActivityId}
+                      garminDetailActivityId={garminDetailActivityId}
                       skippedAt={skippedAt}
                       workoutType={workout?.workoutType}
                       title={title}

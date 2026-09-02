@@ -22,7 +22,7 @@ type Ctx = { params: Promise<{ id: string }> };
 const workoutMatchInclude = {
   segments: { orderBy: { stepOrder: "asc" as const } },
   workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true, name: true } },
-  matched_activity: {
+  garmin_detail_activity: {
     select: {
       id: true,
       activityName: true,
@@ -152,8 +152,8 @@ export async function GET(request: NextRequest, ctx: Ctx) {
           planId: plannedDetail.planId,
           estimatedDistanceInMeters: plannedDetail.estimatedDistanceInMeters,
           workoutType: plannedDetail.workoutType,
-          matchedActivityId: plannedDetail.matchedActivityId,
-          matched_activity: plannedDetail.matched_activity,
+          garminDetailActivityId: plannedDetail.garminDetailActivityId,
+          garmin_detail_activity: plannedDetail.garmin_detail_activity,
           workout_catalogue: plannedDetail.workout_catalogue
             ? { name: plannedDetail.workout_catalogue.name }
             : null,
@@ -164,17 +164,17 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       return NextResponse.json({ error: "Workout not found" }, { status: 404 });
     }
 
-    if (matchTarget.matchedActivityId && matchTarget.matched_activity) {
+    if (matchTarget.garminDetailActivityId && matchTarget.garmin_detail_activity) {
       return NextResponse.json({
         workout: {
           id: matchTarget.id,
           title: matchTarget.title,
           date: matchTarget.date?.toISOString() ?? null,
-          matchedActivityId: matchTarget.matchedActivityId,
+          garminDetailActivityId: matchTarget.garminDetailActivityId,
         },
         matchedActivity: serializeActivity({
-          ...matchTarget.matched_activity,
-          paceSecPerMile: speedMpsToSecPerMile(matchTarget.matched_activity.averageSpeed),
+          ...matchTarget.garmin_detail_activity,
+          paceSecPerMile: speedMpsToSecPerMile(matchTarget.garmin_detail_activity.averageSpeed),
         }),
         candidates: [],
       });
@@ -246,7 +246,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         id: matchTarget.id,
         title: matchTarget.title,
         date: matchTarget.date?.toISOString() ?? null,
-        matchedActivityId: matchTarget.matchedActivityId,
+        garminDetailActivityId: matchTarget.garminDetailActivityId,
       },
       matchedActivity: null,
       candidates: candidates.map((c) => {
@@ -331,7 +331,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       return NextResponse.json({ success: true, cleared: false });
     }
 
-    if (workout?.matchedActivityId === requestedActivityId) {
+    if (workout?.garminDetailActivityId === requestedActivityId) {
       return NextResponse.json({ success: true, workoutId: workout.id, alreadyMatched: true });
     }
 

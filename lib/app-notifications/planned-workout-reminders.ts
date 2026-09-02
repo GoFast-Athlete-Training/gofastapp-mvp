@@ -61,7 +61,7 @@ export async function sendPlannedWorkoutReminders(
     where: {
       athleteId: { not: null },
       date: { gte: tomorrowStart, lt: dayAfterTomorrow },
-      matchedActivityId: null,
+      garminDetailActivityId: null,
       skippedAt: null,
       appnotificationReminderSentAt: null,
       OR: [

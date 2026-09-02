@@ -22,8 +22,8 @@ type WorkoutLike = {
   id: string;
   title: string;
   description?: string | null;
-  matchedActivityId?: string | null;
-  matched_activity?: MatchedActivity | null;
+  garminDetailActivityId?: string | null;
+  garmin_detail_activity?: MatchedActivity | null;
   actualDistanceMeters?: number | null;
   actualDurationSeconds?: number | null;
   actualAvgPaceSecPerMile?: number | null;
@@ -55,7 +55,7 @@ export function CompletedWorkoutResults({
   performanceAnalysis: WorkoutPerformanceAnalysis | null;
 }) {
   const activityTitle =
-    workout.matched_activity?.activityName?.trim() || workout.title || "Activity";
+    workout.garmin_detail_activity?.activityName?.trim() || workout.title || "Activity";
   const planDescription = workout.description?.trim() || null;
   const actualsLine = buildActualsLine(workout);
 
@@ -78,14 +78,14 @@ export function CompletedWorkoutResults({
       </div>
 
       <PaceForPacePanel
-        matchedActivityId={workout.matchedActivityId}
+        garminDetailActivityId={workout.garminDetailActivityId}
         performanceAnalysis={performanceAnalysis}
       />
 
-      {workout.matchedActivityId ? (
+      {workout.garminDetailActivityId ? (
         <div className="flex flex-wrap gap-3">
           <Link
-            href={`/activities/${encodeURIComponent(workout.matchedActivityId)}`}
+            href={`/activities/${encodeURIComponent(workout.garminDetailActivityId)}`}
             className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
           >
             Add photo &amp; note →

@@ -198,7 +198,7 @@ async function resolveAthleteForDetailFallback(
 async function runDetailHydrationPipeline(rowId: string, detailData: object): Promise<void> {
   try {
     await prisma.workouts.updateMany({
-      where: { matchedActivityId: rowId },
+      where: { garminDetailActivityId: rowId },
       data: {
         completedActivityDetailJson: detailData,
       },
@@ -209,7 +209,7 @@ async function runDetailHydrationPipeline(rowId: string, detailData: object): Pr
 
   try {
     const workout = await prisma.workouts.findFirst({
-      where: { matchedActivityId: rowId },
+      where: { garminDetailActivityId: rowId },
       select: { id: true, segmentExecutionStatus: true, workoutType: true },
     });
     if (workout) {

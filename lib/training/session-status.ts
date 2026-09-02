@@ -1,7 +1,9 @@
 /**
  * Shared training session status derivation (web + server).
- * Complete = matched activity; Skipped = athlete action; Missed = past unmatched (with grace).
+ * Complete = stamped actuals on spawned workout; Skipped = athlete action; Missed = past unmatched (with grace).
  */
+
+import { workoutHasActuals } from "./workout-has-actuals";
 
 export type SessionStatus =
   | "completed"
@@ -51,19 +53,29 @@ export function isPastDateKeyMissed(
 
 export function deriveSessionStatus(params: {
   dateKey: string;
-  matchedActivityId?: string | null;
+  actualDistanceMeters?: number | null;
+  actualDurationSeconds?: number | null;
   skippedAt?: string | Date | null;
   workoutType?: string;
   title?: string;
+  /** @deprecated ingest pointer — do not use for completion */
+  garminDetailActivityId?: string | null;
   /** For tests; defaults to now. */
   now?: Date;
 }): SessionStatus {
-  const { dateKey, matchedActivityId, skippedAt, workoutType, title } = params;
+  const { dateKey, skippedAt, workoutType, title } = params;
   const now = params.now ?? new Date();
   const isRest =
     workoutType === "Rest" || title === "Rest" || (!workoutType && !title);
   if (isRest) return "rest";
-  if (matchedActivityId) return "completed";
+  if (
+    workoutHasActuals({
+      actualDistanceMeters: params.actualDistanceMeters,
+      actualDurationSeconds: params.actualDurationSeconds,
+    })
+  ) {
+    return "completed";
+  }
   if (skippedAt) return "skipped";
   const today = localYmdFromDate(now);
   if (dateKey === today) return "today";

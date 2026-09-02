@@ -593,14 +593,14 @@ export default function TrainingHubPage() {
   const focusStatus = focusPlanDay
     ? deriveSessionStatus({
         dateKey: focusPlanDay.dateKey,
-        matchedActivityId: focusPlanDay.matchedActivityId,
+        garminDetailActivityId: focusPlanDay.garminDetailActivityId,
         skippedAt: focusPlanDay.skippedAt,
         workoutType: focusPlanDay.workoutType,
         title: focusPlanDay.title,
       })
     : null;
   const showFindMissingGarmin =
-    Boolean(focusPlanDay && !focusPlanDay.matchedActivityId) &&
+    Boolean(focusPlanDay && !focusPlanDay.garminDetailActivityId) &&
     showFindMissingGarminForStatus(focusStatus);
   const focusHydrated = focusPlanDay
     ? hydratePlanButSwapIfExecuted(focusPlanDay)
@@ -1214,20 +1214,20 @@ export default function TrainingHubPage() {
                 <div
                   id="training-section-today"
                   className={
-                    focusPlanDay?.matchedActivityId
+                    focusPlanDay?.garminDetailActivityId
                       ? "rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm scroll-mt-24"
                       : "rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm scroll-mt-24"
                   }
                 >
                   <p
                     className={`text-xs font-semibold uppercase tracking-wide ${
-                      focusPlanDay?.matchedActivityId ? "text-emerald-900" : "text-orange-900"
+                      focusPlanDay?.garminDetailActivityId ? "text-emerald-900" : "text-orange-900"
                     }`}
                   >
                     {focusIsToday ? "Today" : "Selected day"}
                   </p>
                   {focusPlanDay ? (
-                    focusPlanDay.matchedActivityId ? (
+                    focusPlanDay.garminDetailActivityId ? (
                       <>
                         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">
                           Workout complete
@@ -1286,7 +1286,7 @@ export default function TrainingHubPage() {
                         </p>
                         <div className="mt-5 flex flex-wrap items-center gap-3">
                           {focusHydrated &&
-                          !focusPlanDay.matchedActivityId &&
+                          !focusPlanDay.garminDetailActivityId &&
                           focusStatus !== "upcoming" ? (
                             <p className="w-full text-sm text-gray-700 leading-relaxed">
                               After your run, sync Garmin Connect — GoFast should link the activity
@@ -1345,7 +1345,7 @@ export default function TrainingHubPage() {
                           </p>
                         ) : null}
                         {focusHydrated &&
-                        !focusPlanDay.matchedActivityId &&
+                        !focusPlanDay.garminDetailActivityId &&
                         showMatchPanel &&
                         showFindMissingGarmin ? (
                           <div id="match-garmin-panel" className="mt-4 space-y-4">
@@ -1353,7 +1353,7 @@ export default function TrainingHubPage() {
                               <WorkoutSkipActions
                                 workoutId={focusHydrated.workoutId}
                                 dateKey={focusPlanDay.dateKey}
-                                matchedActivityId={focusPlanDay.matchedActivityId}
+                                garminDetailActivityId={focusPlanDay.garminDetailActivityId}
                                 skippedAt={focusPlanDay.skippedAt}
                                 workoutType={focusPlanDay.workoutType}
                                 title={focusPlanDay.title}

@@ -82,6 +82,12 @@ function formatMeetupConfirmation(city: string, state: string): string {
   return c;
 }
 
+function workoutDateKey(date?: string | null): string {
+  if (!date) return new Date().toISOString().slice(0, 10);
+  const d = new Date(date);
+  return !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+}
+
 function hasValidStartTime(hour: string, minute: string, period: "AM" | "PM"): boolean {
   const h = parseInt(hour, 10);
   const m = parseInt(minute, 10);
@@ -113,7 +119,7 @@ export default function CreateCityRunForm({
   className = "",
   hideWorkoutSummary = false,
 }: CreateCityRunFormProps) {
-  const [runDate, setRunDate] = useState("");
+  const [meetupDate, setMeetupDate] = useState("");
   const [startHour, setStartHour] = useState("");
   const [startMinute, setStartMinute] = useState("");
   const [startPeriod, setStartPeriod] = useState<"AM" | "PM">("AM");
@@ -140,10 +146,7 @@ export default function CreateCityRunForm({
   const [copiedField, setCopiedField] = useState<"rsvp" | "share" | "join" | null>(null);
 
   useEffect(() => {
-    const d = workout.date ? new Date(workout.date) : new Date();
-    setRunDate(
-      !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)
-    );
+    setMeetupDate(workoutDateKey(workout.date));
   }, [workout.date, workout.id]);
 
   const headline = displayWorkoutListTitle({
@@ -174,6 +177,7 @@ export default function CreateCityRunForm({
       : null;
 
   const canSubmit =
+    Boolean(meetupDate.trim()) &&
     Boolean(meetUpPoint.trim()) &&
     Boolean(meetUpCity.trim()) &&
     meetUpPlaceSet &&
@@ -190,6 +194,10 @@ export default function CreateCityRunForm({
     }
     if (!meetUpCity.trim()) {
       setError("We need a city from your meetup pick — select a Places result.");
+      return;
+    }
+    if (!meetupDate.trim()) {
+      setError("Pick a meetup date for the invite.");
       return;
     }
     if (!hasValidStartTime(startHour, startMinute, startPeriod)) {
@@ -214,7 +222,7 @@ export default function CreateCityRunForm({
         citySlug,
         cityName: meetUpCity.trim(),
         state: meetUpState.trim() || undefined,
-        date: runDate,
+        date: meetupDate,
         meetUpPoint: meetUpPoint.trim(),
         meetUpStreetAddress: meetUpStreetAddress.trim() || meetUpPoint.trim(),
         meetUpCity: meetUpCity.trim(),
@@ -381,7 +389,7 @@ export default function CreateCityRunForm({
 
   const plannedMilesLabel = formatPlannedMiles(workout.estimatedDistanceInMeters ?? null);
   const existingRuns = workout.city_runs ?? [];
-  const dateLabel = formatDateLabel(runDate);
+  const planDateLabel = formatDateLabel(workoutDateKey(workout.date));
 
   const workoutPanel = !hideWorkoutSummary ? (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-fit lg:sticky lg:top-6">
@@ -397,10 +405,12 @@ export default function CreateCityRunForm({
           <span className="text-xs text-gray-600">{plannedMilesLabel}</span>
         ) : null}
       </div>
-      {dateLabel ? (
+      {planDateLabel ? (
         <p className="text-sm text-gray-700 mb-2 flex items-center gap-1.5">
           <CalendarClock className="w-4 h-4 text-gray-400 shrink-0" />
-          {dateLabel}
+          <span>
+            On your plan · <span className="font-medium text-gray-900">{planDateLabel}</span>
+          </span>
         </p>
       ) : null}
       <p className="font-medium text-gray-900 text-base">{headline}</p>
@@ -455,6 +465,23 @@ export default function CreateCityRunForm({
         ) : (
           <p className="text-xs text-gray-500">Pick a result so we can list city and address correctly.</p>
         )}
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+          <CalendarClock className="w-3.5 h-3.5" />
+          Meetup date
+        </label>
+        <input
+          type="date"
+          value={meetupDate}
+          onChange={(e) => setMeetupDate(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          required
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Defaults to your plan day — change if you&apos;re meeting on a different date.
+        </p>
       </div>
 
       <div>

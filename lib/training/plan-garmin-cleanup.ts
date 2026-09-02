@@ -42,7 +42,7 @@ export async function cleanupFutureGarminSchedulesForPlan(params: {
       where: {
         planId: params.planId,
         athleteId: params.athleteId,
-        matchedActivityId: null,
+        garminDetailActivityId: null,
         date: { gte: todayUtc },
         garminScheduleId: { not: null },
       },

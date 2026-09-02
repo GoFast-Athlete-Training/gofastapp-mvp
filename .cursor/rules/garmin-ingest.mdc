@@ -1,0 +1,29 @@
+# Garmin ingest (gofastapp-mvp)
+
+## Raw vs product
+
+| Layer | Table / field | Role |
+|-------|----------------|------|
+| Raw Garmin | `athlete_activities` | Summary webhook row; sidecar completes `detailData` |
+| Sidecar pointer | `workouts.garminDetailActivityId` | Join raw activity → spawned workout for detail + laps ingest |
+| Product | `workouts.id` (`workoutId`) | Home, Train, lists, push, reflection — always this |
+| Plan snap | `workouts.plannedWorkoutId` | Spawned row snapped onto `planned_workouts` — not the Garmin pointer |
+
+## Do NOT conflate
+
+- **`garminDetailActivityId`** — Garmin/sidecar only. Used by `applyActivityToWorkout`, `handleActivityDetail`, lap parse lookups. **Never drop the write.**
+- **`plannedWorkoutId`** — training plan match only.
+
+Product surfaces (Home, Train, All activities, finish push) must **never** select, filter, or gate completion on `garminDetailActivityId`. Use **stamps** (`actualDistanceMeters`, `actualDurationSeconds`, etc.) and `workoutId`.
+
+## Ingest flow (target)
+
+```text
+ingest raw → always spawn workoutId → stamp actuals → tryMatchWorkoutToTrainingPlan (plannedWorkoutId)
+```
+
+Sidecar `garmin-activity-detail-ingest` completes the same `athlete_activities` row and spawns laps onto `workoutId` via `workout_segments` / `workout_segment_laps`.
+
+## Push
+
+Finish push = `workout.complete` + deeplink `/workouts/{workoutId}`. Do not use `activity.synced` or `/activities/{id}` for runs.

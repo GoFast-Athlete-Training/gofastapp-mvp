@@ -11,7 +11,7 @@ import {
 type Props = {
   workoutId: string;
   dateKey: string;
-  matchedActivityId?: string | null;
+  garminDetailActivityId?: string | null;
   skippedAt?: string | null;
   workoutType?: string;
   title?: string;
@@ -23,7 +23,7 @@ type Props = {
 export default function WorkoutSkipActions({
   workoutId,
   dateKey,
-  matchedActivityId,
+  garminDetailActivityId,
   skippedAt,
   workoutType,
   title,
@@ -35,13 +35,13 @@ export default function WorkoutSkipActions({
 
   const status = deriveSessionStatus({
     dateKey,
-    matchedActivityId,
+    garminDetailActivityId,
     skippedAt,
     workoutType,
     title,
   });
 
-  if (matchedActivityId || status === "rest" || status === "upcoming" || status === "today") {
+  if (garminDetailActivityId || status === "rest" || status === "upcoming" || status === "today") {
     return null;
   }
 

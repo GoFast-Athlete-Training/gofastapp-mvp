@@ -261,7 +261,7 @@ async function applyMatchCreditsFromWorkoutRow(params: {
 /** Credits + adaptive after Writer B (or easy/long Writer A) has written paceDelta. */
 export async function runPostAnalyzeMatchFollowups(activityId: string): Promise<void> {
   const workout = await prisma.workouts.findFirst({
-    where: { matchedActivityId: activityId },
+    where: { garminDetailActivityId: activityId },
     include: {
       segments: { orderBy: { stepOrder: "asc" } },
       workout_catalogue: { select: { workBasePaceOffsetSecPerMile: true } },
@@ -413,7 +413,7 @@ async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<vo
   if (!activity?.detailData || typeof activity.detailData !== "object") return;
 
   const workout = await prisma.workouts.findFirst({
-    where: { matchedActivityId: activity.id },
+    where: { garminDetailActivityId: activity.id },
     select: { id: true },
   });
   if (!workout) return;
@@ -482,7 +482,7 @@ export async function applyActivityToWorkout(params: {
   await prisma.workouts.update({
     where: { id: workout.id },
     data: {
-      matchedActivityId: activity.id,
+      garminDetailActivityId: activity.id,
       skippedAt: null,
       skipReason: null,
       completedActivitySummaryJson:
@@ -512,21 +512,18 @@ export async function applyActivityToWorkout(params: {
   });
 
   try {
-    const workoutDeeplink =
-      workout.planId != null ? `/workouts/${workout.id}` : `/activities/${activity.id}`;
-
     await sendAppNotification({
       athleteId: activity.athleteId,
       templateKey: "workout.complete",
       objectType: "workout",
       objectId: workout.id,
-      deeplink: workoutDeeplink,
+      deeplink: `/workouts/${workout.id}`,
       payload: {
         workoutId: workout.id,
         activityId: activity.id,
         planId: workout.planId ?? undefined,
         type: "workout_complete",
-        screen: workout.planId != null ? "workout" : "activity",
+        screen: "workout",
         objectType: "workout",
         objectId: workout.id,
       },
@@ -560,21 +557,21 @@ export async function clearActivityFromWorkout(params: {
 }): Promise<{ cleared: boolean; previousActivityId?: string }> {
   const workout = await prisma.workouts.findFirst({
     where: { id: params.workoutId, athleteId: params.athleteId },
-    select: { id: true, matchedActivityId: true },
+    select: { id: true, garminDetailActivityId: true },
   });
 
-  if (!workout?.matchedActivityId) {
+  if (!workout?.garminDetailActivityId) {
     return { cleared: false };
   }
 
-  const previousActivityId = workout.matchedActivityId;
+  const previousActivityId = workout.garminDetailActivityId;
 
   await clearWorkoutDerivedActuals(workout.id);
 
   await prisma.workouts.update({
     where: { id: workout.id },
     data: {
-      matchedActivityId: null,
+      garminDetailActivityId: null,
       completedActivitySummaryJson: Prisma.DbNull,
       completedActivityDetailJson: Prisma.DbNull,
       actualDistanceMeters: null,
@@ -694,14 +691,14 @@ export async function reassignActivityToWorkout(params: {
     throw new Error("Activity not found");
   }
 
-  if (targetWorkout.matchedActivityId === activity.id) {
+  if (targetWorkout.garminDetailActivityId === activity.id) {
     return { success: true, workoutId: targetWorkout.id };
   }
 
   const existingLink = await prisma.workouts.findFirst({
     where: {
       athleteId: params.athleteId,
-      matchedActivityId: activity.id,
+      garminDetailActivityId: activity.id,
     },
     select: {
       id: true,
@@ -740,8 +737,8 @@ export async function reassignActivityToWorkout(params: {
   }
 
   if (
-    targetWorkout.matchedActivityId &&
-    targetWorkout.matchedActivityId !== activity.id
+    targetWorkout.garminDetailActivityId &&
+    targetWorkout.garminDetailActivityId !== activity.id
   ) {
     await clearActivityFromWorkout({
       workoutId: targetWorkout.id,
@@ -772,7 +769,7 @@ export async function deleteAthleteActivity(params: {
   }
 
   const owningWorkout = await prisma.workouts.findFirst({
-    where: { matchedActivityId: activity.id, athleteId: params.athleteId },
+    where: { garminDetailActivityId: activity.id, athleteId: params.athleteId },
     select: { id: true },
   });
   if (owningWorkout) {

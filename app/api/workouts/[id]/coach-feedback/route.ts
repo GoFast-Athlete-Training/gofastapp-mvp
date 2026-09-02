@@ -57,24 +57,24 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   }
 
   let workoutId: string | null = null;
-  let matchedActivityId: string | null = null;
+  let garminDetailActivityId: string | null = null;
 
   if (target.kind === "standalone") {
     const workout = await prisma.workouts.findFirst({
       where: { id: target.workoutId, athleteId: auth.athlete.id },
-      select: { id: true, matchedActivityId: true },
+      select: { id: true, garminDetailActivityId: true },
     });
     workoutId = workout?.id ?? null;
-    matchedActivityId = workout?.matchedActivityId ?? null;
+    garminDetailActivityId = workout?.garminDetailActivityId ?? null;
   } else {
     const detail = await loadPlannedWorkoutDetailForAthlete({
       plannedWorkoutId: target.plannedWorkoutId,
       athleteId: auth.athlete.id,
     });
     if (detail) {
-      matchedActivityId = detail.matchedActivityId;
+      garminDetailActivityId = detail.garminDetailActivityId;
       workoutId =
-        detail.matchedActivityId != null
+        detail.garminDetailActivityId != null
           ? await resolveInstanceWorkoutIdForAthlete(id, auth.athlete.id, {
               spawnIfPlanned: true,
             })
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "Workout not found" }, { status: 404 });
   }
 
-  if (!matchedActivityId) {
+  if (!garminDetailActivityId) {
     return NextResponse.json(
       { error: "Link a Garmin activity before requesting coach feedback" },
       { status: 400 }

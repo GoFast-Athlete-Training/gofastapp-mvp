@@ -76,7 +76,7 @@ test("completed and skipped take precedence over date", () => {
     deriveSessionStatus({
       dateKey: "2026-05-27",
       now,
-      matchedActivityId: "act-1",
+      actualDistanceMeters: 5000,
       workoutType: "Easy",
     }),
     "completed"

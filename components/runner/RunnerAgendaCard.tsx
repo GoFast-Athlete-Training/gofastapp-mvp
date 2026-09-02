@@ -28,7 +28,7 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
     day: 'numeric',
   });
 
-  const planComplete = Boolean(plan?.matchedActivityId);
+  const planComplete = Boolean(plan?.garminDetailActivityId);
   const planHref =
     planComplete && plan?.workoutId
       ? `/workouts/${plan.workoutId}?back=/runner`

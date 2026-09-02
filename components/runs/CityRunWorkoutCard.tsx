@@ -18,7 +18,6 @@ type CityRunWorkoutCardProps = {
   workout?: CityRunWorkoutSummary | null;
   plannedWorkout?: PlannedWorkoutSummary | null;
   workoutDescription?: string | null;
-  workoutNarrative?: string | null;
 };
 
 function segmentsHaveStructure(segments: WorkoutPreviewSegment[] | undefined): boolean {
@@ -30,10 +29,9 @@ export default function CityRunWorkoutCard({
   workout,
   plannedWorkout,
   workoutDescription,
-  workoutNarrative,
 }: CityRunWorkoutCardProps) {
   const linkedId = workoutId || workout?.id || null;
-  const narrative = workoutNarrative?.trim() || null;
+  const narrative = workout?.workoutNarrative?.trim() || null;
   const legacyText = workoutDescription?.trim() || workout?.description?.trim() || null;
   const isGroupWorkout = workout?.scope === 'GROUP';
   const prescribe = plannedWorkout ?? null;

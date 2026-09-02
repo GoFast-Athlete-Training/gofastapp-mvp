@@ -173,8 +173,8 @@ export type PerformanceAnalysisWorkoutInput = {
   actualDurationSeconds?: number | null;
   estimatedDistanceInMeters?: number | null;
   completedActivityDetailJson?: unknown;
-  matchedActivityId?: string | null;
-  matched_activity?: {
+  garminDetailActivityId?: string | null;
+  garmin_detail_activity?: {
     detailData?: unknown;
     hydratedAt?: Date | null;
   } | null;
@@ -858,8 +858,8 @@ export function computeWorkoutPerformanceAnalysis(
 ): WorkoutPerformanceAnalysis {
   const hasActivityDetail =
     workout.completedActivityDetailJson != null ||
-    workout.matched_activity?.detailData != null ||
-    workout.matched_activity?.hydratedAt != null;
+    workout.garmin_detail_activity?.detailData != null ||
+    workout.garmin_detail_activity?.hydratedAt != null;
 
   const workSegments = workout.segments.filter((s) => isWorkSegmentTitle(s.title));
   const hasSegmentActuals = workout.segments.some(segmentHasActuals);
@@ -893,13 +893,13 @@ export function computeWorkoutPerformanceAnalysis(
   let analysisMode: AnalysisMode = "completion_only";
   if (hasPrescribedSegmentComparison || hasSegmentLaps || hasSegmentActuals) {
     analysisMode = "detail";
-  } else if (requiresSegmentLevel && workout.matchedActivityId) {
+  } else if (requiresSegmentLevel && workout.garminDetailActivityId) {
     if (!hasActivityDetail || workout.segmentExecutionStatus === "ALIGNMENT_FAILED") {
       analysisMode = "completion_only";
     } else {
       analysisMode = "summary_only";
     }
-  } else if (workout.matchedActivityId) {
+  } else if (workout.garminDetailActivityId) {
     analysisMode = "summary_only";
   }
 
@@ -912,7 +912,7 @@ export function computeWorkoutPerformanceAnalysis(
   const paceForPaceError =
     requiresSegmentLevel &&
     !hasPrescribedSegmentComparison &&
-    workout.matchedActivityId
+    workout.garminDetailActivityId
       ? formatPaceForPaceUnavailableMessage({
           hasActivityDetail,
           segmentExecutionStatus: workout.segmentExecutionStatus,

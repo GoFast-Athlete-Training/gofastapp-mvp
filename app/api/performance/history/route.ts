@@ -41,14 +41,14 @@ export async function GET(request: NextRequest) {
   const rows = await prisma.workouts.findMany({
     where: {
       athleteId: auth.athlete.id,
-      matchedActivityId: { not: null },
+      garminDetailActivityId: { not: null },
     },
     include: {
       segments: {
         orderBy: { stepOrder: "asc" },
         include: { segment_laps: { orderBy: { lapIndex: "asc" } } },
       },
-      matched_activity: {
+      garmin_detail_activity: {
         select: {
           id: true,
           activityName: true,
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
   }
 
   const items = rows.map((w, index) => {
-    const activity = w.matched_activity;
+    const activity = w.garmin_detail_activity;
     const analysisInput: PerformanceAnalysisWorkoutInput = {
       workoutType: w.workoutType,
       targetPaceSecPerMile: w.targetPaceSecPerMile,
@@ -87,8 +87,8 @@ export async function GET(request: NextRequest) {
       actualDurationSeconds: w.actualDurationSeconds,
       estimatedDistanceInMeters: w.estimatedDistanceInMeters,
       completedActivityDetailJson: w.completedActivityDetailJson,
-      matchedActivityId: w.matchedActivityId,
-      matched_activity: w.matched_activity,
+      garminDetailActivityId: w.garminDetailActivityId,
+      garmin_detail_activity: w.garmin_detail_activity,
       segmentExecutionStatus: w.segmentExecutionStatus,
       segmentExecutionLapCount: w.segmentExecutionLapCount,
       segmentExecutionSegmentCount: w.segmentExecutionSegmentCount,
@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
 
     return {
       id: w.id,
-      activityId: w.matchedActivityId,
+      activityId: w.garminDetailActivityId,
       title: w.title,
       workoutType: w.workoutType,
       planName: w.training_plans?.name ?? null,

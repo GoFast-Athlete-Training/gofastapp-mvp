@@ -52,7 +52,9 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
   };
 
   const hasWorkout =
-    Boolean(run.workoutId || run.workout) || Boolean(run.workoutDescription?.trim());
+    Boolean(run.workoutId || run.workout) ||
+    Boolean(run.workout?.workoutNarrative?.trim()) ||
+    Boolean(run.workoutDescription?.trim());
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -81,7 +83,6 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
               workoutId={run.workoutId}
               workout={run.workout}
               workoutDescription={run.workoutDescription}
-              workoutNarrative={run.workoutNarrative}
             />
           ) : null}
 

@@ -21,6 +21,40 @@ function utcDayRangeFromYmd(dateStr: string): { gte: Date; lt: Date } | null {
   };
 }
 
+/** Map client sport chip → workoutType filter */
+function sportWorkoutTypeFilter(
+  sport: string | null
+): { workoutType?: { in: string[] } | { notIn: string[] } } | Record<string, never> {
+  if (!sport || sport === "all") return {};
+  const runTypes = [
+    "Easy",
+    "LongRun",
+    "Intervals",
+    "Tempo",
+    "SpeedDuration",
+    "Race",
+  ];
+  if (sport === "run") return { workoutType: { in: runTypes } };
+  if (sport === "bike" || sport === "cycle") {
+    return { workoutType: { in: ["Bike", "Cycling", "Ride"] } };
+  }
+  if (sport === "swim") return { workoutType: { in: ["Swim", "Swimming"] } };
+  return {
+    workoutType: {
+      notIn: [...runTypes, "Bike", "Cycling", "Ride", "Swim", "Swimming"],
+    },
+  };
+}
+
+function completedStampsWhere() {
+  return {
+    OR: [
+      { actualDistanceMeters: { gt: 0 } },
+      { actualDurationSeconds: { gt: 0 } },
+    ],
+  };
+}
+
 /**
  * GET /api/workouts
  * List workouts for the authenticated athlete.
@@ -57,6 +91,9 @@ export async function GET(request: NextRequest) {
 
     const standaloneOnly = searchParams.get("standalone") === "1";
     const matchedOnly = searchParams.get("matched") === "1";
+    const completedOnly =
+      searchParams.get("completed") === "1" || matchedOnly;
+    const sportParam = searchParams.get("sport")?.trim().toLowerCase() ?? null;
     const dateParam = searchParams.get("date");
     const dateRange =
       dateParam && dateParam.trim() ? utcDayRangeFromYmd(dateParam) : null;
@@ -64,26 +101,32 @@ export async function GET(request: NextRequest) {
     const where = {
       athleteId: athlete.id,
       ...(standaloneOnly ? { planId: null } : {}),
-      ...(matchedOnly ? { matchedActivityId: { not: null } } : {}),
+      ...(completedOnly ? completedStampsWhere() : {}),
       ...(dateRange ? { date: { gte: dateRange.gte, lt: dateRange.lt } } : {}),
+      ...sportWorkoutTypeFilter(sportParam),
     };
+
+    const listSelect = {
+      id: true,
+      title: true,
+      workoutType: true,
+      description: true,
+      date: true,
+      plannedWorkoutId: true,
+      planId: true,
+      estimatedDistanceInMeters: true,
+      actualDistanceMeters: true,
+      actualAvgPaceSecPerMile: true,
+      actualDurationSeconds: true,
+      _count: { select: { segments: true } },
+    } as const;
 
     const [workouts, total] = await Promise.all([
       usePaging
         ? prisma.workouts.findMany({
             where,
-            select: {
-              id: true,
-              title: true,
-              workoutType: true,
-              description: true,
-              date: true,
-              matchedActivityId: true,
-              estimatedDistanceInMeters: true,
-              planId: true,
-              _count: { select: { segments: true } },
-            },
-            orderBy: { createdAt: "desc" },
+            select: listSelect,
+            orderBy: [{ date: "desc" }, { createdAt: "desc" }],
             take: take!,
             skip,
           })
@@ -94,7 +137,7 @@ export async function GET(request: NextRequest) {
                 orderBy: { stepOrder: "asc" },
               },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy: [{ date: "desc" }, { createdAt: "desc" }],
           }),
       usePaging
         ? prisma.workouts.count({ where })

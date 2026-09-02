@@ -49,11 +49,11 @@ export async function loadPlannedWorkoutForSpawn(
 /** Reuse an existing spawned instance for this planned day (+ optional activity), if any. */
 export async function findSpawnedInstanceForPlanned(params: {
   plannedWorkoutId: string;
-  matchedActivityId?: string;
+  garminDetailActivityId?: string;
 }): Promise<SpawnedWorkoutForApply | null> {
   const activityFilter =
-    params.matchedActivityId != null
-      ? { matchedActivityId: params.matchedActivityId }
+    params.garminDetailActivityId != null
+      ? { garminDetailActivityId: params.garminDetailActivityId }
       : {};
 
   const sameId = await prisma.workouts.findFirst({

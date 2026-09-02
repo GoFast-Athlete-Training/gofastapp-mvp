@@ -71,7 +71,7 @@ export async function evaluateLightAdaptive(params: {
     where: {
       athleteId: params.athleteId,
       planId: params.planId,
-      matchedActivityId: { not: null },
+      garminDetailActivityId: { not: null },
     },
     select: {
       id: true,
@@ -180,7 +180,7 @@ export async function applyLightAdaptiveIfEligible(params: {
       athleteId: params.athleteId,
       planId: params.planId,
       workoutType: { in: ["LongRun", "Race"] },
-      matchedActivityId: { not: null },
+      garminDetailActivityId: { not: null },
     },
     orderBy: { date: "desc" },
     select: { id: true },

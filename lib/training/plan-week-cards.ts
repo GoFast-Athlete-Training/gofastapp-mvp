@@ -20,7 +20,7 @@ export type PlanDayCard = {
   phase: string;
   dayAssigned?: string | null;
   estimatedDistanceInMeters: number;
-  matchedActivityId: string | null;
+  garminDetailActivityId: string | null;
   skippedAt: string | null;
   skipReason: string | null;
   actualDistanceMeters: number | null;
@@ -158,7 +158,7 @@ export async function buildPlanWeekCards(params: {
       phase: s.phase,
       dayAssigned: s.dayAssigned,
       estimatedDistanceInMeters,
-      matchedActivityId: instance?.matchedActivityId ?? null,
+      garminDetailActivityId: instance?.garminDetailActivityId ?? null,
       skippedAt: instance?.skippedAt?.toISOString() ?? null,
       skipReason: instance?.skipReason ?? null,
       actualDistanceMeters: instance?.actualDistanceMeters ?? null,

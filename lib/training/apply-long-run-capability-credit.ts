@@ -44,7 +44,7 @@ export async function applyLongRunCapabilityCreditFromWorkout(params: {
       id: params.workoutId,
       athleteId: params.athleteId,
       workoutType: { in: ["LongRun", "Race"] },
-      matchedActivityId: { not: null },
+      garminDetailActivityId: { not: null },
     },
     select: {
       actualDistanceMeters: true,

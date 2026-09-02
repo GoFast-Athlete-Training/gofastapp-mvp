@@ -12,14 +12,14 @@ export async function cleanupPlanWorkoutsBeforeDelete(params: {
   const todayUtc = utcDateOnly(new Date());
   const workouts = await prisma.workouts.findMany({
     where: { planId: params.planId, athleteId: params.athleteId },
-    select: { id: true, matchedActivityId: true, date: true },
+    select: { id: true, garminDetailActivityId: true, date: true },
   });
 
   const futureUncompleted = workouts.filter(
-    (w) => w.matchedActivityId == null && w.date != null && w.date >= todayUtc
+    (w) => w.garminDetailActivityId == null && w.date != null && w.date >= todayUtc
   );
   const completedOrPast = workouts.filter(
-    (w) => w.matchedActivityId != null || w.date == null || w.date < todayUtc
+    (w) => w.garminDetailActivityId != null || w.date == null || w.date < todayUtc
   );
 
   await prisma.$transaction(async (tx) => {

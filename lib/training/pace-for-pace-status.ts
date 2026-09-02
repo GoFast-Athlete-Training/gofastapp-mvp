@@ -24,7 +24,7 @@ export type PaceForPaceStatusResult = {
 };
 
 export type PaceForPaceStatusInput = PerformanceAnalysisWorkoutInput & {
-  matchedActivityId?: string | null;
+  garminDetailActivityId?: string | null;
 };
 
 function hasSplitsComparison(
@@ -50,15 +50,15 @@ export function derivePaceForPaceStatus(
       actualDurationSeconds: workout.actualDurationSeconds,
       estimatedDistanceInMeters: workout.estimatedDistanceInMeters,
       completedActivityDetailJson: workout.completedActivityDetailJson,
-      matchedActivityId: workout.matchedActivityId,
-      matched_activity: workout.matched_activity,
+      garminDetailActivityId: workout.garminDetailActivityId,
+      garmin_detail_activity: workout.garmin_detail_activity,
       segmentExecutionStatus: workout.segmentExecutionStatus,
       segmentExecutionLapCount: workout.segmentExecutionLapCount,
       segmentExecutionSegmentCount: workout.segmentExecutionSegmentCount,
       segments: workout.segments,
     });
 
-  if (!workout.matchedActivityId) {
+  if (!workout.garminDetailActivityId) {
     return {
       status: "UNMATCHED",
       message: "No activity linked to this workout yet.",

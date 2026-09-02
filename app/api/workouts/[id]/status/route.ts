@@ -29,22 +29,22 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       return NextResponse.json({ error: "Workout not found" }, { status: 404 });
     }
 
-    let matchedActivityId: string | null = null;
+    let garminDetailActivityId: string | null = null;
     if (target.kind === "standalone") {
       const row = await prisma.workouts.findFirst({
         where: { id: target.workoutId, athleteId: auth.athlete.id },
-        select: { matchedActivityId: true },
+        select: { garminDetailActivityId: true },
       });
-      matchedActivityId = row?.matchedActivityId ?? null;
+      garminDetailActivityId = row?.garminDetailActivityId ?? null;
     } else {
       const detail = await loadPlannedWorkoutDetailForAthlete({
         plannedWorkoutId: target.plannedWorkoutId,
         athleteId: auth.athlete.id,
       });
-      matchedActivityId = detail?.matchedActivityId ?? null;
+      garminDetailActivityId = detail?.garminDetailActivityId ?? null;
     }
 
-    if (matchedActivityId) {
+    if (garminDetailActivityId) {
       return NextResponse.json(
         { error: "Completed workouts cannot be marked skipped. Unlink the activity first." },
         { status: 400 }
@@ -108,7 +108,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
         id: updated.id,
         skippedAt: updated.skippedAt?.toISOString() ?? null,
         skipReason: updated.skipReason ?? null,
-        matchedActivityId: updated.matchedActivityId,
+        garminDetailActivityId: updated.garminDetailActivityId,
       },
     });
   } catch (error: unknown) {

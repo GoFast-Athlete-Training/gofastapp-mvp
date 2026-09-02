@@ -188,6 +188,7 @@ export async function GET(
         routeNeighborhood: true,
         runType: true,
         workoutDescription: true,
+        meetUpNote: true,
         directionsText: true,
         workoutId: true,
         plannedWorkoutId: true,
@@ -199,6 +200,8 @@ export async function GET(
             title: true,
             workoutType: true,
             description: true,
+            workoutNarrative: true,
+            scope: true,
             segments: {
               orderBy: { stepOrder: 'asc' as const },
               select: {
@@ -207,7 +210,10 @@ export async function GET(
                 title: true,
                 durationType: true,
                 durationValue: true,
+                targets: true,
                 repeatCount: true,
+                notes: true,
+                paceTargetEncodingVersion: true,
               },
             },
           },
@@ -480,6 +486,7 @@ export async function GET(
         routeNeighborhood: run.routeNeighborhood ?? null,
         runType: run.runType ?? null,
         workoutDescription: run.workoutDescription ?? null,
+        meetUpNote: run.meetUpNote ?? null,
         directionsText: run.directionsText ?? null,
         workoutId: run.workoutId ?? null,
         workout: run.workout
@@ -488,6 +495,8 @@ export async function GET(
               title: run.workout.title,
               workoutType: run.workout.workoutType ?? null,
               description: run.workout.description ?? null,
+              workoutNarrative: run.workout.workoutNarrative ?? null,
+              scope: run.workout.scope ?? null,
               segments: run.workout.segments ?? [],
             }
           : null,

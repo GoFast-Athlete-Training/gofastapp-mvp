@@ -73,7 +73,7 @@ test("does not treat whole-run paceDelta or slogans as splits available", () => 
     targetPaceSecPerMileHigh: 500,
     paceDeltaSecPerMile: 3,
     actualAvgPaceSecPerMile: 477,
-    matchedActivityId: "act-1",
+    garminDetailActivityId: "act-1",
     segments: [
       {
         id: "seg1",
@@ -108,7 +108,7 @@ test("treats lap pace deltas as splits available", () => {
     targetPaceSecPerMileHigh: 500,
     paceDeltaSecPerMile: null,
     actualAvgPaceSecPerMile: 477,
-    matchedActivityId: "act-1",
+    garminDetailActivityId: "act-1",
     segments: [
       {
         id: "seg1",
@@ -144,7 +144,7 @@ test("MP multi-block stays on segment path without whole-run headline", () => {
     targetPaceSecPerMileHigh: 500,
     paceDeltaSecPerMile: 10,
     actualAvgPaceSecPerMile: 470,
-    matchedActivityId: "act-mp",
+    garminDetailActivityId: "act-mp",
     segments: [
       {
         id: "w",

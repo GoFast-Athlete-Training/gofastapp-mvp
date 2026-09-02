@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       id: result.workout.id,
       title: result.workout.title,
       workoutType: result.workout.workoutType,
-      matchedActivityId: result.workout.matchedActivityId,
+      garminDetailActivityId: result.workout.garminDetailActivityId,
       segmentExecutionStatus: result.workout.segmentExecutionStatus,
     },
   });

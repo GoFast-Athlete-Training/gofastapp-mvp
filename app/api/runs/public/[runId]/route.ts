@@ -65,6 +65,7 @@ export async function GET(
             title: true,
             workoutType: true,
             description: true,
+            workoutNarrative: true,
             scope: true,
             segments: {
             orderBy: { stepOrder: "asc" as const },
@@ -136,7 +137,6 @@ export async function GET(
         pace: run.pace,
         description: run.description,
         meetUpNote: run.meetUpNote ?? null,
-        workoutNarrative: run.workoutNarrative ?? null,
         postRunActivity: run.postRunActivity ?? null,
         stravaMapUrl: run.stravaMapUrl,
         routePhotos: run.routePhotos as string[] | null ?? null,
@@ -167,6 +167,7 @@ export async function GET(
               title: run.workout.title,
               workoutType: run.workout.workoutType,
               description: run.workout.description,
+              workoutNarrative: run.workout.workoutNarrative ?? null,
               scope: run.workout.scope,
               segments: run.workout.segments ?? [],
             }

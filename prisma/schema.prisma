@@ -636,8 +636,8 @@ model athlete_activities {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime
   Athlete          Athlete           @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  matched_workout  workouts?         @relation("WorkoutMatchedActivity")
-  matched_bike_workout bike_workout? @relation("BikeWorkoutMatchedActivity")
+  garmin_detail_workout  workouts?         @relation("WorkoutGarminDetailActivity")
+  garmin_detail_bike_workout bike_workout? @relation("BikeWorkoutGarminDetailActivity")
   city_run_activity_links city_run_activity_links[]
   athlete_race_result athlete_race_results?
   workout_segment_laps workout_segment_laps[]
@@ -1436,7 +1436,6 @@ model city_runs {
   meetUpLat           Float?
   meetUpLng           Float?
   meetUpNote          String?              // Host note: how to find the meetup (e.g. "meet at the back")
-  workoutNarrative    String?              // Host note about this session (e.g. "this one's gonna be hard")
   totalMiles          Float?
   pace                String?
   stravaMapUrl        String?              // Public Strava route URL shown on the run page
@@ -2544,8 +2543,8 @@ model workouts {
   garminWorkoutId           Int?
   /// Garmin Training API schedule id (calendar placement for this workout)
   garminScheduleId          Int?
-  /// Matched activity after a run (promoted snapshot fields below)
-  matchedActivityId         String?             @unique
+  /// Garmin detail ingest pointer → athlete_activities.id (sidecar completes raw + laps). Not plan-match.
+  garminDetailActivityId    String?             @unique
   /// Athlete explicitly skipped this planned workout (distinct from past-unmatched "missed")
   skippedAt                 DateTime?
   skipReason                String?             @db.Text
@@ -2602,6 +2601,8 @@ model workouts {
   communityPublishedAt              DateTime?
   /// AI-generated pre-workout coach guidance (materialize + GET fallback; cached).
   prescriptionNarrative             String?
+  /// Host session note for invites (e.g. "this tempo is gonna be hard").
+  workoutNarrative                  String?             @db.Text
   /// Public share path slug for /mytrainingruns/[slug] (e.g. acole842719); set when athlete creates a join link
   slug                      String?             @unique
   /// Schedule-this-run UX: optional start time label (e.g. "6:30 AM")
@@ -2624,7 +2625,7 @@ model workouts {
   planned_workout           planned_workouts?   @relation(fields: [plannedWorkoutId], references: [id], onDelete: SetNull)
   training_plans            training_plans?     @relation("TrainingPlanWorkoutInstances", fields: [planId], references: [id], onDelete: SetNull)
   workout_catalogue         workout_catalogue?  @relation(fields: [catalogueWorkoutId], references: [id], onDelete: SetNull)
-  matched_activity          athlete_activities? @relation("WorkoutMatchedActivity", fields: [matchedActivityId], references: [id], onDelete: SetNull)
+  garmin_detail_activity    athlete_activities? @relation("WorkoutGarminDetailActivity", fields: [garminDetailActivityId], references: [id], onDelete: SetNull)
   segments                  workout_segments[]
   city_runs                 city_runs[]
   tri_workout_leg           tri_workout_leg?
@@ -2723,7 +2724,7 @@ model bike_workout {
   estimatedDurationSeconds Int?
   garminWorkoutId          Int?
   garminScheduleId         Int?
-  matchedActivityId        String?             @unique
+  garminDetailActivityId   String?             @unique
   actualDurationSeconds    Int?
   actualDistanceMeters     Float?
   actualAvgPowerWatts      Int?
@@ -2739,7 +2740,7 @@ model bike_workout {
   Athlete                  Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   steps                    bike_workout_step[]
   tri_workout_leg          tri_workout_leg?
-  matched_activity         athlete_activities? @relation("BikeWorkoutMatchedActivity", fields: [matchedActivityId], references: [id], onDelete: SetNull)
+  garmin_detail_activity   athlete_activities? @relation("BikeWorkoutGarminDetailActivity", fields: [garminDetailActivityId], references: [id], onDelete: SetNull)
 
   @@index([athleteId])
   @@index([athleteId, date])

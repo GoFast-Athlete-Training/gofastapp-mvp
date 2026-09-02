@@ -265,7 +265,7 @@ export async function tryMatchActivityToTrainingWorkout(
   }
 
   const alreadyLinked = await prisma.workouts.findFirst({
-    where: { matchedActivityId: athleteActivityId },
+    where: { garminDetailActivityId: athleteActivityId },
     select: { id: true, title: true },
   });
   if (alreadyLinked) {
@@ -312,7 +312,7 @@ export async function tryMatchActivityToTrainingWorkout(
         where: {
           athleteId: activity.athleteId,
           garminWorkoutId,
-          matchedActivityId: null,
+          garminDetailActivityId: null,
           planId: null,
         },
         include: workoutMatchInclude,
@@ -410,7 +410,7 @@ export async function tryMatchActivityToTrainingWorkout(
 
     if (autoMatchEligible && scored) {
       const existingLink = await prisma.workouts.findFirst({
-        where: { matchedActivityId: activity.id },
+        where: { garminDetailActivityId: activity.id },
         select: { id: true, planId: true, plannedWorkoutId: true },
       });
 

@@ -93,6 +93,10 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
 
   if (props.mode === 'pre-rsvp') {
     const isSeries = props.run.runSeriesId != null;
+    const hasWorkout =
+      Boolean(props.run.workoutId || props.run.workout) ||
+      Boolean(props.run.workout?.workoutNarrative?.trim()) ||
+      Boolean(props.run.workoutDescription?.trim());
     return (
       <MobileHubTabs
         tabs={[...PRE_RSVP_TABS]}
@@ -107,6 +111,13 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
               onBack={props.onBack}
               showHostCard
             />
+            {hasWorkout ? (
+              <CityRunWorkoutCard
+                workoutId={props.run.workoutId}
+                workout={props.run.workout}
+                workoutDescription={props.run.workoutDescription}
+              />
+            ) : null}
             {isSeries && props.run.runSeries ? (
               <CityRunSeriesPanel series={props.run.runSeries} runClub={props.run.runClub} />
             ) : null}
@@ -132,6 +143,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
   if (props.mode === 'going') {
     const hasWorkout =
       Boolean(props.run.workoutId || props.run.workout) ||
+      Boolean(props.run.workout?.workoutNarrative?.trim()) ||
       Boolean(props.run.workoutDescription?.trim());
     const socialRun = hasSocialRunLifecycle(props.run);
 
@@ -156,7 +168,6 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
                 workoutId={props.run.workoutId}
                 workout={props.run.workout}
                 workoutDescription={props.run.workoutDescription}
-                workoutNarrative={props.run.workoutNarrative}
               />
             ) : null}
             <CityRunDetailsSection run={props.run} compact />

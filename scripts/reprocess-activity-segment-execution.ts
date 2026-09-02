@@ -24,14 +24,14 @@ async function main() {
   if (workoutId) {
     const workout = await prisma.workouts.findUnique({
       where: { id: workoutId },
-      select: { id: true, matchedActivityId: true },
+      select: { id: true, garminDetailActivityId: true },
     });
-    if (!workout?.matchedActivityId) {
+    if (!workout?.garminDetailActivityId) {
       console.error("Workout not found or not matched to an activity");
       process.exit(1);
     }
     const result = await parseActivityToSegmentExecution({
-      activityId: workout.matchedActivityId,
+      activityId: workout.garminDetailActivityId,
       workoutId: workout.id,
     });
     console.log(JSON.stringify(result, null, 2));
@@ -46,14 +46,14 @@ async function main() {
 
   const rows = await prisma.workouts.findMany({
     where: {
-      matchedActivityId: { not: null },
-      matched_activity: {
+      garminDetailActivityId: { not: null },
+      garmin_detail_activity: {
         detailData: { not: Prisma.JsonNull },
       },
     },
     select: {
       id: true,
-      matchedActivityId: true,
+      garminDetailActivityId: true,
       title: true,
     },
     take: 200,
@@ -63,9 +63,9 @@ async function main() {
   let aligned = 0;
   let failed = 0;
   for (const row of rows) {
-    if (!row.matchedActivityId) continue;
+    if (!row.garminDetailActivityId) continue;
     const result = await parseActivityToSegmentExecution({
-      activityId: row.matchedActivityId,
+      activityId: row.garminDetailActivityId,
       workoutId: row.id,
     });
     console.log(

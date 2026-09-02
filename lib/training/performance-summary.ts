@@ -149,11 +149,11 @@ export async function loadPerformanceSummary(
 
     weekDays = cards
       .filter((c) => c.workoutType !== "Rest" && c.title !== "Rest")
-      .filter((c) => c.matchedActivityId != null)
+      .filter((c) => c.garminDetailActivityId != null)
       .map((c) => {
         const status = deriveSessionStatus({
           dateKey: c.dateKey,
-          matchedActivityId: c.matchedActivityId,
+          garminDetailActivityId: c.garminDetailActivityId,
           skippedAt: c.skippedAt,
           workoutType: c.workoutType,
           title: c.title,

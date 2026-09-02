@@ -62,9 +62,9 @@ export async function plannedDayConsumedByOtherActivity(params: {
         { plannedWorkoutId: params.plannedWorkoutId },
         { id: params.plannedWorkoutId },
       ],
-      matchedActivityId: { not: null },
+      garminDetailActivityId: { not: null },
     },
-    select: { matchedActivityId: true },
+    select: { garminDetailActivityId: true },
   });
-  return Boolean(row && row.matchedActivityId !== params.activityId);
+  return Boolean(row && row.garminDetailActivityId !== params.activityId);
 }

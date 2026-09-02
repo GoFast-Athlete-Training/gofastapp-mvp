@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const w = await prisma.workouts.findFirst({
       where: {
         athleteId: auth.athlete.id,
-        matchedActivityId: { not: null },
+        garminDetailActivityId: { not: null },
       },
       orderBy: { updatedAt: "desc" },
       select: {
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         targetPaceSecPerMileHigh: true,
         hrDeltaBpm: true,
         creditedFiveKPaceSecPerMile: true,
-        matched_activity: {
+        garmin_detail_activity: {
           select: { startTime: true },
         },
       },
@@ -67,12 +67,12 @@ export async function GET(request: Request) {
       });
     }
 
-    const { matched_activity, ...rest } = w;
+    const { garmin_detail_activity, ...rest } = w;
     return NextResponse.json({
       workout: {
         ...rest,
         date: rest.date?.toISOString() ?? null,
-        activityStartTime: matched_activity?.startTime?.toISOString() ?? null,
+        activityStartTime: garmin_detail_activity?.startTime?.toISOString() ?? null,
       },
       fallbackActivity: null,
     });

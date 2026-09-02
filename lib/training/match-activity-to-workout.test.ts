@@ -82,7 +82,7 @@ const tempoWorkout = {
   dayAssigned: "Tuesday",
   planId: "plan-1",
   garminWorkoutId: null,
-  matchedActivityId: null,
+  garminDetailActivityId: null,
   athleteId: "athlete-1",
   segments: [],
   workout_catalogue: null,

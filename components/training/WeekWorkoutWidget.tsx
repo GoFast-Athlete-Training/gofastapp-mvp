@@ -128,7 +128,7 @@ export default function WeekWorkoutWidget({ days, todayKey, selectedDateKey, onS
           ? ("rest" as const)
           : deriveSessionStatus({
               dateKey,
-              matchedActivityId: planDay!.matchedActivityId,
+              garminDetailActivityId: planDay!.garminDetailActivityId,
               skippedAt: planDay!.skippedAt,
               workoutType: planDay!.workoutType,
               title: planDay!.title,

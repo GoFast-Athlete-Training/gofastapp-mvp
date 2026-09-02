@@ -226,7 +226,7 @@ export async function parseActivityToSegmentExecution(params: {
         include: { segments: { orderBy: { stepOrder: "asc" } } },
       })
     : await prisma.workouts.findFirst({
-        where: { matchedActivityId: params.activityId },
+        where: { garminDetailActivityId: params.activityId },
         include: { segments: { orderBy: { stepOrder: "asc" } } },
       });
 
@@ -238,7 +238,7 @@ export async function parseActivityToSegmentExecution(params: {
     };
   }
 
-  if (workout.matchedActivityId && workout.matchedActivityId !== params.activityId) {
+  if (workout.garminDetailActivityId && workout.garminDetailActivityId !== params.activityId) {
     return {
       ok: false,
       status: "NO_WORKOUT",

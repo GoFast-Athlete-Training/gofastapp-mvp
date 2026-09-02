@@ -173,7 +173,7 @@ export async function GET(request: NextRequest, context: Ctx) {
               },
             },
           },
-          matched_activity: {
+          garmin_detail_activity: {
             select: {
               id: true,
               activityName: true,
@@ -216,8 +216,8 @@ export async function GET(request: NextRequest, context: Ctx) {
         actualDurationSeconds: plannedDetail.actualDurationSeconds,
         estimatedDistanceInMeters: plannedDetail.estimatedDistanceInMeters,
         completedActivityDetailJson: plannedDetail.completedActivityDetailJson,
-        matchedActivityId: plannedDetail.matchedActivityId,
-        matched_activity: plannedDetail.matched_activity,
+        garminDetailActivityId: plannedDetail.garminDetailActivityId,
+        garmin_detail_activity: plannedDetail.garmin_detail_activity,
         segmentExecutionStatus: plannedDetail.segmentExecutionStatus,
         segmentExecutionLapCount: plannedDetail.segmentExecutionLapCount,
         segmentExecutionSegmentCount: plannedDetail.segmentExecutionSegmentCount,
@@ -468,8 +468,8 @@ export async function GET(request: NextRequest, context: Ctx) {
       actualDurationSeconds: workout.actualDurationSeconds,
       estimatedDistanceInMeters: workout.estimatedDistanceInMeters,
       completedActivityDetailJson: workout.completedActivityDetailJson,
-      matchedActivityId: workout.matchedActivityId,
-      matched_activity: workout.matched_activity,
+      garminDetailActivityId: workout.garminDetailActivityId,
+      garmin_detail_activity: workout.garmin_detail_activity,
       segmentExecutionStatus: workout.segmentExecutionStatus,
       segmentExecutionLapCount: workout.segmentExecutionLapCount,
       segmentExecutionSegmentCount: workout.segmentExecutionSegmentCount,

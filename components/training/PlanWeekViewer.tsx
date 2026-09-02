@@ -152,7 +152,7 @@ export default function PlanWeekViewer({
             const selected = w.dateKey === selectedDateKey;
             const status = deriveSessionStatus({
               dateKey: w.dateKey,
-              matchedActivityId: w.matchedActivityId,
+              garminDetailActivityId: w.garminDetailActivityId,
               skippedAt: w.skippedAt,
               workoutType: w.workoutType,
               title: w.title,

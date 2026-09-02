@@ -200,7 +200,7 @@ export async function resolvePaceForPace(params: {
     };
   }
 
-  activityId = loaded.workout.matchedActivityId ?? activityId;
+  activityId = loaded.workout.garminDetailActivityId ?? activityId;
 
   if (!activityId) {
     const candidates = await loadMatchCandidatesForWorkout({

@@ -93,7 +93,7 @@ export async function cleanupFuturePlanWorkoutsAfterRegenerate(params: {
       where: {
         planId: params.planId,
         athleteId: params.athleteId,
-        matchedActivityId: null,
+        garminDetailActivityId: null,
         date: { gte: todayUtc },
       },
       select: { id: true, garminScheduleId: true },

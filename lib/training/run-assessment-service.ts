@@ -108,7 +108,7 @@ export async function runRunAssessment(params: {
         id: true,
         title: true,
         workoutType: true,
-        matchedActivityId: true,
+        garminDetailActivityId: true,
         estimatedDistanceInMeters: true,
         actualDistanceMeters: true,
         targetPaceSecPerMile: true,
@@ -120,7 +120,7 @@ export async function runRunAssessment(params: {
         segmentExecutionStatus: true,
         segmentExecutionLapCount: true,
         segmentExecutionSegmentCount: true,
-        matched_activity: {
+        garmin_detail_activity: {
           select: {
             activityName: true,
             activityType: true,
@@ -155,7 +155,7 @@ export async function runRunAssessment(params: {
     }),
   ]);
 
-  if (!workout?.matchedActivityId || !workout.matched_activity) {
+  if (!workout?.garminDetailActivityId || !workout.garmin_detail_activity) {
     throw new Error("Workout is not linked to a Garmin activity");
   }
   if (!athlete) {
@@ -171,8 +171,8 @@ export async function runRunAssessment(params: {
     actualDistanceMeters: workout.actualDistanceMeters,
     actualDurationSeconds: workout.actualDurationSeconds,
     completedActivityDetailJson: workout.completedActivityDetailJson,
-    matchedActivityId: workout.matchedActivityId,
-    matched_activity: workout.matched_activity,
+    garminDetailActivityId: workout.garminDetailActivityId,
+    garmin_detail_activity: workout.garmin_detail_activity,
     segmentExecutionStatus: workout.segmentExecutionStatus,
     segmentExecutionLapCount: workout.segmentExecutionLapCount,
     segmentExecutionSegmentCount: workout.segmentExecutionSegmentCount,
@@ -235,7 +235,7 @@ export async function runRunAssessment(params: {
       actualAvgPaceSecPerMile: comparison.actualPaceSecPerMile,
       wholeRunAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
       actualDurationSeconds: workout.actualDurationSeconds,
-      activityName: workout.matched_activity.activityName,
+      activityName: workout.garmin_detail_activity.activityName,
     },
     deterministicFacts: {
       distanceStatus: distStatus,
