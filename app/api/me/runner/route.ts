@@ -13,7 +13,9 @@ export async function GET(request: Request) {
   const { athlete } = auth;
 
   try {
-    const agenda = await fetchRunnerAgendaForAthlete(athlete.id);
+    const { searchParams } = new URL(request.url);
+    const todayKey = searchParams.get('todayKey')?.trim() || undefined;
+    const agenda = await fetchRunnerAgendaForAthlete(athlete.id, { todayKey });
     return NextResponse.json(agenda);
   } catch (err: unknown) {
     console.error('GET /api/me/runner:', err);

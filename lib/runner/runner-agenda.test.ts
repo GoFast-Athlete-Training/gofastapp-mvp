@@ -104,6 +104,33 @@ describe('buildRunnerAgenda', () => {
     expect(items.some((i) => i.joinedRun?.id === 'past')).toBe(true);
   });
 
+  it('still surfaces tomorrow plan-only workout after today is completed', () => {
+    const tomorrow = '2026-08-31';
+    const items = buildRunnerAgenda({
+      todayKey: TODAY,
+      planSessions: [
+        plan({
+          dateKey: TODAY,
+          title: 'Easy 5',
+          workoutId: 'w-done',
+          actualDistanceMeters: 8046,
+          actualDurationSeconds: 2400,
+        }),
+        plan({
+          dateKey: tomorrow,
+          title: 'Tempo 6',
+          plannedWorkoutId: 'pw-tomorrow',
+        }),
+      ],
+      joinedRuns: [],
+    });
+
+    const tomorrowItem = items.find((i) => i.dateKey === tomorrow);
+    expect(tomorrowItem?.kind).toBe('plan-only');
+    expect(tomorrowItem?.plan?.title).toBe('Tempo 6');
+    expect(tomorrowItem?.plan?.plannedWorkoutId).toBe('pw-tomorrow');
+  });
+
   it('includes all joined run types when provided', () => {
     const items = buildRunnerAgenda({
       todayKey: TODAY,
