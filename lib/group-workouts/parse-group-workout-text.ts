@@ -17,11 +17,14 @@ function tryParseTrackIntervalLine(text: string): GroupWorkoutSegmentInput[] | n
 
   let recoveryDurationType: string | null = null;
   let recoveryDurationValue: number | null = null;
-  const recoveryMatch = workPart.match(
+  const recoverySource = `${workPart} ${effortFromAt ?? ""}`.trim();
+  const recoveryMatch = recoverySource.match(
     /(?:w\/|with)\s*(\d+(?:\.\d+)?)\s*(m|mi|mile|miles|km|min|minute|minutes)?\s*(?:jog|recovery|rest)?/i
   );
   if (recoveryMatch && recoveryMatch.index != null) {
-    workPart = workPart.slice(0, recoveryMatch.index).trim();
+    if (recoveryMatch.index < workPart.length) {
+      workPart = workPart.slice(0, recoveryMatch.index).trim();
+    }
     const recRaw = parseFloat(recoveryMatch[1]);
     const recUnit = (recoveryMatch[2] || "m").toLowerCase();
     if (Number.isFinite(recRaw) && recRaw > 0) {
@@ -62,7 +65,9 @@ function tryParseTrackIntervalLine(text: string): GroupWorkoutSegmentInput[] | n
     workMiles = metersToMiles(distanceRaw);
   }
 
-  const effortNote = effortFromAt || normalized.match(/@\s*(.+)$/i)?.[1]?.trim();
+  const effortNote = effortFromAt
+    ? effortFromAt.replace(/\s*(?:w\/|with)\s*\d+(?:\.\d+)?\s*(?:m|mi|mile|miles|km|min|minute|minutes)?\s*(?:jog|recovery|rest)?\s*$/i, "").trim()
+    : normalized.match(/@\s*(.+)$/i)?.[1]?.trim();
   const notes = effortNote ? `@ ${effortNote.replace(/^@\s*/, "")}` : null;
 
   return [
@@ -80,12 +85,55 @@ function tryParseTrackIntervalLine(text: string): GroupWorkoutSegmentInput[] | n
   ];
 }
 
-/** Split compound prescriptions: "4-5 x 800m; then 4 x 400m" */
+function tryParseBookendSegment(text: string): GroupWorkoutSegmentInput | null {
+  const normalized = text.trim().replace(/\s+/g, " ");
+  if (!normalized) return null;
+
+  const match = normalized.match(
+    /^(\d+(?:\.\d+)?)\s*(mi|mile|miles|km|m|meter|meters)?\s*(warm\s*-?\s*up|warmup|cool\s*-?\s*down|cooldown)\s*$/i
+  );
+  if (!match) return null;
+
+  const distanceRaw = parseFloat(match[1]);
+  const unit = (match[2] || "mi").toLowerCase();
+  const label = match[3].toLowerCase();
+  if (!Number.isFinite(distanceRaw) || distanceRaw <= 0) return null;
+
+  let workMiles: number;
+  if (unit === "mi" || unit === "mile" || unit === "miles") {
+    workMiles = distanceRaw;
+  } else if (unit === "km") {
+    workMiles = Math.round((distanceRaw / 1.60934) * 1000) / 1000;
+  } else {
+    workMiles = metersToMiles(distanceRaw);
+  }
+
+  const isWarmup = label.includes("warm");
+  return {
+    stepOrder: 1,
+    title: isWarmup ? "Warmup" : "Cooldown",
+    durationType: "DISTANCE",
+    durationValue: workMiles,
+    repeatCount: null,
+    targets: null,
+    notes: null,
+    recoveryDurationType: null,
+    recoveryDurationValue: null,
+  };
+}
+
+/** Split compound prescriptions: warmup, intervals, cooldown */
 function splitCompoundWorkoutText(text: string): string[] {
   return text
-    .split(/;\s*|\n+|,\s*then\s+/i)
+    .split(/;\s*|\n+|,\s*(?=.*(?:warm|cool|\d+\s*[x×]))/i)
     .map((part) => part.trim().replace(/^then\s+/i, ""))
     .filter(Boolean);
+}
+
+function tryParseWorkoutPart(text: string): GroupWorkoutSegmentInput[] | null {
+  const bookend = tryParseBookendSegment(text);
+  if (bookend) return [bookend];
+  return tryParseTrackIntervalLine(text);
 }
 
 export function tryParseTrackIntervalText(text: string): GroupWorkoutParseResult | null {
@@ -94,7 +142,7 @@ export function tryParseTrackIntervalText(text: string): GroupWorkoutParseResult
   let step = 1;
 
   for (const part of parts) {
-    const parsed = tryParseTrackIntervalLine(part);
+    const parsed = tryParseWorkoutPart(part);
     if (!parsed) return null;
     for (const seg of parsed) {
       segments.push({ ...seg, stepOrder: step++ });
@@ -104,9 +152,10 @@ export function tryParseTrackIntervalText(text: string): GroupWorkoutParseResult
   if (segments.length === 0) return null;
 
   const summary = text.trim().slice(0, 120);
+  const hasIntervals = segments.some((s) => (s.repeatCount ?? 0) > 1 || s.title.toLowerCase().includes("interval"));
   return {
     segments,
-    suggestedTitle: "Track workout",
+    suggestedTitle: hasIntervals ? "Track workout" : "Track session",
     suggestedDescription: summary,
   };
 }
@@ -146,10 +195,12 @@ Output ONLY valid JSON (no markdown):
 Rules:
 - Use durationType DISTANCE with durationValue in miles (800m ≈ 0.5 mi, 1600m ≈ 1.0 mi, 400m ≈ 0.25 mi).
 - Use repeatCount for reps (e.g. 8 x 800m → durationValue 0.5, repeatCount 8).
-- Put effort cues ("@ 5K", "at tempo") in notes — NOT in targets.
+- Put effort cues ("@ 5K", "at tempo", "10K pace") in notes — NOT in targets.
 - targets must be null unless the text gives explicit clock paces like "7:30/mile" or HR zones.
 - For HR zones only when explicitly mentioned: { "type": "HEART_RATE", "valueLow": 115, "valueHigh": 130 }.
-- Multiple sets ("then 4 x 400m") → separate segments with incrementing stepOrder.
+- Explicit warmup or cooldown ("1 mile warmup", "800m cooldown") → separate segments titled Warmup or Cooldown with repeatCount null and no recovery fields.
+- Between-rep recovery belongs on the interval Work segment only (recoveryDurationType / recoveryDurationValue), never on Warmup or Cooldown.
+- Multiple interval sets ("then 4 x 400m") → separate Work segments with incrementing stepOrder.
 - suggestedTitle: short, no pace numbers. suggestedDescription: one-line summary of the prescription.`;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {

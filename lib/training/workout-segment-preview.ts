@@ -23,6 +23,9 @@ export type WorkoutPreviewSegment = SegmentLike & {
   durationValue: number;
   repeatCount?: number | null;
   paceTargetEncodingVersion?: number | null;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
+  notes?: string | null;
   targets?: Array<{
     type?: string;
     value?: number;
@@ -60,7 +63,10 @@ export function previewSegmentTargetSummary(
 export function previewGroupedSegmentTargetSummary(
   group: SegmentDisplayGroup<WorkoutPreviewSegment>
 ): string | null {
-  return previewSegmentTargetSummary(group.work);
+  const pace = previewSegmentTargetSummary(group.work);
+  if (pace) return pace;
+  const notes = group.work.notes?.trim();
+  return notes || null;
 }
 
 export function previewGroupedRecoveryDistanceLine(
@@ -68,7 +74,23 @@ export function previewGroupedRecoveryDistanceLine(
 ): string | null {
   const between = formatBetweenRepeatsRecoveryLabel(group);
   if (between) return between.replace(/^Between repeats: /, '');
-  if (!group.recovery) return null;
+  if (!group.recovery) {
+    const work = group.work;
+    if (
+      work.recoveryDurationType &&
+      work.recoveryDurationValue != null &&
+      work.recoveryDurationValue > 0
+    ) {
+      return formatSegmentDuration({
+        stepOrder: work.stepOrder,
+        durationType: work.recoveryDurationType,
+        durationValue: work.recoveryDurationValue,
+        repeatCount: null,
+        title: 'Recovery',
+      });
+    }
+    return null;
+  }
   return formatSegmentDuration({
     stepOrder: group.recovery.stepOrder,
     durationType: group.recovery.durationType,
