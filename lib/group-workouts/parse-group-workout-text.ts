@@ -69,6 +69,11 @@ function tryParseTrackIntervalLine(text: string): GroupWorkoutSegmentInput[] | n
     ? effortFromAt.replace(/\s*(?:w\/|with)\s*\d+(?:\.\d+)?\s*(?:m|mi|mile|miles|km|min|minute|minutes)?\s*(?:jog|recovery|rest)?\s*$/i, "").trim()
     : normalized.match(/@\s*(.+)$/i)?.[1]?.trim();
   const notes = effortNote ? `@ ${effortNote.replace(/^@\s*/, "")}` : null;
+  const paceOffset = effortTextToPaceOffset(notes);
+  const targets =
+    paceOffset != null
+      ? [{ type: "PACE_OFFSET", value: paceOffset, valueLow: paceOffset, valueHigh: paceOffset }]
+      : null;
 
   return [
     {
@@ -77,12 +82,23 @@ function tryParseTrackIntervalLine(text: string): GroupWorkoutSegmentInput[] | n
       durationType: "DISTANCE",
       durationValue: workMiles,
       repeatCount,
-      targets: null,
-      notes,
+      targets,
+      notes: null,
       recoveryDurationType,
       recoveryDurationValue,
     },
   ];
+}
+
+function effortTextToPaceOffset(notes: string | null): number | null {
+  if (!notes?.trim()) return null;
+  const t = notes.trim().toLowerCase();
+  if (/\b5\s*k\b|\b5k\b/.test(t)) return 0;
+  if (/\b10\s*k\b|\b10k\b/.test(t)) return 15;
+  if (/\btempo\b|\bthreshold\b/.test(t)) return 15;
+  if (/\bmarathon\b|\bmp\b/.test(t)) return 45;
+  if (/\binterval\b|\bspeed\b/.test(t)) return -10;
+  return null;
 }
 
 function tryParseBookendSegment(text: string): GroupWorkoutSegmentInput | null {
@@ -195,8 +211,9 @@ Output ONLY valid JSON (no markdown):
 Rules:
 - Use durationType DISTANCE with durationValue in miles (800m ≈ 0.5 mi, 1600m ≈ 1.0 mi, 400m ≈ 0.25 mi).
 - Use repeatCount for reps (e.g. 8 x 800m → durationValue 0.5, repeatCount 8).
-- Put effort cues ("@ 5K", "at tempo", "10K pace") in notes — NOT in targets.
-- targets must be null unless the text gives explicit clock paces like "7:30/mile" or HR zones.
+- Put effort labels ("@ 5K", "10K pace", "at tempo") into targets as PACE_OFFSET (sec/mi vs 5K anchor): 5K=0, 10K=+15, tempo=+15, marathon=+45, interval/speed=−10. Do NOT use notes for effort.
+- targets format: [{ "type": "PACE_OFFSET", "value": 15, "valueLow": 15, "valueHigh": 15 }]
+- targets must be null only when no effort cue is given; use explicit clock PACE targets only for times like "7:30/mile".
 - For HR zones only when explicitly mentioned: { "type": "HEART_RATE", "valueLow": 115, "valueHigh": 130 }.
 - Explicit warmup or cooldown ("1 mile warmup", "800m cooldown") → separate segments titled Warmup or Cooldown with repeatCount null and no recovery fields.
 - Between-rep recovery belongs on the interval Work segment only (recoveryDurationType / recoveryDurationValue), never on Warmup or Cooldown.
@@ -248,13 +265,36 @@ Rules:
 
       let targets: GroupWorkoutSegmentInput["targets"] = null;
       if (Array.isArray(seg.targets) && seg.targets.length > 0) {
-        const filtered = seg.targets.filter(
-          (t) =>
-            t &&
-            typeof t === "object" &&
-            String((t as { type?: string }).type).toUpperCase() === "HEART_RATE"
-        );
-        targets = filtered.length > 0 ? (filtered as GroupWorkoutSegmentInput["targets"]) : null;
+        const mapped = seg.targets
+          .map((t) => {
+            if (!t || typeof t !== "object") return null;
+            const o = t as Record<string, unknown>;
+            const type = String(o.type ?? "").toUpperCase();
+            if (type === "PACE_OFFSET") {
+              const v = typeof o.value === "number" ? o.value : o.valueLow;
+              if (typeof v === "number" && Number.isFinite(v)) {
+                const n = Math.round(v);
+                return { type: "PACE_OFFSET", value: n, valueLow: n, valueHigh: n };
+              }
+              return null;
+            }
+            if (type === "HEART_RATE" || type === "HEARTRATE") {
+              const vl = o.valueLow;
+              const vh = o.valueHigh;
+              if (typeof vl === "number" && typeof vh === "number") {
+                return { type: "HEART_RATE", valueLow: vl, valueHigh: vh };
+              }
+            }
+            return null;
+          })
+          .filter(Boolean);
+        targets = mapped.length > 0 ? (mapped as GroupWorkoutSegmentInput["targets"]) : null;
+      }
+      if (!targets && typeof seg.notes === "string") {
+        const off = effortTextToPaceOffset(seg.notes.trim() ? `@ ${seg.notes.trim()}` : null);
+        if (off != null) {
+          targets = [{ type: "PACE_OFFSET", value: off, valueLow: off, valueHigh: off }];
+        }
       }
 
       return {

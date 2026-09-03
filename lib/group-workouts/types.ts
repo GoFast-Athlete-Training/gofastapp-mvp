@@ -3,7 +3,7 @@ export type GroupWorkoutSegmentInput = {
   title: string;
   durationType: "DISTANCE" | "TIME";
   durationValue: number;
-  targets?: Array<{ type: string; valueLow?: number; valueHigh?: number }> | null;
+  targets?: Array<{ type: string; value?: number; valueLow?: number; valueHigh?: number }> | null;
   repeatCount?: number | null;
   notes?: string | null;
   recoveryDurationType?: string | null;

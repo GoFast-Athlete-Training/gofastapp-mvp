@@ -43,6 +43,14 @@ export function previewSegmentTargetSummary(
   const parts: string[] = [];
   for (const t of targets) {
     const type = (t.type || '').toUpperCase();
+    if (type === 'PACE_OFFSET') {
+      const v = typeof t.value === 'number' ? t.value : t.valueLow;
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        const sign = v > 0 ? '+' : '';
+        parts.push(`${sign}${Math.round(v)} sec/mi vs 5K`);
+      }
+      continue;
+    }
     if (type === 'PACE') {
       if (t.valueLow != null && t.valueHigh != null) {
         parts.push(formatPaceTargetRangeForDisplay(t.valueLow, t.valueHigh, enc));
@@ -65,8 +73,7 @@ export function previewGroupedSegmentTargetSummary(
 ): string | null {
   const pace = previewSegmentTargetSummary(group.work);
   if (pace) return pace;
-  const notes = group.work.notes?.trim();
-  return notes || null;
+  return null;
 }
 
 export function previewGroupedRecoveryDistanceLine(
