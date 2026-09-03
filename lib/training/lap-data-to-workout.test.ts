@@ -253,6 +253,72 @@ test("collapsed 400x8: one work row with repeatCount 8 consumes eight 400m laps"
   }
 });
 
+test("mile repeats: one lap per rep on interval, no cooldown dump", () => {
+  const segments = [
+    {
+      id: "w",
+      stepOrder: 1,
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "int",
+      stepOrder: 2,
+      title: "Interval",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: 5,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "r",
+      stepOrder: 3,
+      title: "Recovery",
+      durationType: "TIME",
+      durationValue: 2,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "c",
+      stepOrder: 4,
+      title: "Cooldown",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+  ];
+  const derived = [
+    lap(0, 540, 0.04),
+    lap(1, 372, 1.0),
+    lap(2, 522, 1.0),
+    lap(3, 377, 1.0),
+    lap(4, 563, 1.0),
+    lap(5, 370, 1.0),
+    lap(6, 327, 0.04),
+    lap(7, 346, 1.0),
+    lap(8, 594, 1.0),
+    lap(9, 416, 1.0),
+    lap(10, 704, 1.0),
+  ];
+  const result = assignLapsForTest(derived, segments, "Intervals");
+  assert.ok(result);
+  assert.equal(result.bySegment.get("w")!.length, 1);
+  assert.equal(result.bySegment.get("int")!.length, 5);
+  assert.equal(result.bySegment.get("r")!.length, 1);
+  assert.equal(result.bySegment.get("c")!.length, 1);
+  const assigned = [...result.bySegment.values()].reduce((a, ls) => a + ls.length, 0);
+  assert.equal(assigned, 8);
+});
+
 test("unassignable laps return null", () => {
   const segments = [
     {

@@ -15,6 +15,7 @@ import {
   normalizePaceTargetEncodingVersion,
   storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
+import { computeBandPaceDelta } from "./pace-comparison-display";
 
 export const NO_DETAIL_SUPPORT_MESSAGE = "Splits aren't available.";
 
@@ -71,21 +72,41 @@ function paceBandFromTargets(
   return { min, max: max ?? min };
 }
 
-function prescribedMid(min: number | null, max: number | null): number | null {
-  if (min == null) return null;
-  if (max == null) return min;
-  return Math.round((min + max) / 2);
-}
-
 function computeLapDelta(
   actualPaceSecPerMile: number | null,
   min: number | null,
   max: number | null
 ): number | null {
   if (actualPaceSecPerMile == null || min == null) return null;
-  const mid = prescribedMid(min, max);
-  if (mid == null) return null;
-  return mid - actualPaceSecPerMile;
+  return computeBandPaceDelta(actualPaceSecPerMile, min, max);
+}
+
+function openAimedLap(lapId: string): AimedLap {
+  return {
+    lapId,
+    prescribedPaceMinSecPerMile: null,
+    prescribedPaceMaxSecPerMile: null,
+    paceDeltaSecPerMile: null,
+  };
+}
+
+function aimedWorkLap(
+  lapId: string,
+  avgPaceSecPerMile: number | null,
+  min: number,
+  max: number | null
+): AimedLap {
+  return {
+    lapId,
+    prescribedPaceMinSecPerMile: min,
+    prescribedPaceMaxSecPerMile: max,
+    paceDeltaSecPerMile: computeLapDelta(avgPaceSecPerMile, min, max),
+  };
+}
+
+/** Odd lap indices within a repeat block are recovery jogs (OPEN). */
+function isRecoveryLapWithinRepeatBlock(lapIndexInSegment: number): boolean {
+  return lapIndexInSegment % 2 === 1;
 }
 
 type ExpandedPrescription =
@@ -138,6 +159,20 @@ export function expandPlannedToLapPrescriptions(
   return out;
 }
 
+/** Multiple laps on one repeatCount row → alternate work/recovery within segment. */
+function repeatBlockNeedsSegmentPath(
+  plannedSegments: PlannedSegmentRow[],
+  sortedLaps: WorkoutLapRow[]
+): boolean {
+  for (const seg of plannedSegments) {
+    const reps = seg.repeatCount ?? 1;
+    if (reps <= 1) continue;
+    const lapsOnSeg = sortedLaps.filter((l) => l.segmentStepOrder === seg.stepOrder);
+    if (lapsOnSeg.length > 1) return true;
+  }
+  return false;
+}
+
 /** Map prescriptions onto detected workout laps in lapIndex order. Fail open on count mismatch. */
 export function translatePlannedOntoWorkout(params: {
   plannedSegments: PlannedSegmentRow[];
@@ -145,6 +180,7 @@ export function translatePlannedOntoWorkout(params: {
 }): AimedLap[] {
   const { plannedSegments, workoutLaps } = params;
   const sortedLaps = [...workoutLaps].sort((a, b) => a.lapIndex - b.lapIndex);
+  const lapIndexInSegment = new Map<string, number>();
 
   // Segment-path: assign prescribe from each workout segment's targets to its laps
   const segmentPath = sortedLaps.map((lap) => {
@@ -159,20 +195,25 @@ export function translatePlannedOntoWorkout(params: {
       isRecoveryLap || phase === "warmup" || phase === "cooldown" || band.min == null;
 
     if (isOpen) {
-      return {
-        lapId: lap.id,
-        prescribedPaceMinSecPerMile: null,
-        prescribedPaceMaxSecPerMile: null,
-        paceDeltaSecPerMile: null,
-      };
+      return openAimedLap(lap.id);
     }
 
-    return {
-      lapId: lap.id,
-      prescribedPaceMinSecPerMile: band.min,
-      prescribedPaceMaxSecPerMile: band.max,
-      paceDeltaSecPerMile: computeLapDelta(lap.avgPaceSecPerMile, band.min, band.max),
-    };
+    const reps = seg?.repeatCount ?? 1;
+    const isRepeatWorkBlock =
+      reps > 1 &&
+      phase === "work" &&
+      !isRecoveryTitle(lap.segmentTitle) &&
+      band.min != null;
+
+    if (isRepeatWorkBlock) {
+      const idx = lapIndexInSegment.get(lap.segmentId) ?? 0;
+      lapIndexInSegment.set(lap.segmentId, idx + 1);
+      if (isRecoveryLapWithinRepeatBlock(idx)) {
+        return openAimedLap(lap.id);
+      }
+    }
+
+    return aimedWorkLap(lap.id, lap.avgPaceSecPerMile, band.min!, band.max);
   });
 
   const expanded = expandPlannedToLapPrescriptions(plannedSegments);
@@ -183,24 +224,18 @@ export function translatePlannedOntoWorkout(params: {
       l.avgPaceSecPerMile != null
   );
 
+  if (repeatBlockNeedsSegmentPath(plannedSegments, sortedLaps)) {
+    return segmentPath;
+  }
+
   // When expanded plan count matches work laps, prefer expanded mapping for repeats/MP
   if (expanded.length > 0 && expanded.length === sortedLaps.length) {
     return sortedLaps.map((lap, i) => {
       const rx = expanded[i]!;
       if (rx.kind === "open") {
-        return {
-          lapId: lap.id,
-          prescribedPaceMinSecPerMile: null,
-          prescribedPaceMaxSecPerMile: null,
-          paceDeltaSecPerMile: null,
-        };
+        return openAimedLap(lap.id);
       }
-      return {
-        lapId: lap.id,
-        prescribedPaceMinSecPerMile: rx.min,
-        prescribedPaceMaxSecPerMile: rx.max,
-        paceDeltaSecPerMile: computeLapDelta(lap.avgPaceSecPerMile, rx.min, rx.max),
-      };
+      return aimedWorkLap(lap.id, lap.avgPaceSecPerMile, rx.min, rx.max);
     });
   }
 
@@ -213,24 +248,14 @@ export function translatePlannedOntoWorkout(params: {
         !isRecoveryTitle(lap.segmentTitle) &&
         lap.avgPaceSecPerMile != null;
       if (!isWork) {
-        return {
-          lapId: lap.id,
-          prescribedPaceMinSecPerMile: null,
-          prescribedPaceMaxSecPerMile: null,
-          paceDeltaSecPerMile: null,
-        };
+        return openAimedLap(lap.id);
       }
       const rx = expanded.filter((e) => e.kind === "work")[workIdx] as Extract<
         ExpandedPrescription,
         { kind: "work" }
       >;
       workIdx += 1;
-      return {
-        lapId: lap.id,
-        prescribedPaceMinSecPerMile: rx.min,
-        prescribedPaceMaxSecPerMile: rx.max,
-        paceDeltaSecPerMile: computeLapDelta(lap.avgPaceSecPerMile, rx.min, rx.max),
-      };
+      return aimedWorkLap(lap.id, lap.avgPaceSecPerMile, rx.min, rx.max);
     });
   }
 

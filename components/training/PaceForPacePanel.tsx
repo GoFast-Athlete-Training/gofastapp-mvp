@@ -4,7 +4,10 @@ import type {
   PhaseAwareLapRow,
   WorkoutPerformanceAnalysis,
 } from "@/lib/training/workout-performance-analysis";
-import { formatPaceTargetRangeDisplay } from "@/lib/training/pace-comparison-display";
+import {
+  formatPaceTargetRangeDisplay,
+  paceRangeDeltaMessage,
+} from "@/lib/training/pace-comparison-display";
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
   if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
@@ -13,18 +16,33 @@ function formatSecPerMile(sec: number | null | undefined): string | null {
   return `${m}:${String(s).padStart(2, "0")}/mi`;
 }
 
-function formatDeltaSecPerMile(delta: number | null | undefined): string {
-  if (delta == null || !Number.isFinite(delta)) return "—";
-  const rounded = Math.round(delta);
-  if (rounded === 0) return "on band";
-  const abs = Math.abs(rounded);
-  return rounded > 0 ? `${abs}s faster` : `${abs}s slower`;
+function lapPaceLabel(lap: PhaseAwareLapRow): string {
+  const bandMessage = paceRangeDeltaMessage(
+    lap.paceSecPerMile,
+    lap.targetPaceSecPerMile,
+    lap.targetPaceSecPerMileHigh
+  );
+  if (bandMessage) return bandMessage;
+  if (lap.vsPlanPaceLabel && lap.vsPlanPaceLabel !== "—") return lap.vsPlanPaceLabel;
+  return "—";
+}
+
+function splitsLaps(analysis: WorkoutPerformanceAnalysis | null): PhaseAwareLapRow[] {
+  if (!analysis) return [];
+  const laps = analysis.phaseAwareLaps;
+  if (analysis.requiresSegmentLevelPaceForPace) {
+    return laps.filter((lap) => lap.phase === "work");
+  }
+  return laps;
 }
 
 function hasLapPaceDeltas(analysis: WorkoutPerformanceAnalysis | null): boolean {
   if (!analysis) return false;
-  return analysis.phaseAwareLaps.some(
-    (lap) => lap.paceDeltaSecPerMile != null && Number.isFinite(lap.paceDeltaSecPerMile)
+  const laps = splitsLaps(analysis);
+  return laps.some(
+    (lap) =>
+      (lap.paceDeltaSecPerMile != null && Number.isFinite(lap.paceDeltaSecPerMile)) ||
+      (lap.vsPlanPaceLabel !== "—" && lap.phase === "work")
   );
 }
 
@@ -47,7 +65,7 @@ function SplitBar({ lap }: { lap: PhaseAwareLapRow }) {
     lap.targetPaceSecPerMile != null
       ? formatPaceTargetRangeDisplay(lap.targetPaceSecPerMile, lap.targetPaceSecPerMileHigh)
       : "OPEN";
-  const delta = formatDeltaSecPerMile(lap.paceDeltaSecPerMile);
+  const label = lapPaceLabel(lap);
   const barWidth =
     lap.paceSecPerMile != null
       ? `${Math.min(100, Math.max(18, 600 / lap.paceSecPerMile))}%`
@@ -70,7 +88,7 @@ function SplitBar({ lap }: { lap: PhaseAwareLapRow }) {
       </div>
       <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-gray-600">
         <span>Prescribed: {prescribed ?? "OPEN"}</span>
-        <span className="font-medium text-violet-900">{delta}</span>
+        <span className="font-medium text-violet-900">{label}</span>
       </div>
     </li>
   );
@@ -86,7 +104,7 @@ export default function PaceForPacePanel({
   performanceAnalysis,
 }: Props) {
   const available = hasLapPaceDeltas(performanceAnalysis);
-  const laps = performanceAnalysis?.phaseAwareLaps ?? [];
+  const laps = splitsLaps(performanceAnalysis);
 
   if (!garminDetailActivityId) {
     return (

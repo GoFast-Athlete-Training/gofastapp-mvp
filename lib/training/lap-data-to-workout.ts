@@ -60,24 +60,17 @@ function isBookendTitle(title: string): boolean {
   return t.includes("warm") || t.includes("cool");
 }
 
-function perRepDistanceMiles(seg: BaseSeg): number {
-  const dt = String(seg.durationType).toUpperCase();
-  if (dt !== "DISTANCE") return 0;
-  return seg.durationValue;
-}
-
-/** Track-style rep block: repeatCount > 1 and each rep is sub-mile. */
-function isRepeatedShortRepSegment(seg: BaseSeg): boolean {
-  const reps = Math.max(1, seg.repeatCount ?? 1);
-  if (reps <= 1) return false;
-  const perRep = perRepDistanceMiles(seg);
-  return perRep > 0 && perRep < 0.9;
-}
-
 function prescribedDistanceMiles(seg: BaseSeg): number {
   const dt = String(seg.durationType).toUpperCase();
   if (dt !== "DISTANCE") return 0;
   return seg.durationValue * Math.max(1, seg.repeatCount ?? 1);
+}
+
+/** repeatCount > 1 distance row → one Garmin lap per rep (400m or mile repeats). */
+function isRepeatedRepSegment(seg: BaseSeg): boolean {
+  const reps = Math.max(1, seg.repeatCount ?? 1);
+  if (reps <= 1) return false;
+  return String(seg.durationType).toUpperCase() === "DISTANCE";
 }
 
 /** Max mile-boundary laps for a continuous (non-rep-block) distance segment. */
@@ -120,7 +113,7 @@ function assignByStepOrderConsumption(
       continue;
     }
 
-    if (isRepeatedShortRepSegment(seg)) {
+    if (isRepeatedRepSegment(seg)) {
       const reps = Math.max(1, seg.repeatCount ?? 1);
       for (let r = 0; r < reps; r++) {
         if (lapIdx >= derived.length) break;
@@ -163,14 +156,6 @@ function assignByStepOrderConsumption(
     if (chunk.length === 0) return null;
     for (const d of chunk) {
       bySeg.get(seg.id)!.push(d);
-    }
-  }
-
-  if (lapIdx < derived.length) {
-    const lastSeg = sorted[sorted.length - 1]!;
-    while (lapIdx < derived.length) {
-      bySeg.get(lastSeg.id)!.push(derived[lapIdx]!);
-      lapIdx++;
     }
   }
 

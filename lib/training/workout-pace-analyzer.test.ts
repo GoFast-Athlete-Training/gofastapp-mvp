@@ -9,6 +9,10 @@ import {
   expandPlannedToLapPrescriptions,
   translatePlannedOntoWorkout,
 } from "./workout-pace-analyzer";
+import { secondsPerMileToSecondsPerKm } from "@/lib/workout-generator/pace-calculator";
+
+const PACE_600 = secondsPerMileToSecondsPerKm(360);
+const PACE_629 = secondsPerMileToSecondsPerKm(389);
 
 test("expands 4x400 compact row into work + recovery prescriptions", () => {
   const expanded = expandPlannedToLapPrescriptions([
@@ -35,6 +39,81 @@ test("expands 4x400 compact row into work + recovery prescriptions", () => {
   ]);
   assert.equal(expanded.filter((e) => e.kind === "work").length, 4);
   assert.equal(expanded.filter((e) => e.kind === "open").length, 4);
+});
+
+test("writes lap deltas band-aware (in range → 0)", () => {
+  const aimed = translatePlannedOntoWorkout({
+    plannedSegments: [
+      {
+        id: "work",
+        stepOrder: 1,
+        title: "Interval",
+        targets: [{ type: "PACE", valueLow: PACE_600, valueHigh: PACE_629 }],
+        paceTargetEncodingVersion: 2,
+        repeatCount: null,
+        recoveryDurationType: null,
+        recoveryDurationValue: null,
+      },
+    ],
+    workoutLaps: [
+      {
+        id: "lap1",
+        lapIndex: 0,
+        segmentId: "seg1",
+        segmentTitle: "Interval",
+        segmentStepOrder: 1,
+        avgPaceSecPerMile: 377,
+      },
+    ],
+  });
+  assert.equal(aimed[0]?.paceDeltaSecPerMile, 0);
+});
+
+test("alternates work/recovery within repeat interval segment", () => {
+  const aimed = translatePlannedOntoWorkout({
+    plannedSegments: [
+      {
+        id: "int",
+        stepOrder: 1,
+        title: "Interval",
+        targets: [{ type: "PACE", valueLow: PACE_600, valueHigh: PACE_629 }],
+        paceTargetEncodingVersion: 2,
+        repeatCount: 3,
+        recoveryDurationType: null,
+        recoveryDurationValue: null,
+      },
+    ],
+    workoutLaps: [
+      {
+        id: "lap0",
+        lapIndex: 0,
+        segmentId: "seg1",
+        segmentTitle: "Interval",
+        segmentStepOrder: 1,
+        avgPaceSecPerMile: 372,
+      },
+      {
+        id: "lap1",
+        lapIndex: 1,
+        segmentId: "seg1",
+        segmentTitle: "Interval",
+        segmentStepOrder: 1,
+        avgPaceSecPerMile: 522,
+      },
+      {
+        id: "lap2",
+        lapIndex: 2,
+        segmentId: "seg1",
+        segmentTitle: "Interval",
+        segmentStepOrder: 1,
+        avgPaceSecPerMile: 377,
+      },
+    ],
+  });
+  assert.equal(aimed[0]?.paceDeltaSecPerMile, 0);
+  assert.equal(aimed[1]?.paceDeltaSecPerMile, null);
+  assert.equal(aimed[1]?.prescribedPaceMinSecPerMile, null);
+  assert.equal(aimed[2]?.paceDeltaSecPerMile, 0);
 });
 
 test("writes lap deltas from prescribed band midpoint", () => {

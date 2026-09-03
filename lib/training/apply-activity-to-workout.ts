@@ -15,6 +15,7 @@ import { normalizeGarminMatchText } from "./garmin-activity-match-helpers";
 import { ymdFromDate } from "./plan-utils";
 import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
 import { stampPaceDeltasAfterSplits } from "./stamp-pace-deltas";
+import { requiresSegmentLevelPaceForPace } from "./workout-paced-segments";
 import { sendAppNotification } from "@/lib/app-notifications/send";
 import { stampWorkoutCompleteInbox } from "@/lib/app-notifications/stamp-workout-complete-inbox";
 import {

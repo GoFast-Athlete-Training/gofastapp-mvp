@@ -89,6 +89,25 @@ export function formatPaceTargetRangeDisplay(
   return `${aShort}–${hiShort} /mi`;
 }
 
+/**
+ * Signed sec/mi delta vs a pace band (positive = faster than band).
+ * In range → 0; faster → lo − actual; slower → −(actual − hi).
+ */
+export function computeBandPaceDelta(
+  actualSecPerMile: number | null | undefined,
+  low: number | null | undefined,
+  high: number | null | undefined
+): number | null {
+  if (actualSecPerMile == null || !Number.isFinite(actualSecPerMile)) return null;
+  const b = paceRangeBounds(low, high);
+  if (!b) return null;
+  const label = paceVsTargetLabel(actualSecPerMile, low, high);
+  if (label === "in_range") return 0;
+  if (label === "faster") return Math.round(b.lo - actualSecPerMile);
+  if (label === "slower") return -Math.round(actualSecPerMile - b.hi);
+  return null;
+}
+
 /** When only a single target pace exists (no range). */
 export function singleTargetPaceDeltaMessage(
   paceDeltaSecPerMile: number | null | undefined
