@@ -14,8 +14,7 @@ import {
 import { normalizeGarminMatchText } from "./garmin-activity-match-helpers";
 import { ymdFromDate } from "./plan-utils";
 import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
-import { requiresDetailForTargetAnalysis } from "./workout-performance-analysis";
-import { requiresSegmentLevelPaceForPace } from "./workout-paced-segments";
+import { stampPaceDeltasAfterSplits } from "./stamp-pace-deltas";
 import { sendAppNotification } from "@/lib/app-notifications/send";
 import { stampWorkoutCompleteInbox } from "@/lib/app-notifications/stamp-workout-complete-inbox";
 import {
@@ -434,21 +433,10 @@ async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<vo
       workoutId: workout.id,
     });
     if (result.ok && result.status === "ALIGNED") {
-      const typed = await prisma.workouts.findUnique({
-        where: { id: workout.id },
-        select: {
-          workoutType: true,
-          segments: {
-            select: { title: true, targets: true, paceTargetEncodingVersion: true },
-          },
-        },
+      await stampPaceDeltasAfterSplits({
+        workoutId: workout.id,
+        activityId: activity.id,
       });
-      if (
-        typed &&
-        requiresSegmentLevelPaceForPace(typed.workoutType, typed.segments)
-      ) {
-        await runPostAnalyzeMatchFollowups(activity.id);
-      }
     }
   } catch (lapErr) {
     console.warn("activity-to-segment after activity match:", lapErr);

@@ -2576,6 +2576,8 @@ model workouts {
   /// Qualifying Easy/LongRun: average HR (bpm) used as aerobic-ceiling evidence when pace was not too fast vs target.
   creditedAerobicCeilingBpm       Int?
   evaluationEligibleFlag          Boolean             @default(false)
+  /// True when Garmin lap rows were written for this workout instance.
+  splitsStamped                   Boolean             @default(false)
   /// ALIGNED | ALIGNMENT_FAILED after activity-to-segment parse
   segmentExecutionStatus          String?
   segmentExecutionLapCount        Int?

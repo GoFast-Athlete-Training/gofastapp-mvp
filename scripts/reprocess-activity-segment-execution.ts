@@ -35,6 +35,14 @@ async function main() {
       workoutId: workout.id,
     });
     console.log(JSON.stringify(result, null, 2));
+    if (result.ok && result.status === "ALIGNED") {
+      const { stampPaceDeltas } = await import("../lib/training/stamp-pace-deltas");
+      const stamp = await stampPaceDeltas({
+        workoutId: workout.id,
+        activityId: workout.garminDetailActivityId,
+      });
+      console.log(JSON.stringify({ stampPaceDeltas: stamp }, null, 2));
+    }
     process.exit(result.ok ? 0 : 1);
   }
 

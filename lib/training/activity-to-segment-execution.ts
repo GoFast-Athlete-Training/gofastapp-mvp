@@ -113,6 +113,7 @@ async function clearWorkoutSegmentExecution(
     data: {
       paceDeltaSecPerMile: null,
       evaluationEligibleFlag: false,
+      splitsStamped: false,
       segmentExecutionStatus: null,
       segmentExecutionLapCount: null,
       segmentExecutionSegmentCount: null,
@@ -176,6 +177,7 @@ async function mutateSegmentExecution(params: {
       segmentExecutionStatus: "ALIGNED",
       segmentExecutionLapCount: derived.length,
       segmentExecutionSegmentCount: workout.segments.length,
+      splitsStamped: toCreate.length > 0,
       updatedAt: new Date(),
     };
     await tx.workouts.update({

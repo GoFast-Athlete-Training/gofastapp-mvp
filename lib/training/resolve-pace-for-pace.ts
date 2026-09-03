@@ -19,10 +19,8 @@ import {
   workoutMatchCandidateUtcRange,
 } from "./workout-activity-match-candidates";
 import { RUNNING_ACTIVITY_TYPES } from "./activity-type-sets";
-import {
-  analyzeWorkoutPaceDeltas,
-  NO_DETAIL_SUPPORT_MESSAGE,
-} from "./workout-pace-analyzer";
+import { stampPaceDeltas } from "./stamp-pace-deltas";
+import { NO_DETAIL_SUPPORT_MESSAGE } from "./workout-pace-analyzer";
 
 const LOG_PREFIX = "PACE_FOR_PACE";
 
@@ -279,7 +277,7 @@ export async function resolvePaceForPace(params: {
     };
   }
 
-  const analyzeResult = await analyzeWorkoutPaceDeltas({ workoutId, activityId });
+  const analyzeResult = await stampPaceDeltas({ workoutId, activityId });
   console.log(`${LOG_PREFIX} pace analyzer`, { workoutId, activityId, analyzeResult });
 
   if (!analyzeResult.ok) {
