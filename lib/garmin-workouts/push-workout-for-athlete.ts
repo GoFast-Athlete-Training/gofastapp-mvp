@@ -7,6 +7,7 @@ import {
 import {
   scheduleFailureToGarminApiResult,
   scheduleWorkoutOnCalendar,
+  deleteGarminScheduleIfPresent,
 } from "@/lib/garmin-workouts/garmin-schedule-service";
 import { GarminNotConnectedError, requireGarminTokenFresh } from "@/lib/domain-garmin";
 import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
@@ -164,6 +165,52 @@ async function resolveGarminWorkoutIdForPush(
   }
 
   return null;
+}
+
+/** Another row already on the Garmin calendar for this athlete + calendar day. */
+async function resolveSiblingGarminScheduleId(
+  athleteId: string,
+  params: {
+    excludeWorkoutId?: string;
+    excludePlannedWorkoutId?: string;
+    planId: string | null;
+    date: Date | null;
+  }
+): Promise<number | null> {
+  if (!params.date) return null;
+
+  const dayStart = new Date(params.date);
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+
+  const dateFilter = { gte: dayStart, lt: dayEnd };
+
+  const workoutSibling = await prisma.workouts.findFirst({
+    where: {
+      athleteId,
+      ...(params.excludeWorkoutId ? { id: { not: params.excludeWorkoutId } } : {}),
+      date: dateFilter,
+      garminScheduleId: { not: null },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { garminScheduleId: true },
+  });
+  if (workoutSibling?.garminScheduleId != null) return workoutSibling.garminScheduleId;
+
+  const plannedSibling = await prisma.planned_workouts.findFirst({
+    where: {
+      athleteId,
+      ...(params.excludePlannedWorkoutId
+        ? { id: { not: params.excludePlannedWorkoutId } }
+        : {}),
+      date: dateFilter,
+      garminScheduleId: { not: null },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { garminScheduleId: true },
+  });
+  return plannedSibling?.garminScheduleId ?? null;
 }
 
 async function persistGarminPlannedPush(params: {
@@ -401,6 +448,38 @@ export async function pushPlannedWorkoutToGarminForAthlete(
           garminScheduleId,
         }),
       };
+    }
+
+    const siblingScheduleId = await resolveSiblingGarminScheduleId(athleteId, {
+      excludePlannedWorkoutId: planned.id,
+      planId: planned.planId,
+      date: planned.date,
+    });
+    if (siblingScheduleId != null) {
+      await persistGarminPlannedPush({
+        plannedWorkoutId: planned.id,
+        garminWorkoutId,
+        garminScheduleId: siblingScheduleId,
+        snapshot,
+      });
+      return {
+        ok: true,
+        garminWorkoutId,
+        garminScheduleId: siblingScheduleId,
+        scheduledDate,
+        mode: "update-library",
+        calendarState: "scheduled_on_calendar",
+      };
+    }
+
+    if (mode === "force-reschedule" && planned.garminScheduleId != null) {
+      await deleteGarminScheduleIfPresent(client, planned.garminScheduleId);
+      await persistGarminPlannedPush({
+        plannedWorkoutId: planned.id,
+        garminWorkoutId,
+        garminScheduleId: null,
+        snapshot,
+      });
     }
 
     const scheduleResult = await scheduleWorkoutOnCalendar(client, {
@@ -656,6 +735,38 @@ export async function pushWorkoutToGarminForAthlete(
           garminScheduleId,
         }),
       };
+    }
+
+    const siblingScheduleId = await resolveSiblingGarminScheduleId(athleteId, {
+      excludeWorkoutId: workout.id,
+      planId: workout.planId,
+      date: workout.date,
+    });
+    if (siblingScheduleId != null) {
+      await persistGarminWorkoutPush({
+        workoutId: workout.id,
+        garminWorkoutId,
+        garminScheduleId: siblingScheduleId,
+        snapshot,
+      });
+      return {
+        ok: true,
+        garminWorkoutId,
+        garminScheduleId: siblingScheduleId,
+        scheduledDate,
+        mode: "update-library",
+        calendarState: "scheduled_on_calendar",
+      };
+    }
+
+    if (mode === "force-reschedule" && workout.garminScheduleId != null) {
+      await deleteGarminScheduleIfPresent(client, workout.garminScheduleId);
+      await persistGarminWorkoutPush({
+        workoutId: workout.id,
+        garminWorkoutId,
+        garminScheduleId: null,
+        snapshot,
+      });
     }
 
     const scheduleResult = await scheduleWorkoutOnCalendar(client, {

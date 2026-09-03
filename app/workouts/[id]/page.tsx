@@ -14,7 +14,6 @@ import {
   ChevronDown,
   ListOrdered,
   CopyPlus,
-  CalendarPlus,
   RefreshCw,
   Watch,
 } from "lucide-react";
@@ -35,6 +34,14 @@ import {
 } from "@/lib/workout-generator/pace-calculator";
 import { PaceMiSplitEditor } from "@/components/workout/PaceMiSplitEditor";
 import { parseSplitPaceToSecPerMile, secPerMileToSplitStrings } from "@/lib/workout/pace-mi-split";
+import {
+  WHAT_PACE_PRESETS,
+  inferOffsetSecPerMileFromPace,
+  isWorkBlockEligibleForPaceOffset,
+  presetIdForWorkoutOffset,
+  shiftPaceBandSecPerMile,
+} from "@/lib/training/workout-pace-offset";
+import { defaultGarminPushModeForState, garminCalendarSyncState } from "@/lib/garmin-workouts/garmin-calendar-state";
 import { hubBackPathFromStash, readWorkoutDayNav } from "@/lib/training/workout-day-nav";
 import {
   backHrefFromGoTrainContext,
@@ -388,12 +395,6 @@ function garminBannerStatusCopy(params: {
       : "Workout is in Garmin but not on your calendar — add it so Run prompts you on your watch.";
   }
   return garminAutoPushStatusCopy(garminAutoState, scheduleLabel);
-}
-
-function garminPrimaryPushMode(params: {
-  inGarminLibraryOnly: boolean;
-}): "force-reschedule" | undefined {
-  return params.inGarminLibraryOnly ? "force-reschedule" : undefined;
 }
 
 /** Left accent for segment cards (readability, not step numbers). */
@@ -958,6 +959,7 @@ export default function WorkoutDetailPage() {
   const [conversationalPaceBySegmentId, setConversationalPaceBySegmentId] = useState<
     Record<string, boolean>
   >({});
+  const [editTitleDraft, setEditTitleDraft] = useState("");
 
   const sortedSegments = useMemo(() => {
     if (!workout?.segments?.length) return [];
@@ -1187,7 +1189,12 @@ export default function WorkoutDetailPage() {
 
     try {
       let titleForPatch = workout.title;
-      if (editDistanceMi.trim() !== "" && Number.isFinite(mi) && mi >= 0) {
+      if (
+        editTitleDraft.trim() &&
+        editTitleDraft.trim() !== (workout.title ?? "").trim()
+      ) {
+        titleForPatch = editTitleDraft.trim();
+      } else if (editDistanceMi.trim() !== "" && Number.isFinite(mi) && mi >= 0) {
         titleForPatch = formatPlannedWorkoutTitle(
           workout.workoutType,
           estimatedDistanceInMeters,
@@ -1211,13 +1218,26 @@ export default function WorkoutDetailPage() {
 
       setIsEditing(false);
       await fetchWorkout();
-      if (typeof window !== "undefined") {
-        requestAnimationFrame(() => {
-          document.getElementById("workout-garmin")?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-        });
+      if (garminConnected === true) {
+        const refreshed = await api.get<{ workout: Workout }>(
+          `/training/workout/${workoutId}`
+        );
+        const saved = refreshed.data?.workout;
+        if (saved) {
+          const mode = defaultGarminPushModeForState(
+            garminCalendarSyncState({
+              garminWorkoutId: saved.garminWorkoutId,
+              garminScheduleId: saved.garminScheduleId,
+            })
+          );
+          try {
+            await api.post(`workouts/${workoutId}/push-to-garmin`, { mode });
+            setGarminToast("Workout saved and synced to Garmin.");
+            await fetchWorkout();
+          } catch {
+            setGarminToast("Workout saved — could not sync to Garmin.");
+          }
+        }
       }
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
@@ -1292,7 +1312,45 @@ export default function WorkoutDetailPage() {
 
   const quickOverridesDirty = Object.keys(segmentOverrides).length > 0;
   const conversationalPaceDirty = Object.values(conversationalPaceBySegmentId).some(Boolean);
-  const quickEditDirty = quickOrderDirty || quickOverridesDirty || conversationalPaceDirty;
+  const titleDirty =
+    workout != null && editTitleDraft.trim() !== (workout.title ?? "").trim();
+  const quickEditDirty =
+    quickOrderDirty || quickOverridesDirty || conversationalPaceDirty || titleDirty;
+
+  const fiveKAnchorSec = useMemo(() => {
+    const paceStr = workout?.training_plans?.currentFiveKPace?.trim();
+    if (!paceStr) return null;
+    try {
+      const sec = parsePaceToSecondsPerMile(paceStr);
+      return Number.isFinite(sec) ? sec : null;
+    } catch {
+      return null;
+    }
+  }, [workout?.training_plans?.currentFiveKPace]);
+
+  useEffect(() => {
+    if (workout?.title != null) {
+      setEditTitleDraft(workout.title);
+    }
+  }, [workout?.id, workout?.title]);
+
+  const firstPaceOffsetBlockId = useMemo(() => {
+    if (fiveKAnchorSec == null) return null;
+    for (const group of segmentDisplayGroups) {
+      const seg = group.work;
+      const { low } = getPaceSecsFromSegment(seg);
+      if (
+        isWorkBlockEligibleForPaceOffset({
+          title: seg.title,
+          hasPaceTarget: low != null,
+          conversational: !!conversationalPaceBySegmentId[seg.id],
+        })
+      ) {
+        return seg.id;
+      }
+    }
+    return null;
+  }, [segmentDisplayGroups, fiveKAnchorSec, conversationalPaceBySegmentId]);
 
   const swapQuickSegment = useCallback(
     (pairIdx: number, dir: -1 | 1) => {
@@ -1389,6 +1447,49 @@ export default function WorkoutDetailPage() {
     [sortedSegments]
   );
 
+  const applyWorkBlockOffset = useCallback(
+    (segmentId: string, newOffset: number) => {
+      if (fiveKAnchorSec == null) return;
+      const seg = sortedSegments.find((s) => s.id === segmentId);
+      if (!seg) return;
+      const o = segmentOverrides[segmentId];
+      const qStr = quickPaceDisplayStrings(seg, o);
+      let lowSec: number;
+      let highSec: number;
+      try {
+        lowSec = parseSplitPaceToSecPerMile(
+          qStr.lowMin,
+          qStr.lowSec,
+          "Pace",
+          "low"
+        );
+        highSec = parseSplitPaceToSecPerMile(
+          qStr.highMin,
+          qStr.highSec,
+          "Pace",
+          "high"
+        );
+      } catch {
+        return;
+      }
+      if (!Number.isFinite(lowSec)) return;
+      if (!Number.isFinite(highSec)) highSec = lowSec;
+      const oldOffset = inferOffsetSecPerMileFromPace(lowSec, highSec, fiveKAnchorSec);
+      if (oldOffset == null) return;
+      const delta = newOffset - oldOffset;
+      const shifted = shiftPaceBandSecPerMile(lowSec, highSec, delta);
+      const lo = secPerMileToSplitStrings(shifted.low);
+      const hi = secPerMileToSplitStrings(shifted.high);
+      patchQuickSegmentOverride(segmentId, {
+        quickPaceLowMin: lo.min,
+        quickPaceLowSec: lo.sec,
+        quickPaceHighMin: hi.min,
+        quickPaceHighSec: hi.sec,
+      });
+    },
+    [fiveKAnchorSec, sortedSegments, segmentOverrides, patchQuickSegmentOverride]
+  );
+
   const saveQuickSegments = useCallback(async () => {
     if (!workout) return;
     setSavingQuick(true);
@@ -1443,21 +1544,45 @@ export default function WorkoutDetailPage() {
         return [workRow];
       });
       const payload = editableSegmentsToApiPayload(editable);
+      if (titleDirty && editTitleDraft.trim()) {
+        await api.patch(`/workouts/${workoutId}`, {
+          title: editTitleDraft.trim(),
+          description: workout.description?.trim() || null,
+          date: workoutCalendarYmd(workout.date) ?? null,
+        });
+      }
       await api.put(`/workouts/${workoutId}/segments`, payload);
       setQuickOrderIds([]);
       setSegmentOverrides({});
       setConversationalPaceBySegmentId({});
       const response = await api.get<{ workout: Workout }>(`/training/workout/${workoutId}`);
       const w = response.data?.workout;
-      if (w) setWorkout(w);
-      setGarminToast("Workout steps saved.");
-      if (typeof window !== "undefined") {
-        requestAnimationFrame(() => {
-          document.getElementById("workout-garmin")?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-        });
+      if (w) {
+        setWorkout(w);
+        setEditTitleDraft(w.title);
+      }
+      if (garminConnected === true && w) {
+        const mode = defaultGarminPushModeForState(
+          garminCalendarSyncState({
+            garminWorkoutId: w.garminWorkoutId,
+            garminScheduleId: w.garminScheduleId,
+          })
+        );
+        try {
+          await api.post(`workouts/${workoutId}/push-to-garmin`, { mode });
+          setGarminToast("Workout saved and synced to Garmin.");
+          const refresh = await api.get<{ workout: Workout }>(
+            `/training/workout/${workoutId}`
+          );
+          if (refresh.data?.workout) setWorkout(refresh.data.workout);
+        } catch (pushErr: unknown) {
+          const ax = pushErr as { response?: { data?: { error?: string } } };
+          setGarminToast(
+            ax.response?.data?.error || "Workout saved — could not sync to Garmin."
+          );
+        }
+      } else {
+        setGarminToast("Workout steps saved.");
       }
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
@@ -1471,6 +1596,9 @@ export default function WorkoutDetailPage() {
     segmentOverrides,
     conversationalPaceBySegmentId,
     workoutId,
+    titleDirty,
+    editTitleDraft,
+    garminConnected,
   ]);
 
   const fetchWorkout = async () => {
@@ -1854,11 +1982,6 @@ export default function WorkoutDetailPage() {
     scheduledOnGarmin,
     garminConnected,
   });
-  const showGarminRetryAction =
-    garminConnected === true &&
-    !scheduledOnGarmin &&
-    !isLogged &&
-    (inGarminLibraryOnly || garminAutoState === "retry");
   const showGarminHeaderCard = !isLogged;
   const dayRel = dayRelativeToToday(workout.date);
   const planName = workout.training_plans?.name?.trim();
@@ -2148,9 +2271,13 @@ export default function WorkoutDetailPage() {
               >
                 {detailEyebrow}
               </p>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">
-                {workoutListTitle(workout)}
-              </h1>
+              <input
+                type="text"
+                value={editTitleDraft}
+                onChange={(e) => setEditTitleDraft(e.target.value)}
+                className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 break-words w-full rounded-lg border border-transparent px-1 py-0.5 -mx-1 hover:border-gray-200 focus:border-orange-300 focus:ring-2 focus:ring-orange-200 focus:outline-none bg-transparent"
+                aria-label="Workout title"
+              />
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 {isLogged ? (
                   <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-900 rounded-full text-sm font-medium border border-emerald-200">
@@ -2226,34 +2353,6 @@ export default function WorkoutDetailPage() {
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {showGarminRetryAction && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    void handlePushToGarmin(
-                      garminPrimaryPushMode({ inGarminLibraryOnly })
-                    )
-                  }
-                  disabled={pushing || copyRepushing || duplicatingWorkout}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-orange-300 bg-white px-3 py-1.5 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
-                >
-                  {pushing ? (
-                    <>
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-orange-600" />
-                      {inGarminLibraryOnly ? "Adding…" : "Sending…"}
-                    </>
-                  ) : (
-                    <>
-                      {inGarminLibraryOnly ? (
-                        <CalendarPlus className="h-3.5 w-3.5" />
-                      ) : (
-                        <Watch className="h-3.5 w-3.5" />
-                      )}
-                      {inGarminLibraryOnly ? "Add to calendar" : "Send to Garmin"}
-                    </>
-                  )}
-                </button>
-              )}
               {garminConnected === true && scheduledOnGarmin && (
                 <>
                   <button
@@ -2752,6 +2851,51 @@ export default function WorkoutDetailPage() {
                 const recoveryQuickEditable = recoverySeg
                   ? mergedQuickEditable(recoverySeg, segmentOverrides[recoverySeg.id])
                   : null;
+                const showPaceOffsetControls =
+                  !isLogged &&
+                  !isEditing &&
+                  fiveKAnchorSec != null &&
+                  isWorkBlockEligibleForPaceOffset({
+                    title: segment.title,
+                    hasPaceTarget,
+                    conversational: !!conversationalPaceBySegmentId[segment.id],
+                  });
+                let blockOffsetSecPerMile: number | null = null;
+                if (showPaceOffsetControls) {
+                  try {
+                    const lowSec = parseSplitPaceToSecPerMile(
+                      qStr.lowMin,
+                      qStr.lowSec,
+                      "Pace",
+                      "low"
+                    );
+                    const highSec = parseSplitPaceToSecPerMile(
+                      qStr.highMin,
+                      qStr.highSec,
+                      "Pace",
+                      "high"
+                    );
+                    if (Number.isFinite(lowSec)) {
+                      blockOffsetSecPerMile = inferOffsetSecPerMileFromPace(
+                        lowSec,
+                        Number.isFinite(highSec) ? highSec : lowSec,
+                        fiveKAnchorSec!
+                      );
+                    }
+                  } catch {
+                    blockOffsetSecPerMile = null;
+                  }
+                }
+                const blockOffsetPreset = presetIdForWorkoutOffset(blockOffsetSecPerMile);
+                const applyOffsetToBlock = (newOffset: number) => {
+                  const ids =
+                    multiStepRepeat && group.cycleSteps
+                      ? group.cycleSteps
+                          .filter((step) => getPaceSecsFromSegment(step).low != null)
+                          .map((step) => step.id)
+                      : [segment.id];
+                  ids.forEach((id) => applyWorkBlockOffset(id, newOffset));
+                };
                 return (
                   <div
                     key={`${segment.id}:${recoverySeg?.id ?? ""}`}
@@ -2989,6 +3133,59 @@ export default function WorkoutDetailPage() {
                         segment.targets.length > 0 &&
                         !conversationalPaceBySegmentId[segment.id] && (
                         <div>
+                          {showPaceOffsetControls ? (
+                            <div className="mb-4 rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-3 space-y-3">
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                  <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600">
+                                    What pace
+                                  </label>
+                                  <select
+                                    value={blockOffsetPreset}
+                                    onChange={(e) => {
+                                      const preset = WHAT_PACE_PRESETS.find(
+                                        (p) => p.id === e.target.value
+                                      );
+                                      if (preset) applyOffsetToBlock(preset.offset);
+                                    }}
+                                    className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm bg-white"
+                                  >
+                                    {WHAT_PACE_PRESETS.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.label}
+                                      </option>
+                                    ))}
+                                    {blockOffsetPreset === "custom" ? (
+                                      <option value="custom">Custom…</option>
+                                    ) : null}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600">
+                                    5K offset
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step={1}
+                                    value={blockOffsetSecPerMile ?? ""}
+                                    onChange={(e) => {
+                                      const raw = e.target.value.trim();
+                                      if (raw === "") return;
+                                      const n = parseInt(raw, 10);
+                                      if (Number.isFinite(n)) applyOffsetToBlock(n);
+                                    }}
+                                    className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm bg-white"
+                                  />
+                                </div>
+                              </div>
+                              {segment.id === firstPaceOffsetBlockId ? (
+                                <p className="text-xs text-gray-600">
+                                  Based on your 5K already in the system. This offset applies to
+                                  every repeat of this block.
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
                           <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
                             Prescribed
                           </dt>
@@ -3124,6 +3321,7 @@ export default function WorkoutDetailPage() {
                       setQuickOrderIds([]);
                       setSegmentOverrides({});
                       setConversationalPaceBySegmentId({});
+                      setEditTitleDraft(workout?.title ?? "");
                       setQuickEditError(null);
                     }}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
