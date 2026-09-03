@@ -15,7 +15,7 @@ import { requiresDetailForTargetAnalysis } from "../training/structured-workout-
 import { tryMatchActivityToCityRun } from "../cta-triggers/try-match-activity-to-city-run";
 import { tryMatchActivityToTrainingWorkout } from "../training/match-activity-to-workout";
 import { tryMatchActivityToBikeWorkout } from "../training/match-activity-to-bike-workout";
-import { promoteUnmatchedRunningActivityToWorkout } from "../training/promote-activity-to-workout";
+import { seedSpawnedWorkoutFromActivity } from "../training/seed-spawned-workout-from-activity";
 import { extractActivityRouteFromDetail } from "../training/activity-route-from-detail";
 import { isGenericGarminActivityName } from "./generic-activity-names";
 
@@ -229,7 +229,7 @@ async function runDetailHydrationPipeline(rowId: string, detailData: object): Pr
   }
 }
 
-/** Same training/bike match + promote pipeline as activity summary ingest. */
+/** Same training/bike match + seed pipeline as activity summary ingest. */
 async function runPostIngestActivityMatching(params: {
   activityId: string;
   activityType: string | null | undefined;
@@ -246,7 +246,7 @@ async function runPostIngestActivityMatching(params: {
       select: { ingestionStatus: true },
     });
     if (!matchResult.matched && ingestRow?.ingestionStatus === "UNMATCHED") {
-      await promoteUnmatchedRunningActivityToWorkout(params.activityId);
+      await seedSpawnedWorkoutFromActivity(params.activityId);
     }
   } catch (matchErr) {
     console.warn("runPostIngestActivityMatching:", matchErr);

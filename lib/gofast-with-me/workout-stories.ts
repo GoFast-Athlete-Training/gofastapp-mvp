@@ -208,19 +208,35 @@ export async function saveWorkoutReflection(
 ): Promise<WorkoutReflectionInput> {
   const workout = await prisma.workouts.findFirst({
     where: { id: workoutId, athleteId },
-    select: { id: true },
+    select: { id: true, communityPublishedAt: true },
   });
   if (!workout) {
     throw new Error('Workout not found');
   }
 
+  const gwmHost = await prisma.gofast_with_me.findUnique({
+    where: { athleteId },
+    select: { id: true },
+  });
+
+  const data: {
+    publicTitle: string | null;
+    reflection: string | null;
+    workoutPhotoUrl: string | null;
+    communityPublishedAt?: Date;
+  } = {
+    publicTitle: input.publicTitle,
+    reflection: input.reflection,
+    workoutPhotoUrl: input.workoutPhotoUrl,
+  };
+
+  if (gwmHost) {
+    data.communityPublishedAt = workout.communityPublishedAt ?? new Date();
+  }
+
   const row = await prisma.workouts.update({
     where: { id: workoutId },
-    data: {
-      publicTitle: input.publicTitle,
-      reflection: input.reflection,
-      workoutPhotoUrl: input.workoutPhotoUrl,
-    },
+    data,
     select: {
       publicTitle: true,
       reflection: true,

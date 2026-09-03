@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendAppNotification } from "@/lib/app-notifications/send";
 import { stampWorkoutCompleteInbox } from "@/lib/app-notifications/stamp-workout-complete-inbox";
-import { promoteUnmatchedRunningActivityToWorkout } from "./promote-activity-to-workout";
 import { seedSpawnedWorkoutFromActivity } from "./seed-spawned-workout-from-activity";
 
 /** Congrats surfacing push — always opens /workouts/{id}, never /activities/{id}. */
@@ -44,7 +43,7 @@ export async function sendFinishWorkoutSurfacingPush(params: {
 
 /**
  * Resolve or seed a spawned workout for a finished run and send surfacing push when
- * applyActivityToWorkout did not already notify (unmatched / promoted / forced seed).
+ * applyActivityToWorkout did not already notify (unmatched / forced seed).
  */
 export async function surfaceFinishedRunningActivity(params: {
   activityId: string;
@@ -72,16 +71,6 @@ export async function surfaceFinishedRunningActivity(params: {
       athleteId: params.athleteId,
       workoutId: linked.id,
       workoutTitle: linked.title,
-    });
-    return { workoutId, pushSent: true };
-  }
-
-  const promoteResult = await promoteUnmatchedRunningActivityToWorkout(params.activityId);
-  if (promoteResult.promoted && promoteResult.workoutId) {
-    workoutId = promoteResult.workoutId;
-    await sendFinishWorkoutSurfacingPush({
-      athleteId: params.athleteId,
-      workoutId: promoteResult.workoutId,
     });
     return { workoutId, pushSent: true };
   }

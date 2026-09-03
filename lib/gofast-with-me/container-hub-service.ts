@@ -7,7 +7,7 @@ import {
   getPublicPlanBySlug,
   listPublicPlansForAthlete,
 } from '@/lib/training/public-plan-service';
-import { effectiveTrainingWeekCount } from '@/lib/training/plan-utils';
+import { currentTrainingWeekNumber, effectiveTrainingWeekCount } from '@/lib/training/plan-utils';
 import type { PublicPlanWeek } from '@/lib/training/public-plan-service';
 import {
   athleteCommunityRelationship,
@@ -93,6 +93,7 @@ export type ContainerHubPayload = {
     slug: string;
     name: string;
     totalWeeks: number;
+    currentWeekNumber: number;
     weeks: PublicPlanWeek[];
     /** False when owner-only preview of an unpublished active plan. */
     isPublic: boolean;
@@ -198,6 +199,7 @@ async function buildPlanStripFromTrainingPlan(plan: {
     slug: plan.publicSlug?.trim() || plan.id,
     name: plan.name,
     totalWeeks: effectiveWeeks,
+    currentWeekNumber: currentTrainingWeekNumber(plan.startDate, effectiveWeeks),
     weeks,
     isPublic: plan.publicVisibility === PublicTrainingPlanVisibility.PUBLIC,
     raceRegistryId,

@@ -8,7 +8,7 @@ import {
 } from "./match-activity-to-workout";
 import { scoreActivityCandidateForWorkout } from "./workout-activity-match-candidates";
 import { activityMatchCandidateUtcRange } from "./garmin-activity-match-helpers";
-import { isPlausiblePlannedWorkoutNearby } from "./promote-activity-to-workout";
+import { isPlausiblePlannedWorkoutNearby } from "./plausible-planned-workout-nearby";
 
 test("isManualMatchOnlyWorkout is true for plan-linked workouts", () => {
   assert.equal(isManualMatchOnlyWorkout({ planId: "plan-1" }), true);

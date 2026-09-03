@@ -15,6 +15,7 @@ import type { PlanDayCard } from "@/lib/training/fetch-plan-week-client";
 type Props = {
   weeks: PublicPlanWeek[];
   totalWeeks: number;
+  initialWeekNumber?: number;
   ctaHref?: string;
   ctaLabel?: string;
 };
@@ -44,10 +45,12 @@ function toPlanDayCard(day: PublicPlanWeek["days"][number]): PlanDayCard {
 export default function PublicPlanWeekViewer({
   weeks,
   totalWeeks,
+  initialWeekNumber = 1,
   ctaHref = "/welcome",
   ctaLabel = "Start this plan in GoFast",
 }: Props) {
-  const [weekNumber, setWeekNumber] = useState(1);
+  const clampedInitial = Math.max(1, Math.min(totalWeeks, initialWeekNumber));
+  const [weekNumber, setWeekNumber] = useState(clampedInitial);
   const week = useMemo(
     () => weeks.find((w) => w.weekNumber === weekNumber) ?? weeks[0] ?? null,
     [weekNumber, weeks]

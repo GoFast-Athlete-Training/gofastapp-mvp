@@ -9,7 +9,6 @@ import { activityExists } from './dedupe';
 import { normalizeActivityFields } from './normalizeActivityFields';
 import { tryMatchActivityToTrainingWorkout } from '../training/match-activity-to-workout';
 import { tryMatchActivityToCityRun } from '../cta-triggers/try-match-activity-to-city-run';
-import { promoteUnmatchedRunningActivityToWorkout } from '../training/promote-activity-to-workout';
 import { tryMatchActivityToBikeWorkout } from '../training/match-activity-to-bike-workout';
 import { isCyclingActivityType } from '../training/activity-type-sets';
 import { surfaceFinishedRunningActivity } from '../training/finish-workout-surfacing-push';
@@ -137,17 +136,6 @@ export async function handleActivitySummary(
           await tryMatchActivityToBikeWorkout(created.id);
         } else {
           matchResult = await tryMatchActivityToTrainingWorkout(created.id);
-
-          const ingestRow = await prisma.athlete_activities.findUnique({
-            where: { id: created.id },
-            select: { ingestionStatus: true },
-          });
-          if (!matchResult.matched && ingestRow?.ingestionStatus === 'UNMATCHED') {
-            const promoteResult = await promoteUnmatchedRunningActivityToWorkout(created.id);
-            if (promoteResult.promoted && promoteResult.workoutId) {
-              matchResult = { matched: true, workoutId: promoteResult.workoutId };
-            }
-          }
         }
         await tryMatchActivityToCityRun(created.id).catch((cityRunErr) => {
           console.warn('tryMatchActivityToCityRun:', cityRunErr);

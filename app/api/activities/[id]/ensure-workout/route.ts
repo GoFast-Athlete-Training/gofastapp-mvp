@@ -3,13 +3,13 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
-import { promoteUnmatchedRunningActivityToWorkout } from '@/lib/training/promote-activity-to-workout';
-import { mapPromoteToEnsureWorkout } from '@/lib/training/ensure-activity-workout';
+import { mapSeedToEnsureWorkout } from '@/lib/training/ensure-activity-workout';
+import { seedSpawnedWorkoutFromActivity } from '@/lib/training/seed-spawned-workout-from-activity';
 
 /**
  * POST /api/activities/[id]/ensure-workout
  * Owner-only: attach or create a workouts row for a recorded activity so
- * community title / reflection / photo have a workoutId to write to.
+ * reflection saves have a workoutId to write to.
  */
 export async function POST(
   request: NextRequest,
@@ -35,13 +35,12 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Activity not found' }, { status: 404 });
     }
 
-    const promoted = await promoteUnmatchedRunningActivityToWorkout(activity.id);
-    const mapped = mapPromoteToEnsureWorkout(promoted);
+    const seeded = await seedSpawnedWorkoutFromActivity(activity.id);
+    const mapped = mapSeedToEnsureWorkout(seeded);
     if (!mapped.ok) {
-      const status = mapped.reason === 'blocked_by_planned_workout' ? 409 : 422;
       return NextResponse.json(
         { success: false, error: mapped.message, reason: mapped.reason },
-        { status }
+        { status: 422 }
       );
     }
 

@@ -21,18 +21,6 @@ function shouldShowPlanStrip(
   return opts.isOwner && !opts.previewFollower;
 }
 
-function planWeekProgress(
-  startIso: string,
-  totalWeeks: number
-): { week: number; total: number } | null {
-  if (!totalWeeks || totalWeeks <= 0) return null;
-  const start = new Date(startIso);
-  const now = new Date();
-  const weeksIn = Math.floor((now.getTime() - start.getTime()) / (7 * 86_400_000));
-  const week = Math.max(1, Math.min(totalWeeks, weeksIn + 1));
-  return { week, total: totalWeeks };
-}
-
 export default function AthleteCommunityMyTrainingSection({
   community,
   firstName,
@@ -54,10 +42,7 @@ export default function AthleteCommunityMyTrainingSection({
       ? 'Publish your plan in studio'
       : `${firstName} hasn't shared a plan yet`;
 
-  const initialPlanWeek =
-    summary?.startDate && summary.totalWeeks
-      ? planWeekProgress(summary.startDate, summary.totalWeeks)?.week ?? 1
-      : 1;
+  const initialPlanWeek = planStrip?.currentWeekNumber ?? 1;
 
   return (
     <section className="h-full rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">

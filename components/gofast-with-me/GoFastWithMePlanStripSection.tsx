@@ -38,6 +38,7 @@ export default function GoFastWithMePlanStripSection({
       <PublicPlanWeekViewer
         weeks={publishedPlan.weeks}
         totalWeeks={publishedPlan.totalWeeks}
+        initialWeekNumber={publishedPlan.currentWeekNumber}
         ctaHref={`/plans/${encodeURIComponent(publishedPlan.slug)}`}
         ctaLabel="View full plan"
       />
