@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getAthleteById } from '@/lib/domain-athlete';
-import { draftAthleteTipFromAbout } from '@/lib/gofast-with-me/draft-athlete-tip';
+import { draftAthleteTipFromAbout, MAX_ABOUT } from '@/lib/gofast-with-me/draft-athlete-tip';
 
 async function requireOwnedAthlete(request: Request, athleteId: string) {
   const authHeader = request.headers.get('authorization');
@@ -47,7 +47,7 @@ export async function POST(
     if (!about) {
       return NextResponse.json({ success: false, error: 'about is required' }, { status: 400 });
     }
-    if (about.length > 2000) {
+    if (about.length > MAX_ABOUT) {
       return NextResponse.json({ success: false, error: 'about too long' }, { status: 400 });
     }
 
@@ -59,7 +59,13 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({ success: true, title: draft.title, body: draft.body });
+    return NextResponse.json({
+      success: true,
+      title: draft.title,
+      body: draft.body,
+      takeaway: draft.takeaway,
+      tipSeries: draft.tipSeries,
+    });
   } catch (e) {
     console.error('athlete/tips/draft POST:', e);
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });

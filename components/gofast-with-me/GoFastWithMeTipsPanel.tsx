@@ -117,12 +117,16 @@ export default function GoFastWithMeTipsPanel({ athleteId, liveUrl }: Props) {
     try {
       const res = await api.post(`/athlete/${athleteId}/tips/draft`, { about: aboutSeed.trim() });
       if (res.data?.title && res.data?.body) {
+        const tipSeries = res.data.tipSeries as { title?: string | null; tips?: AthleteTipSeriesItem[] } | null;
         setDraft((prev) => ({
           ...prev,
           title: String(res.data.title),
           body: String(res.data.body),
+          takeaway: res.data.takeaway ? String(res.data.takeaway) : '',
+          seriesTitle: tipSeries?.title ? String(tipSeries.title) : '',
+          seriesItems: Array.isArray(tipSeries?.tips) ? tipSeries.tips : [],
         }));
-        setSuccess('Draft ready — edit and choose where to publish.');
+        setSuccess('Draft ready — review fields below, then choose where to publish.');
       } else {
         throw new Error(res.data?.error || 'Could not draft tip.');
       }
@@ -266,7 +270,8 @@ export default function GoFastWithMeTipsPanel({ athleteId, liveUrl }: Props) {
               Write with AI
             </span>
             <p className="mt-2 text-xs text-gray-600">
-              Start with &ldquo;I&apos;m thinking of a tip about…&rdquo; — we draft title and body.
+              Paste a rough idea or a structured tip — AI fills title, Big Idea, takeaway, and series
+              items.
             </p>
           </button>
           <button
@@ -314,15 +319,15 @@ export default function GoFastWithMeTipsPanel({ athleteId, liveUrl }: Props) {
           {composeMode === 'ai' ? (
             <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/40 p-4">
               <label className="block text-xs font-semibold text-gray-700">
-                I&apos;m thinking of a tip about…
+                Rough idea or structured tip…
               </label>
               <textarea
                 value={aboutSeed}
                 onChange={(e) => setAboutSeed(e.target.value)}
-                rows={2}
-                maxLength={2000}
-                className="w-full rounded-lg border border-gray-300 p-3 text-sm bg-white"
-                placeholder="Staying healthy during marathon prep — sleep, fuel, and easy days"
+                rows={6}
+                maxLength={8000}
+                className="w-full rounded-lg border border-gray-300 p-3 text-sm bg-white font-mono text-[13px]"
+                placeholder={`Rough idea: staying healthy during marathon prep\n\nOr paste structured content with Title, The Big Idea, The Takeaway, Tip Series, and numbered items.`}
               />
               <button
                 type="button"
