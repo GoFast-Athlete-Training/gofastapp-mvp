@@ -2470,6 +2470,10 @@ model planned_workouts {
   garminScheduleId          Int?
   segmentSnapshotJson       Json?
   prescriptionNarrative     String?
+  /// Execution pointer — workouts.id string, not a Prisma FK. Set on Garmin bolt-on.
+  workoutId                 String?
+  /// Home/agenda read: true when ingest linked a completed workout to this planned day.
+  workoutCompleted          Boolean             @default(false)
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
   Athlete                   Athlete?            @relation(fields: [athleteId], references: [id], onDelete: Cascade)
@@ -2618,6 +2622,10 @@ model workouts {
   /// Athlete acknowledged reminder in app inbox
   appnotificationReminderDeliveredAt  DateTime?
   appnotificationReminderLastError    String?
+  /// Workout complete congrats — surfaced in app inbox after Garmin match/finish
+  appnotificationCompleteSentAt       DateTime?
+  /// Athlete acknowledged complete congrats in app inbox
+  appnotificationCompleteDeliveredAt  DateTime?
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
   Athlete                   Athlete?            @relation(fields: [athleteId], references: [id], onDelete: Cascade)

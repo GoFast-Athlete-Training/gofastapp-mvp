@@ -4,6 +4,7 @@ import type { PlanDayCard } from "./fetch-plan-week-client";
 import {
   detailIdForHydrated,
   hydratePlanButSwapIfExecuted,
+  isPlanDayExecuted,
   matchTargetIdForHydrated,
   prescribeIdForHydrated,
 } from "./hydrate-plan-day";
@@ -12,6 +13,7 @@ function day(partial: Partial<PlanDayCard> & Pick<PlanDayCard, "dateKey">): Plan
   return {
     plannedWorkoutId: null,
     workoutId: null,
+    workoutCompleted: false,
     date: partial.dateKey,
     title: "Easy Run",
     workoutType: "Easy",
@@ -45,6 +47,7 @@ test("executed — same-id spawn (workouts.id = planned_workouts.id)", () => {
       dateKey: "2026-03-14",
       plannedWorkoutId: "plan-1",
       workoutId: "plan-1",
+      workoutCompleted: true,
       garminDetailActivityId: "act-1",
     })
   );
@@ -63,6 +66,7 @@ test("executed — legacy FK spawn (different instance id)", () => {
       dateKey: "2026-03-14",
       plannedWorkoutId: "plan-1",
       workoutId: "inst-1",
+      workoutCompleted: true,
       garminDetailActivityId: "act-1",
     })
   );
@@ -71,6 +75,23 @@ test("executed — legacy FK spawn (different instance id)", () => {
   if (result.kind === "executed") {
     assert.equal(result.workoutId, "inst-1");
     assert.equal(result.plannedWorkoutId, "plan-1");
+  }
+});
+
+test("executed — ingest stamp without actuals on card", () => {
+  const result = hydratePlanButSwapIfExecuted(
+    day({
+      dateKey: "2026-03-14",
+      plannedWorkoutId: "plan-1",
+      workoutId: "inst-1",
+      workoutCompleted: true,
+    })
+  );
+  assert.ok(result);
+  assert.equal(result.kind, "executed");
+  if (result.kind === "executed") {
+    assert.equal(result.workoutId, "inst-1");
+    assert.equal(isPlanDayExecuted(result.day), true);
   }
 });
 
@@ -87,7 +108,12 @@ test("match and detail ids follow kind", () => {
   assert.equal(prescribeIdForHydrated(planned), "plan-1");
 
   const executed = hydratePlanButSwapIfExecuted(
-    day({ dateKey: "2026-03-14", plannedWorkoutId: "plan-1", workoutId: "inst-1" })
+    day({
+      dateKey: "2026-03-14",
+      plannedWorkoutId: "plan-1",
+      workoutId: "inst-1",
+      workoutCompleted: true,
+    })
   )!;
   assert.equal(matchTargetIdForHydrated(executed), "inst-1");
   assert.equal(detailIdForHydrated(executed), "inst-1");

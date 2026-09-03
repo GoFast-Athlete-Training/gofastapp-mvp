@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   canAutoMatchPlannedWorkout,
+  canSameDaySingleRunBolt,
   isManualMatchOnlyWorkout,
   selectPlannedWorkoutCandidate,
 } from "./match-activity-to-workout";
@@ -180,6 +181,36 @@ test("activityMatchCandidateUtcRange spans three UTC days around activity local 
   const range = activityMatchCandidateUtcRange("2026-06-17");
   assert.equal(range.start.toISOString(), "2026-06-16T00:00:00.000Z");
   assert.equal(range.end.toISOString(), "2026-06-19T00:00:00.000Z");
+});
+
+test("canSameDaySingleRunBolt allows sole unconsumed same-day planned row", () => {
+  assert.equal(
+    canSameDaySingleRunBolt({
+      planCandidates: [{ workoutType: "Easy", workoutCompleted: false }],
+    }),
+    true
+  );
+});
+
+test("canSameDaySingleRunBolt rejects multiple same-day planned rows", () => {
+  assert.equal(
+    canSameDaySingleRunBolt({
+      planCandidates: [
+        { workoutType: "Easy", workoutCompleted: false },
+        { workoutType: "Intervals", workoutCompleted: false },
+      ],
+    }),
+    false
+  );
+});
+
+test("canSameDaySingleRunBolt rejects already completed planned row", () => {
+  assert.equal(
+    canSameDaySingleRunBolt({
+      planCandidates: [{ workoutType: "Easy", workoutCompleted: true }],
+    }),
+    false
+  );
 });
 
 test("isPlausiblePlannedWorkoutNearby blocks promotion for same-day planned candidate", () => {

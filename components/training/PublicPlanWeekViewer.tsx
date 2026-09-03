@@ -33,6 +33,7 @@ function toPlanDayCard(day: PublicPlanWeek["days"][number]): PlanDayCard {
     garminDetailActivityId: null,
     skippedAt: null,
     skipReason: null,
+    workoutCompleted: false,
     actualDistanceMeters: null,
     actualAvgPaceSecPerMile: null,
     actualAverageHeartRate: null,

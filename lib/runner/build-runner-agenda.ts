@@ -1,5 +1,3 @@
-import { workoutHasActuals } from "@/lib/training/workout-has-actuals";
-
 export type RunnerPlannedWorkoutPreview = {
   id: string;
   title: string;
@@ -17,6 +15,7 @@ export type RunnerPlannedWorkoutPreview = {
 export type RunnerPlanSession = {
   plannedWorkoutId: string | null;
   workoutId: string | null;
+  workoutCompleted: boolean;
   dateKey: string;
   title: string;
   workoutType: string;

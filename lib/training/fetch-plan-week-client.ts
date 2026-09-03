@@ -10,6 +10,7 @@ export type { WeekPerformanceSnapshot };
 export type PlanDayCard = {
   plannedWorkoutId: string | null;
   workoutId: string | null;
+  workoutCompleted: boolean;
   dateKey: string;
   date: string;
   title: string;

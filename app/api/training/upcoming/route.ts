@@ -151,7 +151,8 @@ export async function GET(request: NextRequest) {
           const todayCard = cards.find((c) => c.dateKey === todayKey);
           workoutTodayDone = Boolean(
             todayCard &&
-              (workoutHasActuals(todayCard) ||
+              (todayCard.workoutCompleted ||
+                workoutHasActuals(todayCard) ||
                 (todayCard.workoutId != null && todayCard.skippedAt != null))
           );
         }

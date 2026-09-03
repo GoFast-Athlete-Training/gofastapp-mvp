@@ -11,8 +11,10 @@ import { mergePlanDayTitle } from "./workout-display-title";
 export type PlanDayCard = {
   /** Planned prescribe row id (canonical calendar key). */
   plannedWorkoutId: string | null;
-  /** Spawned instance id when the athlete has run / opened post-match detail. */
+  /** Execution workouts.id — stamped on planned_workouts or spawned instance. */
   workoutId: string | null;
+  /** Stamped on planned_workouts when ingest bolted a completed workout. */
+  workoutCompleted: boolean;
   dateKey: string;
   date: string;
   title: string;
@@ -98,13 +100,17 @@ export async function buildPlanWeekCards(params: {
   });
 
   const plannedIds = materializedPlanned.map((p) => p.id);
+  const stampedWorkoutIds = materializedPlanned
+    .map((p) => p.workoutId)
+    .filter((id): id is string => Boolean(id));
+  const instanceLookupIds = [...new Set([...plannedIds, ...stampedWorkoutIds])];
   const spawnedInstances =
-    plannedIds.length > 0
+    instanceLookupIds.length > 0
       ? await prisma.workouts.findMany({
           where: {
             athleteId: params.athleteId,
             OR: [
-              { id: { in: plannedIds } },
+              { id: { in: instanceLookupIds } },
               { plannedWorkoutId: { in: plannedIds } },
             ],
           },
@@ -113,7 +119,9 @@ export async function buildPlanWeekCards(params: {
       : [];
 
   const instanceByPlannedId = new Map<string, (typeof spawnedInstances)[number]>();
+  const instanceById = new Map<string, (typeof spawnedInstances)[number]>();
   for (const inst of spawnedInstances) {
+    instanceById.set(inst.id, inst);
     let plannedKey: string | null = null;
     if (plannedIds.includes(inst.id)) {
       plannedKey = inst.id;
@@ -136,6 +144,13 @@ export async function buildPlanWeekCards(params: {
   return scheduled.map((s) => {
     const planned = byDateKey.get(s.dateKey);
     const instance = planned ? instanceByPlannedId.get(planned.id) : undefined;
+    const stampedWorkoutId = planned?.workoutId ?? null;
+    const workoutCompleted = planned?.workoutCompleted ?? false;
+    const executionWorkoutId =
+      stampedWorkoutId ?? instance?.id ?? null;
+    const executionInstance =
+      (stampedWorkoutId ? instanceById.get(stampedWorkoutId) : undefined) ??
+      instance;
     const workoutType = planned?.workoutType ?? instance?.workoutType ?? s.workoutType;
     const estimatedDistanceInMeters =
       planned?.estimatedDistanceInMeters ??
@@ -143,7 +158,8 @@ export async function buildPlanWeekCards(params: {
       s.estimatedDistanceInMeters;
     return {
       plannedWorkoutId: planned?.id ?? null,
-      workoutId: instance?.id ?? null,
+      workoutId: executionWorkoutId,
+      workoutCompleted,
       dateKey: s.dateKey,
       date: s.dateKey,
       title: mergePlanDayTitle({
@@ -158,13 +174,13 @@ export async function buildPlanWeekCards(params: {
       phase: s.phase,
       dayAssigned: s.dayAssigned,
       estimatedDistanceInMeters,
-      garminDetailActivityId: instance?.garminDetailActivityId ?? null,
-      skippedAt: instance?.skippedAt?.toISOString() ?? null,
-      skipReason: instance?.skipReason ?? null,
-      actualDistanceMeters: instance?.actualDistanceMeters ?? null,
-      actualAvgPaceSecPerMile: instance?.actualAvgPaceSecPerMile ?? null,
-      actualAverageHeartRate: instance?.actualAverageHeartRate ?? null,
-      actualDurationSeconds: instance?.actualDurationSeconds ?? null,
+      garminDetailActivityId: executionInstance?.garminDetailActivityId ?? null,
+      skippedAt: executionInstance?.skippedAt?.toISOString() ?? null,
+      skipReason: executionInstance?.skipReason ?? null,
+      actualDistanceMeters: executionInstance?.actualDistanceMeters ?? null,
+      actualAvgPaceSecPerMile: executionInstance?.actualAvgPaceSecPerMile ?? null,
+      actualAverageHeartRate: executionInstance?.actualAverageHeartRate ?? null,
+      actualDurationSeconds: executionInstance?.actualDurationSeconds ?? null,
     };
   });
 }

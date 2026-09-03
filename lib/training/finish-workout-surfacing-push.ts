@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendAppNotification } from "@/lib/app-notifications/send";
+import { stampWorkoutCompleteInbox } from "@/lib/app-notifications/stamp-workout-complete-inbox";
 import { promoteUnmatchedRunningActivityToWorkout } from "./promote-activity-to-workout";
 import { seedSpawnedWorkoutFromActivity } from "./seed-spawned-workout-from-activity";
 
@@ -37,6 +38,8 @@ export async function sendFinishWorkoutSurfacingPush(params: {
   } catch (err) {
     console.error("finish_workout_surfacing push:", err);
   }
+
+  await stampWorkoutCompleteInbox(params.workoutId);
 }
 
 /**

@@ -59,8 +59,8 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
       const dist =
         typeof distanceMi === 'string' && distanceMi.trim() ? ` (${distanceMi.trim()})` : '';
       const type =
-        typeof workoutType === 'string' && workoutType.trim() ? ` ${workoutType.trim()}` : '';
-      return `Please verify${type} ${title}${dist} is correct in GoFast, then send it to your Garmin watch.`;
+        typeof workoutType === 'string' && workoutType.trim() ? `${workoutType.trim()} ` : '';
+      return `Your ${type}${title}${dist} is on your plan for tomorrow — GoFast syncs it to your Garmin watch automatically. Tap to preview.`;
     },
   },
   'scheduledRun.tomorrow': {

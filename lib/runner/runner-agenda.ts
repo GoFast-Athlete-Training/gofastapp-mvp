@@ -6,7 +6,7 @@ import {
 } from '@/lib/city-run-clock';
 import { hasSocialRunLifecycle } from '@/lib/city-run-type';
 import { buildPlanWeekCards, type PlanDayCard } from '@/lib/training/plan-week-cards';
-import { workoutHasActuals } from '@/lib/training/workout-has-actuals';
+import { planDayIsCompleted } from '@/lib/training/workout-has-actuals';
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -233,7 +233,7 @@ export async function fetchRunnerAgendaForAthlete(
     });
 
     for (const card of weekCards) {
-      if (card.dateKey < todayKey && !workoutHasActuals(card)) continue;
+      if (card.dateKey < todayKey && !planDayIsCompleted(card)) continue;
       if (card.workoutType === 'Rest') continue;
 
       const stamp = card.plannedWorkoutId
@@ -243,6 +243,7 @@ export async function fetchRunnerAgendaForAthlete(
       planSessions.push({
         plannedWorkoutId: card.plannedWorkoutId,
         workoutId: card.workoutId,
+        workoutCompleted: card.workoutCompleted,
         dateKey: card.dateKey,
         title: card.title,
         workoutType: card.workoutType,
@@ -286,6 +287,7 @@ export async function fetchRunnerAgendaForAthlete(
         planSessions.push({
           plannedWorkoutId: card.plannedWorkoutId,
           workoutId: card.workoutId,
+          workoutCompleted: card.workoutCompleted,
           dateKey: card.dateKey,
           title: card.title,
           workoutType: card.workoutType,
@@ -315,6 +317,7 @@ export async function fetchRunnerAgendaForAthlete(
     planSessions.push({
       plannedWorkoutId: stamp.id,
       workoutId: null,
+      workoutCompleted: false,
       dateKey,
       title: stamp.title,
       workoutType: String(stamp.workoutType),

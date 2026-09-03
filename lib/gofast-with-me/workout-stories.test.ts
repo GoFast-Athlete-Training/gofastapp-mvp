@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  normalizeWorkoutReflectionInput,
   normalizeWorkoutStoryInput,
+  validateWorkoutReflectionInput,
   validateWorkoutStoryInput,
 } from './workout-stories';
 
@@ -24,4 +26,16 @@ test('normalizeWorkoutStoryInput trims and caps fields', () => {
   assert.equal(input.reflection, 'Felt honest');
   assert.equal(input.howFeltRating, 3);
   assert.equal(input.publish, true);
+});
+
+test('normalizeWorkoutReflectionInput omits publish and howFelt fields', () => {
+  const input = normalizeWorkoutReflectionInput({
+    publicTitle: ' Sunrise miles ',
+    reflection: ' Legs felt heavy ',
+    workoutPhotoUrl: ' https://cdn.example/photo.jpg ',
+  });
+  assert.equal(input.publicTitle, 'Sunrise miles');
+  assert.equal(input.reflection, 'Legs felt heavy');
+  assert.equal(input.workoutPhotoUrl, 'https://cdn.example/photo.jpg');
+  assert.equal(validateWorkoutReflectionInput(input), null);
 });

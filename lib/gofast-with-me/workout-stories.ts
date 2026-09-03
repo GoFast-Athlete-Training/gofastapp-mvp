@@ -152,10 +152,87 @@ export function normalizeWorkoutStoryInput(input: unknown): {
 export function validateWorkoutStoryInput(
   input: ReturnType<typeof normalizeWorkoutStoryInput>
 ): string | null {
+  return validateWorkoutReflectionInput(input);
+}
+
+export type WorkoutReflectionInput = {
+  publicTitle: string | null;
+  reflection: string | null;
+  workoutPhotoUrl: string | null;
+};
+
+export function normalizeWorkoutReflectionInput(input: unknown): WorkoutReflectionInput {
+  const body = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+  const titleRaw = typeof body.publicTitle === 'string' ? body.publicTitle.trim() : '';
+  const publicTitle = titleRaw.length > 0 ? titleRaw.slice(0, MAX_TITLE) : null;
+  const reflectionRaw = typeof body.reflection === 'string' ? body.reflection.trim() : '';
+  const reflection = reflectionRaw.length > 0 ? reflectionRaw.slice(0, MAX_REFLECTION) : null;
+  const workoutPhotoUrl =
+    typeof body.workoutPhotoUrl === 'string' && body.workoutPhotoUrl.trim()
+      ? body.workoutPhotoUrl.trim()
+      : null;
+  return { publicTitle, reflection, workoutPhotoUrl };
+}
+
+export function validateWorkoutReflectionInput(input: WorkoutReflectionInput): string | null {
   if (!input.publicTitle && !input.reflection && !input.workoutPhotoUrl) {
     return 'Add a title, reflection, or photo to share this workout';
   }
   return null;
+}
+
+export async function getWorkoutReflectionForOwner(
+  athleteId: string,
+  workoutId: string
+): Promise<WorkoutReflectionInput | null> {
+  const row = await prisma.workouts.findFirst({
+    where: { id: workoutId, athleteId },
+    select: {
+      publicTitle: true,
+      reflection: true,
+      workoutPhotoUrl: true,
+    },
+  });
+  if (!row) return null;
+  return {
+    publicTitle: row.publicTitle?.trim() || null,
+    reflection: row.reflection?.trim() || null,
+    workoutPhotoUrl: row.workoutPhotoUrl?.trim() || null,
+  };
+}
+
+export async function saveWorkoutReflection(
+  athleteId: string,
+  workoutId: string,
+  input: WorkoutReflectionInput
+): Promise<WorkoutReflectionInput> {
+  const workout = await prisma.workouts.findFirst({
+    where: { id: workoutId, athleteId },
+    select: { id: true },
+  });
+  if (!workout) {
+    throw new Error('Workout not found');
+  }
+
+  const row = await prisma.workouts.update({
+    where: { id: workoutId },
+    data: {
+      publicTitle: input.publicTitle,
+      reflection: input.reflection,
+      workoutPhotoUrl: input.workoutPhotoUrl,
+    },
+    select: {
+      publicTitle: true,
+      reflection: true,
+      workoutPhotoUrl: true,
+    },
+  });
+
+  return {
+    publicTitle: row.publicTitle?.trim() || null,
+    reflection: row.reflection?.trim() || null,
+    workoutPhotoUrl: row.workoutPhotoUrl?.trim() || null,
+  };
 }
 
 export async function upsertWorkoutCommunityStory(

@@ -17,6 +17,11 @@ import { parseActivityToSegmentExecution } from "./activity-to-segment-execution
 import { requiresDetailForTargetAnalysis } from "./workout-performance-analysis";
 import { requiresSegmentLevelPaceForPace } from "./workout-paced-segments";
 import { sendAppNotification } from "@/lib/app-notifications/send";
+import { stampWorkoutCompleteInbox } from "@/lib/app-notifications/stamp-workout-complete-inbox";
+import {
+  clearPlannedWorkoutCompletion,
+  stampPlannedWorkoutCompletion,
+} from "./stamp-planned-workout-completion";
 /** Max sec/mi faster than prescribed easy pace before we skip aerobic HR credit (target − actual). */
 export const EASY_LONG_RUN_MAX_FAST_DRIFT_SEC_PER_MILE = 15;
 
@@ -533,6 +538,8 @@ export async function applyActivityToWorkout(params: {
     console.error("workout_complete push:", err);
   }
 
+  await stampWorkoutCompleteInbox(workout.id);
+
   try {
     await syncActivityDetailToLinkedWorkout(activity.id);
   } catch (detailErr) {
@@ -546,6 +553,8 @@ export async function applyActivityToWorkout(params: {
   if (!deferFollowupsToSegmentAnalyze) {
     await applyMatchCreditsFromWorkoutRow({ workout, activity });
   }
+
+  await stampPlannedWorkoutCompletion(workout.id);
 
   return { workoutId: workout.id };
 }
@@ -602,6 +611,8 @@ export async function clearActivityFromWorkout(params: {
     where: { id: previousActivityId, athleteId: params.athleteId },
     data: { ingestionStatus: "UNMATCHED" },
   });
+
+  await clearPlannedWorkoutCompletion(workout.id);
 
   return { cleared: true, previousActivityId };
 }

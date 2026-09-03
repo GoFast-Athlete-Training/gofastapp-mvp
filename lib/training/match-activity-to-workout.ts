@@ -27,6 +27,9 @@ import {
   plannedDayConsumedByOtherActivity,
   reassignActivityToPlannedWorkout,
 } from "./match-planned-workout";
+import {
+  stampPlannedWorkoutCompletion,
+} from "./stamp-planned-workout-completion";
 
 export {
   computeMatchedWorkoutPaceCredits,
@@ -234,6 +237,21 @@ export function selectPlannedWorkoutCandidate(params: {
 }
 
 /**
+ * Single unconsumed same-day run bolts onto the sole planned row even when
+ * title/distance do not match (e.g. 7.7 mi completes a 4 mi Easy day).
+ * Two or more same-day planned rows stay unmatched.
+ */
+export function canSameDaySingleRunBolt(params: {
+  planCandidates: Array<{ workoutType: string; workoutCompleted?: boolean }>;
+}): boolean {
+  if (params.planCandidates.length !== 1) return false;
+  const sole = params.planCandidates[0]!;
+  if (sole.workoutType === "Rest") return false;
+  if (sole.workoutCompleted) return false;
+  return true;
+}
+
+/**
  * Match activity to at most one workout; planned workouts auto-link only when high-confidence.
  */
 export async function tryMatchActivityToTrainingWorkout(
@@ -272,6 +290,7 @@ export async function tryMatchActivityToTrainingWorkout(
     if (activity.ingestionStatus !== "MATCHED") {
       await setIngestion("MATCHED");
     }
+    await stampPlannedWorkoutCompletion(alreadyLinked.id);
     logGarminWorkoutMatchAttempt({
       activityId: athleteActivityId,
       plannedWorkoutId: alreadyLinked.id,
@@ -293,6 +312,7 @@ export async function tryMatchActivityToTrainingWorkout(
   let standaloneCandidate: WorkoutMatchRow | null = null;
   let precomputedScored: ScoredActivityCandidate | null = null;
   let precomputedTitleMatchCount = 0;
+  let sameDaySingleRunBolt = false;
 
   if (garminWorkoutId != null) {
     plannedCandidate = await prisma.planned_workouts.findFirst({
@@ -347,6 +367,23 @@ export async function tryMatchActivityToTrainingWorkout(
     plannedCandidate = selected.candidate;
     precomputedScored = selected.scored;
     precomputedTitleMatchCount = selected.titleMatchCount;
+
+    if (
+      !plannedCandidate &&
+      canSameDaySingleRunBolt({ planCandidates }) &&
+      planCandidates.length === 1
+    ) {
+      const sole = planCandidates[0]!;
+      if (
+        !(await plannedDayConsumedByOtherActivity({
+          plannedWorkoutId: sole.id,
+          activityId: activity.id,
+        }))
+      ) {
+        plannedCandidate = sole;
+        sameDaySingleRunBolt = true;
+      }
+    }
   }
 
   if (!plannedCandidate && !standaloneCandidate) {
@@ -406,7 +443,9 @@ export async function tryMatchActivityToTrainingWorkout(
         }),
       });
 
-    const autoMatchEligible = canAutoMatchPlannedWorkout({ scored, titleMatchCount });
+    const autoMatchEligible =
+      sameDaySingleRunBolt ||
+      canAutoMatchPlannedWorkout({ scored, titleMatchCount });
 
     if (autoMatchEligible && scored) {
       const existingLink = await prisma.workouts.findFirst({

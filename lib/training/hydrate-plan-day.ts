@@ -7,6 +7,7 @@
  */
 
 import type { PlanDayCard } from "./fetch-plan-week-client";
+import { planDayIsCompleted } from "./workout-has-actuals";
 
 export type HydratedPlanDay =
   | {
@@ -21,10 +22,9 @@ export type HydratedPlanDay =
       workoutId: string;
     };
 
-/** Instance exists for this plan day (same-id or legacy FK row on the card). */
+/** Plan day has a bolted completed workout (ingest stamp or legacy actuals). */
 export function isPlanDayExecuted(day: PlanDayCard): boolean {
-  if (!day.plannedWorkoutId) return day.workoutId != null;
-  return day.workoutId != null;
+  return planDayIsCompleted(day);
 }
 
 /**
@@ -39,7 +39,7 @@ export function hydratePlanButSwapIfExecuted(
       kind: "executed",
       day,
       plannedWorkoutId: day.plannedWorkoutId,
-      workoutId: day.workoutId!,
+      workoutId: day.workoutId ?? day.plannedWorkoutId,
     };
   }
   if (day.plannedWorkoutId) {
