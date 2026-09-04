@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, Copy, DollarSign, Route, Users } from 'lucide-react';
+import { Calendar, DollarSign, Route, Users } from 'lucide-react';
 import api from '@/lib/api';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 import { STUDIO_COMMUNITY_LABEL } from '@/components/gofast-with-me/studio-sections';
@@ -27,26 +27,10 @@ export default function GoFastWithMeDashboardHome({
   onOpenMembers,
   onOpenWorkouts,
 }: Props) {
-  const [inviteCopied, setInviteCopied] = useState(false);
   const [nextRun, setNextRun] = useState<ContainerHubPayload['upcomingRuns'][number] | null>(null);
   const [runsLoading, setRunsLoading] = useState(true);
 
   const memberCount = metrics.followerCount ?? 0;
-
-  const inviteUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}${metrics.invitePath}`
-      : metrics.invitePath;
-
-  const copyInvite = async () => {
-    try {
-      await navigator.clipboard.writeText(inviteUrl);
-      setInviteCopied(true);
-      setTimeout(() => setInviteCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
-  };
 
   const loadNextRun = useCallback(async () => {
     setRunsLoading(true);
@@ -71,28 +55,13 @@ export default function GoFastWithMeDashboardHome({
     <div className="space-y-4 max-w-3xl pb-8">
       <div>
         <h2 className="text-lg font-bold text-gray-900">{STUDIO_COMMUNITY_LABEL}</h2>
-        <p className="text-sm text-gray-600 mt-0.5">Your community home — invite, roster, and next run.</p>
-      </div>
-
-      <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 space-y-3">
-        <div>
-          <h3 className="text-sm font-bold text-gray-900">Invite link</h3>
-          <p className="text-xs text-gray-600 mt-0.5">Copy and share so people can follow you.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void copyInvite()}
-            className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
-          >
-            <Copy className="h-4 w-4 shrink-0" aria-hidden />
-            {inviteCopied ? 'Link copied' : 'Copy invite link'}
-          </button>
-        </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-sm text-gray-600 mt-0.5">
+          Your community home — roster and next hosted run. Share from the header.
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
           Headline: <strong className="text-gray-700">{visitorHeadline}</strong>
         </p>
-      </section>
+      </div>
 
       <section className="rounded-xl border border-gray-200 bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -150,8 +119,8 @@ export default function GoFastWithMeDashboardHome({
               <Route className="h-5 w-5" aria-hidden />
             </div>
             <div>
-              <p className="text-sm font-semibold text-gray-900">Next join-me run</p>
-              <p className="text-xs text-gray-600 mt-0.5">Your next upcoming hosted GoRun.</p>
+              <p className="text-sm font-semibold text-gray-900">Next hosted run</p>
+              <p className="text-xs text-gray-600 mt-0.5">Your next upcoming join-me GoRun.</p>
             </div>
           </div>
           {onOpenWorkouts ? (
@@ -160,7 +129,7 @@ export default function GoFastWithMeDashboardHome({
               onClick={onOpenWorkouts}
               className="text-sm font-semibold text-orange-600 hover:text-orange-700"
             >
-              Runs & Training →
+              Runs →
             </button>
           ) : null}
         </div>
@@ -187,7 +156,7 @@ export default function GoFastWithMeDashboardHome({
           </Link>
         ) : (
           <p className="text-sm text-gray-600 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4">
-            No upcoming hosted run. Pick a plan day in Runs & Training to invite followers.
+            No upcoming hosted run. Pick a plan day in Runs to invite followers.
           </p>
         )}
       </section>

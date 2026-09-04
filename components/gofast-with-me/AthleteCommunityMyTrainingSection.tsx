@@ -85,7 +85,7 @@ export default function AthleteCommunityMyTrainingSection({
         <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4">
           <p className="text-sm text-gray-600">
             {displayAsOwner
-              ? 'Publish your plan in Runs & Training so followers can train week-by-week with you.'
+              ? 'Publish your plan in Training so followers can train week-by-week with you.'
               : `${firstName} hasn't shared a public plan yet.`}
           </p>
           {displayAsOwner ? (

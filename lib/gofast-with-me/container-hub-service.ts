@@ -46,7 +46,10 @@ import type {
   GoFastWithMeTrainingFor,
   GoFastWithMeTrainingSummary,
 } from '@/lib/gofast-with-me/training-for-types';
-import { parseAthleteRaceMainSnap } from '@/lib/training/plan-race-snapshots';
+import {
+  listAttendedClubRunsForHost,
+  type AttendedClubRunPayload,
+} from '@/lib/gofast-with-me/attended-club-runs';
 
 export type ContainerHubMessage = MappedContainerMessage;
 export type { GoFastWithMeChasingGoal, GoFastWithMeTrainingFor, GoFastWithMeTrainingSummary };
@@ -112,6 +115,7 @@ export type ContainerHubPayload = {
   workoutStories: WorkoutStoryPayload[];
   activityPosts: ActivityPostPayload[];
   recentActivities: RecentAthleteActivityPayload[];
+  attendedClubRuns: AttendedClubRunPayload[];
 };
 
 export type AthleteCommunityPayload = ContainerHubPayload & {
@@ -323,6 +327,7 @@ export async function loadAthleteCommunityForHost(
     workoutStories,
     activityPosts,
     recentActivities,
+    attendedClubRuns,
   ] =
     await Promise.all([
     prisma.gofast_container_memberships.findMany({
@@ -358,6 +363,7 @@ export async function loadAthleteCommunityForHost(
     listPublishedWorkoutStories(host.id, 20),
     listPublishedActivityPosts(host.id, 20),
     listRecentAthleteActivities(host.id, 5),
+    listAttendedClubRunsForHost(host.id, 20),
   ]);
 
   return {
@@ -397,6 +403,7 @@ export async function loadAthleteCommunityForHost(
     workoutStories,
     activityPosts,
     recentActivities,
+    attendedClubRuns,
   };
 }
 

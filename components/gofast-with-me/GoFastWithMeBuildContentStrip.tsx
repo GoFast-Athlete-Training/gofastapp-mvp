@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, CalendarDays, MapPin, PenLine } from 'lucide-react';
+import { BookOpen, PenLine } from 'lucide-react';
 import type { ContentEditorFocus, StudioSection } from '@/components/gofast-with-me/studio-sections';
 
 export type StudioContentSurface = 'landing' | 'community';
@@ -14,15 +14,13 @@ type Props = {
 const BUILD_CONTENT_ICONS = {
   'Daily log': PenLine,
   Tip: BookOpen,
-  Route: MapPin,
-  'Run / training': CalendarDays,
 } as const;
 
 function buildContentActions(surface: StudioContentSurface) {
   const feedHint =
     surface === 'landing'
       ? 'Shows as a recent highlight on your public page.'
-      : 'Shows in the follower feed.';
+      : 'Shows in the member feed.';
 
   return [
     {
@@ -35,26 +33,9 @@ function buildContentActions(surface: StudioContentSurface) {
       description:
         surface === 'landing'
           ? 'Evergreen training thoughts — can appear as a highlight on your page.'
-          : 'Evergreen training thoughts — followers can revisit from your feed.',
+          : 'Evergreen training thoughts — followers revisit from your tips rail.',
       section: 'content' as const,
       focus: 'tip' as const,
-    },
-    {
-      title: 'Route' as const,
-      description:
-        surface === 'landing'
-          ? 'Share a route — can surface on your public page.'
-          : 'Share a route — followers see it in your community.',
-      section: 'content' as const,
-      focus: 'route' as const,
-    },
-    {
-      title: 'Run / training' as const,
-      description:
-        surface === 'landing'
-          ? 'Your plan or workout — highlighted for visitors on your page.'
-          : 'Your plan or workout — followers follow along in the feed.',
-      section: 'workouts' as const,
     },
   ] as const;
 }
@@ -71,7 +52,7 @@ export default function GoFastWithMeBuildContentStrip({
       <div>
         <h3 className="text-sm font-bold text-gray-900">Build content</h3>
         <p className="text-xs text-gray-600 mt-0.5">
-          Same content pool — {surface === 'landing' ? 'Landing' : 'Community'} shows it differently.
+          Story, daily log, and tips — runs and training live under Runs and Training.
         </p>
       </div>
       <div className="grid gap-2">

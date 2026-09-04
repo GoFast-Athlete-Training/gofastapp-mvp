@@ -108,7 +108,7 @@ export default function AthleteCommunityDurableChrome({
         ) : (
           <p className="text-sm text-gray-500">
             {displayAsOwner
-              ? 'Publish your plan in Runs & Training so followers can train week-by-week with you.'
+              ? 'Publish your plan in Training so followers can train week-by-week with you.'
               : `${firstName} hasn't shared a public plan yet.`}
           </p>
         )}

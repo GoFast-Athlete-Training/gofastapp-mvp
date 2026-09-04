@@ -83,7 +83,7 @@ export default function AthleteCommunityProfilePanel({
             <h2 className="text-lg font-bold text-gray-900">My Training</h2>
             <p className="text-sm text-gray-600 mt-2">
               {displayAsOwner
-                ? 'Publish your plan in Runs & Training so followers can train with you here.'
+                ? 'Publish your plan in Training so followers can train with you here.'
                 : `${firstName} hasn't shared a public plan yet.`}
             </p>
             {displayAsOwner ? (

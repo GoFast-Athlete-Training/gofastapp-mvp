@@ -18,8 +18,8 @@ export type StudioPayoutsView = 'payouts';
 /** All routable studio views. */
 export type StudioView = StudioChromeView | StudioPayoutsView | StudioSection;
 
-/** Scroll target inside Tips & routes workspace. */
-export type ContentEditorFocus = 'tip' | 'route';
+/** Scroll target inside Tips workspace or Runs/Training split. */
+export type ContentEditorFocus = 'tip' | 'route' | 'runs' | 'training';
 
 export const STUDIO_MY_STORY_LABEL = 'My Story';
 
@@ -47,12 +47,22 @@ export const STUDIO_CENTRAL_LABEL = STUDIO_COMMUNITY_LABEL;
 export const STUDIO_NAV_LABELS: Record<StudioSection, string> = {
   page: STUDIO_MY_STORY_LABEL,
   community: 'Daily log',
-  workouts: 'Runs & Training',
+  workouts: 'Runs',
   content: 'Tips',
   announcements: 'Announcements',
   chatter: 'Chatter',
   members: 'Members',
 };
+
+export const STUDIO_RUNS_TRAINING_NAV_ORDER: Array<{
+  section: StudioSection;
+  label: string;
+  focus?: ContentEditorFocus;
+}> = [
+  { section: 'workouts', label: 'Runs', focus: 'runs' },
+  { section: 'workouts', label: 'Training', focus: 'training' },
+  { section: 'content', label: 'Routes', focus: 'route' },
+];
 
 export const STUDIO_BUILD_NAV_ORDER: Array<{
   section: StudioBuildSection;
@@ -61,8 +71,6 @@ export const STUDIO_BUILD_NAV_ORDER: Array<{
 }> = [
   { section: 'community', label: 'Daily log' },
   { section: 'content', label: 'Tips', focus: 'tip' },
-  { section: 'content', label: 'Routes', focus: 'route' },
-  { section: 'workouts', label: 'Runs & Training' },
 ];
 
 export const STUDIO_MANAGE_NAV_ORDER: Array<{ section: StudioManageSection; label: string }> = [
@@ -78,7 +86,7 @@ export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
 export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
   page: 'Photo, welcome, and about — your public who-am-I page',
   community: 'How you feel today — posts spill into the member feed',
-  workouts: 'Host a joinable run first — plan sharing is optional',
+  workouts: 'Host join-me runs followers can RSVP to',
   content: 'Durable tips — nutrition, training thoughts, and what followers revisit',
   announcements: 'Journey updates followers see in your community feed',
   chatter: 'Follower conversation — review and moderate from studio',

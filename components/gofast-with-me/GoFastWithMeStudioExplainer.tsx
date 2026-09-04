@@ -2,22 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { Layout, Users, X, type LucideIcon } from 'lucide-react';
-import {
-  STUDIO_CHROME_LABELS,
-  STUDIO_COMMUNITY_LABEL,
-  STUDIO_LANDING_LABEL,
-  type StudioChromeView,
-} from '@/components/gofast-with-me/studio-sections';
+import { STUDIO_COMMUNITY_LABEL } from '@/components/gofast-with-me/studio-sections';
 import {
   fetchStudioTutorial,
   STUDIO_TUTORIAL_FALLBACK,
   type StudioTutorialPayload,
 } from '@/lib/gofast-with-me/studio-tutorial';
 
-const CHROME_ICONS: Record<StudioChromeView, LucideIcon> = {
-  landingView: Layout,
-  communityHome: Users,
-};
 
 type Props = {
   onDismiss: () => void;
@@ -67,34 +58,29 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
         <ul className="space-y-2">
           <TutorialRow
             icon={Layout}
-            label="Header: Landing | Community"
-            description={`Flip between ${STUDIO_LANDING_LABEL} (public door) and ${STUDIO_COMMUNITY_LABEL} (home with invite, members, and your next run).`}
+            label="Header: Landing · Hub · Share"
+            description="See Landing Page, preview the member hub, and copy your invite link — always in the top-right."
           />
           <TutorialRow
             icon={Users}
-            label="Build on the left"
-            description="My Story, daily log, tips, routes, and Runs & Training — where you create content."
+            label="Runs and Training first"
+            description="Runs, Training, and Routes — host join-me runs and publish your plan before you build content."
+          />
+          <TutorialRow
+            icon={Users}
+            label="Build content"
+            description="My Story, daily log, and tips — writing for your landing page and member feed."
           />
           <TutorialRow
             icon={Users}
             label="Manage on the left"
             description="Announcements, chatter, and your member roster."
           />
-          {(['landingView', 'communityHome'] as StudioChromeView[]).map((view) => {
-            const Icon = CHROME_ICONS[view];
-            const description =
-              view === 'landingView'
-                ? `${STUDIO_LANDING_LABEL} — preview your public page. Edit in My Story.`
-                : `${STUDIO_COMMUNITY_LABEL} — home with invite link, members, sponsors, and next join-me run.`;
-            return (
-              <TutorialRow
-                key={view}
-                icon={Icon}
-                label={STUDIO_CHROME_LABELS[view]}
-                description={description}
-              />
-            );
-          })}
+          <TutorialRow
+            icon={Users}
+            label={STUDIO_COMMUNITY_LABEL}
+            description="Community home — members, sponsors, and your next hosted run."
+          />
         </ul>
       )}
 

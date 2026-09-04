@@ -5,97 +5,102 @@ import { ArrowLeft } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
 import {
   STUDIO_BUILD_NAV_ORDER,
-  STUDIO_CHROME_LABELS,
   STUDIO_MANAGE_NAV_ORDER,
   STUDIO_MY_STORY_LABEL,
-  isStudioChromeView,
+  STUDIO_RUNS_TRAINING_NAV_ORDER,
   type ContentEditorFocus,
-  type StudioChromeView,
   type StudioSection,
   type StudioView,
 } from '@/components/gofast-with-me/studio-sections';
+
+export type StudioChromeActions = {
+  landingUrl: string;
+  hubPreviewUrl: string;
+  inviteUrl: string;
+  onShare: () => void;
+  shareLabel?: string;
+};
 
 type Props = {
   activeView: StudioView;
   contentFocus?: ContentEditorFocus | null;
   onViewChange: (view: StudioView, options?: { contentFocus?: ContentEditorFocus }) => void;
   landingNeedsAction?: boolean;
+  chromeActions?: StudioChromeActions;
   children: React.ReactNode;
 };
 
-function isBuildNavActive(
+function isNavItemActive(
   activeView: StudioView,
   contentFocus: ContentEditorFocus | null | undefined,
   section: StudioSection,
   focus?: ContentEditorFocus
 ): boolean {
   if (activeView !== section) return false;
-  if (section === 'content') return (contentFocus ?? 'tip') === (focus ?? 'tip');
+  if (section === 'content') {
+    return (contentFocus ?? 'tip') === (focus ?? 'tip');
+  }
+  if (section === 'workouts') {
+    return (contentFocus ?? 'runs') === (focus ?? 'runs');
+  }
   return true;
 }
-
-const CHROME_VIEWS: StudioChromeView[] = ['landingView', 'communityHome'];
 
 export default function GoFastWithMeStudioAppShell({
   activeView,
   contentFocus,
   onViewChange,
   landingNeedsAction,
+  chromeActions,
   children,
 }: Props) {
-  const chromeActive = isStudioChromeView(activeView);
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-            <div>
-              <p className="text-lg font-bold text-gray-900">My Community</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Build on the left — flip Landing or Community in the header.
-              </p>
-            </div>
-            <div
-              className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 self-start"
-              role="tablist"
-              aria-label="View"
-            >
-              {CHROME_VIEWS.map((view) => {
-                const active = activeView === view;
-                const needsAction = view === 'landingView' && landingNeedsAction;
-                return (
-                  <button
-                    key={view}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => onViewChange(view)}
-                    className={`relative inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                      active
-                        ? 'bg-white text-orange-900 shadow-sm'
-                        : chromeActive
-                          ? 'text-gray-600 hover:text-gray-900'
-                          : 'text-gray-500 hover:text-gray-800'
-                    }`}
-                  >
-                    {STUDIO_CHROME_LABELS[view]}
-                    {needsAction ? (
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="min-w-0">
+            <p className="text-lg font-bold text-gray-900">My Community</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Runs and training first — build content below.
+            </p>
           </div>
-          <Link
-            href="/athlete-home"
-            className="inline-flex items-center gap-1.5 self-start rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 sm:self-auto"
-          >
-            <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Back
-          </Link>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            {chromeActions ? (
+              <>
+                <Link
+                  href={chromeActions.landingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                >
+                  See Landing Page
+                </Link>
+                <Link
+                  href={chromeActions.hubPreviewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                >
+                  See Hub as Member
+                </Link>
+                <button
+                  type="button"
+                  onClick={chromeActions.onShare}
+                  className="inline-flex rounded-lg bg-orange-600 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-700"
+                >
+                  {chromeActions.shareLabel ?? 'Share link'}
+                </button>
+              </>
+            ) : null}
+            <Link
+              href="/athlete-home"
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Back
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -113,14 +118,32 @@ export default function GoFastWithMeStudioAppShell({
 
             <div>
               <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                Build
+                Runs and Training
+              </p>
+              <div className="space-y-0.5">
+                {STUDIO_RUNS_TRAINING_NAV_ORDER.map((item) => (
+                  <SidebarButton
+                    key={`rt-${item.section}-${item.focus ?? 'default'}`}
+                    label={item.label}
+                    active={isNavItemActive(activeView, contentFocus, item.section, item.focus)}
+                    onClick={() =>
+                      onViewChange(item.section, item.focus ? { contentFocus: item.focus } : undefined)
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                Build content
               </p>
               <div className="space-y-0.5">
                 {STUDIO_BUILD_NAV_ORDER.map((item) => (
                   <SidebarButton
                     key={`${item.section}-${item.focus ?? 'default'}`}
                     label={item.label}
-                    active={isBuildNavActive(activeView, contentFocus, item.section, item.focus)}
+                    active={isNavItemActive(activeView, contentFocus, item.section, item.focus)}
                     onClick={() =>
                       onViewChange(item.section, item.focus ? { contentFocus: item.focus } : undefined)
                     }
@@ -159,11 +182,21 @@ export default function GoFastWithMeStudioAppShell({
                 onClick={() => onViewChange('page')}
                 badge={landingNeedsAction}
               />
+              {STUDIO_RUNS_TRAINING_NAV_ORDER.map((item) => (
+                <MobileNavPill
+                  key={`m-rt-${item.section}-${item.focus ?? 'default'}`}
+                  label={item.label}
+                  active={isNavItemActive(activeView, contentFocus, item.section, item.focus)}
+                  onClick={() =>
+                    onViewChange(item.section, item.focus ? { contentFocus: item.focus } : undefined)
+                  }
+                />
+              ))}
               {STUDIO_BUILD_NAV_ORDER.map((item) => (
                 <MobileNavPill
                   key={`m-${item.section}-${item.focus ?? 'default'}`}
                   label={item.label}
-                  active={isBuildNavActive(activeView, contentFocus, item.section, item.focus)}
+                  active={isNavItemActive(activeView, contentFocus, item.section, item.focus)}
                   onClick={() =>
                     onViewChange(item.section, item.focus ? { contentFocus: item.focus } : undefined)
                   }

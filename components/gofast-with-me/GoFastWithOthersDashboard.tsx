@@ -18,7 +18,8 @@ import GoFastWithMeAnnouncementsPanel from "@/components/gofast-with-me/GoFastWi
 import GoFastWithMeChatterPanel from "@/components/gofast-with-me/GoFastWithMeChatterPanel";
 import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
 import GoFastWithMePayoutsPanel from "@/components/gofast-with-me/GoFastWithMePayoutsPanel";
-import GoFastWithMeWorkoutsPanel from "@/components/gofast-with-me/GoFastWithMeWorkoutsPanel";
+import GoFastWithMeRunsStudioPanel from "@/components/gofast-with-me/GoFastWithMeRunsStudioPanel";
+import GoFastWithMeTrainingStudioPanel from "@/components/gofast-with-me/GoFastWithMeTrainingStudioPanel";
 import GoFastWithMeTipsPanel from "@/components/gofast-with-me/GoFastWithMeTipsPanel";
 import GoFastWithMeRoutesPanel from "@/components/gofast-with-me/GoFastWithMeRoutesPanel";
 import GoFastWithMeDashboardHome, {
@@ -40,6 +41,7 @@ import {
   type StudioView,
 } from "@/components/gofast-with-me/studio-sections";
 import { runnerPublicLandingUrl } from "@/lib/gofast-with-me/runner-public-url";
+import { athleteCommunityPreviewPath } from "@/lib/gofast-with-me/athlete-community-routes";
 
 type OwnerGwmRow = {
   welcome: string | null;
@@ -97,6 +99,7 @@ export default function GoFastWithOthersDashboard() {
   const [followerCount, setFollowerCount] = useState<number | null>(null);
   const [shareHubStatus, setShareHubStatus] = useState<ShareHubStatus | null>(null);
   const [introDismissed, setIntroDismissed] = useState(() => readStudioIntroDismissed());
+  const [shareCopied, setShareCopied] = useState(false);
 
   const landingValues = ownerRowToLanding(ownerGwm);
   const isWelcomeComplete = isWelcomeContentComplete(landingValues);
@@ -106,6 +109,8 @@ export default function GoFastWithOthersDashboard() {
     setActiveView(section);
     if (section === 'content') {
       setContentFocus(focus ?? 'tip');
+    } else if (section === 'workouts') {
+      setContentFocus(focus ?? 'runs');
     } else {
       setContentFocus(null);
     }
@@ -116,6 +121,8 @@ export default function GoFastWithOthersDashboard() {
       setActiveView(view);
       if (view === 'content') {
         setContentFocus(options?.contentFocus ?? 'tip');
+      } else if (view === 'workouts') {
+        setContentFocus(options?.contentFocus ?? 'runs');
       } else {
         setContentFocus(null);
       }
@@ -302,12 +309,42 @@ export default function GoFastWithOthersDashboard() {
     );
   }
 
+  const shellSlug = publicSlug ?? gofastHandle;
+  const shellLiveUrl = shellSlug ? runnerPublicLandingUrl(shellSlug) : '';
+  const shellInvitePath = shellSlug ? goFastWithFrontDoorPath(shellSlug) : '';
+
+  const copyInviteLink = async () => {
+    if (!shellInvitePath) return;
+    const inviteUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}${shellInvitePath}`
+        : shellInvitePath;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const studioShell = (content: React.ReactNode) => (
     <GoFastWithMeStudioAppShell
       activeView={activeView}
       contentFocus={contentFocus}
       onViewChange={handleViewChange}
       landingNeedsAction={!isWelcomeComplete}
+      chromeActions={
+        shellSlug
+          ? {
+              landingUrl: shellLiveUrl,
+              hubPreviewUrl: athleteCommunityPreviewPath(shellSlug),
+              inviteUrl: shellInvitePath,
+              onShare: () => void copyInviteLink(),
+              shareLabel: shareCopied ? 'Copied!' : 'Share link',
+            }
+          : undefined
+      }
     >
       <div className="px-4 sm:px-6 py-6 max-w-6xl mx-auto">{content}</div>
     </GoFastWithMeStudioAppShell>
@@ -350,8 +387,8 @@ export default function GoFastWithOthersDashboard() {
     );
   }
 
-  const liveUrl = runnerPublicLandingUrl(publicSlug);
-  const invitePath = goFastWithFrontDoorPath(publicSlug);
+  const liveUrl = shellLiveUrl;
+  const invitePath = shellInvitePath;
   const visitorHeadline = firstName ? `GoFast with ${firstName}` : "Your public page";
 
   const dashboardMetrics: DashboardMetrics = {
@@ -382,7 +419,7 @@ export default function GoFastWithOthersDashboard() {
             metrics={dashboardMetrics}
             visitorHeadline={visitorHeadline}
             onOpenMembers={() => openWorkspace('members')}
-            onOpenWorkouts={() => openWorkspace('workouts')}
+            onOpenWorkouts={() => openWorkspace('workouts', 'runs')}
           />
         </div>
       );
@@ -430,14 +467,20 @@ export default function GoFastWithOthersDashboard() {
           />
         );
       case "workouts":
-        return (
-          <GoFastWithMeWorkoutsPanel
-            athleteId={athleteId}
+        return contentFocus === 'training' ? (
+          <GoFastWithMeTrainingStudioPanel
             publicSlug={publicSlug}
             firstName={firstName}
             plan={shareHubStatus?.plan ?? null}
             planLoading={shareHubStatus == null}
+            planRefreshing={false}
             onRefreshPlanStatus={refreshShareHubStatus}
+          />
+        ) : (
+          <GoFastWithMeRunsStudioPanel
+            athleteId={athleteId}
+            publicSlug={publicSlug}
+            plan={shareHubStatus?.plan ?? null}
           />
         );
       case "content":

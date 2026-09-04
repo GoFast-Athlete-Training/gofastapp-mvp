@@ -18,7 +18,7 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'My Community is your studio. Use the header to flip between Landing (public door) and Community (home). Build with My Story, daily log, tips, routes, and Runs & Training. Manage announcements, chatter, and your member roster from the left nav.',
+    'My Community is your studio. Use the header to see your landing page, preview the member hub, and share your invite link. Runs and Training come first — then build content (story, daily log, tips). Manage announcements, chatter, and members from the left nav.',
   steps: [
     {
       id: 'page',
@@ -28,25 +28,39 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
       sortOrder: 0,
     },
     {
-      id: 'community',
-      title: 'Daily log — community feed',
+      id: 'workouts-runs',
+      title: 'Runs — join-me runs',
       instruction:
-        'Post how you feel today — updates spill into the member feed.',
+        'Pick a plan day and invite followers to a hosted GoRun.',
       sortOrder: 1,
     },
     {
-      id: 'workouts',
-      title: 'Runs & Training — join-me runs',
+      id: 'workouts-training',
+      title: 'Training — publish your plan',
       instruction:
-        'Pick a plan day and invite followers to a hosted GoRun.',
+        'Share your active plan so followers can train week-by-week with you.',
       sortOrder: 2,
     },
     {
-      id: 'content',
-      title: 'Tips & routes — durable content',
+      id: 'content-routes',
+      title: 'Routes — favorite runs',
       instruction:
-        'Nutrition, training thoughts, and routes followers revisit.',
+        'Routes followers browse alongside your hosted runs.',
       sortOrder: 3,
+    },
+    {
+      id: 'community',
+      title: 'Daily log — member feed',
+      instruction:
+        'Post how you feel today — updates spill into the member feed.',
+      sortOrder: 4,
+    },
+    {
+      id: 'content',
+      title: 'Tips — durable content',
+      instruction:
+        'Nutrition and training thoughts followers revisit on the tips rail.',
+      sortOrder: 5,
     },
   ],
 };
