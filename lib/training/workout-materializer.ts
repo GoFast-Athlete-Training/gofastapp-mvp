@@ -349,6 +349,7 @@ export async function materializeWorkoutForPlanDay(params: {
       id: true,
       catalogueWorkoutId: true,
       estimatedDistanceInMeters: true,
+      workoutPushed: true,
       _count: { select: { segments: true } },
     },
   });
