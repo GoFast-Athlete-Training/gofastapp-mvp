@@ -1,7 +1,11 @@
 import { Prisma, PublicTrainingPlanVisibility } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
-import { loadPublicAthletePage, normalizeHandle } from '@/lib/server/load-public-athlete-page';
+import {
+  loadPublicAthletePage,
+  normalizeHandle,
+  type PublicAthletePayload,
+} from '@/lib/server/load-public-athlete-page';
 import {
   computeAllPublicPlanWeeks,
   getPublicPlanBySlug,
@@ -85,14 +89,7 @@ export type ContainerHubPayload = {
     gofastHandle: string | null;
     joinedAt: string;
   }[];
-  upcomingRuns: {
-    id: string;
-    title: string;
-    date: string;
-    citySlug: string;
-    meetUpPoint: string;
-    gorunPath: string;
-  }[];
+  upcomingRuns: NonNullable<PublicAthletePayload>['upcomingRuns'];
   publishedPlan: {
     slug: string;
     name: string;
