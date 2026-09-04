@@ -2,11 +2,13 @@ import type { WorkoutPreviewSegment } from '@/lib/training/workout-segment-previ
 
 export type InvitePaceEase = 'easier' | 'keep' | 'quicker';
 
-const PACE_EASE_DELTA: Record<InvitePaceEase, number> = {
+export const PACE_OFFSET_PRESETS: Record<InvitePaceEase, number> = {
   easier: 15,
   keep: 0,
   quicker: -15,
 };
+
+const PACE_EASE_DELTA = PACE_OFFSET_PRESETS;
 
 const METERS_PER_MILE = 1609.34;
 
@@ -60,19 +62,36 @@ function adjustSegmentTargets(
   });
 }
 
+export function applyPaceOffsetDeltaToSegments(
+  baselineSegments: WorkoutPreviewSegment[],
+  deltaSecPerMile: number
+): WorkoutPreviewSegment[] {
+  if (!Number.isFinite(deltaSecPerMile) || deltaSecPerMile === 0) {
+    return baselineSegments.map((s) => ({
+      ...s,
+      targets: s.targets ? s.targets.map((t) => ({ ...t })) : s.targets,
+    }));
+  }
+  return baselineSegments.map((seg) => ({
+    ...seg,
+    targets: adjustSegmentTargets(seg.targets, deltaSecPerMile),
+  }));
+}
+
 export function applyPaceEaseToSegments(
   segments: WorkoutPreviewSegment[],
   baselineSegments: WorkoutPreviewSegment[],
   paceEase: InvitePaceEase
 ): WorkoutPreviewSegment[] {
-  const delta = PACE_EASE_DELTA[paceEase];
-  if (delta === 0) {
-    return baselineSegments.map((s) => ({ ...s, targets: s.targets ? [...s.targets] : s.targets }));
+  return applyPaceOffsetDeltaToSegments(baselineSegments, PACE_EASE_DELTA[paceEase]);
+}
+
+export function presetForPaceOffset(deltaSecPerMile: number): InvitePaceEase | null {
+  if (!Number.isFinite(deltaSecPerMile)) return null;
+  for (const [preset, value] of Object.entries(PACE_OFFSET_PRESETS) as [InvitePaceEase, number][]) {
+    if (deltaSecPerMile === value) return preset;
   }
-  return baselineSegments.map((seg) => ({
-    ...seg,
-    targets: adjustSegmentTargets(seg.targets, delta),
-  }));
+  return null;
 }
 
 export function scaleSegmentDistances(

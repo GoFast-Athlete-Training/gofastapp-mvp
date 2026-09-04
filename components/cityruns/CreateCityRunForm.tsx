@@ -32,9 +32,11 @@ import {
 } from "@/lib/parse-google-address";
 import { formatCalendarDate } from "@/lib/calendar-date";
 import {
-  applyPaceEaseToSegments,
+  applyPaceOffsetDeltaToSegments,
   metersToMiles,
   milesToMeters,
+  PACE_OFFSET_PRESETS,
+  presetForPaceOffset,
   scaleSegmentDistances,
   segmentsToPrescribePayload,
   type InvitePaceEase,
@@ -112,6 +114,21 @@ function hasValidStartTime(hour: string, minute: string, period: "AM" | "PM"): b
   );
 }
 
+function normalizeWorkoutSegments(
+  segments: WorkoutPreviewSegment[] | null | undefined
+): WorkoutPreviewSegment[] {
+  return Array.isArray(segments) ? segments : [];
+}
+
+function normalizeWorkoutForForm(
+  workout: CreateCityRunFormWorkout
+): CreateCityRunFormWorkout {
+  return {
+    ...workout,
+    segments: normalizeWorkoutSegments(workout.segments),
+  };
+}
+
 export interface CreateCityRunFormProps {
   workout: CreateCityRunFormWorkout;
   onCancel?: () => void;
@@ -164,21 +181,32 @@ export default function CreateCityRunForm({
   const [editMiles, setEditMiles] = useState(
     () => metersToMiles(workout.estimatedDistanceInMeters ?? null)?.toString() ?? ""
   );
-  const [paceEase, setPaceEase] = useState<InvitePaceEase>("keep");
+  const [paceOffsetSecPerMile, setPaceOffsetSecPerMile] = useState(0);
   const [workoutSaving, setWorkoutSaving] = useState(false);
   const [workoutSaveError, setWorkoutSaveError] = useState<string | null>(null);
-  const [previewWorkout, setPreviewWorkout] = useState(workout);
-  const baselineSegmentsRef = useRef(workout.segments);
+  const [previewWorkout, setPreviewWorkout] = useState(() => normalizeWorkoutForForm(workout));
+  const baselineSegmentsRef = useRef(normalizeWorkoutSegments(workout.segments));
   const baselineMetersRef = useRef(workout.estimatedDistanceInMeters ?? milesToMeters(4));
+  const lastPersistedRef = useRef({
+    title: workout.title,
+    miles: metersToMiles(workout.estimatedDistanceInMeters ?? null)?.toString() ?? "",
+    paceOffset: 0,
+  });
 
   useEffect(() => {
-    setEditTitle(workout.title);
-    setEditMiles(metersToMiles(workout.estimatedDistanceInMeters ?? null)?.toString() ?? "");
-    setPaceEase("keep");
-    setPreviewWorkout(workout);
-    baselineSegmentsRef.current = workout.segments;
-    baselineMetersRef.current = workout.estimatedDistanceInMeters ?? milesToMeters(4);
-  }, [workout.id, workout.title, workout.estimatedDistanceInMeters, workout.segments, workout]);
+    const normalized = normalizeWorkoutForForm(workout);
+    setEditTitle(normalized.title);
+    setEditMiles(metersToMiles(normalized.estimatedDistanceInMeters ?? null)?.toString() ?? "");
+    setPaceOffsetSecPerMile(0);
+    setPreviewWorkout(normalized);
+    baselineSegmentsRef.current = normalized.segments;
+    baselineMetersRef.current = normalized.estimatedDistanceInMeters ?? milesToMeters(4);
+    lastPersistedRef.current = {
+      title: normalized.title,
+      miles: metersToMiles(normalized.estimatedDistanceInMeters ?? null)?.toString() ?? "",
+      paceOffset: 0,
+    };
+  }, [workout.id]);
 
   useEffect(() => {
     setMeetupDate(workoutDateKey(workout.date));
@@ -192,20 +220,49 @@ export default function CreateCityRunForm({
       : workout.estimatedDistanceInMeters ?? null,
   });
 
+  const structureWorkout = editableWorkout ? previewWorkout : normalizeWorkoutForForm(workout);
+  const structureSegments = structureWorkout.segments;
+
+  const localPreviewSegments = useMemo(() => {
+    if (!editableWorkout) return structureSegments;
+    const milesNum = parseFloat(editMiles);
+    if (!Number.isFinite(milesNum) || milesNum <= 0) return structureSegments;
+    const nextMeters = milesToMeters(milesNum);
+    let segments = applyPaceOffsetDeltaToSegments(
+      baselineSegmentsRef.current,
+      paceOffsetSecPerMile
+    );
+    return scaleSegmentDistances(
+      segments,
+      baselineMetersRef.current > 0 ? baselineMetersRef.current : nextMeters,
+      nextMeters
+    );
+  }, [editableWorkout, editMiles, paceOffsetSecPerMile, structureSegments]);
+
+  const activePacePreset = presetForPaceOffset(paceOffsetSecPerMile);
+
   const persistEditableWorkout = useCallback(async () => {
     if (!editableWorkout) return;
     const trimmedTitle = editTitle.trim();
     const milesNum = parseFloat(editMiles);
     if (!trimmedTitle || !Number.isFinite(milesNum) || milesNum <= 0) return;
+    const milesKey = editMiles.trim();
+    const last = lastPersistedRef.current;
+    if (
+      trimmedTitle === last.title &&
+      milesKey === last.miles &&
+      paceOffsetSecPerMile === last.paceOffset
+    ) {
+      return;
+    }
 
     setWorkoutSaving(true);
     setWorkoutSaveError(null);
     try {
       const nextMeters = milesToMeters(milesNum);
-      let segments = applyPaceEaseToSegments(
+      let segments = applyPaceOffsetDeltaToSegments(
         baselineSegmentsRef.current,
-        baselineSegmentsRef.current,
-        paceEase
+        paceOffsetSecPerMile
       );
       segments = scaleSegmentDistances(
         segments,
@@ -217,16 +274,26 @@ export default function CreateCityRunForm({
         title: trimmedTitle,
         estimatedDistanceInMeters: nextMeters,
       });
-      await api.put(`/workouts/${workout.id}/segments`, {
-        segments: segmentsToPrescribePayload(segments),
-      });
+      if (segments.length > 0) {
+        await api.put(`/workouts/${workout.id}/segments`, {
+          segments: segmentsToPrescribePayload(segments),
+        });
+      }
 
       const { data } = await api.get<{ workout: CreateCityRunFormWorkout }>(
         `/training/workout/${workout.id}`
       );
-      const updated = data?.workout;
+      const updated = data?.workout ? normalizeWorkoutForForm(data.workout) : null;
       if (updated?.id) {
         setPreviewWorkout(updated);
+        baselineSegmentsRef.current = updated.segments;
+        baselineMetersRef.current = updated.estimatedDistanceInMeters ?? nextMeters;
+        setPaceOffsetSecPerMile(0);
+        lastPersistedRef.current = {
+          title: trimmedTitle,
+          miles: milesKey,
+          paceOffset: 0,
+        };
         onWorkoutChange?.(updated);
       }
     } catch {
@@ -234,7 +301,7 @@ export default function CreateCityRunForm({
     } finally {
       setWorkoutSaving(false);
     }
-  }, [editableWorkout, editTitle, editMiles, paceEase, workout.id, onWorkoutChange]);
+  }, [editableWorkout, editTitle, editMiles, paceOffsetSecPerMile, workout.id, onWorkoutChange]);
 
   useEffect(() => {
     if (!editableWorkout) return;
@@ -246,7 +313,7 @@ export default function CreateCityRunForm({
       void persistEditableWorkout();
     }, 600);
     return () => window.clearTimeout(handle);
-  }, [editableWorkout, editTitle, editMiles, paceEase, persistEditableWorkout]);
+  }, [editableWorkout, editTitle, editMiles, paceOffsetSecPerMile, persistEditableWorkout]);
 
   const handleStartPlaceSelected = useCallback((placeData: GooglePlaceSelectedData) => {
     const parsed = parseGoogleAddressFromComponents(
@@ -488,24 +555,6 @@ export default function CreateCityRunForm({
   );
   const existingRuns = workout.city_runs ?? [];
   const planDateLabel = formatDateLabel(workoutDateKey(workout.date));
-  const structureWorkout = editableWorkout ? previewWorkout : workout;
-
-  const localPreviewSegments = useMemo(() => {
-    if (!editableWorkout) return structureWorkout.segments;
-    const milesNum = parseFloat(editMiles);
-    if (!Number.isFinite(milesNum) || milesNum <= 0) return structureWorkout.segments;
-    const nextMeters = milesToMeters(milesNum);
-    let segments = applyPaceEaseToSegments(
-      baselineSegmentsRef.current,
-      baselineSegmentsRef.current,
-      paceEase
-    );
-    return scaleSegmentDistances(
-      segments,
-      baselineMetersRef.current > 0 ? baselineMetersRef.current : nextMeters,
-      nextMeters
-    );
-  }, [editableWorkout, editMiles, paceEase, structureWorkout.segments]);
 
   const workoutPanel = !hideWorkoutSummary ? (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-fit lg:sticky lg:top-6">
@@ -542,22 +591,22 @@ export default function CreateCityRunForm({
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              Pace
+              Pace adjust
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-2">
               {(
                 [
-                  { id: "easier", label: "Easier" },
-                  { id: "keep", label: "Keep" },
-                  { id: "quicker", label: "Quicker" },
+                  { id: "easier" as InvitePaceEase, label: "Easier (+15)" },
+                  { id: "keep" as InvitePaceEase, label: "Keep" },
+                  { id: "quicker" as InvitePaceEase, label: "Quicker (−15)" },
                 ] as const
               ).map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => setPaceEase(opt.id)}
+                  onClick={() => setPaceOffsetSecPerMile(PACE_OFFSET_PRESETS[opt.id])}
                   className={`rounded-full px-3 py-1 text-xs font-semibold border transition ${
-                    paceEase === opt.id
+                    activePacePreset === opt.id
                       ? "border-sky-400 bg-sky-50 text-sky-900"
                       : "border-gray-200 text-gray-700 hover:border-gray-300"
                   }`}
@@ -565,6 +614,25 @@ export default function CreateCityRunForm({
                   {opt.label}
                 </button>
               ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step={5}
+                value={Number.isFinite(paceOffsetSecPerMile) ? paceOffsetSecPerMile : 0}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw.trim() === "" || raw === "-") {
+                    setPaceOffsetSecPerMile(0);
+                    return;
+                  }
+                  const n = parseInt(raw, 10);
+                  setPaceOffsetSecPerMile(Number.isFinite(n) ? n : 0);
+                }}
+                className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                aria-label="Pace offset sec per mile"
+              />
+              <span className="text-xs text-gray-600">sec/mi vs plan (+ slower · − faster)</span>
             </div>
           </div>
           {workoutSaving ? (
@@ -607,13 +675,13 @@ export default function CreateCityRunForm({
         </div>
       )}
 
-      {structureWorkout.segments.length > 0 ? (
+      {structureSegments.length > 0 ? (
         <div className="mt-4 border-t border-gray-100 pt-3">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
             Workout structure
           </p>
           <WorkoutStructurePreview
-            segments={editableWorkout ? localPreviewSegments : structureWorkout.segments}
+            segments={editableWorkout ? localPreviewSegments : structureSegments}
             workoutType={structureWorkout.workoutType}
             compact
           />

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyPaceEaseToSegments,
+  applyPaceOffsetDeltaToSegments,
   metersToMiles,
   milesToMeters,
   scaleSegmentDistances,
@@ -29,6 +30,11 @@ describe('invite-workout-edit', () => {
     expect(easier[0].targets?.[0]?.value).toBe(75);
     const quicker = applyPaceEaseToSegments(baseSegments, baseSegments, 'quicker');
     expect(quicker[0].targets?.[0]?.value).toBe(45);
+  });
+
+  it('supports custom inline pace offset', () => {
+    const custom = applyPaceOffsetDeltaToSegments(baseSegments, 25);
+    expect(custom[0].targets?.[0]?.value).toBe(85);
   });
 
   it('scales distance segments when miles change', () => {
