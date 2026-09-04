@@ -53,6 +53,10 @@ function phaseLabel(phase: PhaseAwareLapRow["phase"]): string {
       return "Recovery";
     case "cooldown":
       return "Cooldown";
+    case "activity":
+      return "Activity";
+    default:
+      return phase;
   }
 }
 
