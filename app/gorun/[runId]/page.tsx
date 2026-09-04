@@ -20,6 +20,7 @@ import {
   type CityRunCheckin,
   type CityRunDetails,
 } from '@/components/runs/city-run-types';
+import { isCityRunToday } from '@/lib/city-run-clock';
 import { hasSocialRunLifecycle, resolveRunRsvpCopy } from '@/lib/city-run-copy';
 
 export default function GoRunPage() {
@@ -160,10 +161,30 @@ export default function GoRunPage() {
 
   // ── Container routing ──────────────────────────────────────────────────────
   // 1. Has a check-in row  →  post-run container (you actually showed up)
-  // 2. RSVP status "going" →  going container    (you're planning to)
-  // 3. Anything else        →  pre-RSVP view      (public)
+  // 2. Host + past + today →  post-run recap (crew + thank shouts, no check-in required)
+  // 3. RSVP status "going" →  going container    (you're planning to)
+  // 4. Anything else        →  pre-RSVP view      (public)
 
-  if (myCheckin && hasSocialRunLifecycle(run)) {
+  const runIsPast = isRunPast(run.date, {
+    startTimeHour: run.startTimeHour,
+    startTimeMinute: run.startTimeMinute,
+    startTimePeriod: run.startTimePeriod,
+    timezone: run.timezone,
+  });
+  const runIsToday = isCityRunToday({
+    date: run.date,
+    startTimeHour: run.startTimeHour,
+    startTimeMinute: run.startTimeMinute,
+    startTimePeriod: run.startTimePeriod,
+    timezone: run.timezone,
+  });
+  const hostRecapMode =
+    run.currentRSVPRole === 'host' &&
+    runIsPast &&
+    runIsToday &&
+    hasSocialRunLifecycle(run);
+
+  if ((myCheckin || hostRecapMode) && hasSocialRunLifecycle(run)) {
     return (
       <CityRunPostRunContainer
         run={{
@@ -175,6 +196,7 @@ export default function GoRunPage() {
         }}
         myCheckin={myCheckin}
         allCheckins={checkins}
+        hostRecapMode={hostRecapMode && !myCheckin}
       />
     );
   }

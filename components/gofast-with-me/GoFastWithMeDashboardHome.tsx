@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, DollarSign, Route, Users } from 'lucide-react';
 import api from '@/lib/api';
+import { isCityRunPast, isCityRunToday } from '@/lib/city-run-clock';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 import { STUDIO_COMMUNITY_LABEL } from '@/components/gofast-with-me/studio-sections';
 
@@ -20,6 +21,45 @@ type Props = {
   onOpenWorkouts?: () => void;
 };
 
+type HostedRunRow = ContainerHubPayload['upcomingRuns'][number];
+
+function hostedRunPhase(run: HostedRunRow): 'today-past' | 'today-live' | 'future' {
+  const clock = {
+    date: run.date,
+    startTimeHour: run.startTimeHour,
+    startTimeMinute: run.startTimeMinute,
+    startTimePeriod: run.startTimePeriod,
+  };
+  if (!isCityRunToday(clock)) return 'future';
+  return isCityRunPast(clock) ? 'today-past' : 'today-live';
+}
+
+function formatRunWhen(run: HostedRunRow): string {
+  const clock = {
+    date: run.date,
+    startTimeHour: run.startTimeHour,
+    startTimeMinute: run.startTimeMinute,
+    startTimePeriod: run.startTimePeriod,
+  };
+  const dateLabel = new Date(run.date).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  if (run.startTimeHour != null && run.startTimeMinute != null) {
+    const min = String(run.startTimeMinute).padStart(2, '0');
+    const period = run.startTimePeriod || 'AM';
+    return `${dateLabel} · ${run.startTimeHour}:${min} ${period}`;
+  }
+  return new Date(run.date).toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export default function GoFastWithMeDashboardHome({
   athleteId,
   metrics,
@@ -27,10 +67,11 @@ export default function GoFastWithMeDashboardHome({
   onOpenMembers,
   onOpenWorkouts,
 }: Props) {
-  const [nextRun, setNextRun] = useState<ContainerHubPayload['upcomingRuns'][number] | null>(null);
+  const [nextRun, setNextRun] = useState<HostedRunRow | null>(null);
   const [runsLoading, setRunsLoading] = useState(true);
 
   const memberCount = metrics.followerCount ?? 0;
+  const phase = useMemo(() => (nextRun ? hostedRunPhase(nextRun) : null), [nextRun]);
 
   const loadNextRun = useCallback(async () => {
     setRunsLoading(true);
@@ -50,6 +91,21 @@ export default function GoFastWithMeDashboardHome({
   useEffect(() => {
     void loadNextRun();
   }, [loadNextRun]);
+
+  const sectionTitle =
+    phase === 'today-past' || phase === 'today-live' ? "Today's hosted run" : 'Next hosted run';
+  const sectionSubtitle =
+    phase === 'today-past'
+      ? 'See who came and thank your crew.'
+      : phase === 'today-live'
+        ? 'Your join-me GoRun today.'
+        : 'Your next upcoming join-me GoRun.';
+
+  const gorunHref = nextRun
+    ? nextRun.gorunPath.startsWith('/')
+      ? nextRun.gorunPath
+      : `/${nextRun.gorunPath}`
+    : null;
 
   return (
     <div className="space-y-4 max-w-3xl pb-8">
@@ -119,8 +175,8 @@ export default function GoFastWithMeDashboardHome({
               <Route className="h-5 w-5" aria-hidden />
             </div>
             <div>
-              <p className="text-sm font-semibold text-gray-900">Next hosted run</p>
-              <p className="text-xs text-gray-600 mt-0.5">Your next upcoming join-me GoRun.</p>
+              <p className="text-sm font-semibold text-gray-900">{sectionTitle}</p>
+              <p className="text-xs text-gray-600 mt-0.5">{sectionSubtitle}</p>
             </div>
           </div>
           {onOpenWorkouts ? (
@@ -136,24 +192,33 @@ export default function GoFastWithMeDashboardHome({
 
         {runsLoading ? (
           <p className="text-sm text-gray-500">Loading…</p>
-        ) : nextRun ? (
-          <Link
-            href={nextRun.gorunPath.startsWith('/') ? nextRun.gorunPath : `/${nextRun.gorunPath}`}
-            className="block rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm hover:border-orange-300 transition"
-          >
-            <span className="font-medium text-gray-900">{nextRun.title}</span>
-            <span className="flex items-center gap-1.5 text-gray-500 mt-1">
-              <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              {new Date(nextRun.date).toLocaleString(undefined, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-              {nextRun.meetUpPoint ? ` · ${nextRun.meetUpPoint}` : ''}
-            </span>
-          </Link>
+        ) : nextRun && gorunHref ? (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm space-y-3">
+            <Link href={gorunHref} className="block hover:border-orange-300 transition">
+              <span className="font-medium text-gray-900">{nextRun.title}</span>
+              <span className="flex items-center gap-1.5 text-gray-500 mt-1">
+                <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {formatRunWhen(nextRun)}
+                {nextRun.meetUpPoint ? ` · ${nextRun.meetUpPoint}` : ''}
+              </span>
+            </Link>
+            {phase === 'today-past' ? (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={gorunHref}
+                  className="inline-flex items-center rounded-full border border-violet-300 bg-white px-3 py-1.5 text-xs font-semibold text-violet-800 hover:bg-violet-50"
+                >
+                  See who came
+                </Link>
+                <Link
+                  href={gorunHref}
+                  className="inline-flex items-center rounded-full border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-orange-800 hover:bg-orange-50"
+                >
+                  Thank those who came
+                </Link>
+              </div>
+            ) : null}
+          </div>
         ) : (
           <p className="text-sm text-gray-600 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4">
             No upcoming hosted run. Pick a plan day in Runs to invite followers.

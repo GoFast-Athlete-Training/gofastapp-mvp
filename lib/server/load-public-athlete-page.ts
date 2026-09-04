@@ -11,6 +11,7 @@ import { resolvePublicActions } from '@/lib/gofast-with-me/resolve-public-action
 import { listPublishedAthleteTips } from '@/lib/gofast-with-me/athlete-tips';
 import { listPublishedAthleteRunRoutes } from '@/lib/gofast-with-me/athlete-run-routes';
 import { listPublicInstagramMedia } from '@/lib/gofast-with-me/instagram-hydration';
+import { localTodayKey } from '@/lib/training/plan-utils';
 import {
   buildPublicTrainingFor,
   serializePublicAthleteRace,
@@ -99,6 +100,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
   };
 
   const now = new Date();
+  const todayKey = localTodayKey();
+  const startOfTodayUtc = new Date(`${todayKey}T00:00:00.000Z`);
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
   const weekStart = startOfWeekMonday(now);
@@ -123,8 +126,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
     prisma.city_runs.findMany({
       where: {
         athleteGeneratedId: athlete.id,
-        date: { gte: now },
         published: true,
+        date: { gte: startOfTodayUtc },
       },
       orderBy: { date: 'asc' },
       take: 20,

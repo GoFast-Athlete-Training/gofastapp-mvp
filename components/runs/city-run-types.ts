@@ -135,6 +135,7 @@ export interface CityRunDetails {
   runCrew?: RunCrew | null;
   rsvps?: CityRunRsvp[];
   currentRSVP?: string | null;
+  currentRSVPRole?: string | null;
 }
 
 export function runHasWorkoutContent(run: {

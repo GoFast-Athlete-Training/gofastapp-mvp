@@ -16,14 +16,17 @@ import { type CityRunCheckin, type PostRunRun } from '@/components/runs/city-run
 
 interface Props {
   run: PostRunRun;
-  myCheckin: CityRunCheckin;
+  myCheckin: CityRunCheckin | null;
   allCheckins: CityRunCheckin[];
+  /** Host viewing crew/shouts after run — no prior check-in row required. */
+  hostRecapMode?: boolean;
 }
 
 export default function CityRunPostRunContainer({
   run,
   myCheckin: initialCheckin,
   allCheckins: initialCheckins,
+  hostRecapMode = false,
 }: Props) {
   const athleteId = LocalStorageAPI.getAthleteId();
   const crewLabel = isIndividualHostedRun(run)
@@ -36,23 +39,41 @@ export default function CityRunPostRunContainer({
     runDate: run.date,
   });
 
-  const [myCheckin, setMyCheckin] = useState<CityRunCheckin>(initialCheckin);
+  const [myCheckin, setMyCheckin] = useState<CityRunCheckin | null>(initialCheckin);
   const [checkins, setCheckins] = useState<CityRunCheckin[]>(initialCheckins);
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [editingShouts, setEditingShouts] = useState(false);
-  const [shoutsInput, setShoutsInput] = useState(initialCheckin.runShouts || '');
+  const [shoutsInput, setShoutsInput] = useState(initialCheckin?.runShouts || '');
   const [savingShouts, setSavingShouts] = useState(false);
 
   const patchMyCheckin = (patch: Partial<CityRunCheckin>) => {
-    const updated = { ...myCheckin, ...patch };
-    setMyCheckin(updated);
-    setCheckins((prev) => prev.map((c) => (c.athleteId === athleteId ? updated : c)));
+    if (!athleteId) return;
+    if (myCheckin) {
+      const updated = { ...myCheckin, ...patch };
+      setMyCheckin(updated);
+      setCheckins((prev) => prev.map((c) => (c.athleteId === athleteId ? updated : c)));
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await api.get(`/runs/${run.id}/checkin`);
+        if (res.data.success) {
+          const list = (res.data.checkins || []) as CityRunCheckin[];
+          const my = (res.data.myCheckin ?? null) as CityRunCheckin | null;
+          setCheckins(list);
+          setMyCheckin(my);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!myCheckin) return;
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
@@ -96,6 +117,15 @@ export default function CityRunPostRunContainer({
     (a, b) => new Date(a.checkedInAt).getTime() - new Date(b.checkedInAt).getTime()
   );
 
+  const shoutsMineCheckin: CityRunCheckin =
+    myCheckin ??
+    ({
+      id: 'host-recap',
+      athleteId: athleteId ?? '',
+      runShouts: shoutsInput,
+      checkedInAt: new Date().toISOString(),
+    } as CityRunCheckin);
+
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <TopNav showBack backUrl="/gorun" backLabel="Run hub" />
@@ -117,7 +147,7 @@ export default function CityRunPostRunContainer({
             )}
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
-                {crewLabel}
+                {hostRecapMode ? 'After your hosted run' : crewLabel}
               </p>
               <h1 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900 leading-snug">
                 {heroHeadline}
@@ -153,7 +183,7 @@ export default function CityRunPostRunContainer({
         />
 
         <CityRunPostRunShoutsSection
-          myCheckin={myCheckin}
+          myCheckin={shoutsMineCheckin}
           othersWithShouts={othersWithShouts}
           editingShouts={editingShouts}
           shoutsInput={shoutsInput}
@@ -163,7 +193,7 @@ export default function CityRunPostRunContainer({
           onStartEdit={() => setEditingShouts(true)}
           onCancelEdit={() => {
             setEditingShouts(false);
-            setShoutsInput(myCheckin.runShouts || '');
+            setShoutsInput(myCheckin?.runShouts || '');
           }}
           onShoutsInputChange={setShoutsInput}
           onSaveShouts={() => void saveShouts()}
@@ -171,7 +201,7 @@ export default function CityRunPostRunContainer({
 
         {othersWithShouts.length > 0 ? (
           <CityRunPostRunShoutsSection
-            myCheckin={myCheckin}
+            myCheckin={shoutsMineCheckin}
             othersWithShouts={othersWithShouts}
             editingShouts={false}
             shoutsInput=""
@@ -185,16 +215,18 @@ export default function CityRunPostRunContainer({
           />
         ) : null}
 
-        <CityRunPostRunPhotosSection
-          myCheckin={myCheckin}
-          photos={photos}
-          athleteId={athleteId}
-          othersCount={others.length}
-          uploading={uploading}
-          uploadError={uploadError}
-          clubName={crewLabel}
-          onFileChange={handleFileChange}
-        />
+        {myCheckin ? (
+          <CityRunPostRunPhotosSection
+            myCheckin={myCheckin}
+            photos={photos}
+            athleteId={athleteId}
+            othersCount={others.length}
+            uploading={uploading}
+            uploadError={uploadError}
+            clubName={crewLabel}
+            onFileChange={handleFileChange}
+          />
+        ) : null}
       </main>
     </div>
   );
