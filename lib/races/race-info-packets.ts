@@ -141,22 +141,8 @@ function buildTrainingTipsPacket(
   phase: RaceInfoPacketPhase,
   daysUntil: number
 ): RaceInfoPacket {
-  const training = athlete.training;
   const tipSegments = (race.courseSegments ?? []).filter((s) => trim(s.runTip));
   const items: RaceInfoPacket["items"] = [];
-
-  if (training?.hasActivePlan && training.planName) {
-    const week =
-      training.weekNumber != null && training.totalWeeks != null
-        ? `Week ${training.weekNumber} of ${training.totalWeeks}`
-        : null;
-    items.push({
-      label: "Training plan",
-      value: week ? `${training.planName} · ${week}` : training.planName,
-    });
-  } else if (training?.goalTime) {
-    items.push({ label: "Goal", value: training.goalTime });
-  }
 
   for (const seg of tipSegments.slice(0, 5)) {
     items.push({
@@ -165,7 +151,7 @@ function buildTrainingTipsPacket(
     });
   }
 
-  const hasData = items.length > 0;
+  const hasData = tipSegments.length > 0;
   const visible = athlete.isSignedUp && hasData && daysUntil >= 0;
 
   return {

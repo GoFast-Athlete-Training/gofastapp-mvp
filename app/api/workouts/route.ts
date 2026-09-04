@@ -60,6 +60,7 @@ function completedStampsWhere() {
  * List workouts for the authenticated athlete.
  * Optional: `?limit=20&offset=0` for pagination (max limit 100). When omitted, returns all (legacy).
  * Optional: `?standalone=1` — only workouts with no training plan (`planId` null).
+ * Optional: `?plan=1` — only workouts tied to a training plan (`planId` not null).
  * Optional: `?date=YYYY-MM-DD` — only workouts whose scheduled `date` falls on that calendar day (UTC).
  */
 export async function GET(request: NextRequest) {
@@ -90,6 +91,7 @@ export async function GET(request: NextRequest) {
     }
 
     const standaloneOnly = searchParams.get("standalone") === "1";
+    const planOnly = searchParams.get("plan") === "1";
     const matchedOnly = searchParams.get("matched") === "1";
     const completedOnly =
       searchParams.get("completed") === "1" || matchedOnly;
@@ -101,6 +103,7 @@ export async function GET(request: NextRequest) {
     const where = {
       athleteId: athlete.id,
       ...(standaloneOnly ? { planId: null } : {}),
+      ...(planOnly ? { planId: { not: null } } : {}),
       ...(completedOnly ? completedStampsWhere() : {}),
       ...(dateRange ? { date: { gte: dateRange.gte, lt: dateRange.lt } } : {}),
       ...sportWorkoutTypeFilter(sportParam),
