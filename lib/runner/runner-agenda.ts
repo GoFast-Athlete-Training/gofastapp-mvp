@@ -149,8 +149,24 @@ export async function fetchRunnerAgendaForAthlete(
         cityRunId: { not: null },
         date: { gte: todayStart, lte: horizonEnd },
       },
-      include: {
-        segments: { orderBy: { stepOrder: 'asc' } },
+      select: {
+        id: true,
+        cityRunId: true,
+        title: true,
+        workoutType: true,
+        date: true,
+        estimatedDistanceInMeters: true,
+        segments: {
+          orderBy: { stepOrder: 'asc' },
+          select: {
+            id: true,
+            stepOrder: true,
+            title: true,
+            durationType: true,
+            durationValue: true,
+            repeatCount: true,
+          },
+        },
       },
       orderBy: { date: 'asc' },
     }),

@@ -97,6 +97,15 @@ export async function buildPlanWeekCards(params: {
       date: { gte, lte },
     },
     orderBy: { date: "asc" },
+    select: {
+      id: true,
+      workoutId: true,
+      workoutCompleted: true,
+      date: true,
+      workoutType: true,
+      estimatedDistanceInMeters: true,
+      title: true,
+    },
   });
 
   const plannedIds = materializedPlanned.map((p) => p.id);
@@ -115,6 +124,21 @@ export async function buildPlanWeekCards(params: {
             ],
           },
           orderBy: { updatedAt: "desc" },
+          select: {
+            id: true,
+            plannedWorkoutId: true,
+            updatedAt: true,
+            workoutType: true,
+            estimatedDistanceInMeters: true,
+            title: true,
+            garminDetailActivityId: true,
+            skippedAt: true,
+            skipReason: true,
+            actualDistanceMeters: true,
+            actualAvgPaceSecPerMile: true,
+            actualAverageHeartRate: true,
+            actualDurationSeconds: true,
+          },
         })
       : [];
 

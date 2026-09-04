@@ -195,8 +195,20 @@ export async function GET(request: NextRequest) {
         planId: null,
         date: { gte: todayStart },
       },
-      include: {
-        segments: { orderBy: { stepOrder: "asc" } },
+      select: {
+        id: true,
+        title: true,
+        workoutType: true,
+        date: true,
+        garminDetailActivityId: true,
+        skippedAt: true,
+        skipReason: true,
+        paceDeltaSecPerMile: true,
+        estimatedDistanceInMeters: true,
+        segments: {
+          orderBy: { stepOrder: "asc" },
+          select: { stepOrder: true, targets: true },
+        },
       },
       orderBy: { date: "asc" },
       take: Math.max(limit * 3, 15),
