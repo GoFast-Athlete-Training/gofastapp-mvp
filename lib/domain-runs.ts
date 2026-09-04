@@ -68,6 +68,13 @@ const CITY_RUN_DISCOVER_SELECT = {
       name: true,
     },
   },
+  plannedWorkoutId: true,
+  plannedWorkout: {
+    select: {
+      id: true,
+      title: true,
+    },
+  },
 } as const;
 
 const RUNTIME_COMMIT_SHA =
@@ -156,6 +163,9 @@ function mapCityRunForResponse(run: Awaited<ReturnType<typeof queryCityRunsForDi
     stravaMapUrl: run.stravaMapUrl,
     workflowStatus: run.workflowStatus,
     published: run.published,
+    attachedWorkout: run.plannedWorkout
+      ? { id: run.plannedWorkout.id, title: run.plannedWorkout.title }
+      : null,
   };
 }
 

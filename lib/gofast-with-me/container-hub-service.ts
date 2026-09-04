@@ -37,6 +37,7 @@ import {
   listRecentAthleteActivities,
   type RecentAthleteActivityPayload,
 } from '@/lib/gofast-with-me/recent-athlete-activities';
+import { parseAthleteRaceMainSnap } from '@/lib/training/plan-race-snapshots';
 import {
   listPublicInstagramMedia,
   type AthleteInstagramMediaPayload,

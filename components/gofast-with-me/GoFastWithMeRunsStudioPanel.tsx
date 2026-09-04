@@ -5,6 +5,7 @@ import CreateCityRunForm, {
   type CreateCityRunFormWorkout,
 } from '@/components/cityruns/CreateCityRunForm';
 import GoFastWithMeWorkoutPicker from '@/components/gofast-with-me/GoFastWithMeWorkoutPicker';
+import GoFastWithMeInvitePathFork from '@/components/gofast-with-me/GoFastWithMeInvitePathFork';
 import GoFastWithMeRunsPanel from '@/components/gofast-with-me/GoFastWithMeRunsPanel';
 import type { ShareHubPlanStatus } from '@/lib/profile/share-creator-card-logic';
 import { canPublishPlan } from '@/lib/gofast-with-me/plan-sharing-utils';
@@ -15,12 +16,15 @@ type Props = {
   plan: ShareHubPlanStatus | null;
 };
 
+type InvitePath = 'fork' | 'own';
+
 export default function GoFastWithMeRunsStudioPanel({
   athleteId,
   publicSlug,
   plan,
 }: Props) {
   const [builderWorkout, setBuilderWorkout] = useState<CreateCityRunFormWorkout | null>(null);
+  const [invitePath, setInvitePath] = useState<InvitePath | null>(null);
   const [hubRefreshKey, setHubRefreshKey] = useState(0);
 
   const showWorkoutPicker =
@@ -31,7 +35,18 @@ export default function GoFastWithMeRunsStudioPanel({
 
   const handleRunCreated = () => {
     setBuilderWorkout(null);
+    setInvitePath(null);
     setHubRefreshKey((k) => k + 1);
+  };
+
+  const handleWorkoutReady = (workout: CreateCityRunFormWorkout) => {
+    setBuilderWorkout(workout);
+    setInvitePath('fork');
+  };
+
+  const resetInviteFlow = () => {
+    setBuilderWorkout(null);
+    setInvitePath(null);
   };
 
   return (
@@ -48,22 +63,33 @@ export default function GoFastWithMeRunsStudioPanel({
           planId={plan!.planId!}
           planStartDate={plan!.startDate!}
           totalWeeks={plan!.totalWeeks!}
-          onWorkoutReady={(workout) => setBuilderWorkout(workout)}
+          onWorkoutReady={handleWorkoutReady}
         />
       ) : null}
 
-      {builderWorkout ? (
+      {builderWorkout && invitePath === 'fork' ? (
+        <GoFastWithMeInvitePathFork
+          sourceWorkout={builderWorkout}
+          onChooseOwn={() => setInvitePath('own')}
+          onCancel={resetInviteFlow}
+          onDone={handleRunCreated}
+        />
+      ) : null}
+
+      {builderWorkout && invitePath === 'own' ? (
         <div className="space-y-3">
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Build your invite</h3>
             <p className="text-xs text-gray-600 mt-1">
-              Your workout is set — add meetup, route, and time. You&apos;ll get an RSVP link for
+              Tune your workout, then add meetup and time. You&apos;ll get an RSVP link for
               followers.
             </p>
           </div>
           <CreateCityRunForm
             workout={builderWorkout}
-            onCancel={() => setBuilderWorkout(null)}
+            editableWorkout
+            onWorkoutChange={setBuilderWorkout}
+            onCancel={resetInviteFlow}
             onDone={handleRunCreated}
           />
         </div>

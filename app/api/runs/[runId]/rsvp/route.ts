@@ -102,10 +102,17 @@ export async function POST(
       body = await request.json();
     } catch {}
 
-    const { status, rsvpPhotoUrls, occurrenceDate } = body;
+    const { status, rsvpPhotoUrls, occurrenceDate, stampMode, sourceWorkoutId } = body;
     if (!status || !['going', 'not-going'].includes(status)) {
       return NextResponse.json({ error: 'Invalid status. Must be going or not-going' }, { status: 400 });
     }
+
+    const normalizedStampMode =
+      stampMode === 'use_city' || stampMode === 'keep_mine' ? stampMode : undefined;
+    const normalizedSourceWorkoutId =
+      typeof sourceWorkoutId === 'string' && sourceWorkoutId.trim()
+        ? sourceWorkoutId.trim()
+        : undefined;
 
     const auth = await requireAthleteFromBearerForRsvp(request);
     if ('error' in auth) {
@@ -145,7 +152,10 @@ export async function POST(
 
     let stampResult: Awaited<ReturnType<typeof upsertCityRunStampForAthlete>> | null = null;
     if (status === 'going' && run.runClubId) {
-      stampResult = await upsertCityRunStampForAthlete(athlete.id, resolvedId);
+      stampResult = await upsertCityRunStampForAthlete(athlete.id, resolvedId, {
+        stampMode: normalizedStampMode,
+        sourceWorkoutId: normalizedSourceWorkoutId,
+      });
     }
 
     return NextResponse.json({

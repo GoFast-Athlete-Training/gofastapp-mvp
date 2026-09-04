@@ -143,6 +143,9 @@ export default function CityRunDetailsSection({
               <Map className="h-4 w-4" /> View Route
             </a>
           ) : null}
+          {run.routeNeighborhood?.trim() ? (
+            <p className="text-sm text-gray-600 pt-1 whitespace-pre-wrap">{run.routeNeighborhood.trim()}</p>
+          ) : null}
         </div>
 
         {run.description ? (

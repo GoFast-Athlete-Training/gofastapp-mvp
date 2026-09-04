@@ -5,7 +5,7 @@
  * POST /api/cityrun/from-workout.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -31,6 +31,14 @@ import {
   generateCitySlugFromParts,
 } from "@/lib/parse-google-address";
 import { formatCalendarDate } from "@/lib/calendar-date";
+import {
+  applyPaceEaseToSegments,
+  metersToMiles,
+  milesToMeters,
+  scaleSegmentDistances,
+  segmentsToPrescribePayload,
+  type InvitePaceEase,
+} from "@/lib/gofast-with-me/invite-workout-edit";
 
 export type CreateCityRunFormWorkout = {
   id: string;
@@ -110,6 +118,9 @@ export interface CreateCityRunFormProps {
   onDone?: () => void;
   className?: string;
   hideWorkoutSummary?: boolean;
+  /** Build-your-own invite path — athlete can edit personal prescribe before creating meetup. */
+  editableWorkout?: boolean;
+  onWorkoutChange?: (workout: CreateCityRunFormWorkout) => void;
 }
 
 export default function CreateCityRunForm({
@@ -118,6 +129,8 @@ export default function CreateCityRunForm({
   onDone,
   className = "",
   hideWorkoutSummary = false,
+  editableWorkout = false,
+  onWorkoutChange,
 }: CreateCityRunFormProps) {
   const [meetupDate, setMeetupDate] = useState("");
   const [startHour, setStartHour] = useState("");
@@ -137,6 +150,8 @@ export default function CreateCityRunForm({
   const [meetUpNote, setMeetUpNote] = useState("");
   const [workoutNarrative, setWorkoutNarrative] = useState("");
   const [stravaMapUrl, setStravaMapUrl] = useState("");
+  const [routeNeighborhood, setRouteNeighborhood] = useState("");
+  const [mapImageUrl, setMapImageUrl] = useState("");
 
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
 
@@ -145,15 +160,93 @@ export default function CreateCityRunForm({
   const [success, setSuccess] = useState<CityRunFromWorkoutSuccess | null>(null);
   const [copiedField, setCopiedField] = useState<"rsvp" | "share" | "join" | null>(null);
 
+  const [editTitle, setEditTitle] = useState(workout.title);
+  const [editMiles, setEditMiles] = useState(
+    () => metersToMiles(workout.estimatedDistanceInMeters ?? null)?.toString() ?? ""
+  );
+  const [paceEase, setPaceEase] = useState<InvitePaceEase>("keep");
+  const [workoutSaving, setWorkoutSaving] = useState(false);
+  const [workoutSaveError, setWorkoutSaveError] = useState<string | null>(null);
+  const [previewWorkout, setPreviewWorkout] = useState(workout);
+  const baselineSegmentsRef = useRef(workout.segments);
+  const baselineMetersRef = useRef(workout.estimatedDistanceInMeters ?? milesToMeters(4));
+
+  useEffect(() => {
+    setEditTitle(workout.title);
+    setEditMiles(metersToMiles(workout.estimatedDistanceInMeters ?? null)?.toString() ?? "");
+    setPaceEase("keep");
+    setPreviewWorkout(workout);
+    baselineSegmentsRef.current = workout.segments;
+    baselineMetersRef.current = workout.estimatedDistanceInMeters ?? milesToMeters(4);
+  }, [workout.id, workout.title, workout.estimatedDistanceInMeters, workout.segments, workout]);
+
   useEffect(() => {
     setMeetupDate(workoutDateKey(workout.date));
   }, [workout.date, workout.id]);
 
   const headline = displayWorkoutListTitle({
-    title: workout.title,
+    title: editableWorkout ? previewWorkout.title : workout.title,
     workoutType: workout.workoutType,
-    estimatedDistanceInMeters: workout.estimatedDistanceInMeters ?? null,
+    estimatedDistanceInMeters: editableWorkout
+      ? previewWorkout.estimatedDistanceInMeters ?? null
+      : workout.estimatedDistanceInMeters ?? null,
   });
+
+  const persistEditableWorkout = useCallback(async () => {
+    if (!editableWorkout) return;
+    const trimmedTitle = editTitle.trim();
+    const milesNum = parseFloat(editMiles);
+    if (!trimmedTitle || !Number.isFinite(milesNum) || milesNum <= 0) return;
+
+    setWorkoutSaving(true);
+    setWorkoutSaveError(null);
+    try {
+      const nextMeters = milesToMeters(milesNum);
+      let segments = applyPaceEaseToSegments(
+        baselineSegmentsRef.current,
+        baselineSegmentsRef.current,
+        paceEase
+      );
+      segments = scaleSegmentDistances(
+        segments,
+        baselineMetersRef.current > 0 ? baselineMetersRef.current : nextMeters,
+        nextMeters
+      );
+
+      await api.patch(`/workouts/${workout.id}`, {
+        title: trimmedTitle,
+        estimatedDistanceInMeters: nextMeters,
+      });
+      await api.put(`/workouts/${workout.id}/segments`, {
+        segments: segmentsToPrescribePayload(segments),
+      });
+
+      const { data } = await api.get<{ workout: CreateCityRunFormWorkout }>(
+        `/training/workout/${workout.id}`
+      );
+      const updated = data?.workout;
+      if (updated?.id) {
+        setPreviewWorkout(updated);
+        onWorkoutChange?.(updated);
+      }
+    } catch {
+      setWorkoutSaveError("Could not save workout changes.");
+    } finally {
+      setWorkoutSaving(false);
+    }
+  }, [editableWorkout, editTitle, editMiles, paceEase, workout.id, onWorkoutChange]);
+
+  useEffect(() => {
+    if (!editableWorkout) return;
+    const trimmedTitle = editTitle.trim();
+    const milesNum = parseFloat(editMiles);
+    if (!trimmedTitle || !Number.isFinite(milesNum) || milesNum <= 0) return;
+
+    const handle = window.setTimeout(() => {
+      void persistEditableWorkout();
+    }, 600);
+    return () => window.clearTimeout(handle);
+  }, [editableWorkout, editTitle, editMiles, paceEase, persistEditableWorkout]);
 
   const handleStartPlaceSelected = useCallback((placeData: GooglePlaceSelectedData) => {
     const parsed = parseGoogleAddressFromComponents(
@@ -234,6 +327,9 @@ export default function CreateCityRunForm({
         meetUpNote: meetUpNote.trim() || undefined,
         workoutNarrative: workoutNarrative.trim() || undefined,
         stravaMapUrl: stravaMapUrl.trim() || undefined,
+        routeNeighborhood: routeNeighborhood.trim() || undefined,
+        mapImageUrl: mapImageUrl.trim() || undefined,
+        routePhotos: mapImageUrl.trim() ? [mapImageUrl.trim()] : undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
@@ -387,41 +483,138 @@ export default function CreateCityRunForm({
     );
   }
 
-  const plannedMilesLabel = formatPlannedMiles(workout.estimatedDistanceInMeters ?? null);
+  const plannedMilesLabel = formatPlannedMiles(
+    (editableWorkout ? previewWorkout : workout).estimatedDistanceInMeters ?? null
+  );
   const existingRuns = workout.city_runs ?? [];
   const planDateLabel = formatDateLabel(workoutDateKey(workout.date));
+  const structureWorkout = editableWorkout ? previewWorkout : workout;
+
+  const localPreviewSegments = useMemo(() => {
+    if (!editableWorkout) return structureWorkout.segments;
+    const milesNum = parseFloat(editMiles);
+    if (!Number.isFinite(milesNum) || milesNum <= 0) return structureWorkout.segments;
+    const nextMeters = milesToMeters(milesNum);
+    let segments = applyPaceEaseToSegments(
+      baselineSegmentsRef.current,
+      baselineSegmentsRef.current,
+      paceEase
+    );
+    return scaleSegmentDistances(
+      segments,
+      baselineMetersRef.current > 0 ? baselineMetersRef.current : nextMeters,
+      nextMeters
+    );
+  }, [editableWorkout, editMiles, paceEase, structureWorkout.segments]);
 
   const workoutPanel = !hideWorkoutSummary ? (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-fit lg:sticky lg:top-6">
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
         <Activity className="w-4 h-4 text-sky-600" />
-        From your workout
+        {editableWorkout ? "Your workout" : "From your workout"}
       </p>
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
-          {workout.workoutType}
-        </span>
-        {plannedMilesLabel ? (
-          <span className="text-xs text-gray-600">{plannedMilesLabel}</span>
-        ) : null}
-      </div>
-      {planDateLabel ? (
-        <p className="text-sm text-gray-700 mb-2 flex items-center gap-1.5">
-          <CalendarClock className="w-4 h-4 text-gray-400 shrink-0" />
-          <span>
-            On your plan · <span className="font-medium text-gray-900">{planDateLabel}</span>
+
+      {editableWorkout ? (
+        <div className="space-y-4 mb-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Title
+            </label>
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Planned miles
+            </label>
+            <input
+              type="number"
+              min={0.1}
+              step={0.1}
+              value={editMiles}
+              onChange={(e) => setEditMiles(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Pace
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { id: "easier", label: "Easier" },
+                  { id: "keep", label: "Keep" },
+                  { id: "quicker", label: "Quicker" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setPaceEase(opt.id)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold border transition ${
+                    paceEase === opt.id
+                      ? "border-sky-400 bg-sky-50 text-sky-900"
+                      : "border-gray-200 text-gray-700 hover:border-gray-300"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {workoutSaving ? (
+            <p className="text-xs text-gray-500">Saving workout…</p>
+          ) : null}
+          {workoutSaveError ? (
+            <p className="text-xs text-red-600">{workoutSaveError}</p>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
+              {workout.workoutType}
+            </span>
+            {plannedMilesLabel ? (
+              <span className="text-xs text-gray-600">{plannedMilesLabel}</span>
+            ) : null}
+          </div>
+          {planDateLabel ? (
+            <p className="text-sm text-gray-700 mb-2 flex items-center gap-1.5">
+              <CalendarClock className="w-4 h-4 text-gray-400 shrink-0" />
+              <span>
+                On your plan · <span className="font-medium text-gray-900">{planDateLabel}</span>
+              </span>
+            </p>
+          ) : null}
+          <p className="font-medium text-gray-900 text-base">{headline}</p>
+        </>
+      )}
+
+      {!editableWorkout ? null : (
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
+            {structureWorkout.workoutType}
           </span>
-        </p>
-      ) : null}
-      <p className="font-medium text-gray-900 text-base">{headline}</p>
-      {workout.segments.length > 0 ? (
+          {plannedMilesLabel ? (
+            <span className="text-xs text-gray-600">{plannedMilesLabel}</span>
+          ) : null}
+        </div>
+      )}
+
+      {structureWorkout.segments.length > 0 ? (
         <div className="mt-4 border-t border-gray-100 pt-3">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
             Workout structure
           </p>
           <WorkoutStructurePreview
-            segments={workout.segments}
-            workoutType={workout.workoutType}
+            segments={editableWorkout ? localPreviewSegments : structureWorkout.segments}
+            workoutType={structureWorkout.workoutType}
             compact
           />
         </div>
@@ -522,18 +715,51 @@ export default function CreateCityRunForm({
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Route <span className="font-normal text-gray-400">(optional)</span>
-        </label>
-        <input
-          type="url"
-          value={stravaMapUrl}
-          onChange={(e) => setStravaMapUrl(e.target.value)}
-          placeholder="https://www.strava.com/routes/…"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-        />
-        <p className="text-xs text-gray-500 mt-1">Skip if you&apos;re looping the meetup.</p>
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            Strava route <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          <input
+            type="url"
+            value={stravaMapUrl}
+            onChange={(e) => setStravaMapUrl(e.target.value)}
+            placeholder="https://www.strava.com/routes/…"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            Route description <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          <textarea
+            value={routeNeighborhood}
+            onChange={(e) => setRouteNeighborhood(e.target.value)}
+            rows={2}
+            placeholder="Down George Mason and through the woods"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            Route photo <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          <input
+            type="url"
+            value={mapImageUrl}
+            onChange={(e) => setMapImageUrl(e.target.value)}
+            placeholder="https://… route preview image"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+          {mapImageUrl.trim() ? (
+            <img
+              src={mapImageUrl.trim()}
+              alt="Route preview"
+              className="mt-2 max-h-40 w-full rounded-lg object-cover border border-gray-200"
+            />
+          ) : null}
+        </div>
+        <p className="text-xs text-gray-500">Skip route fields if you&apos;re looping the meetup.</p>
       </div>
 
       <div className="border-t border-gray-100 pt-2">

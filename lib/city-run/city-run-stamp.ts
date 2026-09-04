@@ -8,6 +8,15 @@ import {
 } from '@/lib/club-planned-workouts/clone-planned-for-athlete';
 import { pushPlannedWorkoutToGarminForAthlete } from '@/lib/garmin-workouts/push-workout-for-athlete';
 import { ymdFromDate } from '@/lib/training/plan-utils';
+import { resolveWorkoutTargetForAthlete } from '@/lib/training/workout-or-planned-resolve';
+
+export type CityRunStampMode = 'use_city' | 'keep_mine';
+
+export type CityRunStampOptions = {
+  stampMode?: CityRunStampMode;
+  /** Plan-day workout id from invite flow (prescribe or instance id). */
+  sourceWorkoutId?: string;
+};
 
 export type CityRunStampResult =
   | {
@@ -78,10 +87,12 @@ async function ensureMinimalSegments(
 
 /**
  * Upsert athlete City Run stamp on I'm in. Fulfill same-day plan day when present.
+ * Explicit stampMode from invite flow overrides auto fulfill/clone behavior.
  */
 export async function upsertCityRunStampForAthlete(
   athleteId: string,
-  cityRunId: string
+  cityRunId: string,
+  options?: CityRunStampOptions
 ): Promise<CityRunStampResult> {
   const run = await prisma.city_runs.findUnique({
     where: { id: cityRunId },
@@ -145,7 +156,84 @@ export async function upsertCityRunStampForAthlete(
   let action: 'created' | 'updated' | 'fulfilled' = existingStamp ? 'updated' : 'created';
   let plannedWorkoutId: string;
 
-  if (existingStamp) {
+  if (options?.stampMode === 'keep_mine' && options.sourceWorkoutId) {
+    const target = await resolveWorkoutTargetForAthlete(options.sourceWorkoutId, athleteId);
+    if (target?.kind === 'planned') {
+      const updated = await prisma.planned_workouts.update({
+        where: { id: target.plannedWorkoutId },
+        data: {
+          cityRunId,
+          courseSnapJson: courseJson,
+          cityRunMatchLabel: matchLabel,
+          updatedAt: new Date(),
+        },
+      });
+      plannedWorkoutId = updated.id;
+      action = existingStamp?.id === updated.id ? 'updated' : 'fulfilled';
+    } else {
+      return {
+        ok: false,
+        code: 'not_found',
+        message: 'Could not link your plan workout to this run.',
+      };
+    }
+  } else if (options?.stampMode === 'use_city') {
+    if (existingStamp) {
+      plannedWorkoutId = existingStamp.id;
+      if (template?.id) {
+        await resyncAthleteStampFromTemplate(existingStamp.id, template.id, {
+          date: run.date,
+          courseSnapJson: courseJson,
+          cityRunMatchLabel: matchLabel,
+        });
+      } else {
+        await prisma.planned_workouts.update({
+          where: { id: existingStamp.id },
+          data: {
+            date: run.date,
+            courseSnapJson: courseJson,
+            cityRunMatchLabel: matchLabel,
+            updatedAt: new Date(),
+          },
+        });
+      }
+    } else if (template?.id) {
+      const cloned = await clonePlannedWorkoutForAthlete(template.id, athleteId, {
+        cityRunId,
+        date: run.date,
+        courseSnapJson: courseJson,
+        cityRunMatchLabel: matchLabel,
+      });
+      plannedWorkoutId = cloned.id;
+      action = 'created';
+    } else {
+      const created = await prisma.planned_workouts.create({
+        data: {
+          title: workoutTitle,
+          workoutType:
+            run.runType?.trim().toLowerCase() === 'track'
+              ? WorkoutType.Intervals
+              : WorkoutType.Easy,
+          athleteId,
+          planId: null,
+          cityRunId,
+          date: run.date,
+          estimatedDistanceInMeters:
+            run.totalMiles != null ? Math.round(run.totalMiles * 1609.34) : null,
+          courseSnapJson: courseJson,
+          cityRunMatchLabel: matchLabel,
+          updatedAt: new Date(),
+        },
+      });
+      plannedWorkoutId = created.id;
+      action = 'created';
+      await ensureMinimalSegments(
+        plannedWorkoutId,
+        run.totalMiles,
+        fallbackSegmentTitle
+      );
+    }
+  } else if (existingStamp) {
     plannedWorkoutId = existingStamp.id;
     if (existingStamp.planId == null && template?.id) {
       await resyncAthleteStampFromTemplate(existingStamp.id, template.id, {

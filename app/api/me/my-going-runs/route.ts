@@ -35,6 +35,10 @@ export async function GET(request: Request) {
             runClub: {
               select: { slug: true, name: true, logoUrl: true },
             },
+            plannedWorkoutId: true,
+            plannedWorkout: {
+              select: { id: true, title: true },
+            },
           },
         },
       },
@@ -68,6 +72,12 @@ export async function GET(request: Request) {
         timezone: r.city_runs.timezone,
         runClubId: r.city_runs.runClubId,
         runClub: r.city_runs.runClub,
+        attachedWorkout: r.city_runs.plannedWorkout
+          ? {
+              id: r.city_runs.plannedWorkout.id,
+              title: r.city_runs.plannedWorkout.title,
+            }
+          : null,
       }));
 
     return NextResponse.json({ runs });

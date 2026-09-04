@@ -11,6 +11,8 @@ import { assignUniqueWorkoutShareSlug } from "@/lib/workout-public-slug";
 import { parseCalendarDateForWrite } from "@/lib/calendar-date";
 import { WORKOUT_BACKED_CITY_RUN_VISIBILITY } from '@/lib/cityrun/workout-backed-run-visibility';
 import { autoRsvpHostGoing, buildJoinRunSignupUrl } from "@/lib/host-run-rsvp";
+import { resolveSpawnedWorkoutForPlanned } from '@/lib/training/match-planned-workout';
+import { resolveWorkoutTargetForAthlete } from '@/lib/training/workout-or-planned-resolve';
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +69,33 @@ const UNSUPPORTED_CITY_RUN_FIELDS = [
   "meetUpNote",
 ] as const;
 
+async function resolveOwnedWorkoutForCityRunInvite(
+  workoutId: string,
+  athleteId: string
+) {
+  const target = await resolveWorkoutTargetForAthlete(workoutId.trim(), athleteId);
+  if (!target) return null;
+
+  if (target.kind === "standalone") {
+    return prisma.workouts.findFirst({
+      where: { id: target.workoutId, athleteId },
+    });
+  }
+
+  let instanceWorkoutId = target.instanceWorkoutId;
+  if (!instanceWorkoutId) {
+    try {
+      instanceWorkoutId = await resolveSpawnedWorkoutForPlanned(target.plannedWorkoutId);
+    } catch {
+      return null;
+    }
+  }
+
+  return prisma.workouts.findFirst({
+    where: { id: instanceWorkoutId, athleteId },
+  });
+}
+
 type FromWorkoutBody = {
   workoutId?: string;
   citySlug?: string;
@@ -87,6 +116,9 @@ type FromWorkoutBody = {
   meetUpLat?: number | string | null;
   meetUpLng?: number | string | null;
   stravaMapUrl?: string | null;
+  routeNeighborhood?: string | null;
+  mapImageUrl?: string | null;
+  routePhotos?: string[] | null;
 };
 
 /**
@@ -122,6 +154,9 @@ export async function POST(request: NextRequest) {
       meetUpLat,
       meetUpLng,
       stravaMapUrl: stravaMapUrlBody,
+      routeNeighborhood,
+      mapImageUrl,
+      routePhotos,
     } = body;
 
     if (!workoutId?.trim()) {
@@ -166,9 +201,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const workout = await prisma.workouts.findFirst({
-      where: { id: workoutId.trim(), athleteId: athlete.id },
-    });
+    const workout = await resolveOwnedWorkoutForCityRunInvite(workoutId, athlete.id);
 
     if (!workout) {
       return NextResponse.json(
@@ -300,7 +333,7 @@ export async function POST(request: NextRequest) {
       meetUpState: meetUpState?.trim() || state?.trim() || null,
       meetUpZip: meetUpZip?.trim() || null,
       meetUpNote: meetUpNote?.trim() || null,
-      routeNeighborhood: null,
+      routeNeighborhood: routeNeighborhood?.trim() || null,
       runType: null,
       workoutDescription: null,
       meetUpPlaceId: meetUpPlaceId?.trim() || null,
@@ -315,8 +348,11 @@ export async function POST(request: NextRequest) {
       stravaMapUrl: stravaMapUrlBody?.trim() || null,
       description: null,
       postRunActivity: null,
-      routePhotos: Prisma.JsonNull,
-      mapImageUrl: null,
+      routePhotos:
+        Array.isArray(routePhotos) && routePhotos.length > 0
+          ? routePhotos.filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+          : Prisma.JsonNull,
+      mapImageUrl: mapImageUrl?.trim() || null,
       staffNotes: null,
       stravaEventUrl: null,
       stravaText: null,

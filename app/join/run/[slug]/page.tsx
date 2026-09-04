@@ -6,6 +6,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
+import CityRunRouteMedia from '@/components/runs/CityRunRouteMedia';
 import { Calendar, Clock, MapPin } from 'lucide-react';
 
 /**
@@ -175,6 +176,9 @@ export default function JoinRunPage() {
                 {run.pace && <span><span className="text-gray-400">Pace</span> {run.pace}</span>}
               </div>
             )}
+            {run.routeNeighborhood?.trim() ? (
+              <p className="text-sm text-gray-600 pt-1 whitespace-pre-wrap">{run.routeNeighborhood.trim()}</p>
+            ) : null}
           </div>
           {run.description && (
             <p className="mt-5 pt-5 border-t border-gray-100 text-sm text-gray-600 whitespace-pre-wrap">
@@ -182,6 +186,8 @@ export default function JoinRunPage() {
             </p>
           )}
         </div>
+
+        <CityRunRouteMedia routePhotos={run.routePhotos} mapImageUrl={run.mapImageUrl} />
 
         {/* CTA — skeleton while auth resolves, then fork */}
         <div className="bg-white rounded-xl shadow-sm p-6">
