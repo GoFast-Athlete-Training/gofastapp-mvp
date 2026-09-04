@@ -11,7 +11,7 @@ import { resolvePublicActions } from '@/lib/gofast-with-me/resolve-public-action
 import { listPublishedAthleteTips } from '@/lib/gofast-with-me/athlete-tips';
 import { listPublishedAthleteRunRoutes } from '@/lib/gofast-with-me/athlete-run-routes';
 import { listPublicInstagramMedia } from '@/lib/gofast-with-me/instagram-hydration';
-import { localTodayKey } from '@/lib/training/plan-utils';
+import { localTodayKey, currentTrainingWeekNumber, effectiveTrainingWeekCount } from '@/lib/training/plan-utils';
 import {
   buildPublicTrainingFor,
   serializePublicAthleteRace,
@@ -285,17 +285,26 @@ export async function loadPublicAthletePage(rawHandle: string) {
     : [];
 
   const trainingSummary = plan
-    ? {
-        planName: plan.name,
-        startDate: plan.startDate.toISOString(),
-        totalWeeks: plan.totalWeeks,
-        athleteRaceId: plan.athleteRaceId ?? plan.athlete_race?.id ?? null,
-        raceName: planRace?.name ?? null,
-        raceDate: planRace?.raceDate.toISOString() ?? null,
-        raceCity: planRace?.city ?? null,
-        raceState: planRace?.state ?? null,
-        raceDistanceLabel: planRace?.distanceLabel ?? null,
-      }
+    ? (() => {
+        const raceDate = planRace?.raceDate ?? null;
+        const effectiveWeeks = effectiveTrainingWeekCount(
+          plan.startDate,
+          plan.totalWeeks,
+          raceDate
+        );
+        return {
+          planName: plan.name,
+          startDate: plan.startDate.toISOString(),
+          totalWeeks: effectiveWeeks,
+          currentWeekNumber: currentTrainingWeekNumber(plan.startDate, effectiveWeeks),
+          athleteRaceId: plan.athleteRaceId ?? plan.athlete_race?.id ?? null,
+          raceName: planRace?.name ?? null,
+          raceDate: planRace?.raceDate.toISOString() ?? null,
+          raceCity: planRace?.city ?? null,
+          raceState: planRace?.state ?? null,
+          raceDistanceLabel: planRace?.distanceLabel ?? null,
+        };
+      })()
     : null;
 
   const trainingFor = primaryAthleteRace

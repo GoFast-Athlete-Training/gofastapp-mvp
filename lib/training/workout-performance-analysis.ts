@@ -21,6 +21,7 @@ import {
   requiresSegmentLevelPaceForPace,
 } from "@/lib/training/workout-paced-segments";
 import { NO_DETAIL_SUPPORT_MESSAGE, workoutHasLapPaceDeltas } from "./workout-pace-analyzer";
+import { deriveActivityLapsForDisplay } from "./activity-lap-display";
 
 export { requiresDetailForTargetAnalysis } from "@/lib/training/structured-workout-types";
 export {
@@ -31,7 +32,7 @@ export {
 
 export type AnalysisMode = "detail" | "completion_only" | "summary_only";
 
-export type SegmentPhase = "warmup" | "work" | "recovery" | "cooldown";
+export type SegmentPhase = "warmup" | "work" | "recovery" | "cooldown" | "activity";
 
 export type WorkSegmentActualRow = {
   segmentId: string;
@@ -116,7 +117,7 @@ export type PhaseAwareLapRow = {
   paceDeltaSecPerMile: number | null;
 };
 
-export type LapSource = "step" | "auto" | null;
+export type LapSource = "step" | "auto" | "activity_detail" | null;
 
 export type WorkoutPerformanceAnalysis = {
   hasActivityDetail: boolean;
@@ -700,6 +701,34 @@ export function buildPhaseAwareLapRows(params: {
   return rows;
 }
 
+function buildActivityFallbackLaps(
+  workout: PerformanceAnalysisWorkoutInput
+): PhaseAwareLapRow[] {
+  const derived = deriveActivityLapsForDisplay({
+    detailData: workout.garmin_detail_activity?.detailData,
+    hydratedAt: workout.garmin_detail_activity?.hydratedAt,
+    distanceMeters: workout.actualDistanceMeters,
+    durationSeconds: workout.actualDurationSeconds,
+  });
+  if (derived.length === 0) return [];
+
+  return derived.map((lap, index) => ({
+    lapOrder: index + 1,
+    lapIndex: lap.lapIndex,
+    segmentId: 'activity',
+    segmentTitle: 'Run',
+    phase: 'activity' as SegmentPhase,
+    paceSecPerMile: lap.paceSecPerMile,
+    avgHr: null,
+    distanceMiles: lap.distanceMiles,
+    targetPaceSecPerMile: null,
+    targetPaceSecPerMileHigh: null,
+    vsPlanPaceLabel: '—',
+    vsPlanTone: 'neutral' as const,
+    paceDeltaSecPerMile: null,
+  }));
+}
+
 export function computeWorkSegmentActual(
   segments: PerformanceAnalysisSegmentInput[],
   workoutTargetLow: number | null,
@@ -996,7 +1025,14 @@ export function computeWorkoutPerformanceAnalysis(
         workoutTargetLow: workout.targetPaceSecPerMile,
         workoutTargetHigh: workout.targetPaceSecPerMileHigh,
       })
-    : [];
+    : buildActivityFallbackLaps(workout);
+
+  const resolvedLapSource =
+    hasSegmentLaps
+      ? lapSource
+      : phaseAwareLaps.length > 0
+        ? ('activity_detail' as LapSource)
+        : lapSource;
 
   const analysisWithoutScorecard = {
     hasActivityDetail,
@@ -1007,7 +1043,7 @@ export function computeWorkoutPerformanceAnalysis(
     requiresPaceForPaceAnalysis: requiresPaceForPace,
     requiresSegmentLevelPaceForPace: requiresSegmentLevel,
     canJudgeTargetPace,
-    lapSource,
+    lapSource: resolvedLapSource,
     workSegmentActual,
     workRepsOnTarget,
     completionOnlyMessage,

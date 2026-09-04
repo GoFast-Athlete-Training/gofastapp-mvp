@@ -6,6 +6,7 @@ import { requireAthleteFromBearerForRsvp } from '@/lib/training/require-athlete'
 import { prisma } from '@/lib/prisma';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 import { upsertCityRunStampForAthlete } from '@/lib/city-run/city-run-stamp';
+import { upsertIndividualCityRunStampForAthlete } from '@/lib/city-run/individual-city-run-stamp';
 import { RSVP_ROLE_GOING, RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
 
 /**
@@ -168,11 +169,15 @@ export async function POST(
     });
 
     let stampResult: Awaited<ReturnType<typeof upsertCityRunStampForAthlete>> | null = null;
-    if (status === 'going' && run.runClubId) {
-      stampResult = await upsertCityRunStampForAthlete(athlete.id, resolvedId, {
-        stampMode: normalizedStampMode,
-        sourceWorkoutId: normalizedSourceWorkoutId,
-      });
+    if (status === 'going') {
+      if (run.runClubId) {
+        stampResult = await upsertCityRunStampForAthlete(athlete.id, resolvedId, {
+          stampMode: normalizedStampMode,
+          sourceWorkoutId: normalizedSourceWorkoutId,
+        });
+      } else if (run.cityRunType === 'INDIVIDUAL') {
+        await upsertIndividualCityRunStampForAthlete(athlete.id, resolvedId);
+      }
     }
 
     return NextResponse.json({

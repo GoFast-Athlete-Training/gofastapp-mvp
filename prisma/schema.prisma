@@ -2479,6 +2479,12 @@ model planned_workouts {
   workoutId                 String?
   /// Home/agenda read: true when ingest linked a completed workout to this planned day.
   workoutCompleted          Boolean             @default(false)
+  /// Athlete confirmed they ran this city run (Yes on I-ran card or Garmin match).
+  iRanAt                    DateTime?
+  /// host | running — copied from RSVP role on Yes; Garmin match uses running.
+  iRanRole                  String?
+  /// Athlete tapped No on I-ran card — stop prompting.
+  iRanDeclined              Boolean             @default(false)
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
   Athlete                   Athlete?            @relation(fields: [athleteId], references: [id], onDelete: Cascade)

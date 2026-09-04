@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { RUNNING_ACTIVITY_TYPES } from '@/lib/training/activity-type-sets';
 import { getCityRunStartMs } from '@/lib/city-run-clock';
+import { stampPlannedWorkoutIRan } from '@/lib/planned-workouts/i-ran';
 
 const CITY_RUN_MATCH_WINDOW_MS = 36 * 60 * 60 * 1000;
 
@@ -87,6 +88,14 @@ async function creditCityRunFromStamp(params: {
       },
     });
   }
+
+  await stampPlannedWorkoutIRan({
+    athleteId: params.athleteId,
+    cityRunId: params.cityRunId,
+    role: 'running',
+  }).catch(() => {
+    /* stamp may not exist if athlete never RSVPed — checkin row still credits */
+  });
 
   await prisma.city_run_activity_links.upsert({
     where: { cityRunId_athleteId: { cityRunId: params.cityRunId, athleteId: params.athleteId } },

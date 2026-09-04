@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
+import { upsertIndividualCityRunStampForAthlete } from '@/lib/city-run/individual-city-run-stamp';
 
 function generateRsvpId(): string {
   const timestamp = Date.now().toString(36);
@@ -22,6 +23,14 @@ export async function autoRsvpHostRole(runId: string, athleteId: string): Promis
       role: RSVP_ROLE_HOST,
     },
   });
+
+  const run = await prisma.city_runs.findUnique({
+    where: { id: runId },
+    select: { cityRunType: true },
+  });
+  if (run?.cityRunType === 'INDIVIDUAL') {
+    await upsertIndividualCityRunStampForAthlete(athleteId, runId);
+  }
 }
 
 /** @deprecated Use autoRsvpHostRole */

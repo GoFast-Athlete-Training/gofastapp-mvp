@@ -25,8 +25,12 @@ export type TodayRunPayload = {
   timezone: string | null;
   runClub: { slug: string; name: string; logoUrl: string | null } | null;
   runClubId: string | null;
+  /** Legacy check-in row or planned_workouts.iRanAt */
   hasCheckin: boolean;
   checkedInAt: string | null;
+  hasIRan: boolean;
+  iRanAt: string | null;
+  iRanDeclined: boolean;
   isPast: boolean;
   isToday: boolean;
   isLive: boolean;
@@ -53,6 +57,10 @@ export type MyDayResponse = {
   plannedRun: TodayPlannedRunPayload | null;
   goingRuns: TodayRunPayload[];
   hostedRuns: TodayRunPayload[];
+  /** Joiner runs needing I-ran answer (no iRanAt, not declined). */
+  needsYouRuns: TodayRunPayload[];
+  /** Recent I-ran confirmations for shoe mini-feed. */
+  doneRuns: TodayRunPayload[];
 };
 
 type RunClockInput = {
@@ -80,6 +88,10 @@ type RunSelectRow = {
   runClubId: string | null;
   runClub: { slug: string; name: string; logoUrl: string | null } | null;
   city_run_checkins: Array<{ id: string; checkedInAt: Date }>;
+  athlete_stamp?: {
+    iRanAt: Date | null;
+    iRanDeclined: boolean;
+  } | null;
 };
 
 const RUN_SELECT = {
@@ -137,10 +149,18 @@ function mapRunToTodayPayload(
     run.city_run_checkins.find((row) => row.checkedInAt) ??
     run.city_run_checkins[0] ??
     null;
-  const hasCheckin = Boolean(checkin);
+  const stamp = run.athlete_stamp;
+  const iRanAt = stamp?.iRanAt ?? null;
+  const iRanDeclined = stamp?.iRanDeclined ?? false;
+  const hasIRan = Boolean(iRanAt) || Boolean(checkin);
+  const hasCheckin = hasIRan;
   const clock = mapRunClock(run);
 
-  if (!isTodayRunRelevant(clock, nowMs, hasCheckin)) return null;
+  if (!isTodayRunRelevant(clock, nowMs, hasCheckin) && !iRanAt) return null;
+  if (iRanDeclined && !hasIRan && !isTodayRunRelevant(clock, nowMs, false)) return null;
+
+  const checkedInAtIso =
+    iRanAt?.toISOString() ?? checkin?.checkedInAt.toISOString() ?? null;
 
   return {
     id: run.id,
@@ -159,12 +179,16 @@ function mapRunToTodayPayload(
     runClub: run.runClub,
     runClubId: run.runClubId,
     hasCheckin,
-    checkedInAt: checkin?.checkedInAt.toISOString() ?? null,
+    checkedInAt: checkedInAtIso,
+    hasIRan,
+    iRanAt: iRanAt?.toISOString() ?? null,
+    iRanDeclined,
     isPast: isCityRunPast(clock, nowMs),
     isToday: isCityRunToday(clock, new Date(nowMs)),
     isLive: isCityRunLiveForCheckin(clock, nowMs),
     needsWereYouThere:
-      !hasCheckin &&
+      !hasIRan &&
+      !iRanDeclined &&
       isCityRunPast(clock, nowMs) &&
       isCityRunWithinPostRunCheckinWindow(clock, nowMs),
     supportsCheckin: hasSocialRunLifecycle(run),
@@ -188,6 +212,38 @@ function utcNextDayStartFromKey(dateKey: string): Date {
   const d = new Date(`${dateKey}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   return d;
+}
+
+async function fetchAthleteStampByRunId(
+  athleteId: string,
+  runIds: string[]
+): Promise<Map<string, { iRanAt: Date | null; iRanDeclined: boolean }>> {
+  if (runIds.length === 0) return new Map();
+  const stamps = await prisma.planned_workouts.findMany({
+    where: { athleteId, cityRunId: { in: runIds } },
+    select: { cityRunId: true, iRanAt: true, iRanDeclined: true },
+  });
+  const map = new Map<string, { iRanAt: Date | null; iRanDeclined: boolean }>();
+  for (const s of stamps) {
+    if (s.cityRunId) {
+      map.set(s.cityRunId, { iRanAt: s.iRanAt, iRanDeclined: s.iRanDeclined });
+    }
+  }
+  return map;
+}
+
+async function attachStampsToRuns(
+  athleteId: string,
+  runs: Array<Omit<RunSelectRow, 'athlete_stamp'>>
+): Promise<RunSelectRow[]> {
+  const stampMap = await fetchAthleteStampByRunId(
+    athleteId,
+    runs.map((r) => r.id)
+  );
+  return runs.map((run) => ({
+    ...run,
+    athlete_stamp: stampMap.get(run.id) ?? null,
+  }));
 }
 
 async function fetchRsvpRunsForRole(
@@ -223,8 +279,10 @@ async function fetchRsvpRunsForRole(
   });
 
   const runs: TodayRunPayload[] = [];
-  for (const rsvp of rsvps) {
-    const mapped = mapRunToTodayPayload(rsvp.city_runs, athleteId, opts.nowMs);
+  const rawRuns = rsvps.map((r) => r.city_runs);
+  const withStamps = await attachStampsToRuns(athleteId, rawRuns);
+  for (const run of withStamps) {
+    const mapped = mapRunToTodayPayload(run, athleteId, opts.nowMs);
     if (mapped) runs.push(mapped);
   }
 
@@ -275,8 +333,12 @@ export async function fetchTodayPlannedRunForAthlete(
 
   if (!planned) return null;
 
-  const cityRunPayload = planned.city_run
-    ? mapRunToTodayPayload(planned.city_run, athleteId, nowMs)
+  const [stampedRun] = planned.city_run
+    ? await attachStampsToRuns(athleteId, [planned.city_run])
+    : [null];
+
+  const cityRunPayload = stampedRun
+    ? mapRunToTodayPayload(stampedRun, athleteId, nowMs)
     : null;
 
   return {
@@ -326,11 +388,26 @@ export async function fetchMyDayForAthlete(
     fetchTodayHostedRunsForAthlete(athleteId, shared),
   ]);
 
+  const allGoing = going.runs;
+  const hostIds = new Set(hosted.runs.map((r) => r.id));
+  const needsYouRuns = allGoing.filter(
+    (r) =>
+      r.needsWereYouThere &&
+      !r.hasIRan &&
+      !r.iRanDeclined &&
+      !hostIds.has(r.id)
+  );
+  const doneRuns = allGoing.filter((r) => r.hasIRan && r.iRanAt);
+
   return {
     todayKey,
     plannedRun,
-    goingRuns: going.runs,
+    goingRuns: allGoing,
     hostedRuns: hosted.runs,
+    needsYouRuns,
+    doneRuns: [...doneRuns].sort((a, b) =>
+      (b.iRanAt ?? '').localeCompare(a.iRanAt ?? '')
+    ),
   };
 }
 

@@ -29,7 +29,8 @@ export default function CityRunPostRunContainer({
   hostRecapMode = false,
 }: Props) {
   const athleteId = LocalStorageAPI.getAthleteId();
-  const crewLabel = isIndividualHostedRun(run)
+  const individualRun = isIndividualHostedRun(run);
+  const crewLabel = individualRun
     ? 'Hosted run'
     : resolveRunClubLabel(run.runClub, run.title);
   const heroHeadline = buildPostRunHeroHeadline({
@@ -182,37 +183,41 @@ export default function CityRunPostRunContainer({
           clubName={crewLabel}
         />
 
-        <CityRunPostRunShoutsSection
-          myCheckin={shoutsMineCheckin}
-          othersWithShouts={othersWithShouts}
-          editingShouts={editingShouts}
-          shoutsInput={shoutsInput}
-          savingShouts={savingShouts}
-          clubName={crewLabel}
-          showOthers={false}
-          onStartEdit={() => setEditingShouts(true)}
-          onCancelEdit={() => {
-            setEditingShouts(false);
-            setShoutsInput(myCheckin?.runShouts || '');
-          }}
-          onShoutsInputChange={setShoutsInput}
-          onSaveShouts={() => void saveShouts()}
-        />
+        {!individualRun ? (
+          <>
+            <CityRunPostRunShoutsSection
+              myCheckin={shoutsMineCheckin}
+              othersWithShouts={othersWithShouts}
+              editingShouts={editingShouts}
+              shoutsInput={shoutsInput}
+              savingShouts={savingShouts}
+              clubName={crewLabel}
+              showOthers={false}
+              onStartEdit={() => setEditingShouts(true)}
+              onCancelEdit={() => {
+                setEditingShouts(false);
+                setShoutsInput(myCheckin?.runShouts || '');
+              }}
+              onShoutsInputChange={setShoutsInput}
+              onSaveShouts={() => void saveShouts()}
+            />
 
-        {othersWithShouts.length > 0 ? (
-          <CityRunPostRunShoutsSection
-            myCheckin={shoutsMineCheckin}
-            othersWithShouts={othersWithShouts}
-            editingShouts={false}
-            shoutsInput=""
-            savingShouts={false}
-            clubName={crewLabel}
-            showMine={false}
-            onStartEdit={() => undefined}
-            onCancelEdit={() => undefined}
-            onShoutsInputChange={() => undefined}
-            onSaveShouts={() => undefined}
-          />
+            {othersWithShouts.length > 0 ? (
+              <CityRunPostRunShoutsSection
+                myCheckin={shoutsMineCheckin}
+                othersWithShouts={othersWithShouts}
+                editingShouts={false}
+                shoutsInput=""
+                savingShouts={false}
+                clubName={crewLabel}
+                showMine={false}
+                onStartEdit={() => undefined}
+                onCancelEdit={() => undefined}
+                onShoutsInputChange={() => undefined}
+                onSaveShouts={() => undefined}
+              />
+            ) : null}
+          </>
         ) : null}
 
         {myCheckin ? (

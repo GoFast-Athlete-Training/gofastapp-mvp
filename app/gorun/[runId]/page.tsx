@@ -178,13 +178,7 @@ export default function GoRunPage() {
     startTimePeriod: run.startTimePeriod,
     timezone: run.timezone,
   });
-  const hostRecapMode =
-    run.currentRSVPRole === 'host' &&
-    runIsPast &&
-    runIsToday &&
-    hasSocialRunLifecycle(run);
-
-  if ((myCheckin || hostRecapMode) && hasSocialRunLifecycle(run)) {
+  if ((myCheckin) && hasSocialRunLifecycle(run)) {
     return (
       <CityRunPostRunContainer
         run={{
@@ -196,7 +190,7 @@ export default function GoRunPage() {
         }}
         myCheckin={myCheckin}
         allCheckins={checkins}
-        hostRecapMode={hostRecapMode && !myCheckin}
+        hostRecapMode={false}
       />
     );
   }

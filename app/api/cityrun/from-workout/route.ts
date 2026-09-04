@@ -122,6 +122,8 @@ type FromWorkoutBody = {
   routeNeighborhood?: string | null;
   mapImageUrl?: string | null;
   routePhotos?: string[] | null;
+  /** Social meetup title — required; never defaults to plan workout title. */
+  title?: string;
 };
 
 /**
@@ -161,6 +163,7 @@ export async function POST(request: NextRequest) {
       routeNeighborhood,
       mapImageUrl,
       routePhotos,
+      title: socialTitleBody,
     } = body;
 
     if (!workoutId?.trim()) {
@@ -175,6 +178,14 @@ export async function POST(request: NextRequest) {
     if (!meetUpCity?.trim()) {
       return NextResponse.json(
         { error: "meetUpCity is required — pick a Google Places result." },
+        { status: 400 }
+      );
+    }
+
+    const socialTitle = socialTitleBody?.trim();
+    if (!socialTitle) {
+      return NextResponse.json(
+        { error: "title is required — give your run a social name (e.g. Saturday morning miles)." },
         { status: 400 }
       );
     }
@@ -280,7 +291,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
 
-    const finalTitle = workout.title.trim();
+    const finalTitle = socialTitle;
 
     let runSlug: string | null = null;
     try {

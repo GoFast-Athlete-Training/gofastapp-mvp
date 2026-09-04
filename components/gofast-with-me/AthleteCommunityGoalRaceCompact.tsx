@@ -23,18 +23,6 @@ function countdownLabel(
   return { label: `${weeks} weeks to go`, tone: 'soft' };
 }
 
-function planWeekProgress(
-  startIso: string,
-  totalWeeks: number
-): { week: number; total: number; pct: number } | null {
-  if (!totalWeeks || totalWeeks <= 0) return null;
-  const start = new Date(startIso);
-  const now = new Date();
-  const weeksIn = Math.floor((now.getTime() - start.getTime()) / (7 * MS_PER_DAY));
-  const week = Math.max(1, Math.min(totalWeeks, weeksIn + 1));
-  return { week, total: totalWeeks, pct: Math.min(100, Math.round((week / totalWeeks) * 100)) };
-}
-
 function formatRaceDate(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -65,8 +53,6 @@ export default function AthleteCommunityGoalRaceCompact({
   let targetIso: string | null = null;
   let goalTime: string | null = null;
   let raceLogoUrl: string | null = null;
-  let progress: ReturnType<typeof planWeekProgress> = null;
-  let planName: string | null = null;
 
   if (trainingSummary) {
     raceName = trainingSummary.raceName;
@@ -75,8 +61,6 @@ export default function AthleteCommunityGoalRaceCompact({
     raceState = trainingSummary.raceState;
     distanceLabel = trainingSummary.raceDistanceLabel;
     targetIso = trainingSummary.raceDate;
-    progress = planWeekProgress(trainingSummary.startDate, trainingSummary.totalWeeks);
-    planName = trainingSummary.planName;
     raceLogoUrl = primaryChasingGoal?.raceLogoUrl ?? null;
     goalTime = primaryChasingGoal?.goalTime ?? null;
   } else if (primaryChasingGoal) {
@@ -139,23 +123,6 @@ export default function AthleteCommunityGoalRaceCompact({
           ) : null}
         </div>
       </div>
-
-      {progress ? (
-        <div className="mt-5">
-          <div className="mb-1.5 flex items-center justify-between text-xs text-gray-600">
-            <span className="font-semibold text-gray-700">
-              Week {progress.week} of {progress.total}
-            </span>
-            {planName ? <span className="truncate">{planName}</span> : null}
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-orange-100">
-            <div
-              className="h-full rounded-full bg-orange-500 transition-all"
-              style={{ width: `${progress.pct}%` }}
-            />
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

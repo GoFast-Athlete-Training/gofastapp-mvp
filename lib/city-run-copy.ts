@@ -197,7 +197,7 @@ export function buildPostRunCtaCopy(opts: {
   runClub?: RunClubSummary | null;
   runTitle?: string | null;
   runDate: string;
-  ctaTarget: 'checkin' | 'shouts';
+  ctaTarget: 'checkin' | 'shouts' | 'view-run';
   host?: RunSocialCopyContext['host'];
 }): { headline: string; subline: string; buttonLabel: string } {
   const socialCtx: RunSocialCopyContext = {
@@ -207,20 +207,20 @@ export function buildPostRunCtaCopy(opts: {
     host: opts.host,
   };
   if (isIndividualHostedRun(socialCtx)) {
-    const host = resolveHostLabel(opts.host, opts.runTitle);
+    const title = opts.runTitle?.trim() || 'this run';
     const dateLabel = formatRunLookBackDate(opts.runDate);
     const datePhrase = dateLabel ? ` ${dateLabel}` : '';
     if (opts.ctaTarget === 'checkin') {
       return {
-        headline: `Were you at ${host}'s run${datePhrase}?`,
-        subline: 'Check in and see who else showed up',
-        buttonLabel: 'Check in',
+        headline: `Did you run ${title}?`,
+        subline: 'Let your host know you made it',
+        buttonLabel: 'I ran',
       };
     }
     return {
-      headline: `You ran with ${host}${datePhrase}`,
-      subline: 'See who showed up and share how it felt',
-      buttonLabel: 'Add a shout-out',
+      headline: `Glad you made it to ${title}${datePhrase}`,
+      subline: 'See your run details and splits',
+      buttonLabel: 'View run',
     };
   }
 

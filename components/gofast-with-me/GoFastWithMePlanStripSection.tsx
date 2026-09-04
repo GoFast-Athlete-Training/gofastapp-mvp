@@ -25,16 +25,11 @@ export default function GoFastWithMePlanStripSection({
 
   return (
     <div className="space-y-3">
-      <div className="px-1">
-        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-          My Training
-        </h2>
-        <p className="text-xs text-gray-500 mt-1">
-          {isHost
-            ? 'This is the training week your followers see when you share your GoFast plan.'
-            : `Train alongside ${hostFirstName} — their current week on this plan.`}
-        </p>
-      </div>
+      <p className="px-1 text-xs text-gray-500">
+        {isHost
+          ? 'This is the training week your followers see when you share your GoFast plan.'
+          : `Train alongside ${hostFirstName} — their current week on this plan.`}
+      </p>
       <PublicPlanWeekViewer
         weeks={publishedPlan.weeks}
         totalWeeks={publishedPlan.totalWeeks}
@@ -42,15 +37,15 @@ export default function GoFastWithMePlanStripSection({
         ctaHref={`/plans/${encodeURIComponent(publishedPlan.slug)}`}
         ctaLabel="View full plan"
       />
-      <p className="text-xs text-gray-500 px-1">
+      <p className="px-1 text-xs text-gray-500">
         <Link
           href={`/plans/${encodeURIComponent(publishedPlan.slug)}`}
-          className="text-orange-600 font-semibold hover:underline"
+          className="font-semibold text-orange-600 hover:underline"
         >
-          {publishedPlan.name}
+          View full plan
         </Link>
         {' · '}
-        See the full build on this plan.
+        See the complete build.
       </p>
       {canAdopt ? (
         <AdoptThisPlanPanel

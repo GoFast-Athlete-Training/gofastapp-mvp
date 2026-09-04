@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { AthleteCommunityPayload } from '@/lib/gofast-with-me/container-hub-service';
 import GoFastWithMePlanStripSection from '@/components/gofast-with-me/GoFastWithMePlanStripSection';
+import { hubPlanDisplay, initialHubPlanWeek } from '@/lib/gofast-with-me/hub-plan-display';
 
 type Props = {
   community: AthleteCommunityPayload;
@@ -34,22 +35,38 @@ export default function AthleteCommunityMyTrainingSection({
     isOwner: community.isOwner,
     previewFollower,
   });
-  const hasTrainingSummary = Boolean(summary);
 
-  const planSummary = planStrip
-    ? planStrip.name
-    : displayAsOwner
-      ? 'Publish your plan in studio'
-      : `${firstName} hasn't shared a plan yet`;
-
-  const initialPlanWeek = planStrip?.currentWeekNumber ?? 1;
+  const planProgress = hubPlanDisplay(planStrip, summary);
+  const initialPlanWeek = initialHubPlanWeek(planStrip, summary);
+  const hasPlan = Boolean(planProgress?.planName || summary || planStrip);
 
   return (
     <section className="h-full rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">My Training</h2>
-        <p className="mt-1 text-sm text-gray-500">{planSummary}</p>
-      </div>
+      {hasPlan ? (
+        <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">My Plan</p>
+          {planProgress?.planName ? (
+            <h2 className="mt-1 text-lg font-bold text-gray-900">{planProgress.planName}</h2>
+          ) : null}
+          {planProgress ? (
+            <>
+              <p className="mt-2 text-sm font-semibold text-gray-700">
+                Week {planProgress.week} of {planProgress.total}
+              </p>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-orange-100">
+                <div
+                  className="h-full rounded-full bg-orange-500 transition-all"
+                  style={{ width: `${planProgress.pct}%` }}
+                />
+              </div>
+            </>
+          ) : displayAsOwner ? (
+            <p className="mt-2 text-sm text-gray-600">Publish your plan in studio</p>
+          ) : (
+            <p className="mt-2 text-sm text-gray-600">{firstName} hasn&apos;t shared a plan yet</p>
+          )}
+        </div>
+      ) : null}
 
       {showPlanStrip && planStrip && !expanded ? (
         <button
@@ -57,7 +74,7 @@ export default function AthleteCommunityMyTrainingSection({
           onClick={() => setExpanded(true)}
           className="mt-4 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:border-orange-200 hover:bg-orange-50/40"
         >
-          <p className="text-sm font-semibold text-gray-900">See my training</p>
+          <p className="text-sm font-semibold text-gray-900">See this week&apos;s workouts</p>
           <p className="mt-1 text-xs text-gray-500">
             Week {initialPlanWeek} of {planStrip.totalWeeks} · See more ↓
           </p>
@@ -81,9 +98,10 @@ export default function AthleteCommunityMyTrainingSection({
         </div>
       ) : null}
 
-      {!showPlanStrip || !planStrip ? (
+      {!hasPlan ? (
         <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4">
-          <p className="text-sm text-gray-600">
+          <h2 className="text-lg font-bold text-gray-900">My Plan</h2>
+          <p className="mt-2 text-sm text-gray-600">
             {displayAsOwner
               ? 'Publish your plan in Training so followers can train week-by-week with you.'
               : `${firstName} hasn't shared a public plan yet.`}
@@ -96,13 +114,13 @@ export default function AthleteCommunityMyTrainingSection({
               Open Runs &amp; Training →
             </Link>
           ) : null}
-          {displayAsOwner && hasTrainingSummary ? (
-            <p className="mt-3 text-xs leading-5 text-gray-500">
-              Goal race above comes from your active plan. This section appears after you publish
-              the plan for followers.
-            </p>
-          ) : null}
         </div>
+      ) : !showPlanStrip || !planStrip ? (
+        displayAsOwner ? (
+          <p className="mt-4 text-xs leading-5 text-gray-500">
+            Publish your plan in Training so followers can train week-by-week with you.
+          </p>
+        ) : null
       ) : null}
     </section>
   );

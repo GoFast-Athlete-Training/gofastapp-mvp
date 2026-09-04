@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { hasSocialRunLifecycle } from '@/lib/city-run-type';
+import { hasSocialRunLifecycle, isIndividualHostedRun } from '@/lib/city-run-type';
+import { RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
 import {
   isCityRunPast,
   isCityRunWithinPostRunCheckinWindow,
@@ -91,7 +92,7 @@ export type CityRunPostRunShoutCta = {
     startTime: string | null;
     distanceMeters: number | null;
   } | null;
-  ctaTarget: 'checkin' | 'shouts';
+  ctaTarget: 'checkin' | 'shouts' | 'view-run';
 };
 
 export async function findCityRunPostRunShoutCta(
@@ -130,6 +131,9 @@ export async function findCityRunPostRunShoutCta(
       },
     });
 
+    const isIndividual = isIndividualHostedRun(run);
+    const ctaTarget = isIndividual ? 'view-run' : 'shouts';
+
     return {
       type: 'cityRunPostRunShoutCta',
       runId: run.id,
@@ -149,7 +153,7 @@ export async function findCityRunPostRunShoutCta(
             distanceMeters: link.athlete_activities.distance ?? null,
           }
         : null,
-      ctaTarget: 'shouts',
+      ctaTarget,
     };
   }
 
@@ -157,6 +161,7 @@ export async function findCityRunPostRunShoutCta(
     where: {
       athleteId,
       status: 'going',
+      NOT: { role: RSVP_ROLE_HOST },
       city_runs: {
         date: { gte: since },
       },
@@ -180,6 +185,53 @@ export async function findCityRunPostRunShoutCta(
     });
     if (existingCheckin) continue;
 
+    const iRanStamp = await prisma.planned_workouts.findFirst({
+      where: { athleteId, cityRunId: run.id },
+      select: { iRanAt: true, iRanDeclined: true },
+    });
+    if (iRanStamp?.iRanAt || iRanStamp?.iRanDeclined) continue;
+
+    const activityLink = await prisma.city_run_activity_links.findUnique({
+      where: { cityRunId_athleteId: { cityRunId: run.id, athleteId } },
+      include: {
+        athlete_activities: {
+          select: {
+            id: true,
+            activityName: true,
+            startTime: true,
+            distance: true,
+          },
+        },
+      },
+    });
+
+    const isIndividual = isIndividualHostedRun(run);
+    const garminLinked = Boolean(activityLink?.activityId);
+
+    if (garminLinked && isIndividual) {
+      return {
+        type: 'cityRunPostRunShoutCta',
+        runId: run.id,
+        runTitle: run.title,
+        runDate: run.date.toISOString(),
+        cityRunType: run.cityRunType,
+        runClub: run.runClub,
+        hasCheckin: false,
+        checkedInAt: null,
+        hasShout: false,
+        garminLinked: true,
+        activitySummary: activityLink?.athlete_activities
+          ? {
+              id: activityLink.athlete_activities.id,
+              activityName: activityLink.athlete_activities.activityName,
+              startTime: activityLink.athlete_activities.startTime?.toISOString() ?? null,
+              distanceMeters: activityLink.athlete_activities.distance ?? null,
+            }
+          : null,
+        ctaTarget: 'view-run',
+      };
+    }
+
     return {
       type: 'cityRunPostRunShoutCta',
       runId: run.id,
@@ -190,8 +242,15 @@ export async function findCityRunPostRunShoutCta(
       hasCheckin: false,
       checkedInAt: null,
       hasShout: false,
-      garminLinked: false,
-      activitySummary: null,
+      garminLinked,
+      activitySummary: activityLink?.athlete_activities
+        ? {
+            id: activityLink.athlete_activities.id,
+            activityName: activityLink.athlete_activities.activityName,
+            startTime: activityLink.athlete_activities.startTime?.toISOString() ?? null,
+            distanceMeters: activityLink.athlete_activities.distance ?? null,
+          }
+        : null,
       ctaTarget: 'checkin',
     };
   }
