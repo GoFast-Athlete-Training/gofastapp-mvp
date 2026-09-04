@@ -159,16 +159,43 @@ export function expandPlannedToLapPrescriptions(
   return out;
 }
 
-/** Multiple laps on one repeatCount row → alternate work/recovery within segment. */
+/** True when recovery jogs landed on a separate Recovery segment row (modular mile repeats). */
+function plannedHasRecoverySegmentWithLaps(
+  plannedSegments: PlannedSegmentRow[],
+  sortedLaps: WorkoutLapRow[]
+): boolean {
+  return plannedSegments.some(
+    (s) =>
+      isRecoveryTitle(s.title) &&
+      sortedLaps.some((l) => l.segmentStepOrder === s.stepOrder)
+  );
+}
+
+/** Multiple laps on one repeatCount row → alternate work/recovery only when mixed on same segment. */
 function repeatBlockNeedsSegmentPath(
   plannedSegments: PlannedSegmentRow[],
   sortedLaps: WorkoutLapRow[]
 ): boolean {
+  const modularSeparateRecovery = plannedHasRecoverySegmentWithLaps(
+    plannedSegments,
+    sortedLaps
+  );
+
   for (const seg of plannedSegments) {
     const reps = seg.repeatCount ?? 1;
     if (reps <= 1) continue;
     const lapsOnSeg = sortedLaps.filter((l) => l.segmentStepOrder === seg.stepOrder);
-    if (lapsOnSeg.length > 1) return true;
+    if (lapsOnSeg.length <= 1) continue;
+
+    if (
+      modularSeparateRecovery &&
+      isWorkSegmentTitle(seg.title) &&
+      !lapsOnSeg.some((l) => isRecoveryTitle(l.segmentTitle))
+    ) {
+      continue;
+    }
+
+    return true;
   }
   return false;
 }
@@ -199,13 +226,15 @@ export function translatePlannedOntoWorkout(params: {
     }
 
     const reps = seg?.repeatCount ?? 1;
-    const isRepeatWorkBlock =
+    const usesSameSegmentAlternation =
       reps > 1 &&
       phase === "work" &&
       !isRecoveryTitle(lap.segmentTitle) &&
-      band.min != null;
+      band.min != null &&
+      !plannedHasRecoverySegmentWithLaps(plannedSegments, sortedLaps) &&
+      sortedLaps.filter((l) => l.segmentId === lap.segmentId).length > 1;
 
-    if (isRepeatWorkBlock) {
+    if (usesSameSegmentAlternation) {
       const idx = lapIndexInSegment.get(lap.segmentId) ?? 0;
       lapIndexInSegment.set(lap.segmentId, idx + 1);
       if (isRecoveryLapWithinRepeatBlock(idx)) {

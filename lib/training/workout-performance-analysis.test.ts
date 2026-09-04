@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildPhaseAwareLapRows,
   buildWorkSegmentDeltas,
+  classifyLapPhase,
   classifySegmentPhase,
   computeWorkSegmentActual,
   computeWorkoutPerformanceAnalysis,
@@ -364,6 +365,85 @@ test("recovery laps are labeled recovery not slower", () => {
   assert.equal(rows[0]!.vsPlanPaceLabel, "Warmup");
   assert.notEqual(rows[1]!.vsPlanPaceLabel, "Slower");
   assert.equal(rows[2]!.vsPlanPaceLabel, "Recovery");
+});
+
+test("classifyLapPhase uses Recovery segment title not Interval band", () => {
+  assert.equal(
+    classifyLapPhase({
+      segmentTitle: "Recovery",
+      lapIndexInSegment: 0,
+      segmentLapCount: 1,
+    }),
+    "recovery"
+  );
+  assert.equal(
+    classifyLapPhase({
+      segmentTitle: "Interval",
+      lapIndexInSegment: 0,
+      segmentLapCount: 1,
+      prescribedMin: 360,
+      prescribedMax: 389,
+    }),
+    "work"
+  );
+});
+
+test("mile repeat recovery jogs on Recovery segment stay OPEN in splits", () => {
+  const rows = buildPhaseAwareLapRows({
+    segments: [
+      {
+        id: "int",
+        title: "Interval",
+        stepOrder: 2,
+        targets: [{ type: "PACE", valueLow: 223, valueHigh: 242 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [
+          {
+            lapIndex: 0,
+            avgPaceSecPerMile: 377,
+            prescribedPaceMinSecPerMile: 360,
+            prescribedPaceMaxSecPerMile: 389,
+          },
+          {
+            lapIndex: 2,
+            avgPaceSecPerMile: 370,
+            prescribedPaceMinSecPerMile: 360,
+            prescribedPaceMaxSecPerMile: 389,
+          },
+        ],
+      },
+      {
+        id: "rec",
+        title: "Recovery",
+        stepOrder: 3,
+        targets: null,
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [
+          {
+            lapIndex: 1,
+            avgPaceSecPerMile: 522,
+            prescribedPaceMinSecPerMile: null,
+            prescribedPaceMaxSecPerMile: null,
+          },
+        ],
+      },
+    ],
+    workoutTargetLow: 360,
+    workoutTargetHigh: 389,
+  });
+
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0]!.phase, "work");
+  assert.equal(rows[1]!.phase, "recovery");
+  assert.equal(rows[1]!.targetPaceSecPerMile, null);
+  assert.equal(rows[1]!.vsPlanPaceLabel, "Recovery");
+  assert.equal(rows[2]!.phase, "work");
 });
 
 test("countWorkRepsOnTarget ignores recovery segments", () => {

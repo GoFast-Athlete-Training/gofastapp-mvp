@@ -253,7 +253,7 @@ test("collapsed 400x8: one work row with repeatCount 8 consumes eight 400m laps"
   }
 });
 
-test("mile repeats: one lap per rep on interval, no cooldown dump", () => {
+test("mile repeats: modular W/R until five work miles, all laps assigned", () => {
   const segments = [
     {
       id: "w",
@@ -313,10 +313,18 @@ test("mile repeats: one lap per rep on interval, no cooldown dump", () => {
   assert.ok(result);
   assert.equal(result.bySegment.get("w")!.length, 1);
   assert.equal(result.bySegment.get("int")!.length, 5);
-  assert.equal(result.bySegment.get("r")!.length, 1);
+  assert.equal(result.bySegment.get("r")!.length, 4);
   assert.equal(result.bySegment.get("c")!.length, 1);
   const assigned = [...result.bySegment.values()].reduce((a, ls) => a + ls.length, 0);
-  assert.equal(assigned, 8);
+  assert.equal(assigned, 11);
+  assert.deepEqual(
+    result.bySegment.get("int")!.map((l) => l.lapIndex),
+    [1, 3, 5, 7, 9]
+  );
+  assert.deepEqual(
+    result.bySegment.get("r")!.map((l) => l.lapIndex),
+    [2, 4, 6, 8]
+  );
 });
 
 test("unassignable laps return null", () => {

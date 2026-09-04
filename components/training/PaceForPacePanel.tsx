@@ -29,18 +29,15 @@ function lapPaceLabel(lap: PhaseAwareLapRow): string {
 
 function splitsLaps(analysis: WorkoutPerformanceAnalysis | null): PhaseAwareLapRow[] {
   if (!analysis) return [];
-  const laps = analysis.phaseAwareLaps;
-  if (analysis.requiresSegmentLevelPaceForPace) {
-    return laps.filter((lap) => lap.phase === "work");
-  }
-  return laps;
+  return analysis.phaseAwareLaps;
 }
 
 function hasLapPaceDeltas(analysis: WorkoutPerformanceAnalysis | null): boolean {
   if (!analysis) return false;
-  const laps = splitsLaps(analysis);
+  const laps = analysis.phaseAwareLaps;
   return laps.some(
     (lap) =>
+      lap.paceSecPerMile != null ||
       (lap.paceDeltaSecPerMile != null && Number.isFinite(lap.paceDeltaSecPerMile)) ||
       (lap.vsPlanPaceLabel !== "—" && lap.phase === "work")
   );

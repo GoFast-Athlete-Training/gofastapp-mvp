@@ -13,6 +13,8 @@ export type LapRow = {
   distanceMeters?: number | null;
   avgSpeedMetersPerSecond?: number | null;
   avgHeartRate?: number | null;
+  /** Garmin lap intensity when present (e.g. ACTIVE, REST, RECOVERY). */
+  intensity?: string | null;
 };
 
 export type SampleRow = {
@@ -80,6 +82,13 @@ function readDistanceMeters(obj: Record<string, unknown>): number | null {
   );
 }
 
+function readIntensity(obj: Record<string, unknown>): string | null {
+  const raw = obj.intensity ?? obj.Intensity ?? obj.intensityType ?? obj.IntensityType;
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function parseLapRow(item: Record<string, unknown>): LapRow | null {
   const t = toNum(item.startTimeInSeconds) ?? toNum(item.StartTimeInSeconds);
   if (t == null) return null;
@@ -89,6 +98,7 @@ function parseLapRow(item: Record<string, unknown>): LapRow | null {
     distanceMeters: readDistanceMeters(item),
     avgSpeedMetersPerSecond: readSpeed(item),
     avgHeartRate: readHeartRate(item),
+    intensity: readIntensity(item),
   };
 }
 

@@ -5,12 +5,16 @@
  * Walk segments by stepOrder and consume laps in order. repeatCount on a row
  * means that many consecutive laps (e.g. 400×8 → eight 400m laps on one segment).
  *
+ * Mile / 1600 repeats with paired recovery: consume W,R,W,R until repeatCount
+ * work laps are placed — do not treat repeatCount as N raw consecutive laps.
+ *
  * @deprecated Prefer parseActivityToSegmentExecution() for the activity-to-segment pipeline.
  */
 
 import { Prisma } from "@prisma/client";
 import type { DerivedLap } from "./lap-converter";
 import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
+import { isRecoveryTitle } from "./segment-summary";
 
 type BaseSeg = {
   id: string;
@@ -21,6 +25,8 @@ type BaseSeg = {
   repeatCount: number | null;
   targets: Prisma.JsonValue;
   paceTargetEncodingVersion: number;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
 };
 
 export type LapAssignmentMode = "step" | "distance" | "unassigned";
@@ -73,6 +79,107 @@ function isRepeatedRepSegment(seg: BaseSeg): boolean {
   return String(seg.durationType).toUpperCase() === "DISTANCE";
 }
 
+function hasInlineRecovery(seg: BaseSeg): boolean {
+  return (
+    seg.recoveryDurationType != null &&
+    seg.recoveryDurationType !== "NONE" &&
+    seg.recoveryDurationValue != null &&
+    seg.recoveryDurationValue > 0
+  );
+}
+
+function findPairedRecoverySegmentId(
+  sorted: BaseSeg[],
+  intervalIndex: number
+): string | null {
+  const next = sorted[intervalIndex + 1];
+  if (next && isRecoveryTitle(next.title)) return next.id;
+  return null;
+}
+
+/** Mile / ~1600m repeat blocks with recovery between reps. */
+function inferModularMileRepeats(seg: BaseSeg): boolean {
+  const reps = seg.repeatCount ?? 1;
+  if (reps <= 1) return false;
+  const miles = seg.durationValue;
+  return miles >= 0.9 && miles <= 1.1;
+}
+
+function usesModularWorkRecovery(
+  seg: BaseSeg,
+  sorted: BaseSeg[],
+  segIndex: number
+): boolean {
+  if (!isRepeatedRepSegment(seg)) return false;
+  if (hasInlineRecovery(seg)) return true;
+  if (findPairedRecoverySegmentId(sorted, segIndex)) return true;
+  return inferModularMileRepeats(seg);
+}
+
+function isGarminRecoveryIntensity(intensity: string | null | undefined): boolean {
+  if (!intensity) return false;
+  const u = intensity.toUpperCase();
+  return (
+    u.includes("REST") ||
+    u.includes("RECOVERY") ||
+    u === "COOLDOWN" ||
+    u === "INTERVAL_REST"
+  );
+}
+
+function isGarminWorkIntensity(intensity: string | null | undefined): boolean {
+  if (!intensity) return false;
+  const u = intensity.toUpperCase();
+  return (
+    u.includes("ACTIVE") ||
+    u.includes("INTERVAL") ||
+    u === "WARMUP" ||
+    u.includes("TARGET")
+  );
+}
+
+/**
+ * Consume laps as W,R,W,R until `reps` work laps land on the interval segment.
+ * Recovery laps bolt to the paired recovery segment (or inline on the same row).
+ */
+function consumeModularWorkRecovery(params: {
+  derived: DerivedLap[];
+  bySeg: Map<string, DerivedLap[]>;
+  intervalSeg: BaseSeg;
+  recoverySegId: string;
+  reps: number;
+  lapIdxRef: { value: number };
+}): void {
+  const { derived, bySeg, intervalSeg, recoverySegId, reps, lapIdxRef } = params;
+  let workPlaced = 0;
+
+  while (workPlaced < reps && lapIdxRef.value < derived.length) {
+    const workLap = derived[lapIdxRef.value]!;
+    if (isGarminRecoveryIntensity(workLap.intensity)) {
+      bySeg.get(recoverySegId)!.push(workLap);
+      lapIdxRef.value++;
+      continue;
+    }
+
+    bySeg.get(intervalSeg.id)!.push(workLap);
+    lapIdxRef.value++;
+    workPlaced++;
+
+    if (workPlaced >= reps || lapIdxRef.value >= derived.length) break;
+
+    const recLap = derived[lapIdxRef.value]!;
+    if (isGarminWorkIntensity(recLap.intensity) && workPlaced < reps) {
+      bySeg.get(intervalSeg.id)!.push(recLap);
+      lapIdxRef.value++;
+      workPlaced++;
+      continue;
+    }
+
+    bySeg.get(recoverySegId)!.push(recLap);
+    lapIdxRef.value++;
+  }
+}
+
 /** Max mile-boundary laps for a continuous (non-rep-block) distance segment. */
 function maxMileBoundaryLapsForSegment(seg: BaseSeg): number {
   const dt = String(seg.durationType).toUpperCase();
@@ -100,25 +207,45 @@ function assignByStepOrderConsumption(
   if (sorted.length === 0) return null;
 
   const bySeg = emptyBySegment(baseSegments);
-  let lapIdx = 0;
+  const lapIdxRef = { value: 0 };
 
-  for (const seg of sorted) {
-    if (lapIdx >= derived.length) break;
+  for (let segIndex = 0; segIndex < sorted.length; segIndex++) {
+    const seg = sorted[segIndex]!;
+    if (lapIdxRef.value >= derived.length) break;
 
     const dt = String(seg.durationType).toUpperCase();
 
     if (dt === "TIME") {
-      bySeg.get(seg.id)!.push(derived[lapIdx]!);
-      lapIdx++;
+      if (isRecoveryTitle(seg.title) && (bySeg.get(seg.id)?.length ?? 0) > 0) {
+        // Modular W/R already placed recovery jogs on this row
+        continue;
+      }
+      bySeg.get(seg.id)!.push(derived[lapIdxRef.value]!);
+      lapIdxRef.value++;
       continue;
     }
 
     if (isRepeatedRepSegment(seg)) {
       const reps = Math.max(1, seg.repeatCount ?? 1);
+
+      if (usesModularWorkRecovery(seg, sorted, segIndex)) {
+        const recoverySegId =
+          findPairedRecoverySegmentId(sorted, segIndex) ?? seg.id;
+        consumeModularWorkRecovery({
+          derived,
+          bySeg,
+          intervalSeg: seg,
+          recoverySegId,
+          reps,
+          lapIdxRef,
+        });
+        continue;
+      }
+
       for (let r = 0; r < reps; r++) {
-        if (lapIdx >= derived.length) break;
-        bySeg.get(seg.id)!.push(derived[lapIdx]!);
-        lapIdx++;
+        if (lapIdxRef.value >= derived.length) break;
+        bySeg.get(seg.id)!.push(derived[lapIdxRef.value]!);
+        lapIdxRef.value++;
       }
       continue;
     }
@@ -131,10 +258,10 @@ function assignByStepOrderConsumption(
     let totalMiles = 0;
     const chunk: DerivedLap[] = [];
 
-    while (lapIdx < derived.length) {
-      const lap = derived[lapIdx]!;
+    while (lapIdxRef.value < derived.length) {
+      const lap = derived[lapIdxRef.value]!;
       chunk.push(lap);
-      lapIdx++;
+      lapIdxRef.value++;
       if (lap.distanceMiles != null && lap.distanceMiles > 0) {
         totalMiles += lap.distanceMiles;
       }

@@ -202,6 +202,50 @@ export function isWorkSegmentTitle(title: string | null | undefined): boolean {
   return classifySegmentPhase(title) === "work";
 }
 
+/** Odd lap indices within a repeat block on one segment are recovery jogs. */
+function isRecoveryLapWithinRepeatBlock(lapIndexInSegment: number): boolean {
+  return lapIndexInSegment % 2 === 1;
+}
+
+function lapHasStampedWorkPrescription(lap: {
+  prescribedPaceMinSecPerMile?: number | null;
+  prescribedPaceMaxSecPerMile?: number | null;
+}): boolean {
+  return (
+    lap.prescribedPaceMinSecPerMile != null || lap.prescribedPaceMaxSecPerMile != null
+  );
+}
+
+/** Per-lap phase — do not inherit Interval title for recovery jogs. */
+export function classifyLapPhase(params: {
+  segmentTitle: string;
+  lapIndexInSegment: number;
+  segmentLapCount: number;
+  prescribedMin?: number | null;
+  prescribedMax?: number | null;
+}): SegmentPhase {
+  const titlePhase = classifySegmentPhase(params.segmentTitle);
+  if (titlePhase !== "work") return titlePhase;
+
+  if (
+    lapHasStampedWorkPrescription({
+      prescribedPaceMinSecPerMile: params.prescribedMin,
+      prescribedPaceMaxSecPerMile: params.prescribedMax,
+    })
+  ) {
+    return "work";
+  }
+
+  // Collapsed 400×8: work + recovery jogs on one segment row, no separate Recovery bolt
+  if (params.segmentLapCount > 1 && !isBookendTitle(params.segmentTitle)) {
+    return isRecoveryLapWithinRepeatBlock(params.lapIndexInSegment)
+      ? "recovery"
+      : "work";
+  }
+
+  return "work";
+}
+
 function paceTargetSecPerMileFromSegment(
   targets: unknown,
   paceTargetEncodingVersion: number
@@ -594,11 +638,25 @@ export function buildPhaseAwareLapRows(params: {
     return a.segment.stepOrder - b.segment.stepOrder;
   });
 
+  const segmentLapCount = new Map<string, number>();
+  for (const segment of sorted) {
+    segmentLapCount.set(segment.id, segment.segment_laps?.length ?? 0);
+  }
+  const lapIndexInSegment = new Map<string, number>();
+
   const rows: PhaseAwareLapRow[] = [];
   let lapOrder = 0;
   for (const { lap, segment } of flat) {
     lapOrder += 1;
-    const phase = classifySegmentPhase(segment.title);
+    const idxInSeg = lapIndexInSegment.get(segment.id) ?? 0;
+    lapIndexInSegment.set(segment.id, idxInSeg + 1);
+    const phase = classifyLapPhase({
+      segmentTitle: segment.title,
+      lapIndexInSegment: idxInSeg,
+      segmentLapCount: segmentLapCount.get(segment.id) ?? 1,
+      prescribedMin: lap.prescribedPaceMinSecPerMile,
+      prescribedMax: lap.prescribedPaceMaxSecPerMile,
+    });
     const segmentTargetLow = paceTargetSecPerMileFromSegment(
       segment.targets,
       segment.paceTargetEncodingVersion

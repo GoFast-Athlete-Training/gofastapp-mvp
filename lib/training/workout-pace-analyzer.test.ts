@@ -116,6 +116,63 @@ test("alternates work/recovery within repeat interval segment", () => {
   assert.equal(aimed[2]?.paceDeltaSecPerMile, 0);
 });
 
+test("mile repeats with separate Recovery segment stamps all interval work laps", () => {
+  const aimed = translatePlannedOntoWorkout({
+    plannedSegments: [
+      {
+        id: "int",
+        stepOrder: 2,
+        title: "Interval",
+        targets: [{ type: "PACE", valueLow: PACE_600, valueHigh: PACE_629 }],
+        paceTargetEncodingVersion: 2,
+        repeatCount: 5,
+        recoveryDurationType: null,
+        recoveryDurationValue: null,
+      },
+      {
+        id: "rec",
+        stepOrder: 3,
+        title: "Recovery",
+        targets: null,
+        paceTargetEncodingVersion: 2,
+        repeatCount: null,
+        recoveryDurationType: null,
+        recoveryDurationValue: null,
+      },
+    ],
+    workoutLaps: [
+      {
+        id: "w1",
+        lapIndex: 1,
+        segmentId: "int-seg",
+        segmentTitle: "Interval",
+        segmentStepOrder: 2,
+        avgPaceSecPerMile: 377,
+      },
+      {
+        id: "r1",
+        lapIndex: 2,
+        segmentId: "rec-seg",
+        segmentTitle: "Recovery",
+        segmentStepOrder: 3,
+        avgPaceSecPerMile: 522,
+      },
+      {
+        id: "w2",
+        lapIndex: 3,
+        segmentId: "int-seg",
+        segmentTitle: "Interval",
+        segmentStepOrder: 2,
+        avgPaceSecPerMile: 372,
+      },
+    ],
+  });
+
+  assert.equal(aimed[0]?.prescribedPaceMinSecPerMile, 360);
+  assert.equal(aimed[1]?.prescribedPaceMinSecPerMile, null);
+  assert.equal(aimed[2]?.prescribedPaceMinSecPerMile, 360);
+});
+
 test("writes lap deltas from prescribed band midpoint", () => {
   const aimed = translatePlannedOntoWorkout({
     plannedSegments: [

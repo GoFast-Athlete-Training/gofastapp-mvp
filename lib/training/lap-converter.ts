@@ -16,6 +16,8 @@ export type DerivedLap = {
   avgHeartRate: number | null;
   distanceMiles: number | null;
   durationSeconds: number;
+  /** Garmin lap intensity when present on detailData laps. */
+  intensity?: string | null;
 };
 
 function mean(nums: number[]): number | null {
@@ -50,6 +52,7 @@ function derivedFromFlatLap(lap: LapRow, lapIndex: number): DerivedLap {
     avgHeartRate: lap.avgHeartRate ?? null,
     distanceMiles,
     durationSeconds,
+    intensity: lap.intensity ?? null,
   };
 }
 
@@ -89,6 +92,7 @@ export function convertLapsToDerived(
           ? Math.round((lap.distanceMeters / METERS_PER_MILE) * 100) / 100
           : null,
       durationSeconds: Math.max(0, Math.round(lap.durationSeconds ?? 0)),
+      intensity: lap.intensity ?? null,
     }));
   }
 
@@ -141,6 +145,7 @@ export function convertLapsToDerived(
       avgHeartRate: mean(hrs) ?? laps[i]!.avgHeartRate ?? null,
       distanceMiles: distMiles,
       durationSeconds: Math.round(dur),
+      intensity: laps[i]!.intensity ?? null,
     });
   }
   return out;

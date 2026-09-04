@@ -9,6 +9,39 @@ import {
   normalizeActivityLapsFromDetail,
 } from "./lap-converter";
 
+test("parseDetailData preserves Garmin lap intensity when present", () => {
+  const parsed = parseDetailData({
+    laps: [
+      {
+        startTimeInSeconds: 1000,
+        timerDurationInSeconds: 600,
+        totalDistanceInMeters: 1609.34,
+        intensity: "INTERVAL_TARGET",
+      },
+      {
+        startTimeInSeconds: 1600,
+        timerDurationInSeconds: 120,
+        Intensity: "REST",
+      },
+    ],
+  });
+
+  assert.equal(parsed.laps[0]!.intensity, "INTERVAL_TARGET");
+  assert.equal(parsed.laps[1]!.intensity, "REST");
+
+  const derived = normalizeActivityLapsFromDetail({
+    laps: [
+      {
+        startTimeInSeconds: 1000,
+        timerDurationInSeconds: 600,
+        totalDistanceInMeters: 1609.34,
+        intensity: "INTERVAL_TARGET",
+      },
+    ],
+  });
+  assert.equal(derived[0]!.intensity, "INTERVAL_TARGET");
+});
+
 test("parseDetailData reads flat Garmin lap summaries", () => {
   const parsed = parseDetailData({
     laps: [

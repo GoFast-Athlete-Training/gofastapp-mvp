@@ -47,6 +47,8 @@ type BaseSeg = {
   repeatCount: number | null;
   targets: Prisma.JsonValue;
   paceTargetEncodingVersion: number;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
 };
 
 function paceTargetSecPerMileFromTargets(
@@ -286,6 +288,8 @@ export async function parseActivityToSegmentExecution(params: {
     repeatCount: s.repeatCount,
     targets: s.targets,
     paceTargetEncodingVersion: s.paceTargetEncodingVersion,
+    recoveryDurationType: s.recoveryDurationType,
+    recoveryDurationValue: s.recoveryDurationValue,
   }));
 
   const assignment = assignLapsToSegments(
