@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { pushWorkoutToGarminForAthlete } from "@/lib/garmin-workouts/push-workout-for-athlete";
-import type { GarminPushMode } from "@/lib/garmin-workouts/garmin-calendar-state";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 
 export type GarminPlanWorkoutPushResult = {
@@ -12,7 +11,6 @@ export type GarminPlanWorkoutPushResult = {
   action?: string;
   error?: string;
   scheduledDate?: string;
-  garminScheduleId?: number | null;
 };
 
 export type PushPlanWorkoutsBatchSummary = {
@@ -28,40 +26,17 @@ export type PushPlanWorkoutsBatchOptions = {
   dateEnd: Date;
   candidateLimit?: number;
   runLabel: string;
-  /** Weekly pre-push: force library-only rows onto the Training Calendar. */
-  recoverLibraryOnly?: boolean;
-  /** Daily cron fallback: only rows not yet on the Garmin Training Calendar. */
+  /** Daily cron / post-generate: only rows the stack has not pushed yet. */
   unsentOnly?: boolean;
   athleteIds?: string[];
 };
-
-function resolvePushMode(
-  garminWorkoutId: number | null,
-  garminScheduleId: number | null,
-  recoverLibraryOnly: boolean
-): GarminPushMode | "skip_library_only" {
-  if (garminWorkoutId != null && garminScheduleId == null) {
-    return recoverLibraryOnly ? "force-reschedule" : "skip_library_only";
-  }
-  return garminScheduleId != null ? "update-library" : "schedule-today";
-}
-
-/** Exported for unit tests. */
-export function resolveGarminPushModeForBatch(
-  garminWorkoutId: number | null,
-  garminScheduleId: number | null,
-  recoverLibraryOnly: boolean
-): GarminPushMode | "skip_library_only" {
-  return resolvePushMode(garminWorkoutId, garminScheduleId, recoverLibraryOnly);
-}
 
 export type BatchPushCandidate = {
   id: string;
   athleteId: string | null;
   planId: string | null;
   date: Date | null;
-  garminWorkoutId: number | null;
-  garminScheduleId: number | null;
+  workoutPushed: boolean;
 };
 
 function batchCandidateGroupKey(w: BatchPushCandidate): string | null {
@@ -70,9 +45,7 @@ function batchCandidateGroupKey(w: BatchPushCandidate): string | null {
 }
 
 function batchCandidateRank(w: BatchPushCandidate): number {
-  if (w.garminScheduleId != null) return 3;
-  if (w.garminWorkoutId != null) return 2;
-  return 1;
+  return w.workoutPushed ? 2 : 1;
 }
 
 /** One canonical row per athlete + plan + scheduled date; duplicates are skipped. */
@@ -108,9 +81,14 @@ export function dedupeBatchPushCandidates<T extends BatchPushCandidate>(
   return { toPush, duplicateSkips };
 }
 
+/** Exported for unit tests. */
+export function shouldPushBatchCandidate(workoutPushed: boolean): boolean {
+  return !workoutPushed;
+}
+
 /**
  * Push materialized plan workouts in a date range to Garmin Training Calendar.
- * Reuses the single-workout push primitive and existing calendar-state modes.
+ * Skips rows where workoutPushed is already true (stack already acted).
  */
 export async function pushPlanWorkoutsInDateRange(
   options: PushPlanWorkoutsBatchOptions
@@ -123,7 +101,6 @@ export async function pushPlanWorkoutsInDateRange(
     dateEnd,
     candidateLimit = 40,
     runLabel,
-    recoverLibraryOnly = false,
     unsentOnly = false,
     athleteIds,
   } = options;
@@ -132,7 +109,6 @@ export async function pushPlanWorkoutsInDateRange(
     dateStart: dateStart.toISOString(),
     dateEnd: dateEnd.toISOString(),
     candidateLimit,
-    recoverLibraryOnly,
     unsentOnly,
     athleteFilterCount: athleteIds?.length ?? null,
   });
@@ -140,7 +116,7 @@ export async function pushPlanWorkoutsInDateRange(
   const candidates = await prisma.planned_workouts.findMany({
     where: {
       date: { gte: dateStart, lte: dateEnd },
-      ...(unsentOnly ? { garminScheduleId: null } : {}),
+      ...(unsentOnly ? { workoutPushed: false } : {}),
       training_plans: {
         lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
       },
@@ -155,8 +131,7 @@ export async function pushPlanWorkoutsInDateRange(
       athleteId: true,
       planId: true,
       date: true,
-      garminWorkoutId: true,
-      garminScheduleId: true,
+      workoutPushed: true,
     },
     orderBy: [{ date: "asc" }, { id: "asc" }],
     take: candidateLimit,
@@ -186,6 +161,19 @@ export async function pushPlanWorkoutsInDateRange(
     const athleteId = w.athleteId;
     if (!athleteId) continue;
 
+    if (!shouldPushBatchCandidate(w.workoutPushed)) {
+      skipped++;
+      results.push({
+        workoutId: w.id,
+        athleteId,
+        ok: true,
+        skipped: true,
+        action: "already_pushed_skip",
+        error: "Stack already pushed this plan day.",
+      });
+      continue;
+    }
+
     const segCount = await prisma.planned_workout_segments.count({
       where: { plannedWorkoutId: w.id },
     });
@@ -201,30 +189,9 @@ export async function pushPlanWorkoutsInDateRange(
       continue;
     }
 
-    const modeOrSkip = resolvePushMode(
-      w.garminWorkoutId,
-      w.garminScheduleId,
-      recoverLibraryOnly
-    );
-
-    if (modeOrSkip === "skip_library_only") {
-      skipped++;
-      results.push({
-        workoutId: w.id,
-        athleteId,
-        ok: true,
-        skipped: true,
-        action: "library_only_skip",
-        error:
-          "Garmin workout exists without calendar schedule id; use force-reschedule from GoFast to avoid duplicate calendar entries.",
-      });
-      continue;
-    }
-
-    const mode = modeOrSkip;
-    const r = await pushWorkoutToGarminForAthlete(athleteId, w.id, { mode });
+    const r = await pushWorkoutToGarminForAthlete(athleteId, w.id);
     if (r.ok) {
-      if (mode === "update-library") {
+      if (r.isUpdatedResend) {
         updated++;
       } else {
         scheduled++;
@@ -233,9 +200,8 @@ export async function pushPlanWorkoutsInDateRange(
         workoutId: w.id,
         athleteId,
         ok: true,
-        action: mode,
+        action: r.isUpdatedResend ? "updated_resend" : "schedule-today",
         scheduledDate: r.scheduledDate,
-        garminScheduleId: r.garminScheduleId,
       });
     } else {
       failed++;
@@ -243,7 +209,7 @@ export async function pushPlanWorkoutsInDateRange(
         workoutId: w.id,
         athleteId,
         ok: false,
-        action: mode,
+        action: "schedule-today",
         error: `${r.code}: ${r.message}`,
       });
     }

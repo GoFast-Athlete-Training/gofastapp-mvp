@@ -1383,6 +1383,8 @@ model city_run_rsvps {
   runId           String
   athleteId       String
   status          String        // "going", "not-going", "maybe"
+  /// Junction role: host (created meetup) vs going (joined). Distinct from status.
+  role            String?       // "host" | "going"
   occurrenceDate  DateTime?     // null = standalone run; set = recurring (the specific occurrence date)
   checkedInAt     DateTime?     // Timestamp when checked in (null = not checked in)
   rsvpPhotoUrls   Json?         // Photos attendee posted for this run (ambassador credit when going + ≥1 photo)
@@ -1392,6 +1394,7 @@ model city_run_rsvps {
   ambassador_credits ambassador_credits?
 
   @@unique([runId, athleteId])
+  @@index([athleteId, role])
   @@index([checkedInAt])
   @@index([occurrenceDate])
 }
@@ -2466,8 +2469,10 @@ model planned_workouts {
   weekNumber                Int?
   dayAssigned               String?
   planCycleIndex            Int?
-  garminWorkoutId           Int?
-  garminScheduleId          Int?
+  /// Stack stamp: encoder fired for this plan day. Not a Garmin receipt.
+  workoutPushed             Boolean             @default(false)
+  /// Athlete edited prescribe after push — show ready CTA again for (Updated) re-send.
+  workoutEditedAfterPush    Boolean             @default(false)
   segmentSnapshotJson       Json?
   prescriptionNarrative     String?
   /// Execution pointer — workouts.id string, not a Prisma FK. Set on Garmin bolt-on.
@@ -2486,7 +2491,6 @@ model planned_workouts {
 
   @@unique([athleteId, planId, date])
   @@unique([athleteId, cityRunId])
-  @@index([athleteId, garminWorkoutId])
   @@index([planId, date])
   @@index([cityRunId])
   @@index([catalogueWorkoutId])
@@ -2543,10 +2547,6 @@ model workouts {
   dayAssigned               String?
   /// Intervals/Tempo: cycle position 0–3 fixed at plan generation (ordinal % 4); aligns with legacy schedule token `-iN`
   planCycleIndex            Int?
-  /// Garmin Training API workout id after push-to-garmin (links activity → planned workout)
-  garminWorkoutId           Int?
-  /// Garmin Training API schedule id (calendar placement for this workout)
-  garminScheduleId          Int?
   /// Garmin detail ingest pointer → athlete_activities.id (sidecar completes raw + laps). Not plan-match.
   garminDetailActivityId    String?             @unique
   /// Athlete explicitly skipped this planned workout (distinct from past-unmatched "missed")
@@ -2649,7 +2649,6 @@ model workouts {
   @@index([planId, date])
   @@index([planId, weekNumber])
   @@index([planId, nOffset])
-  @@index([athleteId, garminWorkoutId])
   @@index([catalogueWorkoutId])
 }
 
@@ -2732,8 +2731,6 @@ model bike_workout {
   /// Athlete FTP at creation time (optional denormalized snapshot).
   ftpWattsSnapshot         Int?
   estimatedDurationSeconds Int?
-  garminWorkoutId          Int?
-  garminScheduleId         Int?
   garminDetailActivityId   String?             @unique
   actualDurationSeconds    Int?
   actualDistanceMeters     Float?
@@ -2789,8 +2786,6 @@ model swim_workout {
   date             DateTime?
   poolLengthMeters Int?
   cssSecPer100m    Int?
-  garminWorkoutId  Int?
-  garminScheduleId Int?
   notes            String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt

@@ -14,8 +14,6 @@ import { ymdFromDate } from "@/lib/training/plan-utils";
 export type PushBikeWorkoutForAthleteResult =
   | {
       ok: true;
-      garminWorkoutId: number;
-      garminScheduleId: number | null;
       scheduledDate: string;
     }
   | {
@@ -57,8 +55,6 @@ export async function pushBikeWorkoutToGarminForAthlete(
       return { ok: false, code: "no_steps", message: "Bike workout has no steps" };
     }
 
-    const hadGarminWorkoutId = workout.garminWorkoutId != null;
-
     const scheduledDate =
       scheduleDateYmdOverride?.trim() ||
       (workout.date ? ymdFromDate(workout.date) : utcTodayYmd());
@@ -74,34 +70,13 @@ export async function pushBikeWorkoutToGarminForAthlete(
     const token = await requireGarminTokenFresh(athleteId);
     const client = createGarminTrainingApiForAthlete(athleteId, token);
 
-    let garminWorkoutId = workout.garminWorkoutId;
-    if (garminWorkoutId != null) {
-      try {
-        await client.updateWorkout(garminWorkoutId, garminWorkout);
-      } catch (e) {
-        if (e instanceof GarminApiError && e.status === 404) {
-          const result = await client.createWorkout(garminWorkout);
-          garminWorkoutId = result.workoutId;
-        } else {
-          throw e;
-        }
-      }
-    } else {
-      const result = await client.createWorkout(garminWorkout);
-      garminWorkoutId = result.workoutId;
-    }
-
-    await prisma.bike_workout.update({
-      where: { id: workout.id },
-      data: { garminWorkoutId },
-    });
-
-    if (hadGarminWorkoutId) {
+    const createResult = await client.createWorkout(garminWorkout);
+    const garminWorkoutId = createResult?.workoutId;
+    if (garminWorkoutId == null) {
       return {
-        ok: true,
-        garminWorkoutId,
-        garminScheduleId: workout.garminScheduleId,
-        scheduledDate,
+        ok: false,
+        code: "garmin_api",
+        message: "Garmin did not return a workout id for scheduling",
       };
     }
 
@@ -119,7 +94,7 @@ export async function pushBikeWorkoutToGarminForAthlete(
       };
     }
 
-    return { ok: true, garminWorkoutId, garminScheduleId: scheduleResult.garminScheduleId, scheduledDate };
+    return { ok: true, scheduledDate };
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {
       return { ok: false, code: "garmin_disconnected", message: error.message };

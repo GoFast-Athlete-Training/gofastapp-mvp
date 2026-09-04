@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
 
 function generateRsvpId(): string {
   const timestamp = Date.now().toString(36);
@@ -6,8 +7,8 @@ function generateRsvpId(): string {
   return `c${timestamp}${random}`;
 }
 
-/** Auto-RSVP the host as going so they can use chatter immediately after create. */
-export async function autoRsvpHostGoing(runId: string, athleteId: string): Promise<void> {
+/** Host junction row — role host (not a fake going join). Status stays going for chatter. */
+export async function autoRsvpHostRole(runId: string, athleteId: string): Promise<void> {
   await prisma.city_run_rsvps.upsert({
     where: { runId_athleteId: { runId, athleteId } },
     create: {
@@ -15,12 +16,16 @@ export async function autoRsvpHostGoing(runId: string, athleteId: string): Promi
       runId,
       athleteId,
       status: 'going',
+      role: RSVP_ROLE_HOST,
     },
     update: {
-      status: 'going',
+      role: RSVP_ROLE_HOST,
     },
   });
 }
+
+/** @deprecated Use autoRsvpHostRole */
+export const autoRsvpHostGoing = autoRsvpHostRole;
 
 export function buildJoinRunSignupUrl(slug: string | null | undefined, baseUrl?: string): string | null {
   if (!slug?.trim()) return null;

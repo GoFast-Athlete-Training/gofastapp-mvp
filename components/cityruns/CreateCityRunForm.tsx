@@ -379,6 +379,7 @@ export default function CreateCityRunForm({
 
       const { data } = await api.post<CityRunFromWorkoutSuccess>("/cityrun/from-workout", {
         workoutId: workout.id,
+        plannedWorkoutId: workout.id,
         citySlug,
         cityName: meetUpCity.trim(),
         state: meetUpState.trim() || undefined,

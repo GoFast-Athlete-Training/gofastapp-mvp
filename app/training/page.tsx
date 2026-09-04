@@ -1324,7 +1324,7 @@ export default function TrainingHubPage() {
                               onClick={() => void handleSendTodayToGarmin()}
                               className="inline-flex justify-center rounded-xl border-2 border-sky-600 bg-sky-50 px-6 py-3 text-sm font-semibold text-sky-900 hover:bg-sky-100 disabled:opacity-50"
                             >
-                              {pushingGarmin ? "Sending…" : "Send to Garmin"}
+                              {pushingGarmin ? "Getting it ready…" : "Looks good, I'm ready"}
                             </button>
                           ) : null}
                           <Link

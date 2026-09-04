@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import { RUNNING_ACTIVITY_TYPES } from '@/lib/training/activity-type-sets';
-import { extractGarminWorkoutIdFromSummary } from '@/lib/training/extract-garmin-workout-id';
 import { getCityRunStartMs } from '@/lib/city-run-clock';
 
 const CITY_RUN_MATCH_WINDOW_MS = 36 * 60 * 60 * 1000;
@@ -131,7 +130,6 @@ async function matchStampedPlannedWorkout(
 ): Promise<CityRunActivityMatchResult | null> {
   if (!activity.startTime) return null;
 
-  const garminWorkoutId = extractGarminWorkoutIdFromSummary(activity.summaryData);
   const activityStartMs = activity.startTime.getTime();
   const activityDayStart = new Date(activity.startTime);
   activityDayStart.setUTCHours(0, 0, 0, 0);
@@ -162,28 +160,6 @@ async function matchStampedPlannedWorkout(
   if (stamps.length === 0) return null;
 
   let candidates = stamps;
-
-  if (garminWorkoutId != null) {
-    const byGarmin = stamps.filter((s) => s.garminWorkoutId === garminWorkoutId);
-    if (byGarmin.length === 1) {
-      const stamp = byGarmin[0];
-      if (stamp.cityRunId && stamp.city_run) {
-        return creditCityRunFromStamp({
-          athleteId: activity.athleteId,
-          cityRunId: stamp.cityRunId,
-          activityId: activity.id,
-          runClubSlug: stamp.city_run.runClub?.slug ?? null,
-        });
-      }
-    }
-    if (byGarmin.length > 1) {
-      console.log('city-run stamp match skipped: ambiguous garminWorkoutId', {
-        activityId: activity.id,
-        garminWorkoutId,
-      });
-      return null;
-    }
-  }
 
   const byLabel = candidates.filter((s) =>
     labelMatchesActivity(s.cityRunMatchLabel, activity.activityName)

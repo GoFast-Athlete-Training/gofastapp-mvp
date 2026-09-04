@@ -10,7 +10,8 @@ import {
 import { assignUniqueWorkoutShareSlug } from "@/lib/workout-public-slug";
 import { parseCalendarDateForWrite } from "@/lib/calendar-date";
 import { WORKOUT_BACKED_CITY_RUN_VISIBILITY } from '@/lib/cityrun/workout-backed-run-visibility';
-import { autoRsvpHostGoing, buildJoinRunSignupUrl } from "@/lib/host-run-rsvp";
+import { autoRsvpHostRole, buildJoinRunSignupUrl } from "@/lib/host-run-rsvp";
+import { stampPlannedWorkoutCityRun } from "@/lib/city-run/stamp-planned-city-run";
 import { resolveSpawnedWorkoutForPlanned } from '@/lib/training/match-planned-workout';
 import { resolveWorkoutTargetForAthlete } from '@/lib/training/workout-or-planned-resolve';
 
@@ -98,6 +99,8 @@ async function resolveOwnedWorkoutForCityRunInvite(
 
 type FromWorkoutBody = {
   workoutId?: string;
+  /** Canonical plan-day id for planned_workouts.cityRunId stamp. */
+  plannedWorkoutId?: string;
   citySlug?: string;
   cityName?: string;
   state?: string;
@@ -136,6 +139,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as FromWorkoutBody;
     const {
       workoutId,
+      plannedWorkoutId: plannedWorkoutIdBody,
       citySlug,
       cityName,
       state,
@@ -210,6 +214,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const workoutTarget = await resolveWorkoutTargetForAthlete(workoutId.trim(), athlete.id);
+    const resolvedPlannedWorkoutId =
+      plannedWorkoutIdBody?.trim() ||
+      (workoutTarget?.kind === "planned" ? workoutTarget.plannedWorkoutId : null);
+
+    if (resolvedPlannedWorkoutId) {
+      const plannedRow = await prisma.planned_workouts.findFirst({
+        where: { id: resolvedPlannedWorkoutId, athleteId: athlete.id },
+        select: { id: true, cityRunId: true },
+      });
+      if (!plannedRow) {
+        return NextResponse.json(
+          { error: "Planned workout not found for this athlete" },
+          { status: 404 }
+        );
+      }
+      if (plannedRow.cityRunId) {
+        return NextResponse.json(
+          { error: "This plan day already has a meetup linked." },
+          { status: 400 }
+        );
+      }
+    }
+
     if (
       !citySlug?.trim() &&
       !cityName?.trim() &&
@@ -250,19 +278,6 @@ export async function POST(request: NextRequest) {
       runDateObj = parseCalendarDateForWrite(date);
     } catch {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
-    }
-
-    const existingForWorkout = await prisma.city_runs.count({
-      where: { workoutId: workout.id },
-    });
-    if (existingForWorkout >= 10) {
-      return NextResponse.json(
-        {
-          error:
-            "Too many CityRuns already linked to this workout. Remove old invites or contact support.",
-        },
-        { status: 400 }
-      );
     }
 
     const finalTitle = workout.title.trim();
@@ -361,7 +376,7 @@ export async function POST(request: NextRequest) {
       igPostText: null,
       igPostGraphic: null,
       routeId: null,
-      workoutId: workout.id,
+      workoutId: null,
       updatedAt: new Date(),
     };
 
@@ -445,7 +460,18 @@ export async function POST(request: NextRequest) {
     const workoutPath = `/mytrainingruns/${workoutSlug}`;
     const workoutShareUrl = `${baseNorm}${workoutPath}`;
 
-    await autoRsvpHostGoing(run.id, athlete.id);
+    if (resolvedPlannedWorkoutId) {
+      const stamp = await stampPlannedWorkoutCityRun(
+        resolvedPlannedWorkoutId,
+        athlete.id,
+        run.id
+      );
+      if (!stamp.ok) {
+        return NextResponse.json({ error: stamp.message }, { status: 400 });
+      }
+    }
+
+    await autoRsvpHostRole(run.id, athlete.id);
 
     const joinSignupUrl = buildJoinRunSignupUrl(run.slug, baseNorm);
 

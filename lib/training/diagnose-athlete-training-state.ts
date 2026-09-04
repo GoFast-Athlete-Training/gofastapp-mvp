@@ -54,13 +54,13 @@ export type AthleteTrainingStateDiagnosis = {
   plannedWorkouts: {
     byPlanId: Record<
       string,
-      { count: number; withGarminWorkout: number; withGarminSchedule: number }
+      { count: number; withWorkoutPushed: number }
     >;
   };
   legacyWorkouts: {
     byPlanId: Record<
       string,
-      { count: number; withGarminWorkout: number; withGarminSchedule: number }
+      { count: number; withWorkoutPushed: number }
     >;
   };
 };
@@ -116,16 +116,13 @@ export async function diagnoseAthleteTrainingState(
         where: { athleteId, date: { gte: todayUtc } },
         select: {
           planId: true,
-          garminWorkoutId: true,
-          garminScheduleId: true,
+          workoutPushed: true,
         },
       }),
       prisma.workouts.findMany({
         where: { athleteId, date: { gte: todayUtc } },
         select: {
           planId: true,
-          garminWorkoutId: true,
-          garminScheduleId: true,
         },
       }),
     ]);
@@ -140,22 +137,20 @@ export async function diagnoseAthleteTrainingState(
   function bucketByPlanId(
     rows: Array<{
       planId: string | null;
-      garminWorkoutId: number | null;
-      garminScheduleId: number | null;
+      workoutPushed?: boolean;
     }>
   ) {
     const out: Record<
       string,
-      { count: number; withGarminWorkout: number; withGarminSchedule: number }
+      { count: number; withWorkoutPushed: number }
     > = {};
     for (const row of rows) {
       const key = row.planId ?? "(none)";
       if (!out[key]) {
-        out[key] = { count: 0, withGarminWorkout: 0, withGarminSchedule: 0 };
+        out[key] = { count: 0, withWorkoutPushed: 0 };
       }
       out[key].count++;
-      if (row.garminWorkoutId != null) out[key].withGarminWorkout++;
-      if (row.garminScheduleId != null) out[key].withGarminSchedule++;
+      if (row.workoutPushed) out[key].withWorkoutPushed++;
     }
     return out;
   }

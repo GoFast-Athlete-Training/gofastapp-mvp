@@ -2,24 +2,16 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   dedupeBatchPushCandidates,
-  resolveGarminPushModeForBatch,
+  shouldPushBatchCandidate,
 } from "./push-plan-workouts-batch";
 
-describe("resolveGarminPushModeForBatch", () => {
-  it("schedules new workouts", () => {
-    assert.equal(resolveGarminPushModeForBatch(null, null, false), "schedule-today");
+describe("shouldPushBatchCandidate", () => {
+  it("pushes when workoutPushed is false", () => {
+    assert.equal(shouldPushBatchCandidate(false), true);
   });
 
-  it("updates already scheduled workouts", () => {
-    assert.equal(resolveGarminPushModeForBatch(10, 20, false), "update-library");
-  });
-
-  it("skips library-only rows during daily cron", () => {
-    assert.equal(resolveGarminPushModeForBatch(10, null, false), "skip_library_only");
-  });
-
-  it("recovers library-only rows during weekly pre-push", () => {
-    assert.equal(resolveGarminPushModeForBatch(10, null, true), "force-reschedule");
+  it("skips when workoutPushed is true", () => {
+    assert.equal(shouldPushBatchCandidate(true), false);
   });
 });
 
@@ -33,24 +25,21 @@ describe("dedupeBatchPushCandidates", () => {
         athleteId: "ath1",
         planId: "p1",
         date,
-        garminWorkoutId: null,
-        garminScheduleId: null,
+        workoutPushed: false,
       },
       {
         id: "b",
         athleteId: "ath1",
         planId: "p1",
         date,
-        garminWorkoutId: 10,
-        garminScheduleId: null,
+        workoutPushed: true,
       },
       {
         id: "c",
         athleteId: "ath1",
         planId: "p1",
         date: new Date("2026-06-18T12:00:00.000Z"),
-        garminWorkoutId: null,
-        garminScheduleId: null,
+        workoutPushed: false,
       },
     ];
     const { toPush, duplicateSkips } = dedupeBatchPushCandidates(candidates);
@@ -60,23 +49,21 @@ describe("dedupeBatchPushCandidates", () => {
     assert.equal(duplicateSkips[0]?.id, "a");
   });
 
-  it("prefers row with garminScheduleId over library-only sibling", () => {
+  it("prefers row with workoutPushed over unstamped sibling", () => {
     const candidates = [
       {
         id: "a",
         athleteId: "ath1",
         planId: "p1",
         date,
-        garminWorkoutId: 10,
-        garminScheduleId: null,
+        workoutPushed: false,
       },
       {
         id: "b",
         athleteId: "ath1",
         planId: "p1",
         date,
-        garminWorkoutId: 10,
-        garminScheduleId: 20,
+        workoutPushed: true,
       },
     ];
     const { toPush, duplicateSkips } = dedupeBatchPushCandidates(candidates);

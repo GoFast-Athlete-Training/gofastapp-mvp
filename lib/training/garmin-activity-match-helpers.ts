@@ -126,11 +126,17 @@ export function normalizeGarminMatchText(value: string | null | undefined): stri
     .trim();
 }
 
+/** Strip edit-after-push prefix from Garmin push / activity titles. */
+export function stripUpdatedGarminTitlePrefix(title: string): string {
+  return title.replace(/^\(Updated\)\s+/i, "").trim();
+}
+
 /** Strip Garmin location prefix before `GF W#:` and optional week label for title comparison. */
 export function normalizeActivityNameForMatch(
   activityName: string | null | undefined
 ): string {
   let text = normalizeGarminMatchText(activityName);
+  text = text.replace(/\(updated\)\s+/gi, "");
   const gfMarker = text.match(/\bgf\s+w\d+\s*:/i);
   if (gfMarker?.index != null && gfMarker.index > 0) {
     text = text.slice(gfMarker.index);
@@ -209,6 +215,7 @@ export function workoutTitleMatchVariants(params: {
       estimatedDistanceInMeters: params.estimatedDistanceInMeters,
     });
     variants.add(pushed);
+    variants.add(`(Updated) ${pushed}`);
     variants.add(stripTrailingWeekdayMarkerFromTitle(
       pushed.replace(/^GF\s+W\d+\s*:\s*/i, "").trim()
     ));
@@ -232,7 +239,9 @@ function activityNameContainsSingleWorkoutTitle(params: {
 }): boolean {
   const activityName = normalizeGarminMatchText(params.activityName);
   const activityCore = normalizeActivityNameForMatch(params.activityName);
-  const workoutTitle = normalizeGarminMatchText(params.workoutTitle);
+  const workoutTitle = normalizeGarminMatchText(
+    stripUpdatedGarminTitlePrefix(params.workoutTitle)
+  );
   const pushedTitle = normalizeGarminMatchText(
     garminTitleForWorkout({
       title: params.workoutTitle,

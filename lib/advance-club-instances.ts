@@ -193,7 +193,7 @@ const CLUB_RUN_SELECT = {
   workoutDescription: true,
   directionsText: true,
   routeId: true,
-  workoutId: true,
+  plannedWorkoutId: true,
   cityRunType: true,
   staffGeneratedId: true,
 } as const;
@@ -368,7 +368,8 @@ async function duplicateRunForward(
     workoutDescription: prior.workoutDescription,
     directionsText: prior.directionsText,
     routeId: prior.routeId,
-    workoutId: prior.workoutId,
+    plannedWorkoutId: prior.plannedWorkoutId,
+    workoutId: null,
     cityRunType: prior.runClubId ? 'CLUB' : prior.cityRunType,
     updatedAt: new Date(),
   };

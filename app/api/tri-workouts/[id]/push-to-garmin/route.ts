@@ -48,7 +48,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
           include: {
             bikeWorkout: true,
             swimWorkout: true,
-            runWorkout: { select: { id: true, title: true, garminWorkoutId: true, garminScheduleId: true } },
+            runWorkout: { select: { id: true, title: true } },
           },
         },
       },

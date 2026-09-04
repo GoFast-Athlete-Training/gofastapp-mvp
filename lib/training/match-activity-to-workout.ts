@@ -1,6 +1,6 @@
 /**
  * Webhook ingest: store athlete_activity and optionally auto-link to workouts.
- * Standalone pushed workouts: auto-match via garminWorkoutId.
+ * Plan workouts: auto-match via title/date variants (including (Updated) re-sends).
  * Planned workouts: auto-match only when a single high-confidence title match is found;
  * otherwise athletes confirm via POST /match-activity.
  */
@@ -306,7 +306,6 @@ export async function tryMatchActivityToTrainingWorkout(
   }
 
   const summaryBlob = activity.summaryData as Record<string, unknown> | null;
-  const garminWorkoutId = extractGarminWorkoutIdFromSummary(summaryBlob);
 
   let plannedCandidate: PlannedMatchRow | null = null;
   let standaloneCandidate: WorkoutMatchRow | null = null;
@@ -314,33 +313,7 @@ export async function tryMatchActivityToTrainingWorkout(
   let precomputedTitleMatchCount = 0;
   let sameDaySingleRunBolt = false;
 
-  if (garminWorkoutId != null) {
-    plannedCandidate = await prisma.planned_workouts.findFirst({
-      where: {
-        athleteId: activity.athleteId,
-        garminWorkoutId,
-        OR: [
-          { planId: null },
-          { training_plans: { lifecycleStatus: TrainingPlanLifecycle.ACTIVE } },
-        ],
-      },
-      include: plannedMatchInclude,
-    });
-
-    if (!plannedCandidate) {
-      standaloneCandidate = await prisma.workouts.findFirst({
-        where: {
-          athleteId: activity.athleteId,
-          garminWorkoutId,
-          garminDetailActivityId: null,
-          planId: null,
-        },
-        include: workoutMatchInclude,
-      });
-    }
-  }
-
-  if (!plannedCandidate && !standaloneCandidate) {
+  {
     const activityYmd = activityLocalYmdFromSummary(activity.startTime, summaryBlob);
     const { start, end } = activityMatchCandidateUtcRange(activityYmd);
     const planCandidates = await prisma.planned_workouts.findMany({
@@ -353,7 +326,7 @@ export async function tryMatchActivityToTrainingWorkout(
         ],
       },
       include: plannedMatchInclude,
-      orderBy: [{ garminWorkoutId: "desc" }, { updatedAt: "desc" }],
+      orderBy: [{ workoutPushed: "desc" }, { updatedAt: "desc" }],
     });
 
     const selected = selectPlannedWorkoutCandidate({

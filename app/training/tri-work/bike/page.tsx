@@ -20,7 +20,6 @@ type BikeRow = {
   title: string;
   date: string | null;
   steps: BikeStep[];
-  garminWorkoutId: number | null;
 };
 
 export default function TriWorkBikeListPage() {
@@ -132,7 +131,6 @@ export default function TriWorkBikeListPage() {
                     {w.date ? new Date(w.date).toLocaleDateString() : "No date"} ·{" "}
                     {w.steps?.length ?? 0} steps
                     {durMin != null ? ` · ~${durMin} min` : ""}
-                    {w.garminWorkoutId != null ? ` · Garmin #${w.garminWorkoutId}` : ""}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">

@@ -1,64 +1,29 @@
 /**
- * Garmin Connect: garminWorkoutId is the universal truth for "sent to Garmin".
- * Calendar placement uses POST /schedule { workoutId, date } on first push only.
+ * Garmin push state: our stack stamp on planned_workouts.workoutPushed — not Garmin ids.
  */
 
-export type GarminPushMode = "schedule-today" | "update-library" | "force-reschedule";
+export type GarminPushMode = "schedule-today";
 
-export type GarminCalendarSyncState =
-  | "not_pushed"
-  | "library_only"
-  | "scheduled_on_calendar";
-
-export type GarminPushedCalendarState = Exclude<GarminCalendarSyncState, "not_pushed">;
+export type GarminCalendarSyncState = "not_pushed" | "pushed";
 
 export function garminCalendarSyncState(workout: {
-  garminWorkoutId?: number | null;
-  garminScheduleId?: number | null;
+  workoutPushed?: boolean | null;
 }): GarminCalendarSyncState {
-  if (workout.garminWorkoutId == null) return "not_pushed";
-  return garminPushedCalendarState({
-    garminWorkoutId: workout.garminWorkoutId,
-    garminScheduleId: workout.garminScheduleId,
-  });
-}
-
-/** After a successful push, garminWorkoutId is always set. */
-export function garminPushedCalendarState(workout: {
-  garminWorkoutId: number;
-  garminScheduleId?: number | null;
-}): GarminPushedCalendarState {
-  if (workout.garminScheduleId == null) return "library_only";
-  return "scheduled_on_calendar";
+  return workout.workoutPushed ? "pushed" : "not_pushed";
 }
 
 export function garminCalendarStateLabel(state: GarminCalendarSyncState): string {
   switch (state) {
-    case "scheduled_on_calendar":
-      return "On Garmin Connect Training Calendar";
-    case "library_only":
-      return "In Garmin workout library only";
+    case "pushed":
+      return "Sent to Garmin";
     default:
       return "Not sent to Garmin";
   }
 }
 
-/** Default push mode for manual UI actions from current DB state. */
-export function defaultGarminPushModeForState(
-  state: GarminCalendarSyncState
-): GarminPushMode {
-  switch (state) {
-    case "scheduled_on_calendar":
-      return "update-library";
-    case "library_only":
-      return "force-reschedule";
-    default:
-      return "schedule-today";
-  }
-}
-
 export type PushWorkoutToGarminOptions = {
   scheduleDateYmdOverride?: string;
+  /** @deprecated Modes removed — always schedule on push. */
   mode?: GarminPushMode;
 };
 
@@ -73,12 +38,7 @@ export function normalizePushWorkoutOptions(
 }
 
 export function parseGarminPushModeFromBody(
-  body: Record<string, unknown> | null | undefined
+  _body: Record<string, unknown> | null | undefined
 ): GarminPushMode | undefined {
-  if (!body || typeof body !== "object") return undefined;
-  const raw = body.mode;
-  if (raw === "schedule-today" || raw === "update-library" || raw === "force-reschedule") {
-    return raw;
-  }
   return undefined;
 }

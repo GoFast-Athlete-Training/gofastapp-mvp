@@ -662,7 +662,7 @@ export async function DELETE(request: NextRequest, context: Ctx) {
       success: true,
       deletedFutureWorkouts: workoutCleanup.deletedFutureWorkouts,
       detachedCompletedWorkouts: workoutCleanup.detachedCompletedWorkouts,
-      garminSchedulesCleared: cleanup.clearedScheduleIds,
+      garminPushStampsCleared: cleanup.clearedPushStamps,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Failed to delete plan";

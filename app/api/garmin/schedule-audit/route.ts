@@ -3,13 +3,11 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { garminCalendarSyncState } from "@/lib/garmin-workouts/garmin-calendar-state";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 
 /**
  * GET /api/garmin/schedule-audit
- * Read-only: workouts with Garmin library id but missing calendar schedule id,
- * and duplicate plan-day rows for the same UTC date.
+ * Read-only: planned rows stamped as pushed and duplicate plan-day rows.
  */
 export async function GET(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -27,14 +25,10 @@ export async function GET(request: NextRequest) {
   start.setUTCDate(start.getUTCDate() - (days - 1));
   start.setUTCHours(0, 0, 0, 0);
 
-  const rows = await prisma.workouts.findMany({
+  const rows = await prisma.planned_workouts.findMany({
     where: {
       athleteId,
       date: { gte: start, lte: end },
-      OR: [
-        { garminWorkoutId: { not: null }, garminScheduleId: null },
-        { garminWorkoutId: { not: null } },
-      ],
     },
     select: {
       id: true,
@@ -42,24 +36,23 @@ export async function GET(request: NextRequest) {
       date: true,
       planId: true,
       weekNumber: true,
-      garminWorkoutId: true,
-      garminScheduleId: true,
+      workoutPushed: true,
+      workoutEditedAfterPush: true,
       updatedAt: true,
     },
     orderBy: [{ date: "asc" }, { updatedAt: "desc" }],
     take: 200,
   });
 
-  const libraryOnly = rows
-    .filter((r) => r.garminWorkoutId != null && r.garminScheduleId == null)
+  const pushed = rows
+    .filter((r) => r.workoutPushed)
     .map((r) => ({
       id: r.id,
       title: r.title,
       date: r.date ? ymdFromDate(r.date) : null,
       planId: r.planId,
       weekNumber: r.weekNumber,
-      garminWorkoutId: r.garminWorkoutId,
-      calendarState: garminCalendarSyncState(r),
+      workoutEditedAfterPush: r.workoutEditedAfterPush,
     }));
 
   const byDateTitle = new Map<string, typeof rows>();
@@ -79,9 +72,8 @@ export async function GET(request: NextRequest) {
         date: dateYmd,
         title: list[0]?.title ?? "",
         count: list.length,
-        workoutIds: list.map((w) => w.id),
-        garminWorkoutIds: list.map((w) => w.garminWorkoutId),
-        garminScheduleIds: list.map((w) => w.garminScheduleId),
+        plannedWorkoutIds: list.map((w) => w.id),
+        workoutPushed: list.map((w) => w.workoutPushed),
       };
     });
 
@@ -89,8 +81,8 @@ export async function GET(request: NextRequest) {
     ok: true,
     athleteId,
     windowDays: days,
-    libraryOnlyCount: libraryOnly.length,
-    libraryOnly,
+    pushedCount: pushed.length,
+    pushed,
     duplicateSameDayCount: duplicateSameDay.length,
     duplicateSameDay,
   });

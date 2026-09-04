@@ -4,10 +4,6 @@ import { NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { materializeTodayPlanWorkoutForAthlete } from "@/lib/training/materialize-todays-plan-workout";
 import { pushWorkoutToGarminForAthlete } from "@/lib/garmin-workouts/push-workout-for-athlete";
-import {
-  defaultGarminPushModeForState,
-  garminCalendarSyncState,
-} from "@/lib/garmin-workouts/garmin-calendar-state";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -53,19 +49,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const workoutRow = await prisma.planned_workouts.findFirst({
-    where: { id: workoutId, athleteId },
-    select: { garminWorkoutId: true, garminScheduleId: true },
-  });
-
-  const pushed = await pushWorkoutToGarminForAthlete(athleteId, workoutId, {
-    mode: defaultGarminPushModeForState(
-      garminCalendarSyncState({
-        garminWorkoutId: workoutRow?.garminWorkoutId ?? null,
-        garminScheduleId: workoutRow?.garminScheduleId ?? null,
-      })
-    ),
-  });
+  const pushed = await pushWorkoutToGarminForAthlete(athleteId, workoutId);
   if (!pushed.ok) {
     const status =
       pushed.code === "garmin_disconnected"
@@ -82,10 +66,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     workoutId,
-    garminWorkoutId: pushed.garminWorkoutId,
-    garminScheduleId: pushed.garminScheduleId,
+    workoutPushed: pushed.workoutPushed,
+    isUpdatedResend: pushed.isUpdatedResend,
     scheduledDate: pushed.scheduledDate,
-    mode: pushed.mode,
-    calendarState: pushed.calendarState,
   });
 }

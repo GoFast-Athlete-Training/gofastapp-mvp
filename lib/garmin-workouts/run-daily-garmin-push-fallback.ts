@@ -66,7 +66,6 @@ export async function runDailyGarminPushFallback(
     dateEnd: end,
     candidateLimit: 80,
     runLabel: "auto-push-garmin",
-    recoverLibraryOnly: true,
     unsentOnly: true,
   });
 

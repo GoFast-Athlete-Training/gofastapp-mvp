@@ -5,9 +5,38 @@ import {
   activityMatchCandidateUtcRange,
   activityNameContainsPushedWorkoutTitle,
   garminPushTitleForPlannedWorkout,
+  workoutTitleMatchVariants,
   garminTitleForWorkout,
   normalizeActivityNameForMatch,
 } from "./garmin-activity-match-helpers";
+
+test("workoutTitleMatchVariants includes (Updated) pushed title for edit-after-push matching", () => {
+  const variants = workoutTitleMatchVariants({
+    workoutTitle: "Friday Easy",
+    weekNumber: 5,
+    workoutType: "Easy",
+    dayAssigned: "Friday",
+    planId: "plan-1",
+    catalogueName: "Easy",
+  });
+  assert.ok(variants.includes("GF W5: Easy (Fri)"));
+  assert.ok(variants.includes("(Updated) GF W5: Easy (Fri)"));
+});
+
+test("activityNameContainsPushedWorkoutTitle matches (Updated) re-send title", () => {
+  assert.equal(
+    activityNameContainsPushedWorkoutTitle({
+      activityName: "Falmouth - (Updated) GF W5: Easy (Fri)",
+      workoutTitle: "Friday Easy",
+      weekNumber: 5,
+      workoutType: "Easy",
+      dayAssigned: "Friday",
+      planId: "plan-1",
+      catalogueName: "Easy",
+    }),
+    true
+  );
+});
 
 test("garminPushTitleForPlannedWorkout prefers catalogue over generic stored title", () => {
   assert.equal(

@@ -243,6 +243,7 @@ export async function GET(
           select: {
             id: true,
             status: true,
+            role: true,
             athleteId: true,
             Athlete: {
               select: {
@@ -326,6 +327,7 @@ export async function GET(
             select: {
               id: true,
               status: true,
+              role: true,
               athleteId: true,
               Athlete: {
                 select: {
@@ -444,6 +446,33 @@ export async function GET(
       });
     }
 
+    // Athlete plan stamp (planned_workouts.cityRunId) — not city_runs.workoutId.
+    let displayPlannedWorkout = run.plannedWorkout;
+    if (!displayPlannedWorkout && athlete) {
+      displayPlannedWorkout = await prisma.planned_workouts.findFirst({
+        where: { cityRunId: run.id, athleteId: athlete.id },
+        select: {
+          id: true,
+          title: true,
+          workoutType: true,
+          segments: {
+            orderBy: { stepOrder: 'asc' as const },
+            select: {
+              id: true,
+              stepOrder: true,
+              title: true,
+              durationType: true,
+              durationValue: true,
+              repeatCount: true,
+              notes: true,
+              recoveryDurationType: true,
+              recoveryDurationValue: true,
+            },
+          },
+        },
+      });
+    }
+
     // Get current user's RSVP (if authenticated)
     const userRSVP = athlete ? run.city_run_rsvps.find((r: any) => r.athleteId === athlete.id) : null;
 
@@ -504,12 +533,12 @@ export async function GET(
               segments: run.workout.segments ?? [],
             }
           : null,
-        plannedWorkout: run.plannedWorkout
+        plannedWorkout: displayPlannedWorkout
           ? {
-              id: run.plannedWorkout.id,
-              title: run.plannedWorkout.title,
-              workoutType: run.plannedWorkout.workoutType ?? null,
-              segments: run.plannedWorkout.segments ?? [],
+              id: displayPlannedWorkout.id,
+              title: displayPlannedWorkout.title,
+              workoutType: displayPlannedWorkout.workoutType ?? null,
+              segments: displayPlannedWorkout.segments ?? [],
             }
           : null,
         locationId: run.locationId ?? null,
@@ -540,10 +569,12 @@ export async function GET(
         rsvps: run.city_run_rsvps.map((rsvp: any) => ({
           id: rsvp.id,
           status: rsvp.status,
+          role: rsvp.role ?? null,
           athleteId: rsvp.athleteId,
           Athlete: rsvp.Athlete,
         })),
         currentRSVP: userRSVP?.status || null,
+        currentRSVPRole: userRSVP?.role ?? null,
       },
     });
   } catch (error: any) {

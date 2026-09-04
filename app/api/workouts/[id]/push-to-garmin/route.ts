@@ -3,24 +3,15 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import {
-  resolveGarminIdsForAthlete,
-  resolveWorkoutTargetForAthlete,
-} from "@/lib/training/workout-or-planned-resolve";
+import { resolveWorkoutTargetForAthlete } from "@/lib/training/workout-or-planned-resolve";
 import { GarminApiError } from "@/lib/garmin-workouts/garmin-training-api";
 import { GarminNotConnectedError } from "@/lib/domain-garmin";
 import { summarizeGarminTokenForLogs } from "@/lib/garmin-access-token-claims";
 import { pushWorkoutToGarminForAthlete } from "@/lib/garmin-workouts/push-workout-for-athlete";
-import {
-  defaultGarminPushModeForState,
-  garminCalendarSyncState,
-  parseGarminPushModeFromBody,
-} from "@/lib/garmin-workouts/garmin-calendar-state";
 
 /**
  * POST /api/workouts/[id]/push-to-garmin
- * Auth: Firebase Bearer + x-athlete-id (see lib/api.ts). Pushes to Garmin Training API with the athlete's stored OAuth2 token.
- * Creates or updates the workout, then schedules it on the workout's date so it appears on Garmin Connect / the watch calendar.
+ * Auth: Firebase Bearer + x-athlete-id. Athlete taps "Looks good, I'm ready".
  */
 export async function POST(
   request: NextRequest,
@@ -35,23 +26,7 @@ export async function POST(
 
     const { id } = await params;
 
-    let body: Record<string, unknown> = {};
-    try {
-      body = (await request.json()) as Record<string, unknown>;
-    } catch {
-      /* empty body ok */
-    }
-
-    const garminIds = await resolveGarminIdsForAthlete(id, auth.athlete.id);
-    if (!garminIds) {
-      return NextResponse.json({ error: "Workout not found" }, { status: 404 });
-    }
-
-    const calendarState = garminCalendarSyncState(garminIds);
-    const mode =
-      parseGarminPushModeFromBody(body) ?? defaultGarminPushModeForState(calendarState);
-
-    const result = await pushWorkoutToGarminForAthlete(auth.athlete.id, id, { mode });
+    const result = await pushWorkoutToGarminForAthlete(auth.athlete.id, id);
 
     if (!result.ok) {
       if (result.code === "not_found") {
@@ -109,14 +84,10 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      workout: workout
-        ? { ...workout, garminWorkoutId: result.garminWorkoutId, garminScheduleId: result.garminScheduleId }
-        : null,
-      garminWorkoutId: result.garminWorkoutId,
-      garminScheduleId: result.garminScheduleId,
+      workout,
+      workoutPushed: result.workoutPushed,
+      isUpdatedResend: result.isUpdatedResend,
       scheduledDate: result.scheduledDate,
-      mode: result.mode,
-      calendarState: result.calendarState,
     });
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {

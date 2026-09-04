@@ -12,8 +12,6 @@ test("assembleGarminSwimWorkout maps distance steps with pace targets", () => {
     date: null,
     poolLengthMeters: 25,
     cssSecPer100m: 95,
-    garminWorkoutId: null,
-    garminScheduleId: null,
     notes: null,
     createdAt: new Date(),
     updatedAt: new Date(),

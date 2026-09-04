@@ -1,12 +1,10 @@
 /**
  * Promote raw athlete_activity → matched bike_workout (Garmin cycling summary).
- * Primary match: garminWorkoutId from webhook payload ↔ bike_workout.garminWorkoutId
  * Fallback: same athlete, same UTC calendar day, unmatched bike workout
  */
 
 import type { bike_workout_step } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { extractGarminWorkoutIdFromSummary } from "./extract-garmin-workout-id";
 import { isCyclingActivityType } from "./activity-type-sets";
 
 function utcDayBounds(d: Date): { start: Date; end: Date } {
@@ -81,25 +79,8 @@ export async function tryMatchActivityToBikeWorkout(
     return { matched: false };
   }
 
-  const summaryBlob = activity.summaryData as Record<string, unknown> | null;
-  const garminWorkoutId = extractGarminWorkoutIdFromSummary(summaryBlob);
-
-  let candidate = null;
-
-  if (garminWorkoutId != null) {
-    candidate = await prisma.bike_workout.findFirst({
-      where: {
-        athleteId: activity.athleteId,
-        garminWorkoutId,
-        garminDetailActivityId: null,
-      },
-      include: bikeMatchInclude,
-    });
-  }
-
-  if (!candidate) {
-    const { start, end } = utcDayBounds(activity.startTime);
-    candidate = await prisma.bike_workout.findFirst({
+  const { start, end } = utcDayBounds(activity.startTime);
+  const candidate = await prisma.bike_workout.findFirst({
       where: {
         athleteId: activity.athleteId,
         date: { gte: start, lte: end },
@@ -108,7 +89,6 @@ export async function tryMatchActivityToBikeWorkout(
       orderBy: { date: "asc" },
       include: bikeMatchInclude,
     });
-  }
 
   if (!candidate) {
     await setIngestion("UNMATCHED");

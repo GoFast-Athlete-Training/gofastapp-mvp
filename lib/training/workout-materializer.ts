@@ -383,9 +383,8 @@ export async function materializeWorkoutForPlanDay(params: {
         dayAssigned: scheduled.dayAssigned,
         nOffset: scheduled.nOffset,
         planCycleIndex: scheduled.planCycleIndex,
-        garminWorkoutId: null,
-        garminScheduleId: null,
         updatedAt: new Date(),
+        ...(existing.workoutPushed ? { workoutEditedAfterPush: true } : {}),
       },
     });
   }

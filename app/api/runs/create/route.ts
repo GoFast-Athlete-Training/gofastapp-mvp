@@ -9,6 +9,9 @@ import { parseRunTotalMiles } from "@/lib/parse-run-total-miles";
 import { toCanonicalDayOfWeek } from "@/lib/utils/dayOfWeekConverter";
 import { resolveCityRunType } from "@/lib/city-run-type";
 import { parseCalendarDateForWrite } from "@/lib/calendar-date";
+import { autoRsvpHostRole } from "@/lib/host-run-rsvp";
+import { stampPlannedWorkoutCityRun } from "@/lib/city-run/stamp-planned-city-run";
+import { resolveWorkoutTargetForAthlete } from "@/lib/training/workout-or-planned-resolve";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +141,7 @@ export async function POST(request: NextRequest) {
       igPostGraphic,
       routeId,
       workoutId,
+      plannedWorkoutId,
       newRoute,
       /** Direct prod run_clubs.id (e.g. Company build-instance) */
       runClubId: bodyRunClubId,
@@ -228,6 +232,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "workoutId not found" }, { status: 404 });
       }
       resolvedWorkoutId = w.id;
+    }
+
+    let resolvedPlannedWorkoutId: string | null = plannedWorkoutId?.trim() || null;
+    if (!resolvedPlannedWorkoutId && resolvedWorkoutId && athleteGeneratedId?.trim()) {
+      const target = await resolveWorkoutTargetForAthlete(
+        resolvedWorkoutId,
+        athleteGeneratedId.trim()
+      );
+      if (target?.kind === "planned") {
+        resolvedPlannedWorkoutId = target.plannedWorkoutId;
+      }
     }
 
     let routeCityFallback: string | null = null;
@@ -498,7 +513,7 @@ export async function POST(request: NextRequest) {
     }
 
     const isAthleteJoinMyWorkoutShare =
-      !!resolvedWorkoutId &&
+      !!resolvedPlannedWorkoutId &&
       !!athleteGeneratedId?.trim() &&
       !finalRunClubId &&
       !runCrewId?.trim();
@@ -556,7 +571,7 @@ export async function POST(request: NextRequest) {
       igPostText: igPostText?.trim() || null,
       igPostGraphic: igPostGraphic?.trim() || null,
       routeId: resolvedRouteId,
-      workoutId: resolvedWorkoutId,
+      workoutId: isAthleteJoinMyWorkoutShare ? null : resolvedWorkoutId,
       cityRunType: finalRunClubId ? 'CLUB' : resolveCityRunType({
         runClubId: finalRunClubId,
         runCrewId: runCrewId?.trim() || null,
@@ -616,6 +631,18 @@ export async function POST(request: NextRequest) {
           Athlete: true,
         },
       });
+    }
+
+    if (isAthleteJoinMyWorkoutShare && resolvedPlannedWorkoutId && athleteGeneratedId?.trim()) {
+      const stamp = await stampPlannedWorkoutCityRun(
+        resolvedPlannedWorkoutId,
+        athleteGeneratedId.trim(),
+        run.id
+      );
+      if (!stamp.ok) {
+        return NextResponse.json({ success: false, error: stamp.message }, { status: 400 });
+      }
+      await autoRsvpHostRole(run.id, athleteGeneratedId.trim());
     }
 
     const response = NextResponse.json({

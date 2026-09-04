@@ -77,7 +77,6 @@ export async function syncPlanAfterGenerate(params: {
       athleteIds: [params.athleteId],
       candidateLimit: 80,
       runLabel: "post-generate-sync",
-      recoverLibraryOnly: true,
       unsentOnly: true,
     });
 

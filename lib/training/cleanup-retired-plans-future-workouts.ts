@@ -14,9 +14,6 @@ export type RetiredPlanCleanupSummary = {
   plansProcessed: number;
   clearedFutureWorkouts: number;
   clearedFuturePlannedWorkouts: number;
-  garminSchedulesDeleted: number;
-  garminSchedulesStale: number;
-  garminScheduleDeleteErrors: number;
   perPlan: Array<{
     planId: string;
     athleteId: string;
@@ -50,9 +47,6 @@ export async function cleanupAllRetiredPlansFutureWorkouts(params?: {
   const perPlan: RetiredPlanCleanupSummary["perPlan"] = [];
   let clearedFutureWorkouts = 0;
   let clearedFuturePlannedWorkouts = 0;
-  let garminSchedulesDeleted = 0;
-  let garminSchedulesStale = 0;
-  let garminScheduleDeleteErrors = 0;
 
   for (const plan of retiredPlans) {
     const result = await cleanupFutureWorkoutsForRetiredPlan({
@@ -67,18 +61,12 @@ export async function cleanupAllRetiredPlansFutureWorkouts(params?: {
     });
     clearedFutureWorkouts += result.clearedFutureWorkouts;
     clearedFuturePlannedWorkouts += result.clearedFuturePlannedWorkouts;
-    garminSchedulesDeleted += result.garminSchedulesDeleted;
-    garminSchedulesStale += result.garminSchedulesStale;
-    garminScheduleDeleteErrors += result.garminScheduleDeleteErrors;
   }
 
   return {
     plansProcessed: retiredPlans.length,
     clearedFutureWorkouts,
     clearedFuturePlannedWorkouts,
-    garminSchedulesDeleted,
-    garminSchedulesStale,
-    garminScheduleDeleteErrors,
     perPlan,
   };
 }
@@ -91,9 +79,6 @@ export function formatRetiredPlanCleanupSummary(
     `  plans processed: ${summary.plansProcessed}`,
     `  cleared future workouts: ${summary.clearedFutureWorkouts}`,
     `  cleared future planned_workouts: ${summary.clearedFuturePlannedWorkouts}`,
-    `  garmin schedules deleted: ${summary.garminSchedulesDeleted}`,
-    `  garmin schedules stale: ${summary.garminSchedulesStale}`,
-    `  garmin schedule delete errors: ${summary.garminScheduleDeleteErrors}`,
   ];
 
   const touched = summary.perPlan.filter(

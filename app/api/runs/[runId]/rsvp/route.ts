@@ -6,6 +6,7 @@ import { requireAthleteFromBearerForRsvp } from '@/lib/training/require-athlete'
 import { prisma } from '@/lib/prisma';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 import { upsertCityRunStampForAthlete } from '@/lib/city-run/city-run-stamp';
+import { RSVP_ROLE_GOING, RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
 
 /**
  * GET /api/runs/[runId]/rsvp
@@ -45,6 +46,7 @@ export async function GET(
       select: {
         id: true,
         status: true,
+        role: true,
         athleteId: true,
         Athlete: {
           select: {
@@ -59,6 +61,7 @@ export async function GET(
     const rsvps = rows.map((r) => ({
       id: r.id,
       status: r.status,
+      role: r.role,
       athleteId: r.athleteId,
       Athlete: r.Athlete,
     }));
@@ -133,10 +136,23 @@ export async function POST(
     const normalizedRsvpPhotoUrls = Array.isArray(rsvpPhotoUrls) ? rsvpPhotoUrls : Prisma.JsonNull;
     const parsedOccurrenceDate = occurrenceDate ? new Date(occurrenceDate) : null;
 
+    const existingRsvp = await prisma.city_run_rsvps.findUnique({
+      where: { runId_athleteId: { runId: resolvedId, athleteId: athlete.id } },
+      select: { role: true },
+    });
+
+    const rsvpRole =
+      status === 'going'
+        ? existingRsvp?.role === RSVP_ROLE_HOST
+          ? RSVP_ROLE_HOST
+          : RSVP_ROLE_GOING
+        : null;
+
     const rsvp = await prisma.city_run_rsvps.upsert({
       where: { runId_athleteId: { runId: resolvedId, athleteId: athlete.id } },
       update: {
         status,
+        role: rsvpRole,
         rsvpPhotoUrls: normalizedRsvpPhotoUrls,
         occurrenceDate: parsedOccurrenceDate,
       },
@@ -145,6 +161,7 @@ export async function POST(
         runId: resolvedId,
         athleteId: athlete.id,
         status,
+        role: rsvpRole,
         rsvpPhotoUrls: normalizedRsvpPhotoUrls,
         occurrenceDate: parsedOccurrenceDate,
       },

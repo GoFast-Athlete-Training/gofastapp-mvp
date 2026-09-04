@@ -57,8 +57,6 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     return NextResponse.json({
       success: true,
       bikeWorkout: workout,
-      garminWorkoutId: result.garminWorkoutId,
-      garminScheduleId: result.garminScheduleId,
       scheduledDate: result.scheduledDate,
     });
   } catch (error: unknown) {

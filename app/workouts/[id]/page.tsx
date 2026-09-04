@@ -41,7 +41,7 @@ import {
   presetIdForWorkoutOffset,
   shiftPaceBandSecPerMile,
 } from "@/lib/training/workout-pace-offset";
-import { defaultGarminPushModeForState, garminCalendarSyncState } from "@/lib/garmin-workouts/garmin-calendar-state";
+import { garminCalendarSyncState } from "@/lib/garmin-workouts/garmin-calendar-state";
 import { hubBackPathFromStash, readWorkoutDayNav } from "@/lib/training/workout-day-nav";
 import {
   backHrefFromGoTrainContext,
@@ -155,8 +155,8 @@ interface Workout {
   workoutType: string;
   description?: string;
   date?: string | null;
-  garminWorkoutId?: number | null;
-  garminScheduleId?: number | null;
+  workoutPushed?: boolean;
+  workoutEditedAfterPush?: boolean;
   catalogueWorkoutId?: string | null;
   workout_catalogue?: WorkoutCatalogue | null;
   estimatedDistanceInMeters?: number | null;
@@ -331,70 +331,43 @@ function dayRelativeToToday(workoutDate: string | null | undefined): "today" | "
   return "future";
 }
 
-type GarminAutoPushUiState = "not_applicable" | "waiting_primary" | "waiting_backup" | "retry";
+type GarminAutoPushUiState = "not_applicable" | "verify_and_send" | "retry";
 
 function garminAutoPushUiState(params: {
   workoutDateKey: string | null;
-  scheduledOnGarmin: boolean;
+  workoutPushed: boolean;
+  workoutEditedAfterPush: boolean;
   garminConnected: boolean | null;
 }): GarminAutoPushUiState {
-  const { workoutDateKey, scheduledOnGarmin, garminConnected } = params;
-  if (!garminConnected || scheduledOnGarmin || !workoutDateKey) return "not_applicable";
-
+  const { workoutDateKey, workoutPushed, workoutEditedAfterPush, garminConnected } = params;
+  if (!garminConnected || !workoutDateKey) return "not_applicable";
+  if (workoutPushed && !workoutEditedAfterPush) return "not_applicable";
   const todayKey = localYmd(new Date());
-  if (workoutDateKey > todayKey) return "not_applicable";
   if (workoutDateKey < todayKey) return "retry";
-
-  const hour = new Date().getHours();
-  if (hour < 1) return "waiting_primary";
-  if (hour < 8) return "waiting_backup";
-  return "retry";
-}
-
-function garminAutoPushStatusCopy(
-  state: GarminAutoPushUiState,
-  scheduleLabel: string | null
-): string {
-  switch (state) {
-    case "waiting_primary":
-      return "Sending to Garmin overnight — check back after 1 AM.";
-    case "waiting_backup":
-      return "Sending to Garmin this morning — if it is not on your calendar by 8 AM, tap Send to Garmin.";
-    case "retry":
-      return "Not on your Garmin calendar yet — tap Send to Garmin below.";
-    default:
-      return scheduleLabel
-        ? `Will send to Garmin for ${scheduleLabel}.`
-        : "Will send to Garmin automatically.";
-  }
+  return "verify_and_send";
 }
 
 function garminBannerStatusCopy(params: {
   garminConnected: boolean | null;
-  scheduledOnGarmin: boolean;
-  inGarminLibraryOnly: boolean;
-  garminAutoState: GarminAutoPushUiState;
+  workoutPushed: boolean;
+  workoutEditedAfterPush: boolean;
   scheduleLabel: string | null;
 }): string {
-  const {
-    garminConnected,
-    scheduledOnGarmin,
-    inGarminLibraryOnly,
-    garminAutoState,
-    scheduleLabel,
-  } = params;
+  const { garminConnected, workoutPushed, workoutEditedAfterPush, scheduleLabel } = params;
 
   if (garminConnected === null) return "Checking Garmin…";
   if (!garminConnected) return "Connect Garmin to send this workout to your watch.";
-  if (scheduledOnGarmin) {
-    return "On your Garmin calendar — open Garmin Connect on your phone to sync, then start Run on your watch.";
+  if (workoutPushed && !workoutEditedAfterPush) {
+    return "Sent to Garmin — open Garmin Connect on your phone to sync, then start Run on your watch.";
   }
-  if (inGarminLibraryOnly) {
+  if (workoutEditedAfterPush) {
     return scheduleLabel
-      ? `Workout is in Garmin but not on your calendar for ${scheduleLabel} — add it so Run prompts you on your watch.`
-      : "Workout is in Garmin but not on your calendar — add it so Run prompts you on your watch.";
+      ? `You edited this workout — tap Looks good, I'm ready to send the update for ${scheduleLabel}.`
+      : "You edited this workout — tap Looks good, I'm ready to send the update.";
   }
-  return garminAutoPushStatusCopy(garminAutoState, scheduleLabel);
+  return scheduleLabel
+    ? `Review your workout for ${scheduleLabel}, then tap Looks good, I'm ready.`
+    : "Review your workout, then tap Looks good, I'm ready.";
 }
 
 /** Left accent for segment cards (readability, not step numbers). */
@@ -935,8 +908,6 @@ export default function WorkoutDetailPage() {
   const [pushStatus, setPushStatus] = useState<{
     success: boolean;
     message: string;
-    garminWorkoutId?: number;
-    garminScheduleId?: number;
     scheduledDate?: string;
   } | null>(null);
   const [showCreatedBanner, setShowCreatedBanner] = useState(false);
@@ -1218,27 +1189,7 @@ export default function WorkoutDetailPage() {
 
       setIsEditing(false);
       await fetchWorkout();
-      if (garminConnected === true) {
-        const refreshed = await api.get<{ workout: Workout }>(
-          `/training/workout/${workoutId}`
-        );
-        const saved = refreshed.data?.workout;
-        if (saved) {
-          const mode = defaultGarminPushModeForState(
-            garminCalendarSyncState({
-              garminWorkoutId: saved.garminWorkoutId,
-              garminScheduleId: saved.garminScheduleId,
-            })
-          );
-          try {
-            await api.post(`workouts/${workoutId}/push-to-garmin`, { mode });
-            setGarminToast("Workout saved and synced to Garmin.");
-            await fetchWorkout();
-          } catch {
-            setGarminToast("Workout saved — could not sync to Garmin.");
-          }
-        }
-      }
+      setGarminToast("Workout saved.");
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
       setEditError(ax.response?.data?.error || "Failed to save changes");
@@ -1561,29 +1512,7 @@ export default function WorkoutDetailPage() {
         setWorkout(w);
         setEditTitleDraft(w.title);
       }
-      if (garminConnected === true && w) {
-        const mode = defaultGarminPushModeForState(
-          garminCalendarSyncState({
-            garminWorkoutId: w.garminWorkoutId,
-            garminScheduleId: w.garminScheduleId,
-          })
-        );
-        try {
-          await api.post(`workouts/${workoutId}/push-to-garmin`, { mode });
-          setGarminToast("Workout saved and synced to Garmin.");
-          const refresh = await api.get<{ workout: Workout }>(
-            `/training/workout/${workoutId}`
-          );
-          if (refresh.data?.workout) setWorkout(refresh.data.workout);
-        } catch (pushErr: unknown) {
-          const ax = pushErr as { response?: { data?: { error?: string } } };
-          setGarminToast(
-            ax.response?.data?.error || "Workout saved — could not sync to Garmin."
-          );
-        }
-      } else {
-        setGarminToast("Workout steps saved.");
-      }
+      setGarminToast("Workout steps saved.");
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
       setQuickEditError(ax.response?.data?.error || "Could not save workout parts");
@@ -1627,88 +1556,35 @@ export default function WorkoutDetailPage() {
     }
   };
 
-  const garminPushSuccessCopy = (params: {
-    scheduledDate?: string;
-    calendarState?: string;
-    mode?: string;
-  }): { status: string; toast: string } => {
-    const dateLabel =
-      params.scheduledDate != null && params.scheduledDate.length >= 10
-        ? new Date(`${params.scheduledDate.slice(0, 10)}T12:00:00`).toLocaleDateString(
-            undefined,
-            { weekday: "short", month: "short", day: "numeric", year: "numeric" }
-          )
-        : null;
-
-    if (params.mode === "update-library") {
-      const when = dateLabel ? ` for ${dateLabel}` : "";
-      return {
-        status: `Updated workout steps on Garmin${when}. Open Garmin Connect on your phone to sync your watch.`,
-        toast: `Garmin workout updated${when}. Sync your watch.`,
-      };
-    }
-
-    if (params.calendarState === "scheduled_on_calendar" || params.mode === "force-reschedule") {
-      return {
-        status: dateLabel
-          ? `Added to your Garmin calendar for ${dateLabel}. Open Garmin Connect on your phone to sync, then start Run on your watch.`
-          : "Added to your Garmin calendar. Open Garmin Connect on your phone to sync your watch.",
-        toast: dateLabel
-          ? `On Garmin calendar for ${dateLabel} — sync your watch.`
-          : "On Garmin calendar — sync your watch.",
-      };
-    }
-
-    return {
-      status: dateLabel
-        ? `Sent to Garmin for ${dateLabel}. Open Garmin Connect on your phone to sync your watch.`
-        : "Sent to Garmin. Open Garmin Connect on your phone to sync your watch.",
-      toast: dateLabel
-        ? `Sent to Garmin for ${dateLabel}.`
-        : "Sent to Garmin.",
-    };
-  };
-
-  const handlePushToGarmin = async (
-    mode?: "schedule-today" | "update-library" | "force-reschedule"
-  ) => {
+  const handlePushToGarmin = async () => {
     if (!workout) return;
 
     setPushing(true);
     setPushStatus(null);
 
     try {
-      const response = await api.post(`workouts/${workoutId}/push-to-garmin`, {
-        ...(mode ? { mode } : {}),
-      });
-      const {
-        garminWorkoutId,
-        garminScheduleId,
-        scheduledDate,
-        calendarState,
-        mode: responseMode,
-      } = response.data as {
-        garminWorkoutId?: number;
-        garminScheduleId?: number;
+      const response = await api.post(`workouts/${workoutId}/push-to-garmin`);
+      const { scheduledDate, isUpdatedResend } = response.data as {
         scheduledDate?: string;
-        calendarState?: string;
-        mode?: string;
+        isUpdatedResend?: boolean;
       };
 
-      const copy = garminPushSuccessCopy({
-        scheduledDate,
-        calendarState,
-        mode: responseMode ?? mode,
-      });
+      const dateLabel =
+        scheduledDate != null && scheduledDate.length >= 10
+          ? new Date(`${scheduledDate.slice(0, 10)}T12:00:00`).toLocaleDateString(
+              undefined,
+              { weekday: "short", month: "short", day: "numeric", year: "numeric" }
+            )
+          : null;
 
-      setPushStatus({
-        success: true,
-        message: copy.status,
-        garminWorkoutId,
-        garminScheduleId,
-        scheduledDate,
-      });
-      setGarminToast(copy.toast);
+      const status = isUpdatedResend
+        ? "Updated workout sent to Garmin. Open Garmin Connect to sync your watch."
+        : dateLabel
+          ? `Added to your Garmin calendar for ${dateLabel}. Open Garmin Connect to sync your watch.`
+          : "Added to your Garmin calendar. Open Garmin Connect to sync your watch.";
+
+      setPushStatus({ success: true, message: status, scheduledDate });
+      setGarminToast(status);
       void fetchWorkout();
     } catch (error: unknown) {
       console.error("Error pushing to Garmin:", error);
@@ -1723,10 +1599,6 @@ export default function WorkoutDetailPage() {
     } finally {
       setPushing(false);
     }
-  };
-
-  const handleUpdateGarminWorkoutSteps = async () => {
-    await handlePushToGarmin("update-library");
   };
 
   const handleCopyAndPushToGarmin = async () => {
@@ -1745,16 +1617,8 @@ export default function WorkoutDetailPage() {
         throw new Error("Duplicate did not return a workout id");
       }
 
-      const response = await api.post(`workouts/${newId}/push-to-garmin`, {
-        mode: "force-reschedule",
-      });
-      const {
-        garminWorkoutId,
-        garminScheduleId,
-        scheduledDate,
-      } = response.data as {
-        garminWorkoutId?: number;
-        garminScheduleId?: number;
+      const response = await api.post(`workouts/${newId}/push-to-garmin`);
+      const { scheduledDate } = response.data as {
         scheduledDate?: string;
       };
 
@@ -1771,16 +1635,12 @@ export default function WorkoutDetailPage() {
         message: dateLabel
           ? `Copied workout and added to Garmin Connect calendar for ${dateLabel}. Sync your watch in Garmin Connect.`
           : "Copied workout and added to Garmin Connect calendar. Sync your watch in Garmin Connect.",
-        garminWorkoutId,
-        garminScheduleId,
         scheduledDate,
       });
       setGarminToast(
-        dateLabel && garminWorkoutId != null
-          ? `On Garmin Connect calendar for ${dateLabel} — sync your watch (workout #${garminWorkoutId}).`
-          : garminWorkoutId != null
-            ? `Added to Garmin Connect (workout #${garminWorkoutId}). Sync your watch in Garmin Connect.`
-            : "Added to Garmin Connect. Sync your watch in Garmin Connect."
+        dateLabel
+          ? `On Garmin Connect calendar for ${dateLabel} — sync your watch.`
+          : "Added to Garmin Connect. Sync your watch in Garmin Connect."
       );
       router.push(`/workouts/${newId}?created=1`);
     } catch (error: unknown) {
@@ -1965,24 +1825,13 @@ export default function WorkoutDetailPage() {
     );
   }
 
-  const scheduledOnGarmin =
-    workout.garminWorkoutId != null &&
-    workout.garminWorkoutId !== undefined &&
-    workout.garminScheduleId != null &&
-    workout.garminScheduleId !== undefined;
-  const inGarminLibraryOnly =
-    workout.garminWorkoutId != null &&
-    workout.garminWorkoutId !== undefined &&
-    (workout.garminScheduleId == null || workout.garminScheduleId === undefined);
-
+  const workoutPushed = workout.workoutPushed === true;
+  const workoutEditedAfterPush = workout.workoutEditedAfterPush === true;
+  const showGarminReadyCta =
+    !isLogged && garminConnected === true && (!workoutPushed || workoutEditedAfterPush);
+  const showGarminHeaderCard = !isLogged;
   const scheduleLabel = formatWorkoutScheduleLong(workout.date);
   const workoutDateKey = workoutCalendarYmd(workout.date);
-  const garminAutoState = garminAutoPushUiState({
-    workoutDateKey,
-    scheduledOnGarmin,
-    garminConnected,
-  });
-  const showGarminHeaderCard = !isLogged;
   const dayRel = dayRelativeToToday(workout.date);
   const planName = workout.training_plans?.name?.trim();
   const weekOnPlan =
@@ -2345,52 +2194,29 @@ export default function WorkoutDetailPage() {
               <span className="text-sm font-medium text-orange-900 leading-snug">
                 {garminBannerStatusCopy({
                   garminConnected,
-                  scheduledOnGarmin,
-                  inGarminLibraryOnly,
-                  garminAutoState,
+                  workoutPushed,
+                  workoutEditedAfterPush,
                   scheduleLabel,
                 })}
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {garminConnected === true && scheduledOnGarmin && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => void handleUpdateGarminWorkoutSteps()}
-                    disabled={copyRepushing || pushing || duplicatingWorkout}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-orange-300 bg-white px-3 py-1.5 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
-                    title="Updates the structured workout on Garmin without creating a duplicate calendar entry."
-                  >
-                    {pushing ? (
-                      <>
-                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-orange-600" />
-                        Updating…
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        Update steps
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCopyAndPushToGarmin}
-                    disabled={copyRepushing || pushing || duplicatingWorkout}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50/50 px-3 py-1.5 text-sm font-medium text-orange-800 hover:bg-orange-50 disabled:opacity-50"
-                    title="Exceptional: duplicates this GoFast workout and force-schedules a fresh Garmin calendar entry. May create duplicates in Garmin Connect if misused."
-                  >
-                    {copyRepushing ? (
-                      <>
-                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-orange-600" />
-                        Fresh copy…
-                      </>
-                    ) : (
-                      <>Fresh copy</>
-                    )}
-                  </button>
-                </>
+              {showGarminReadyCta && (
+                <button
+                  type="button"
+                  onClick={() => void handlePushToGarmin()}
+                  disabled={copyRepushing || pushing || duplicatingWorkout}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                >
+                  {pushing ? (
+                    <>
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white" />
+                      Getting it ready…
+                    </>
+                  ) : (
+                    <>Looks good, I&apos;m ready</>
+                  )}
+                </button>
               )}
               {!garminConnected && garminConnected !== null && !isLogged && (
                 <button

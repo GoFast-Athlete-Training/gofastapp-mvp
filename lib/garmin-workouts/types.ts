@@ -169,9 +169,7 @@ export interface PlannedData {
   };
   distanceOverride?: number;
   notes?: string;
-  // Garmin tracking
-  garminWorkoutId?: number; // Garmin's workoutId after push
-  garminScheduleId?: number; // If scheduled
+  // Transient Garmin API response fields (not persisted to DB)
   garminSyncedAt?: string; // ISO timestamp
 }
 

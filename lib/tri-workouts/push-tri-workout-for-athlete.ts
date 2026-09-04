@@ -14,8 +14,6 @@ export type PushTriWorkoutLegResult = {
   ok: boolean;
   code?: string;
   message?: string;
-  garminWorkoutId?: number;
-  garminScheduleId?: number;
 };
 
 export type PushTriWorkoutForAthleteResult =
@@ -80,8 +78,6 @@ export async function pushTriWorkoutToGarminForAthlete(
           legId: leg.id,
           sport: leg.sport,
           ok: true,
-          garminWorkoutId: r.garminWorkoutId,
-          garminScheduleId: r.garminScheduleId ?? undefined,
         });
       } else {
         legs.push({
@@ -108,15 +104,12 @@ export async function pushTriWorkoutToGarminForAthlete(
       }
       const r = await pushWorkoutToGarminForAthlete(athleteId, leg.runWorkoutId, {
         scheduleDateYmdOverride: scheduledDate,
-        mode: "schedule-today",
       });
       if (r.ok) {
         legs.push({
           legId: leg.id,
           sport: leg.sport,
           ok: true,
-          garminWorkoutId: r.garminWorkoutId,
-          garminScheduleId: r.garminScheduleId ?? undefined,
         });
       } else {
         legs.push({

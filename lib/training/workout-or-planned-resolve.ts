@@ -66,35 +66,27 @@ export async function resolveWorkoutTargetForAthlete(
   return null;
 }
 
-/** Garmin ids for calendar-state gating (planned row is source of truth for plan days). */
-export async function resolveGarminIdsForAthlete(
+/** Push state for calendar gating (planned row is source of truth for plan days). */
+export async function resolveWorkoutPushStateForAthlete(
   id: string,
   athleteId: string
-): Promise<{ garminWorkoutId: number | null; garminScheduleId: number | null } | null> {
+): Promise<{ workoutPushed: boolean; workoutEditedAfterPush: boolean } | null> {
   const target = await resolveWorkoutTargetForAthlete(id, athleteId);
   if (!target) return null;
 
   if (target.kind === "planned") {
     const planned = await prisma.planned_workouts.findFirst({
       where: { id: target.plannedWorkoutId, athleteId },
-      select: { garminWorkoutId: true, garminScheduleId: true },
+      select: { workoutPushed: true, workoutEditedAfterPush: true },
     });
     if (!planned) return null;
     return {
-      garminWorkoutId: planned.garminWorkoutId,
-      garminScheduleId: planned.garminScheduleId,
+      workoutPushed: planned.workoutPushed,
+      workoutEditedAfterPush: planned.workoutEditedAfterPush,
     };
   }
 
-  const workout = await prisma.workouts.findFirst({
-    where: { id: target.workoutId, athleteId },
-    select: { garminWorkoutId: true, garminScheduleId: true },
-  });
-  if (!workout) return null;
-  return {
-    garminWorkoutId: workout.garminWorkoutId,
-    garminScheduleId: workout.garminScheduleId,
-  };
+  return { workoutPushed: false, workoutEditedAfterPush: false };
 }
 
 /** Instance row for mutations that only exist on `workouts` (skip, coach feedback). */
@@ -156,9 +148,16 @@ export async function applyPrescribePatchForAthlete(params: {
   }
 
   if (Object.keys(plannedData).length > 1) {
+    const existing = await prisma.planned_workouts.findFirst({
+      where: { id: target.plannedWorkoutId },
+      select: { workoutPushed: true },
+    });
     await prisma.planned_workouts.update({
       where: { id: target.plannedWorkoutId },
-      data: plannedData,
+      data: {
+        ...plannedData,
+        ...(existing?.workoutPushed ? { workoutEditedAfterPush: true } : {}),
+      },
     });
   }
 
@@ -255,7 +254,18 @@ export async function replacePrescribeSegmentsForAthlete(params: {
     });
     await tx.planned_workouts.update({
       where: { id: plannedWorkoutId },
-      data: { segmentSnapshotJson, updatedAt: new Date() },
+      data: {
+        segmentSnapshotJson,
+        updatedAt: new Date(),
+        ...((
+          await tx.planned_workouts.findFirst({
+            where: { id: plannedWorkoutId },
+            select: { workoutPushed: true },
+          })
+        )?.workoutPushed
+          ? { workoutEditedAfterPush: true }
+          : {}),
+      },
     });
 
     if (target.instanceWorkoutId) {
