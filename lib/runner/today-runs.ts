@@ -36,6 +36,8 @@ export type TodayRunPayload = {
   isLive: boolean;
   needsWereYouThere: boolean;
   supportsCheckin: boolean;
+  /** Athlete RSVP role on this run (host vs joiner). */
+  isHost: boolean;
 };
 
 export type TodayRunsResponse = {
@@ -57,7 +59,7 @@ export type MyDayResponse = {
   plannedRun: TodayPlannedRunPayload | null;
   goingRuns: TodayRunPayload[];
   hostedRuns: TodayRunPayload[];
-  /** Joiner runs needing I-ran answer (no iRanAt, not declined). */
+  /** Host or joiner runs needing I-ran answer (no iRanAt, not declined). */
   needsYouRuns: TodayRunPayload[];
   /** Recent I-ran confirmations for shoe mini-feed. */
   doneRuns: TodayRunPayload[];
@@ -92,6 +94,7 @@ type RunSelectRow = {
     iRanAt: Date | null;
     iRanDeclined: boolean;
   } | null;
+  rsvpRole?: string | null;
 };
 
 const RUN_SELECT = {
@@ -156,8 +159,9 @@ function mapRunToTodayPayload(
   const hasCheckin = hasIRan;
   const clock = mapRunClock(run);
 
+  if (iRanDeclined) return null;
+
   if (!isTodayRunRelevant(clock, nowMs, hasCheckin) && !iRanAt) return null;
-  if (iRanDeclined && !hasIRan && !isTodayRunRelevant(clock, nowMs, false)) return null;
 
   const checkedInAtIso =
     iRanAt?.toISOString() ?? checkin?.checkedInAt.toISOString() ?? null;
@@ -192,6 +196,7 @@ function mapRunToTodayPayload(
       isCityRunPast(clock, nowMs) &&
       isCityRunWithinPostRunCheckinWindow(clock, nowMs),
     supportsCheckin: hasSocialRunLifecycle(run),
+    isHost: run.rsvpRole === RSVP_ROLE_HOST,
   };
 }
 
@@ -234,15 +239,23 @@ async function fetchAthleteStampByRunId(
 
 async function attachStampsToRuns(
   athleteId: string,
-  runs: Array<Omit<RunSelectRow, 'athlete_stamp'>>
+  runs: Array<Omit<RunSelectRow, 'athlete_stamp' | 'rsvpRole'>>
 ): Promise<RunSelectRow[]> {
-  const stampMap = await fetchAthleteStampByRunId(
-    athleteId,
-    runs.map((r) => r.id)
-  );
+  const runIds = runs.map((r) => r.id);
+  const [stampMap, rsvpRows] = await Promise.all([
+    fetchAthleteStampByRunId(athleteId, runIds),
+    runIds.length > 0
+      ? prisma.city_run_rsvps.findMany({
+          where: { athleteId, runId: { in: runIds }, status: 'going' },
+          select: { runId: true, role: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const roleMap = new Map(rsvpRows.map((r) => [r.runId, r.role]));
   return runs.map((run) => ({
     ...run,
     athlete_stamp: stampMap.get(run.id) ?? null,
+    rsvpRole: roleMap.get(run.id) ?? null,
   }));
 }
 
@@ -373,6 +386,22 @@ export async function fetchTodayHostedRunsForAthlete(
   return { todayKey, runs };
 }
 
+function dedupeRunsById(runs: TodayRunPayload[]): TodayRunPayload[] {
+  const seen = new Set<string>();
+  const out: TodayRunPayload[] = [];
+  for (const run of runs) {
+    if (seen.has(run.id)) continue;
+    seen.add(run.id);
+    out.push(run);
+  }
+  return out;
+}
+
+/** Closed out: declined, or past with I-ran evidence — drop from upcoming widgets. */
+function isStackClosedOut(run: TodayRunPayload): boolean {
+  return run.iRanDeclined || (run.hasIRan && run.isPast);
+}
+
 /** MyDay card — three widgets, not merged. */
 export async function fetchMyDayForAthlete(
   athleteId: string,
@@ -389,25 +418,31 @@ export async function fetchMyDayForAthlete(
   ]);
 
   const allGoing = going.runs;
-  const hostIds = new Set(hosted.runs.map((r) => r.id));
-  const needsYouRuns = allGoing.filter(
-    (r) =>
-      r.needsWereYouThere &&
-      !r.hasIRan &&
-      !r.iRanDeclined &&
-      !hostIds.has(r.id)
+  const allHosted = hosted.runs;
+  const roster = dedupeRunsById([...allGoing, ...allHosted]);
+
+  const needsYouRuns = roster.filter(
+    (r) => r.needsWereYouThere && !r.hasIRan && !r.iRanDeclined
   );
-  const doneRuns = allGoing.filter((r) => r.hasIRan && r.iRanAt);
+
+  const goingRuns = allGoing.filter(
+    (r) => !isStackClosedOut(r) && !r.needsWereYouThere
+  );
+  const hostedRuns = allHosted.filter(
+    (r) => !isStackClosedOut(r) && !r.needsWereYouThere
+  );
+
+  const doneRuns = dedupeRunsById(
+    roster.filter((r) => Boolean(r.iRanAt))
+  ).sort((a, b) => (b.iRanAt ?? '').localeCompare(a.iRanAt ?? ''));
 
   return {
     todayKey,
     plannedRun,
-    goingRuns: allGoing,
-    hostedRuns: hosted.runs,
+    goingRuns,
+    hostedRuns,
     needsYouRuns,
-    doneRuns: [...doneRuns].sort((a, b) =>
-      (b.iRanAt ?? '').localeCompare(a.iRanAt ?? '')
-    ),
+    doneRuns,
   };
 }
 

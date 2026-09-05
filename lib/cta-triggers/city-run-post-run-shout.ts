@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import { hasSocialRunLifecycle, isIndividualHostedRun } from '@/lib/city-run-type';
-import { RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
 import {
   isCityRunPast,
   isCityRunWithinPostRunCheckinWindow,
@@ -117,6 +116,15 @@ export async function findCityRunPostRunShoutCta(
     if (!isCheckinWithinPostRunShoutCtaWindow(checkin.checkedInAt)) continue;
     if (checkin.runShouts?.trim()) continue;
 
+    const isIndividual = isIndividualHostedRun(run);
+    if (isIndividual) {
+      const iRanStamp = await prisma.planned_workouts.findFirst({
+        where: { athleteId, cityRunId: run.id },
+        select: { iRanAt: true },
+      });
+      if (!iRanStamp?.iRanAt) continue;
+    }
+
     const link = await prisma.city_run_activity_links.findUnique({
       where: { cityRunId_athleteId: { cityRunId: run.id, athleteId } },
       include: {
@@ -131,7 +139,6 @@ export async function findCityRunPostRunShoutCta(
       },
     });
 
-    const isIndividual = isIndividualHostedRun(run);
     const ctaTarget = isIndividual ? 'view-run' : 'shouts';
 
     return {
@@ -161,7 +168,6 @@ export async function findCityRunPostRunShoutCta(
     where: {
       athleteId,
       status: 'going',
-      NOT: { role: RSVP_ROLE_HOST },
       city_runs: {
         date: { gte: since },
       },
@@ -205,32 +211,7 @@ export async function findCityRunPostRunShoutCta(
       },
     });
 
-    const isIndividual = isIndividualHostedRun(run);
     const garminLinked = Boolean(activityLink?.activityId);
-
-    if (garminLinked && isIndividual) {
-      return {
-        type: 'cityRunPostRunShoutCta',
-        runId: run.id,
-        runTitle: run.title,
-        runDate: run.date.toISOString(),
-        cityRunType: run.cityRunType,
-        runClub: run.runClub,
-        hasCheckin: false,
-        checkedInAt: null,
-        hasShout: false,
-        garminLinked: true,
-        activitySummary: activityLink?.athlete_activities
-          ? {
-              id: activityLink.athlete_activities.id,
-              activityName: activityLink.athlete_activities.activityName,
-              startTime: activityLink.athlete_activities.startTime?.toISOString() ?? null,
-              distanceMeters: activityLink.athlete_activities.distance ?? null,
-            }
-          : null,
-        ctaTarget: 'view-run',
-      };
-    }
 
     return {
       type: 'cityRunPostRunShoutCta',
