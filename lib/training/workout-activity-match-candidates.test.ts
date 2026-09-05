@@ -117,3 +117,30 @@ test("distance-close same-day activity can be high-confidence without title matc
   assert.ok(scored);
   assert.equal(isHighConfidenceActivityCandidate(scored!), true);
 });
+
+test("Wednesday Easy title match stays high-confidence when distance is far off", () => {
+  const wedEasy = {
+    id: "w-wed-easy",
+    title: "Wednesday Easy 4 miles",
+    weekNumber: 2,
+    date: new Date("2026-09-03T12:00:00.000Z"),
+    estimatedDistanceInMeters: 4 * 1609.34,
+    workoutType: "Easy",
+    dayAssigned: "Wednesday",
+    planId: "plan-1",
+    catalogueName: "Easy Run",
+  };
+  const scored = scoreActivityCandidateForWorkout({
+    workout: wedEasy,
+    activity: baseActivity({
+      activityName: "Arlington County - GF W2: Easy Run (Wed)",
+      startTime: new Date("2026-09-03T14:00:00.000Z"),
+      distance: 7.7 * 1609.34,
+    }),
+  });
+  assert.ok(scored);
+  assert.ok(scored!.reasonLabels.includes("Title match"));
+  assert.ok(scored!.reasonLabels.includes("Distance far off"));
+  assert.ok(scored!.reasonLabels.includes("Same day"));
+  assert.equal(isHighConfidenceActivityCandidate(scored!), true);
+});

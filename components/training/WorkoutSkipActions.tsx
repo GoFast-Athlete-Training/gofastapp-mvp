@@ -76,8 +76,7 @@ export default function WorkoutSkipActions({
     return (
       <div className="space-y-2">
         <p className="text-sm text-neutral-600">
-          You marked this workout as skipped. It should still link automatically after Garmin sync,
-          or use manual matching below.
+          You marked this workout as skipped. You can still attach a run using matching below.
         </p>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <button
@@ -98,8 +97,7 @@ export default function WorkoutSkipActions({
     <div className="space-y-2">
       {showMissedPrompt ? (
         <p className="text-sm text-red-800">
-          This looks missed. After Garmin sync it should link automatically — use manual matching
-          below only if it does not.
+          This workout is not linked to a run yet. Confirm a match below if you completed it.
         </p>
       ) : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

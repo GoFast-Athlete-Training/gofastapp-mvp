@@ -91,6 +91,13 @@ function isDistanceFarOff(
 export function isHighConfidenceActivityCandidate(
   candidate: Pick<ScoredActivityCandidate, "reasons">
 ): boolean {
+  // Pushed-workout title on the same day — extra miles should still auto-link.
+  if (
+    candidate.reasons.includes("title_match") &&
+    candidate.reasons.includes("same_day")
+  ) {
+    return true;
+  }
   if (candidate.reasons.includes("distance_far_off")) return false;
   if (candidate.reasons.includes("title_match")) return true;
   if (

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   canAutoMatchPlannedWorkout,
   canSameDaySingleRunBolt,
+  filterSameDayPlanCandidates,
   isManualMatchOnlyWorkout,
   selectPlannedWorkoutCandidate,
 } from "./match-activity-to-workout";
@@ -219,4 +220,63 @@ test("isPlausiblePlannedWorkoutNearby blocks promotion for same-day planned cand
   });
   assert.ok(scored);
   assert.equal(isPlausiblePlannedWorkoutNearby({ scored }), true);
+});
+
+test("filterSameDayPlanCandidates ignores adjacent-day rows in query window", () => {
+  const wedEasy = {
+    workoutType: "Easy",
+    workoutCompleted: false,
+    date: new Date("2026-09-03T12:00:00.000Z"),
+  };
+  const tueTempo = {
+    workoutType: "Tempo",
+    workoutCompleted: false,
+    date: new Date("2026-09-02T12:00:00.000Z"),
+  };
+  const thuIntervals = {
+    workoutType: "Intervals",
+    workoutCompleted: false,
+    date: new Date("2026-09-04T12:00:00.000Z"),
+  };
+  const sameDay = filterSameDayPlanCandidates(
+    [tueTempo, wedEasy, thuIntervals],
+    "2026-09-03"
+  );
+  assert.equal(sameDay.length, 1);
+  assert.equal(canSameDaySingleRunBolt({ planCandidates: sameDay }), true);
+  assert.equal(
+    canSameDaySingleRunBolt({ planCandidates: [tueTempo, wedEasy, thuIntervals] }),
+    false
+  );
+});
+
+test("Wednesday Easy 7.7 mi auto-match eligible via title and same day", () => {
+  const wedEasy = {
+    id: "w-wed-easy",
+    title: "Wednesday Easy 4 miles",
+    weekNumber: 2,
+    date: new Date("2026-09-03T12:00:00.000Z"),
+    estimatedDistanceInMeters: 4 * 1609.34,
+    workoutType: "Easy",
+    dayAssigned: "Wednesday",
+    planId: "plan-1",
+    workout_catalogue: { name: "Easy Run", workBasePaceOffsetSecPerMile: null },
+  };
+  const result = selectPlannedWorkoutCandidate({
+    planCandidates: [wedEasy as never],
+    activity: baseActivity({
+      activityName: "Arlington County - GF W2: Easy Run (Wed)",
+      startTime: new Date("2026-09-03T14:00:00.000Z"),
+      distance: 7.7 * 1609.34,
+    }),
+  });
+  assert.ok(result.scored);
+  assert.equal(result.titleMatchCount, 1);
+  assert.equal(
+    canAutoMatchPlannedWorkout({
+      scored: result.scored,
+      titleMatchCount: result.titleMatchCount,
+    }),
+    true
+  );
 });

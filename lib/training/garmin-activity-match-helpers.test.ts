@@ -228,3 +228,18 @@ test("activityMatchCandidateUtcRange spans three UTC days around activity local 
   assert.equal(range.start.toISOString(), "2026-06-16T00:00:00.000Z");
   assert.equal(range.end.toISOString(), "2026-06-19T00:00:00.000Z");
 });
+
+test("activityNameContainsPushedWorkoutTitle matches Easy Run activity without catalogue", () => {
+  assert.equal(
+    activityNameContainsPushedWorkoutTitle({
+      activityName: "Arlington County - GF W2: Easy Run (Wed)",
+      workoutTitle: "Wednesday Easy 4 miles",
+      weekNumber: 2,
+      workoutType: "Easy",
+      dayAssigned: "Wednesday",
+      planId: "plan-1",
+      estimatedDistanceInMeters: 4 * 1609.34,
+    }),
+    true
+  );
+});

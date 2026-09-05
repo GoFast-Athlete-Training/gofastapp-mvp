@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendAppNotification } from "@/lib/app-notifications/send";
 import { stampWorkoutCompleteInbox } from "@/lib/app-notifications/stamp-workout-complete-inbox";
+import { activityHasPlausiblePlannedWorkoutNearby } from "./plausible-planned-workout-nearby";
 import { seedSpawnedWorkoutFromActivity } from "./seed-spawned-workout-from-activity";
 
 /** Congrats surfacing push — always opens /workouts/{id}, never /activities/{id}. */
@@ -73,6 +74,10 @@ export async function surfaceFinishedRunningActivity(params: {
       workoutTitle: linked.title,
     });
     return { workoutId, pushSent: true };
+  }
+
+  if (await activityHasPlausiblePlannedWorkoutNearby(params.activityId)) {
+    return { workoutId: null, pushSent: false };
   }
 
   const seeded = await seedSpawnedWorkoutFromActivity(params.activityId);

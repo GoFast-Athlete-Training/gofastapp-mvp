@@ -71,22 +71,38 @@ function conflictMessage(conflict: ActivityLinkConflict | null): string | null {
   if (conflict.type === "unrelated_planned_workout") {
     return `Linked to another planned workout: ${conflict.workoutTitle}. Unlink that workout first.`;
   }
-  return `Looks like the right Garmin run. It's attached to an older duplicate workout — confirming moves it here.`;
+  if (conflict.type === "standalone_workout") {
+    return "Already recorded — confirm to put it on this workout.";
+  }
+  return "Attached to another workout — confirming moves it here.";
+}
+
+function isRecommendedCandidate(candidate: Pick<CandidateActivity, "reasonLabels">): boolean {
+  return (
+    candidate.reasonLabels.includes("Same day") ||
+    candidate.reasonLabels.includes("Title match")
+  );
+}
+
+function isHighConfidenceCandidate(candidate: Pick<CandidateActivity, "reasonLabels">): boolean {
+  if (
+    candidate.reasonLabels.includes("Title match") &&
+    candidate.reasonLabels.includes("Same day")
+  ) {
+    return true;
+  }
+  if (candidate.reasonLabels.includes("Distance far off")) return false;
+  if (candidate.reasonLabels.includes("Title match")) return true;
+  return (
+    candidate.reasonLabels.includes("Distance close") &&
+    candidate.reasonLabels.includes("Same day")
+  );
 }
 
 function isRepairableConflict(conflict: ActivityLinkConflict | null): boolean {
   return (
     conflict?.type === "standalone_workout" ||
     conflict?.type === "sibling_planned_workout"
-  );
-}
-
-function isHighConfidenceCandidate(candidate: Pick<CandidateActivity, "reasonLabels">): boolean {
-  if (candidate.reasonLabels.includes("Distance far off")) return false;
-  if (candidate.reasonLabels.includes("Title match")) return true;
-  return (
-    candidate.reasonLabels.includes("Distance close") &&
-    candidate.reasonLabels.includes("Same day")
   );
 }
 
@@ -110,18 +126,18 @@ function distanceMismatchWarning(
 
 function confirmButtonLabel(
   selected: CandidateActivity | null,
-  suggested: CandidateActivity | null,
+  recommended: CandidateActivity | null,
   saving: boolean
 ): string {
   if (saving) return "Matching…";
-  if (!selected) return "Use this Garmin activity";
+  if (!selected) return "Use this run";
   if (
-    suggested?.id === selected.id &&
+    recommended?.id === selected.id &&
     isHighConfidenceCandidate(selected)
   ) {
     return "Yep, looks right";
   }
-  return "Use this Garmin activity";
+  return "Use this run";
 }
 
 export default function WorkoutActivityMatchPanel({
@@ -177,11 +193,20 @@ export default function WorkoutActivityMatchPanel({
     void loadCandidates();
   }, [loadCandidates]);
 
+  const recommendedCandidates = useMemo(
+    () => candidates.filter(isRecommendedCandidate),
+    [candidates]
+  );
+  const primaryRecommended = recommendedCandidates[0] ?? candidates[0] ?? null;
+  const otherCandidates = useMemo(() => {
+    if (!primaryRecommended) return [];
+    return candidates.filter((c) => c.id !== primaryRecommended.id);
+  }, [candidates, primaryRecommended]);
+
   const suggested = useMemo(() => {
-    const top = candidates[0] ?? null;
-    if (!top) return null;
-    return isHighConfidenceCandidate(top) ? top : null;
-  }, [candidates]);
+    if (!primaryRecommended) return null;
+    return isHighConfidenceCandidate(primaryRecommended) ? primaryRecommended : null;
+  }, [primaryRecommended]);
 
   const visibleLimit = VISIBLE_STEPS[visibleStepIndex] ?? Number.POSITIVE_INFINITY;
   const visibleCandidates = useMemo(() => {
@@ -477,21 +502,26 @@ export default function WorkoutActivityMatchPanel({
           </p>
         ) : (
           <p className="text-xs text-gray-600 leading-relaxed">
-            Use this only if the run did not link automatically after Garmin sync.
+            Pick the run that matches this workout.
           </p>
         )}
 
         {candidates.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No nearby running activities found. Sync Garmin from Training settings, then refresh
-            this page.
-          </p>
+          <p className="text-sm text-gray-500">No run found for this day yet.</p>
         ) : (
           <>
-            {compact && suggested && !showAllCandidates ? (
+            {compact && primaryRecommended && !showAllCandidates ? (
               <div className="space-y-3">
-                {renderCandidate(suggested, true)}
-                {candidates.length > 1 ? (
+                {renderCandidate(primaryRecommended, true)}
+                {otherCandidates.length > 0 ? (
+                  <>
+                    <p className="text-xs font-semibold uppercase text-gray-500">
+                      Other nearby runs
+                    </p>
+                    {otherCandidates.map((a) => renderCandidate(a))}
+                  </>
+                ) : null}
+                {candidates.length > 1 && otherCandidates.length === 0 ? (
                   <button
                     type="button"
                     onClick={() => setShowAllCandidates(true)}
@@ -504,9 +534,17 @@ export default function WorkoutActivityMatchPanel({
               </div>
             ) : (
               <div className="space-y-2">
-                {visibleCandidates.map((a, index) =>
-                  renderCandidate(a, index === 0 && a.reasonLabels.includes("Title match"))
-                )}
+                {primaryRecommended ? renderCandidate(primaryRecommended, true) : null}
+                {otherCandidates.length > 0 ? (
+                  <>
+                    <p className="text-xs font-semibold uppercase text-gray-500 pt-1">
+                      Other nearby runs
+                    </p>
+                    {(showAllCandidates ? otherCandidates : otherCandidates.slice(0, visibleLimit - 1)).map(
+                      (a) => renderCandidate(a)
+                    )}
+                  </>
+                ) : null}
                 {hiddenCount > 0 ? (
                   <button
                     type="button"
@@ -543,7 +581,7 @@ export default function WorkoutActivityMatchPanel({
               ) : (
                 <CheckCircle2 className="h-4 w-4" />
               )}
-              {confirmButtonLabel(selectedCandidate, suggested, saving)}
+              {confirmButtonLabel(selectedCandidate, primaryRecommended, saving)}
             </button>
             {onClose ? (
               <button

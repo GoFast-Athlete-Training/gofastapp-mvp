@@ -14,6 +14,7 @@ import {
   activityMatchCandidateUtcRange,
   activityNameContainsPushedWorkoutTitle,
 } from "@/lib/training/garmin-activity-match-helpers";
+import { ymdFromDate } from "@/lib/training/plan-utils";
 import {
   isHighConfidenceActivityCandidate,
   scoreActivityCandidateForWorkout,
@@ -251,6 +252,18 @@ export function canSameDaySingleRunBolt(params: {
   return true;
 }
 
+/** Planned rows on the activity's local calendar day (excludes Rest). */
+export function filterSameDayPlanCandidates<T extends { date: Date | null; workoutType: string }>(
+  planCandidates: T[],
+  activityYmd: string
+): T[] {
+  return planCandidates.filter((planned) => {
+    if (planned.workoutType === "Rest") return false;
+    if (!planned.date) return false;
+    return ymdFromDate(planned.date) === activityYmd;
+  });
+}
+
 /**
  * Match activity to at most one workout; planned workouts auto-link only when high-confidence.
  */
@@ -284,9 +297,15 @@ export async function tryMatchActivityToTrainingWorkout(
 
   const alreadyLinked = await prisma.workouts.findFirst({
     where: { garminDetailActivityId: athleteActivityId },
-    select: { id: true, title: true },
+    select: { id: true, title: true, planId: true, plannedWorkoutId: true },
   });
-  if (alreadyLinked) {
+
+  const isStandaloneGhost =
+    alreadyLinked != null &&
+    alreadyLinked.planId == null &&
+    alreadyLinked.plannedWorkoutId == null;
+
+  if (alreadyLinked && !isStandaloneGhost) {
     if (activity.ingestionStatus !== "MATCHED") {
       await setIngestion("MATCHED");
     }
@@ -329,6 +348,8 @@ export async function tryMatchActivityToTrainingWorkout(
       orderBy: [{ workoutPushed: "desc" }, { updatedAt: "desc" }],
     });
 
+    const sameDayPlanCandidates = filterSameDayPlanCandidates(planCandidates, activityYmd);
+
     const selected = selectPlannedWorkoutCandidate({
       planCandidates,
       activity: {
@@ -341,12 +362,19 @@ export async function tryMatchActivityToTrainingWorkout(
     precomputedScored = selected.scored;
     precomputedTitleMatchCount = selected.titleMatchCount;
 
+    const autoMatchFromSelection =
+      plannedCandidate != null &&
+      precomputedScored != null &&
+      canAutoMatchPlannedWorkout({
+        scored: precomputedScored,
+        titleMatchCount: precomputedTitleMatchCount,
+      });
+
     if (
-      !plannedCandidate &&
-      canSameDaySingleRunBolt({ planCandidates }) &&
-      planCandidates.length === 1
+      !autoMatchFromSelection &&
+      canSameDaySingleRunBolt({ planCandidates: sameDayPlanCandidates })
     ) {
-      const sole = planCandidates[0]!;
+      const sole = sameDayPlanCandidates[0]!;
       if (
         !(await plannedDayConsumedByOtherActivity({
           plannedWorkoutId: sole.id,
@@ -354,6 +382,15 @@ export async function tryMatchActivityToTrainingWorkout(
         }))
       ) {
         plannedCandidate = sole;
+        precomputedScored =
+          scoreActivityCandidateForWorkout({
+            workout: plannedScoreInput(sole),
+            activity: activityCandidateInput({
+              ...activity,
+              startTime: activity.startTime,
+            }),
+          }) ?? precomputedScored;
+        precomputedTitleMatchCount = 0;
         sameDaySingleRunBolt = true;
       }
     }
@@ -421,10 +458,13 @@ export async function tryMatchActivityToTrainingWorkout(
       canAutoMatchPlannedWorkout({ scored, titleMatchCount });
 
     if (autoMatchEligible && scored) {
-      const existingLink = await prisma.workouts.findFirst({
-        where: { garminDetailActivityId: activity.id },
-        select: { id: true, planId: true, plannedWorkoutId: true },
-      });
+      const existingLink =
+        isStandaloneGhost && alreadyLinked
+          ? alreadyLinked
+          : await prisma.workouts.findFirst({
+              where: { garminDetailActivityId: activity.id },
+              select: { id: true, planId: true, plannedWorkoutId: true },
+            });
 
       if (
         existingLink &&
