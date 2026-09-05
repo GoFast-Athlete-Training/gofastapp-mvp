@@ -42,9 +42,17 @@ export default function GoFastWithMeWorkoutPicker({
       const days = (res.data?.days ?? []) as PlanDayCard[];
       setWeekDays(days);
       setSelectedDayKey((prev) => {
-        if (days.some((d) => d.dateKey === prev)) return prev;
-        if (days.some((d) => d.dateKey === todayKey)) return todayKey;
-        return days.find((d) => d.workoutType !== 'Rest')?.dateKey ?? days[0]?.dateKey ?? todayKey;
+        const remaining = days.filter((d) => d.dateKey >= todayKey);
+        if (remaining.some((d) => d.dateKey === prev)) return prev;
+        const todayWorkout = remaining.find(
+          (d) => d.dateKey === todayKey && d.workoutType !== 'Rest'
+        );
+        if (todayWorkout) return todayWorkout.dateKey;
+        return (
+          remaining.find((d) => d.workoutType !== 'Rest')?.dateKey ??
+          remaining[0]?.dateKey ??
+          todayKey
+        );
       });
     } catch {
       setError('Could not load this week\'s workouts.');
@@ -58,7 +66,7 @@ export default function GoFastWithMeWorkoutPicker({
   }, [loadWeek]);
 
   const handleInviteFromDay = async (day: PlanDayCard) => {
-    if (day.workoutType === 'Rest' || !day.dateKey) return;
+    if (day.workoutType === 'Rest' || !day.dateKey || day.dateKey < todayKey) return;
     setBusyDayKey(day.dateKey);
     setError(null);
     try {
@@ -86,11 +94,12 @@ export default function GoFastWithMeWorkoutPicker({
     }
   };
 
-  const workoutDays = weekDays.filter(
+  const remainingDays = weekDays.filter((day) => day.dateKey >= todayKey);
+  const workoutDays = remainingDays.filter(
     (day) => day.workoutType !== 'Rest' && day.title.trim().length > 0
   );
   const selectedDay =
-    weekDays.find((day) => day.dateKey === selectedDayKey) ??
+    remainingDays.find((day) => day.dateKey === selectedDayKey) ??
     workoutDays[0] ??
     null;
 
@@ -119,13 +128,14 @@ export default function GoFastWithMeWorkoutPicker({
           Loading this week&apos;s workouts…
         </p>
       ) : workoutDays.length === 0 ? (
-        <p className="text-sm text-gray-600">No workouts scheduled for this week.</p>
+        <p className="text-sm text-gray-600">No remaining workouts this week to invite from.</p>
       ) : (
         <div className="space-y-4">
           <WeekWorkoutWidget
             days={weekDays}
             todayKey={todayKey}
             selectedDateKey={selectedDayKey || todayKey}
+            hideDaysBefore={todayKey}
             onSelectDay={(day) => setSelectedDayKey(day.dateKey)}
           />
 

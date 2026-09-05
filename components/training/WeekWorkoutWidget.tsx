@@ -14,6 +14,8 @@ type Props = {
   todayKey: string;
   selectedDateKey: string;
   onSelectDay: (day: PlanDayCard) => void;
+  /** Hide strip cells before this YYYY-MM-DD (inclusive floor). */
+  hideDaysBefore?: string;
 };
 
 type StripDayItem = {
@@ -48,7 +50,10 @@ function mondayOfWeekContaining(dateKey: string): Date {
 }
 
 /** Full Mon–Sun strip from scheduled workout days (inserts rest placeholders). */
-export function buildWeekWorkoutWidgetDays(days: PlanDayCard[]): StripDayItem[] {
+export function buildWeekWorkoutWidgetDays(
+  days: PlanDayCard[],
+  opts?: { hideDaysBefore?: string }
+): StripDayItem[] {
   if (!days.length) return [];
 
   const byKey = new Map<string, PlanDayCard>();
@@ -58,10 +63,12 @@ export function buildWeekWorkoutWidgetDays(days: PlanDayCard[]): StripDayItem[] 
 
   const sortedKeys = [...byKey.keys()].sort();
   const weekMonday = mondayOfWeekContaining(sortedKeys[0]!);
+  const hideBefore = opts?.hideDaysBefore?.trim().slice(0, 10) || "";
   const strip: StripDayItem[] = [];
 
   for (let i = 0; i < 7; i++) {
     const dateKey = localYmdFromDate(addDaysLocal(weekMonday, i));
+    if (hideBefore && dateKey < hideBefore) continue;
     const planDay = byKey.get(dateKey) ?? null;
     strip.push({
       dateKey,
@@ -111,8 +118,17 @@ function stripCellClasses(params: {
     .join(" ");
 }
 
-export default function WeekWorkoutWidget({ days, todayKey, selectedDateKey, onSelectDay }: Props) {
-  const stripDays = useMemo(() => buildWeekWorkoutWidgetDays(days), [days]);
+export default function WeekWorkoutWidget({
+  days,
+  todayKey,
+  selectedDateKey,
+  onSelectDay,
+  hideDaysBefore,
+}: Props) {
+  const stripDays = useMemo(
+    () => buildWeekWorkoutWidgetDays(days, { hideDaysBefore }),
+    [days, hideDaysBefore]
+  );
 
   if (!stripDays.length) return null;
 
