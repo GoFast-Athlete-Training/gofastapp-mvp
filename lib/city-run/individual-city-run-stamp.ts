@@ -55,12 +55,14 @@ export async function upsertIndividualCityRunStampForAthlete(
 
   const courseSnap = buildCourseSnapFromRun(run, 'city_run_rsvp');
   const courseJson = courseSnapToJson(courseSnap);
-  const matchLabel = buildCityRunMatchLabel({
-    club: run.runClub ?? undefined,
-    dayOfWeek: run.dayOfWeek,
-    runDate: run.date,
-    workoutTitle: run.title,
-  });
+  const matchLabel = run.runClub
+    ? buildCityRunMatchLabel({
+        club: run.runClub,
+        dayOfWeek: run.dayOfWeek,
+        runDate: run.date,
+        workoutTitle: run.title,
+      })
+    : run.title.trim() || 'Run';
 
   const existing = await prisma.planned_workouts.findFirst({
     where: { athleteId, cityRunId },
