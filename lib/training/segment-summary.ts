@@ -14,6 +14,20 @@ export type SegmentLike = {
 /** Miles → meters (matches Garmin conversion in lib/garmin-workouts/types). */
 export const SEGMENT_METERS_PER_MILE = 1609.34;
 
+/** Standard track rep lengths — only these display as meters (not ~3 mi MP blocks). */
+const STANDARD_TRACK_REP_METERS = [
+  200, 400, 600, 800, 1000, 1200, 1500, 1600, 2000, 3000, 5000,
+] as const;
+
+function isStandardTrackRepMeters(meters: number): boolean {
+  if (!Number.isFinite(meters) || meters <= 0) return false;
+  for (const target of STANDARD_TRACK_REP_METERS) {
+    const relErr = Math.abs(meters - target) / target;
+    if (relErr <= 0.005) return true;
+  }
+  return false;
+}
+
 /**
  * Human-readable distance for RUN prescriptions: show meters when the value matches a standard track rep length.
  * Otherwise show miles, preserving tenths when the value is not effectively a whole mile.
@@ -29,14 +43,11 @@ function formatMilesWithOptionalTenth(miles: number): string {
 export function formatSegmentDistance(miles: number): string {
   if (!Number.isFinite(miles) || miles < 0) return "—";
   const meters = miles * SEGMENT_METERS_PER_MILE;
-  if (meters <= 5000 && meters > 0) {
-    const rounded50 = Math.round(meters / 50) * 50;
-    if (rounded50 > 0) {
-      const relErr = Math.abs(meters - rounded50) / meters;
-      if (relErr <= 0.005) {
-        return `${rounded50}m`;
-      }
-    }
+  if (isStandardTrackRepMeters(meters)) {
+    const match = STANDARD_TRACK_REP_METERS.find(
+      (target) => Math.abs(meters - target) / target <= 0.005
+    );
+    if (match) return `${match}m`;
   }
   return formatMilesWithOptionalTenth(miles);
 }
@@ -77,12 +88,11 @@ export type SegmentDisplayGroup<T extends SegmentLike = SegmentLike> = {
 export function milesToDisplayMeters(miles: number): number {
   if (!Number.isFinite(miles) || miles <= 0) return 0;
   const meters = miles * SEGMENT_METERS_PER_MILE;
-  if (meters <= 5000) {
-    const rounded50 = Math.round(meters / 50) * 50;
-    if (rounded50 > 0) {
-      const relErr = Math.abs(meters - rounded50) / meters;
-      if (relErr <= 0.005) return rounded50;
-    }
+  if (isStandardTrackRepMeters(meters)) {
+    const match = STANDARD_TRACK_REP_METERS.find(
+      (target) => Math.abs(meters - target) / target <= 0.005
+    );
+    if (match) return match;
   }
   return Math.round(meters);
 }
@@ -354,16 +364,39 @@ export function displayGroupTitle(group: SegmentDisplayGroup): string {
   return group.work.title?.trim() || "Workout part";
 }
 
+export type SegmentTitleContext = {
+  workoutType?: string | null;
+  paceAnchor?: string | null;
+  catalogueName?: string | null;
+};
+
+function isMpSimulationContext(ctx?: SegmentTitleContext | null): boolean {
+  const anchor = ctx?.paceAnchor?.trim().toLowerCase() ?? "";
+  if (anchor === "mpsimulation") return true;
+  const name = ctx?.catalogueName?.toLowerCase() ?? "";
+  return (
+    name.includes("marathon pace") ||
+    name.includes("mp simulation") ||
+    name.includes("goal marathon")
+  );
+}
+
 /** Athlete-facing workout-part title (avoid raw "Work" / "Segment" in UI). */
 export function humanizeSegmentTitle(
   title: string | null | undefined,
-  workoutType?: string | null
+  workoutType?: string | null,
+  context?: SegmentTitleContext | null
 ): string {
   const raw = title?.trim() || "";
   if (!raw) return "Step";
   const lower = raw.toLowerCase();
+  const wt = workoutType ?? context?.workoutType ?? null;
+  if (lower.includes("goal marathon") || lower.includes("marathon pace")) {
+    return "Marathon pace";
+  }
   if (lower === "work" || lower === "segment") {
-    switch (workoutType) {
+    if (isMpSimulationContext(context ?? { workoutType: wt })) return "Marathon pace";
+    switch (wt) {
       case "Intervals":
         return "Intervals";
       case "Tempo":
@@ -378,6 +411,10 @@ export function humanizeSegmentTitle(
         return "Main set";
     }
   }
+  if (lower === "long run") {
+    if (isMpSimulationContext(context ?? { workoutType: wt })) return "Marathon pace";
+    return "Long run";
+  }
   if (lower.includes("warm")) return "Warm-up";
   if (lower.includes("cool")) return "Cool-down";
   if (isRecoveryTitle(raw)) return "Recovery";
@@ -389,10 +426,16 @@ export function humanizeSegmentTitle(
 /** Group card title for plan-day / workout preview UI. */
 export function humanDisplayGroupTitle(
   group: SegmentDisplayGroup,
-  workoutType?: string | null
+  workoutType?: string | null,
+  context?: SegmentTitleContext | null
 ): string {
   if (isMultiStepRepeatGroup(group)) return formatRepeatBlockLabel(group);
-  return humanizeSegmentTitle(group.work.title, workoutType);
+  const ctx: SegmentTitleContext = {
+    workoutType: workoutType ?? context?.workoutType,
+    paceAnchor: context?.paceAnchor,
+    catalogueName: context?.catalogueName,
+  };
+  return humanizeSegmentTitle(group.work.title, workoutType, ctx);
 }
 
 /** Optional side tag for a plan step; null when redundant with the header. */

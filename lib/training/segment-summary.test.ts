@@ -156,6 +156,17 @@ test("humanizeSegmentTitle replaces raw Work with athlete-facing labels", () => 
   assert.equal(humanizeSegmentTitle("Recovery"), "Recovery");
 });
 
+test("3 mile MP blocks display as miles not 4850m", () => {
+  assert.equal(formatSegmentDistance(3), "3 mi");
+  assert.equal(formatSegmentDistance(3.01), "3 mi");
+});
+
+test("humanizeSegmentTitle maps Long run to Marathon pace under mpSimulation", () => {
+  const ctx = { paceAnchor: "mpSimulation", workoutType: "LongRun" };
+  assert.equal(humanizeSegmentTitle("Long Run", "LongRun", ctx), "Marathon pace");
+  assert.equal(humanizeSegmentTitle("Work", "LongRun", ctx), "Marathon pace");
+});
+
 test("humanDisplayGroupTitle uses workout type for lone Work segments", () => {
   const groups = groupSegmentsInDisplayOrder([seg(1, "Work", 3)]);
   assert.equal(humanDisplayGroupTitle(groups[0]!, "LongRun"), "Long run");

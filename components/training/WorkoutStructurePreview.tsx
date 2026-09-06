@@ -11,11 +11,13 @@ import {
   previewGroupedSegmentTargetSummary,
   previewSegmentTargetSummary,
   type WorkoutPreviewSegment,
+  type SegmentTitleContext,
 } from '@/lib/training/workout-segment-preview';
 
 type Props = {
   segments: WorkoutPreviewSegment[];
   workoutType?: string | null;
+  paceAnchor?: string | null;
   compact?: boolean;
   className?: string;
 };
@@ -23,6 +25,7 @@ type Props = {
 export default function WorkoutStructurePreview({
   segments,
   workoutType,
+  paceAnchor,
   compact = false,
   className = '',
 }: Props) {
@@ -43,7 +46,7 @@ export default function WorkoutStructurePreview({
         const distanceLine = formatGroupedSegmentDuration(group);
         const recoveryLine = previewGroupedRecoveryDistanceLine(group);
         const sideTag = humanPlanStepSideTag(segment.title);
-        const groupTitle = humanDisplayGroupTitle(group, workoutType);
+        const groupTitle = humanDisplayGroupTitle(group, workoutType, { paceAnchor, workoutType });
 
         return (
           <li

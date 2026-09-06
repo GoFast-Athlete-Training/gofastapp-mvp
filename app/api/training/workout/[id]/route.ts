@@ -133,6 +133,18 @@ export async function GET(request: NextRequest, context: Ctx) {
     }
     const { id } = await context.params;
 
+    const athleteRow = await prisma.athlete.findUnique({
+      where: { id: auth.athlete.id },
+      select: {
+        fiveKPace: true,
+        goalRacePace: true,
+        paceAdjusterEasySecPerMile: true,
+        paceAdjusterLongRunSecPerMile: true,
+        paceAdjusterThresholdSecPerMile: true,
+        paceAdjusterIntervalSecPerMile: true,
+      },
+    });
+
     const loadWorkout = () =>
       prisma.workouts.findFirst({
         where: { id, athleteId: auth.athlete.id },
@@ -149,9 +161,7 @@ export async function GET(request: NextRequest, context: Ctx) {
               id: true,
               name: true,
               totalWeeks: true,
-              currentFiveKPace: true,
               goalRaceTime: true,
-              goalRacePace: true,
               lifecycleStatus: true,
               planSchedule: true,
               easyRunConfig: true,
@@ -235,14 +245,11 @@ export async function GET(request: NextRequest, context: Ctx) {
       });
 
       const linkedRace = plannedDetail.training_plans?.athlete_race ?? null;
-      const goalFinishTime =
-        linkedRace?.goalTime?.trim() ||
-        plannedDetail.training_plans?.goalRaceTime?.trim() ||
-        null;
+      const goalFinishTime = linkedRace?.goalTime?.trim() || null;
       const goalRacePaceSecPerMile = resolveGoalRacePace({
         goalTime: goalFinishTime,
         dbGoalRacePaceSecPerMile: linkedRace?.goalRacePace ?? null,
-        planGoalRacePace: plannedDetail.training_plans?.goalRacePace ?? null,
+        athleteSnapGoalRacePace: athleteRow?.goalRacePace ?? null,
         distanceMeters:
           plannedDetail.training_plans?.race_registry?.distanceMeters != null
             ? Number(plannedDetail.training_plans.race_registry.distanceMeters)
@@ -278,21 +285,7 @@ export async function GET(request: NextRequest, context: Ctx) {
       });
     }
 
-    const athleteFiveKRow = await prisma.athlete.findUnique({
-      where: { id: auth.athlete.id },
-      select: {
-        fiveKPace: true,
-        paceAdjusterEasySecPerMile: true,
-        paceAdjusterLongRunSecPerMile: true,
-        paceAdjusterThresholdSecPerMile: true,
-        paceAdjusterIntervalSecPerMile: true,
-      },
-    });
-
-    const anchorPaceStr =
-      workout.training_plans?.currentFiveKPace?.trim() ||
-      athleteFiveKRow?.fiveKPace?.trim() ||
-      null;
+    const anchorPaceStr = athleteRow?.fiveKPace?.trim() || null;
 
     if (workout.segments.length === 0 && anchorPaceStr) {
       try {
@@ -315,14 +308,11 @@ export async function GET(request: NextRequest, context: Ctx) {
 
         const dm = workout.training_plans?.race_registry?.distanceMeters;
         const linkedRace = workout.training_plans?.athlete_race ?? null;
-        const goalFinishTime =
-          linkedRace?.goalTime?.trim() ||
-          workout.training_plans?.goalRaceTime?.trim() ||
-          null;
+        const goalFinishTime = linkedRace?.goalTime?.trim() || null;
         const racePaceSecondsPerMile = resolveGoalRacePace({
           goalTime: goalFinishTime,
           dbGoalRacePaceSecPerMile: linkedRace?.goalRacePace ?? null,
-          planGoalRacePace: workout.training_plans?.goalRacePace ?? null,
+          athleteSnapGoalRacePace: athleteRow?.goalRacePace ?? null,
           distanceMeters: dm != null ? Number(dm) : null,
           distanceLabel: workout.training_plans?.race_registry?.distanceLabel ?? null,
           goalDistance: linkedRace?.goalDistance ?? null,
@@ -332,16 +322,7 @@ export async function GET(request: NextRequest, context: Ctx) {
           const easyCfg = parseEasyRunConfigJson(
             workout.training_plans?.easyRunConfig ?? null
           );
-          const athleteAdjuster = parseAthletePaceAdjuster(
-            athleteFiveKRow
-              ? {
-                  paceAdjusterEasySecPerMile: athleteFiveKRow.paceAdjusterEasySecPerMile,
-                  paceAdjusterLongRunSecPerMile: athleteFiveKRow.paceAdjusterLongRunSecPerMile,
-                  paceAdjusterThresholdSecPerMile: athleteFiveKRow.paceAdjusterThresholdSecPerMile,
-                  paceAdjusterIntervalSecPerMile: athleteFiveKRow.paceAdjusterIntervalSecPerMile,
-                }
-              : null
-          );
+          const athleteAdjuster = parseAthletePaceAdjuster(athleteRow);
           apiSegs = prescribe({
             entry: workout.workout_catalogue,
             scheduleMiles,
@@ -412,14 +393,11 @@ export async function GET(request: NextRequest, context: Ctx) {
     }
 
     const linkedRaceInstance = workout.training_plans?.athlete_race ?? null;
-    const goalFinishTimeInstance =
-      linkedRaceInstance?.goalTime?.trim() ||
-      workout.training_plans?.goalRaceTime?.trim() ||
-      null;
+    const goalFinishTimeInstance = linkedRaceInstance?.goalTime?.trim() || null;
     const goalRacePaceSecPerMile = resolveGoalRacePace({
       goalTime: goalFinishTimeInstance,
       dbGoalRacePaceSecPerMile: linkedRaceInstance?.goalRacePace ?? null,
-      planGoalRacePace: workout.training_plans?.goalRacePace ?? null,
+      athleteSnapGoalRacePace: athleteRow?.goalRacePace ?? null,
       distanceMeters:
         workout.training_plans?.race_registry?.distanceMeters != null
           ? Number(workout.training_plans.race_registry.distanceMeters)

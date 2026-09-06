@@ -121,6 +121,8 @@ model Athlete {
   goalRaceName            String?
   /// Login hydrate — copied from primary athlete_races.goalTime by align service only.
   goalRaceTime            String?
+  /// Login hydrate — copied from primary athlete_races.goalRacePace (sec/mi) by align service only.
+  goalRacePace            Int?
   /// Last app bootstrap (GET /api/athlete/me or POST /api/athlete/create)
   lastSeenAt              DateTime?
   /// Rolling 90d avg weekly miles from athlete_activities — populated by cron, not computed on read.

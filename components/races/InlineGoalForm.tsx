@@ -8,6 +8,7 @@ import {
   parseGoalTimeToParts,
   validateAndAssembleGoalTime,
 } from "@/lib/goal-time-input";
+import { formatSecPerMileForHub } from "@/components/races/race-hub-types";
 
 export type RaceForGoal = {
   /** athlete_races.id — identity for goal bolt */
@@ -122,10 +123,17 @@ export function InlineGoalForm({
   const helper = goalTimeHelperLine(race.distanceLabel, race.distanceMeters ?? null);
 
   if (hasTime && !expanded) {
+    const paceLabel =
+      goal?.goalRacePace != null && goal.goalRacePace > 0
+        ? formatSecPerMileForHub(goal.goalRacePace)
+        : null;
     return (
       <div className={`flex flex-wrap items-center gap-2 ${className}`}>
         <span className="inline-flex items-center rounded-full border border-orange-200 bg-white px-3 py-1 text-sm font-mono font-semibold text-gray-900">
           Goal {goal!.goalTime!.trim()}
+          {paceLabel ? (
+            <span className="ml-2 font-sans font-normal text-gray-600">· {paceLabel}</span>
+          ) : null}
         </span>
         <button
           type="button"

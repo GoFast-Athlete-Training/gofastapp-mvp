@@ -12,18 +12,51 @@ import {
 } from "@/lib/workout-generator/pace-calculator";
 import { metersToMiles, normalizeDistanceForPace } from "@/lib/pace-utils";
 
-/** Pace anchor: fitness (5K-derived) vs goal race pace from plan goal time. */
+/** Pace anchor: fitness (5K) vs goal race pace from Athlete snap. */
+export const PACE_ANCHOR_FIVE_K = "fiveKPace";
+export const PACE_ANCHOR_GOAL_RACE = "goalRacePace";
+
+/** @deprecated Use PACE_ANCHOR_FIVE_K — legacy HQ / seed rows. */
 export const PACE_ANCHOR_CURRENT_BUILDUP = "currentBuildup";
+/** @deprecated Use PACE_ANCHOR_GOAL_RACE — legacy HQ / seed rows. */
 export const PACE_ANCHOR_MP_SIMULATION = "mpSimulation";
 
-export type PaceAnchorMode =
-  | typeof PACE_ANCHOR_CURRENT_BUILDUP
-  | typeof PACE_ANCHOR_MP_SIMULATION;
+export type PaceAnchorCanonical = typeof PACE_ANCHOR_FIVE_K | typeof PACE_ANCHOR_GOAL_RACE;
+
+export type PaceAnchorMode = PaceAnchorCanonical;
+
+/** Normalize stored paceAnchor to canonical Athlete field names. */
+export function normalizePaceAnchorCanonical(raw: string | null | undefined): PaceAnchorCanonical {
+  const s = (raw ?? "").trim();
+  if (
+    s === PACE_ANCHOR_GOAL_RACE ||
+    s === PACE_ANCHOR_MP_SIMULATION ||
+    s.toLowerCase() === "mpsimulation"
+  ) {
+    return PACE_ANCHOR_GOAL_RACE;
+  }
+  return PACE_ANCHOR_FIVE_K;
+}
+
+/** @deprecated Prefer normalizePaceAnchorCanonical */
+export function normalizePaceAnchor(raw: string | null | undefined): PaceAnchorMode {
+  return normalizePaceAnchorCanonical(raw);
+}
+
+export function isGoalRacePaceAnchor(mode: string | null | undefined): boolean {
+  return normalizePaceAnchorCanonical(mode) === PACE_ANCHOR_GOAL_RACE;
+}
+
+/** @deprecated Prefer isGoalRacePaceAnchor */
+export function isMpSimulationAnchor(mode: string | null | undefined): boolean {
+  return isGoalRacePaceAnchor(mode);
+}
 
 export type GoalPaceResolutionSource =
   | "db_goal_pace"
   | "plan_cache_pace"
   | "derived_from_goal_time"
+  | "athlete_snap"
   | null;
 
 export type ResolvedGoalRacePace = {
@@ -32,16 +65,6 @@ export type ResolvedGoalRacePace = {
   raceDistanceMiles: number | null;
   source: GoalPaceResolutionSource;
 };
-
-export function normalizePaceAnchor(raw: string | null | undefined): PaceAnchorMode {
-  const s = (raw ?? "").trim();
-  if (s === PACE_ANCHOR_MP_SIMULATION) return PACE_ANCHOR_MP_SIMULATION;
-  return PACE_ANCHOR_CURRENT_BUILDUP;
-}
-
-export function isMpSimulationAnchor(mode: string | null | undefined): boolean {
-  return normalizePaceAnchor(mode) === PACE_ANCHOR_MP_SIMULATION;
-}
 
 /** Seconds per mile from goal finish time string (e.g. "2:59:00") and race distance in miles. */
 export function goalPaceSecondsPerMileFromPlan(
@@ -137,6 +160,8 @@ export function resolveRaceDistanceMiles(params: {
 export function resolveGoalRacePace(params: {
   goalTime?: string | null;
   dbGoalRacePaceSecPerMile?: number | null;
+  /** Athlete.goalRacePace login snap — preferred live source over plan cache. */
+  athleteSnapGoalRacePace?: number | null;
   planGoalRacePace?: string | null;
   distanceMeters?: number | null;
   distanceLabel?: string | null;
@@ -153,6 +178,20 @@ export function resolveGoalRacePace(params: {
     raceDistanceMiles != null && goalTime
       ? goalPaceSecondsPerMileFromPlan(goalTime, raceDistanceMiles)
       : null;
+
+  const athleteSnap = params.athleteSnapGoalRacePace;
+  if (
+    athleteSnap != null &&
+    isPlausibleGoalPaceSecPerMile(athleteSnap) &&
+    agreesWithDerived(athleteSnap, derived)
+  ) {
+    return {
+      goalPaceSecPerMile: athleteSnap,
+      goalPaceDisplay: formatPaceMinSec(athleteSnap),
+      raceDistanceMiles,
+      source: "athlete_snap",
+    };
+  }
 
   const dbPace = params.dbGoalRacePaceSecPerMile;
   if (

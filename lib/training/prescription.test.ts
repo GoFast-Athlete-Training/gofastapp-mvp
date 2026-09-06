@@ -245,7 +245,7 @@ function totalDistanceMiles(steps: ReturnType<typeof prescribe>): number {
     .reduce((sum, s) => sum + s.durationValue, 0);
 }
 
-test("LongRun progression defaults null bookends to 15% open warmup and cooldown", () => {
+test("LongRun progression with null bookends skips invented warmup/cooldown", () => {
   const steps = prescribe({
     entry: baseCatalogue({
       workoutType: "LongRun",
@@ -261,15 +261,10 @@ test("LongRun progression defaults null bookends to 15% open warmup and cooldown
     scheduleMiles: 12,
     anchorSecondsPerMile: ANCHOR_SEC,
   });
-  const warmup = steps.find((s) => s.title === "Warmup");
-  const cooldown = steps.find((s) => s.title === "Cooldown");
-  assert.ok(warmup, "expected default warmup");
-  assert.ok(cooldown, "expected default cooldown");
-  assert.equal(warmup!.durationValue, 1.8, "15% of 12 mi");
-  assert.equal(cooldown!.durationValue, 1.8, "15% of 12 mi");
-  assert.equal(warmup!.targets, undefined, "warmup is OPEN");
-  assert.equal(cooldown!.targets, undefined, "cooldown is OPEN");
-  assert.equal(steps[0]!.title, "Warmup", "must not start with hard-paced work");
+  assert.equal(steps.find((s) => s.title === "Warmup"), undefined);
+  assert.equal(steps.find((s) => s.title === "Cooldown"), undefined);
+  assert.ok(steps.length >= 1, "progression segments materialize without bookends");
+  assert.equal(steps[0]!.title.toLowerCase().includes("long"), true);
 });
 
 test("LongRun progression explicit zero bookends skip warmup and cooldown", () => {
@@ -312,8 +307,7 @@ test("LongRun progression scales authored segments to fit scheduled distance", (
     total <= scheduleMiles + 0.06,
     `total ${total} should not exceed schedule ${scheduleMiles}`
   );
-  assert.ok(steps.some((s) => s.title === "Warmup"));
-  assert.ok(steps.some((s) => s.title === "Cooldown"));
+  assert.ok(steps.some((s) => s.targets?.length), "expected paced work segments");
 });
 
 test("LongRun segment offsets resolve targets via catalogue plus adjuster", () => {
@@ -369,6 +363,33 @@ test("LongRun workFraction + goalRacePace uses back-half canonical path (no mpFr
   assert.ok(mpStep!.stepOrder > easyStep!.stepOrder, "MP block follows easy miles");
 });
 
+test("LongRun mpSimulation ignores leftover segmentPaceDist when fractions are set", () => {
+  const steps = prescribe({
+    entry: baseCatalogue({
+      workoutType: "LongRun",
+      paceAnchor: PACE_ANCHOR_MP_SIMULATION,
+      warmupFraction: 0.1,
+      workFraction: 0.5,
+      cooldownFraction: 0.1,
+      warmupMiles: null,
+      cooldownMiles: null,
+      segmentPaceDist: [
+        { miles: 3, paceOffsetSecPerMile: 0 },
+        { miles: 3, paceOffsetSecPerMile: 0 },
+        { miles: 3, paceOffsetSecPerMile: 0 },
+      ] as unknown as workout_catalogue["segmentPaceDist"],
+    }),
+    scheduleMiles: 20,
+    anchorSecondsPerMile: ANCHOR_SEC,
+    racePaceSecondsPerMile: 480,
+  });
+  const mpSteps = steps.filter((s) => s.title.toLowerCase().includes("goal marathon"));
+  assert.equal(mpSteps.length, 1, "single MP block, not progressive leftovers");
+  assert.ok(mpSteps[0]!.durationValue > 8, "MP block is majority of run from work %");
+  const threeMiSteps = steps.filter((s) => Math.abs(s.durationValue - 3) < 0.05);
+  assert.equal(threeMiSteps.length, 0, "no 3 mi progressive segments");
+});
+
 test("LongRun catalogue segment offset plus adjuster", () => {
   const anchorSec = 386;
   const steps = prescribe({
@@ -384,8 +405,13 @@ test("LongRun catalogue segment offset plus adjuster", () => {
     anchorSecondsPerMile: anchorSec,
     paceAdjuster: { ...DEFAULT_ATHLETE_PACE_ADJUSTER, longRun: -20 },
   });
-  const work = steps.find((s) => s.title === "Long run");
-  assert.ok(work?.targets?.length);
+  const work = steps.find(
+    (s) =>
+      s.durationType === "DISTANCE" &&
+      Math.abs(s.durationValue - 3) < 0.05 &&
+      s.targets?.length
+  );
+  assert.ok(work?.targets?.length, "expected 3 mi paced segment");
   const paceTarget = work!.targets!.find((t) => t.type === "PACE")!;
   const custom = paceTargetFromSecondsPerMile(anchorSec + 45 - 20);
   assert.equal(paceTarget.valueLow, custom.valueLow);

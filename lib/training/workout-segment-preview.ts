@@ -122,4 +122,5 @@ export {
   isMultiStepRepeatGroup,
   formatGroupedSegmentDuration,
   formatSegmentDuration,
+  type SegmentTitleContext,
 };

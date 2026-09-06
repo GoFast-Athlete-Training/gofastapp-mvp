@@ -335,7 +335,7 @@ export async function updateRaceGoal(
     select: athleteRaceGoalSelect,
   });
 
-  if (updated.isPrimaryRace) {
+  if (updated.isPrimaryRace || patch.goalTime !== undefined) {
     await alignAthleteGoalSnap(athleteId);
   }
 
@@ -345,7 +345,7 @@ export async function updateRaceGoal(
 export async function clearRaceGoal(athleteRaceId: string, athleteId: string) {
   const existing = await prisma.athlete_races.findFirst({
     where: { id: athleteRaceId, athleteId },
-    select: { id: true },
+    select: { id: true, isPrimaryRace: true },
   });
   if (!existing) return null;
 
@@ -366,6 +366,10 @@ export async function clearRaceGoal(athleteRaceId: string, athleteId: string) {
     },
     select: athleteRaceGoalSelect,
   });
+
+  if (existing.isPrimaryRace) {
+    await alignAthleteGoalSnap(athleteId);
+  }
 
   return serializeGoalFromAthleteRace(updated);
 }

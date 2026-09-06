@@ -61,7 +61,6 @@ export async function ensureWorkoutPrescriptionNarrative(params: {
         select: {
           name: true,
           totalWeeks: true,
-          currentFiveKPace: true,
           planSchedule: true,
         },
       },
@@ -93,8 +92,7 @@ export async function ensureWorkoutPrescriptionNarrative(params: {
   if (!athlete) return;
 
   const cat = workout.workout_catalogue;
-  const anchorPaceDisplay =
-    workout.training_plans?.currentFiveKPace?.trim() || athlete.fiveKPace?.trim() || null;
+  const anchorPaceDisplay = athlete.fiveKPace?.trim() || null;
 
   const paceTargetLine =
     workout.targetPaceSecPerMile != null &&
@@ -250,7 +248,6 @@ export async function ensurePlannedWorkoutPrescriptionNarrative(params: {
         select: {
           name: true,
           totalWeeks: true,
-          currentFiveKPace: true,
           planSchedule: true,
         },
       },
@@ -282,8 +279,7 @@ export async function ensurePlannedWorkoutPrescriptionNarrative(params: {
   if (!athlete) return;
 
   const cat = planned.workout_catalogue;
-  const anchorPaceDisplay =
-    planned.training_plans?.currentFiveKPace?.trim() || athlete.fiveKPace?.trim() || null;
+  const anchorPaceDisplay = athlete.fiveKPace?.trim() || null;
 
   const catalogueContext = {
     name: cat.name,

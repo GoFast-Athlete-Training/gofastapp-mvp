@@ -24,6 +24,8 @@ export type PreviewWorkout = {
   estimatedDistanceInMeters?: number | null;
   /** From materialized `workouts.weekNumber` when present */
   weekNumber?: number | null;
+  /** Catalogue pace anchor (mpSimulation → Marathon pace labels in preview). */
+  paceAnchor?: string | null;
   segments: PreviewSegment[];
 };
 
@@ -44,6 +46,10 @@ export function pickWorkoutPayload(raw: unknown): PreviewWorkout | null {
       : typeof weekNumRaw === "number" && Number.isFinite(weekNumRaw)
         ? weekNumRaw
         : Number(weekNumRaw);
+  const paceAnchor =
+    typeof w.paceAnchor === "string" && w.paceAnchor.trim()
+      ? w.paceAnchor.trim()
+      : null;
   const segsRaw = w.segments;
   const segments: PreviewSegment[] = [];
   if (Array.isArray(segsRaw)) {
@@ -95,6 +101,7 @@ export function pickWorkoutPayload(raw: unknown): PreviewWorkout | null {
     workoutType,
     description,
     estimatedDistanceInMeters,
+    paceAnchor,
     weekNumber:
       weekNumber != null && Number.isFinite(weekNumber) ? weekNumber : null,
     segments,

@@ -12,7 +12,14 @@ import {
   type PaceZone,
   type TrainingPaces,
 } from "@/lib/workout-generator/pace-calculator";
-import { isMpSimulationAnchor } from "@/lib/training/goal-pace-calculator";
+import { isGoalRacePaceAnchor, isMpSimulationAnchor } from "@/lib/training/goal-pace-calculator";
+import {
+  distributeCatalogueMiles,
+  detectDistributeMode,
+  isCanonicalWorkFractionOnlyLongRun,
+  type DistributedBags,
+} from "@/lib/training/catalogue-distribute";
+import { setPaceTargetSecPerMile } from "@/lib/training/set-pace-targets";
 import {
   betweenRepRecoveryForMaterialization,
   type CatalogueBetweenRepRecovery,
@@ -76,19 +83,19 @@ function openBookendStepFields(): Pick<WorkoutStep, "targets"> | object {
 }
 
 /**
- * Long-run progression bookends: null/undefined → 15% open warmup/cooldown;
+ * Long-run progression bookends: null/undefined → no bookend (0 mi);
  * explicit 0 opts out; positive values are absolute miles.
  */
 function longRunProgressionBookendMiles(
   authored: number | null | undefined,
-  totalMiles: number
+  _totalMiles: number
 ): number {
   if (authored != null && Number.isFinite(Number(authored))) {
     const v = Number(authored);
     if (v <= 0) return 0;
     return round(v, 2);
   }
-  return round(totalMiles * 0.15, 2);
+  return 0;
 }
 
 function isBookendSegmentTitle(title: string): boolean {
@@ -146,14 +153,83 @@ function mpPaceSecPerMile(params: {
   fitnessAnchorSec: number;
   racePaceSecPerMile: number | null;
 }): number {
-  const { entry, fitnessAnchorSec, racePaceSecPerMile } = params;
-  const paces = getTrainingPaces(fitnessAnchorSec);
-  if (isMpSimulationAnchor(entry.paceAnchor) && racePaceSecPerMile != null) {
-    const off = entry.workPaceOffsetSecPerMile;
-    return off != null ? Math.max(1, racePaceSecPerMile + off) : racePaceSecPerMile;
+  const resolved = setPaceTargetSecPerMile({
+    paceAnchor: params.entry.paceAnchor,
+    fitnessAnchorSecPerMile: params.fitnessAnchorSec,
+    goalRacePaceSecPerMile: params.racePaceSecPerMile,
+    workPaceOffsetSecPerMile: params.entry.workPaceOffsetSecPerMile,
+    mpPaceOffsetSecPerMile: params.entry.mpPaceOffsetSecPerMile,
+  });
+  if (resolved != null) return resolved;
+  const paces = getTrainingPaces(params.fitnessAnchorSec);
+  return paces.marathon;
+}
+
+function buildLongRunGoalPaceStepsFromBags(params: {
+  bags: DistributedBags;
+  totalMiles: number;
+  longP: number | null;
+  mpP: number;
+  workAtBack: boolean;
+}): WorkoutStep[] {
+  const { bags, totalMiles, longP, mpP, workAtBack } = params;
+  let order = 1;
+  const out: WorkoutStep[] = [];
+
+  const pushWarmup = (miles: number) => {
+    if (miles <= 0.05) return;
+    out.push({
+      stepOrder: order++,
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: round(miles, 2),
+      ...openBookendStepFields(),
+    });
+  };
+  const pushEasy = (miles: number) => {
+    if (miles <= 0.05) return;
+    out.push({
+      stepOrder: order++,
+      title: "Long Run",
+      durationType: "DISTANCE",
+      durationValue: round(miles, 2),
+      ...targetsOrOpen(longP),
+    });
+  };
+  const pushMp = (miles: number) => {
+    if (miles <= 0.05) return;
+    out.push({
+      stepOrder: order++,
+      title: "Goal marathon pace",
+      durationType: "DISTANCE",
+      durationValue: round(miles, 2),
+      targets: [paceTargetFromSecondsPerMile(mpP)],
+    });
+  };
+  const pushCooldown = (miles: number) => {
+    if (miles <= 0.05) return;
+    out.push({
+      stepOrder: order++,
+      title: "Cooldown",
+      durationType: "DISTANCE",
+      durationValue: round(miles, 2),
+      ...openBookendStepFields(),
+    });
+  };
+
+  if (workAtBack) {
+    const workM = round(Math.min(Math.max(0.25, bags.workMiles), round(totalMiles * 0.9, 2)), 2);
+    const easyM = round(Math.max(0.25, totalMiles - workM), 2);
+    pushEasy(easyM);
+    pushMp(workM);
+    return out;
   }
-  const off = entry.mpPaceOffsetSecPerMile;
-  return off != null ? Math.max(1, fitnessAnchorSec + off) : paces.marathon;
+
+  pushWarmup(bags.warmupMiles);
+  pushMp(bags.workMiles);
+  pushEasy(bags.easyRemainderMiles);
+  pushCooldown(bags.cooldownMiles);
+  return out;
 }
 
 function buildPaceCtx(params: {
@@ -490,7 +566,8 @@ export function prescribe(params: {
     });
 
     const wj = entry.segmentPaceDist;
-    if (isMilesWorkSegmentList(wj)) {
+    const isMpLongRun = isMpSimulationAnchor(entry.paceAnchor);
+    if (!isMpLongRun && isMilesWorkSegmentList(wj)) {
       const warmupM = longRunProgressionBookendMiles(entry.warmupMiles, totalMiles);
       const cooldownM = longRunProgressionBookendMiles(entry.cooldownMiles, totalMiles);
       const workBudget = Math.max(0, round(totalMiles - warmupM - cooldownM, 2));
@@ -569,98 +646,46 @@ export function prescribe(params: {
     const wf0 = entry.warmupFraction;
     const wkf0 = entry.workFraction;
     const cf0 = entry.cooldownFraction;
+    const isGoalPaceLongRun = isGoalRacePaceAnchor(entry.paceAnchor) || isMpSimulationAnchor(entry.paceAnchor);
+    const distributeMode = detectDistributeMode(entry);
 
-    // Canonical goal-pace long run: workFraction + goalRacePace at the back (no easy-before-work mpBlock).
-    const canonicalWorkFractionOnly =
-      wkf0 != null &&
-      wkf0 > 0 &&
-      mpP != null &&
-      isMpSimulationAnchor(entry.paceAnchor) &&
-      entry.mpFraction == null &&
-      entry.mpTotalMiles == null &&
-      entry.warmupMiles == null &&
-      entry.cooldownMiles == null &&
-      (wf0 == null || wf0 <= 0) &&
-      (cf0 == null || cf0 <= 0);
-
-    if (canonicalWorkFractionOnly) {
-      const workM = round(
-        totalMiles * effectiveMpFraction(wkf0!, planCycleIndex),
-        2
-      );
-      const clampedWork = Math.min(Math.max(0.25, workM), round(totalMiles * 0.9, 2));
-      const easyRemain = round(Math.max(0.25, totalMiles - clampedWork), 2);
-      const out: WorkoutStep[] = [];
-      if (easyRemain > 0.05) {
-        out.push({
-          stepOrder: 1,
-          title: "Long Run",
-          durationType: "DISTANCE",
-          durationValue: easyRemain,
-          ...targetsOrOpen(longP),
-        });
-      }
-      out.push({
-        stepOrder: out.length + 1,
-        title: "Goal marathon pace",
-        durationType: "DISTANCE",
-        durationValue: clampedWork,
-        targets: [paceTargetFromSecondsPerMile(mpP)],
+    if (isGoalPaceLongRun && (distributeMode !== "none" || isCanonicalWorkFractionOnlyLongRun(entry))) {
+      const bags = distributeCatalogueMiles(entry, totalMiles);
+      const workAtBack = isCanonicalWorkFractionOnlyLongRun(entry);
+      const steps = buildLongRunGoalPaceStepsFromBags({
+        bags,
+        totalMiles,
+        longP,
+        mpP,
+        workAtBack,
       });
-      if (out.length > 0) return out;
+      if (steps.length > 0) return steps;
     }
 
     const legacyMpFractionSimulation =
-      isMpSimulationAnchor(entry.paceAnchor) &&
+      isGoalPaceLongRun &&
+      distributeMode === "none" &&
       ((wf0 != null && wf0 > 0) ||
         (wkf0 != null && wkf0 > 0) ||
-        (cf0 != null && cf0 > 0)) &&
-      entry.warmupMiles == null &&
-      entry.cooldownMiles == null &&
-      !canonicalWorkFractionOnly;
+        (cf0 != null && cf0 > 0));
 
     const mpSimulationBookendsAuthored =
-      entry.warmupMiles != null || entry.cooldownMiles != null;
-
-    // MVP1: fixed warmup/cooldown miles authored on the catalogue row; marathon-pace block =
-    // remainder of scheduled long run. Explicit bookends prevent silently changing legacy mpFraction/mpBlock prescriptions.
-    if (
-      isMpSimulationAnchor(entry.paceAnchor) &&
+      isGoalPaceLongRun &&
       !legacyMpFractionSimulation &&
-      mpSimulationBookendsAuthored
-    ) {
-      const warmupM = round(Math.max(0, Number(entry.warmupMiles ?? 0)), 2);
-      const cooldownM = round(Math.max(0, Number(entry.cooldownMiles ?? 0)), 2);
-      const remainder = round(totalMiles - warmupM - cooldownM, 2);
-      const mpBlock = round(Math.min(Math.max(0.05, remainder), Math.max(0.05, totalMiles)), 2);
-      let order = 1;
-      const out: WorkoutStep[] = [];
-      if (warmupM > 0.05) {
-        out.push({
-          stepOrder: order++,
-          title: "Warmup",
-          durationType: "DISTANCE",
-          durationValue: warmupM,
-          ...openBookendStepFields(),
-        });
-      }
-      out.push({
-        stepOrder: order++,
-        title: "Goal marathon pace",
-        durationType: "DISTANCE",
-        durationValue: mpBlock,
-        targets: [paceTargetFromSecondsPerMile(mpP)],
+      distributeMode === "miles" &&
+      (entry.warmupMiles != null || entry.cooldownMiles != null);
+
+    // Miles-only bookends: absolute warmup/cooldown; marathon-pace block = remainder.
+    if (isGoalPaceLongRun && mpSimulationBookendsAuthored) {
+      const bags = distributeCatalogueMiles(entry, totalMiles);
+      const steps = buildLongRunGoalPaceStepsFromBags({
+        bags,
+        totalMiles,
+        longP,
+        mpP,
+        workAtBack: false,
       });
-      if (cooldownM > 0.05) {
-        out.push({
-          stepOrder: order++,
-          title: "Cooldown",
-          durationType: "DISTANCE",
-          durationValue: cooldownM,
-          ...openBookendStepFields(),
-        });
-      }
-      if (out.length > 0) return out;
+      if (steps.length > 0) return steps;
     }
 
     if (legacyMpFractionSimulation) {
@@ -714,9 +739,9 @@ export function prescribe(params: {
     }
 
     const usesConfigurableMp =
-      (entry.mpTotalMiles != null && entry.mpTotalMiles > 0) ||
-      (entry.mpFraction != null && entry.mpFraction > 0) ||
-      isMpSimulationAnchor(entry.paceAnchor);
+      !isGoalPaceLongRun &&
+      ((entry.mpTotalMiles != null && entry.mpTotalMiles > 0) ||
+        (entry.mpFraction != null && entry.mpFraction > 0));
 
     if (!usesConfigurableMp) {
       return [

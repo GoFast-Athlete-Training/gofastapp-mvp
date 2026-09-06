@@ -12,9 +12,9 @@ import {
 } from "./plan-schedule";
 import {
   prescribe,
-  anchorSecondsPerMileFromPlanPace,
   type WorkoutStep,
 } from "./prescription";
+import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { metersToMiles } from "@/lib/pace-utils";
 import {
   segmentSnapshotDocumentFromApiSegments,
@@ -171,11 +171,21 @@ async function buildPrescriptionSteps(params: {
     distanceMeters: number | null;
     distanceLabel: string | null;
   } | null;
+  athlete: {
+    fiveKPace: string | null;
+    goalRacePace: number | null;
+    paceAdjusterEasySecPerMile: number | null;
+    paceAdjusterLongRunSecPerMile: number | null;
+    paceAdjusterThresholdSecPerMile: number | null;
+    paceAdjusterIntervalSecPerMile: number | null;
+  } | null;
 }): Promise<{ steps: WorkoutStep[]; goalRacePaceSecPerMile: number | null }> {
-  const { scheduled, plan, race } = params;
+  const { scheduled, plan, race, athlete } = params;
   if (!plan) {
     throw new MaterializeWorkoutError("Plan not found");
   }
+
+  const athleteFiveKPace = athlete?.fiveKPace?.trim() || null;
 
   const needsCatalogueAnchoredIT =
     (scheduled.workoutType === "Intervals" ||
@@ -189,9 +199,9 @@ async function buildPrescriptionSteps(params: {
     scheduled.workoutType === "Race" ||
     needsCatalogueAnchoredIT ||
     needsCatalogueAnchoredEasy;
-  if (needsPace && !plan.currentFiveKPace?.trim()) {
+  if (needsPace && !athleteFiveKPace) {
     throw new MaterializeWorkoutError(
-      "training_plans.currentFiveKPace is missing; set 5K pace on your profile or plan."
+      "Athlete.fiveKPace is missing; set 5K pace on your profile."
     );
   }
 
@@ -215,36 +225,25 @@ async function buildPrescriptionSteps(params: {
     throw new MaterializeWorkoutError(EASY_RUN_NOT_CONFIGURED);
   }
 
-  if (!catalogueEntryForDay || !plan.currentFiveKPace?.trim()) {
+  if (!catalogueEntryForDay || !athleteFiveKPace) {
     if (scheduled.workoutType === "Easy") {
       throw new MaterializeWorkoutError(EASY_RUN_NOT_CONFIGURED);
     }
     return { steps: [], goalRacePaceSecPerMile: null };
   }
 
-  const anchorSecPerMile = anchorSecondsPerMileFromPlanPace(plan.currentFiveKPace ?? null);
-  const goalFinishTime =
-    plan.athlete_race?.goalTime?.trim() || plan.goalRaceTime?.trim() || null;
+  const anchorSecPerMile = parsePaceToSecondsPerMile(athleteFiveKPace);
+  const goalFinishTime = plan.athlete_race?.goalTime?.trim() || null;
   const racePaceSec = resolveGoalRacePace({
     goalTime: goalFinishTime,
     dbGoalRacePaceSecPerMile: plan.athlete_race?.goalRacePace ?? null,
-    planGoalRacePace: plan.goalRacePace ?? null,
+    athleteSnapGoalRacePace: athlete?.goalRacePace ?? null,
     distanceMeters: race?.distanceMeters ?? null,
     distanceLabel: race?.distanceLabel ?? null,
     goalDistance: plan.athlete_race?.goalDistance ?? null,
   }).goalPaceSecPerMile;
 
-  const paceAdjuster = parseAthletePaceAdjuster(
-    await prisma.athlete.findUnique({
-      where: { id: plan.athleteId },
-      select: {
-        paceAdjusterEasySecPerMile: true,
-        paceAdjusterLongRunSecPerMile: true,
-        paceAdjusterThresholdSecPerMile: true,
-        paceAdjusterIntervalSecPerMile: true,
-      },
-    })
-  );
+  const paceAdjuster = parseAthletePaceAdjuster(athlete);
 
   return {
     steps: prescribe({
@@ -278,32 +277,45 @@ export async function materializeWorkoutForPlanDay(params: {
   const { gte, lte } = utcDayBounds(anchor);
   const dateKey = utcDateOnly(anchor).toISOString().slice(0, 10);
 
-  const plan = await prisma.training_plans.findFirst({
-    where: { id: planId, athleteId },
-    include: {
-      athlete_race: {
-        select: {
-          goalTime: true,
-          goalRacePace: true,
-          goalDistance: true,
+  const [plan, athleteRow] = await Promise.all([
+    prisma.training_plans.findFirst({
+      where: { id: planId, athleteId },
+      include: {
+        athlete_race: {
+          select: {
+            goalTime: true,
+            goalRacePace: true,
+            goalDistance: true,
+          },
+        },
+        race_registry: {
+          select: {
+            raceDate: true,
+            name: true,
+            distanceMeters: true,
+            distanceLabel: true,
+          },
+        },
+        training_plan_preset: {
+          select: { athletePersonaCapability: true },
+        },
+        athlete_preset: {
+          select: { id: true },
         },
       },
-      race_registry: {
-        select: {
-          raceDate: true,
-          name: true,
-          distanceMeters: true,
-          distanceLabel: true,
-        },
+    }),
+    prisma.athlete.findUnique({
+      where: { id: athleteId },
+      select: {
+        fiveKPace: true,
+        goalRacePace: true,
+        paceAdjusterEasySecPerMile: true,
+        paceAdjusterLongRunSecPerMile: true,
+        paceAdjusterThresholdSecPerMile: true,
+        paceAdjusterIntervalSecPerMile: true,
       },
-      training_plan_preset: {
-        select: { athletePersonaCapability: true },
-      },
-      athlete_preset: {
-        select: { id: true },
-      },
-    },
-  });
+    }),
+  ]);
 
   if (!plan) {
     throw new MaterializeWorkoutError("Plan not found");
@@ -366,7 +378,12 @@ export async function materializeWorkoutForPlanDay(params: {
     return resultFromPlannedId(existing.id, "already_ready");
   }
 
-  const { steps, goalRacePaceSecPerMile } = await buildPrescriptionSteps({ scheduled, plan, race });
+  const { steps, goalRacePaceSecPerMile } = await buildPrescriptionSteps({
+    scheduled,
+    plan,
+    race,
+    athlete: athleteRow,
+  });
   assertPrescriptionSteps(steps, scheduled, dateKey);
 
   if (existing && existing._count.segments > 0) {
