@@ -719,7 +719,10 @@ export default function TrainingPlanDayPreviewPage() {
                       const distanceLine = formatGroupedSegmentDuration(group);
                       const recoveryLine = previewGroupedRecoveryDistanceLine(group);
                       const sideTag = humanPlanStepSideTag(segment.title);
-                      const groupTitle = humanDisplayGroupTitle(group, workout.workoutType);
+                      const groupTitle = humanDisplayGroupTitle(group, workout.workoutType, {
+                        paceAnchor: workout.paceAnchor,
+                        workoutType: workout.workoutType,
+                      });
                       return (
                         <li
                           key={`${segment.id}:${group.recovery?.id ?? ""}`}

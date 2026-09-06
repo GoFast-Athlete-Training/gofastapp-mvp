@@ -138,6 +138,8 @@ export interface CreateCityRunFormProps {
   /** Build-your-own invite path — athlete can edit personal prescribe before creating meetup. */
   editableWorkout?: boolean;
   onWorkoutChange?: (workout: CreateCityRunFormWorkout) => void;
+  /** When set, stamps planned_workouts.cityRunId for this plan day. */
+  plannedWorkoutId?: string | null;
 }
 
 export default function CreateCityRunForm({
@@ -148,6 +150,7 @@ export default function CreateCityRunForm({
   hideWorkoutSummary = false,
   editableWorkout = false,
   onWorkoutChange,
+  plannedWorkoutId = null,
 }: CreateCityRunFormProps) {
   const [meetupDate, setMeetupDate] = useState("");
   const [startHour, setStartHour] = useState("");
@@ -377,9 +380,20 @@ export default function CreateCityRunForm({
       const hourNum = Math.min(12, Math.max(1, parseInt(startHour, 10)));
       const minuteNum = Math.min(59, Math.max(0, parseInt(startMinute, 10) || 0));
 
+      const socialTitle = (editableWorkout ? editTitle : workout.title).trim();
+      if (!socialTitle) {
+        setError("Add a title for your run invite.");
+        setBusy(false);
+        return;
+      }
+
+      const milesNum = parseFloat(editMiles);
       const { data } = await api.post<CityRunFromWorkoutSuccess>("/cityrun/from-workout", {
         workoutId: workout.id,
-        plannedWorkoutId: workout.id,
+        ...(plannedWorkoutId ? { plannedWorkoutId } : {}),
+        title: socialTitle,
+        totalMiles:
+          Number.isFinite(milesNum) && milesNum > 0 ? milesNum : undefined,
         citySlug,
         cityName: meetUpCity.trim(),
         state: meetUpState.trim() || undefined,

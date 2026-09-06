@@ -124,6 +124,12 @@ type FromWorkoutBody = {
   routePhotos?: string[] | null;
   /** Social meetup title — required; never defaults to plan workout title. */
   title?: string;
+  /** Optional pace band label for city run listing (e.g. 7:00-7:30). */
+  pace?: string | null;
+  /** Optional social description for the run invite. */
+  description?: string | null;
+  /** Override total miles on city run (defaults from workout distance). */
+  totalMiles?: number | null;
 };
 
 /**
@@ -164,6 +170,9 @@ export async function POST(request: NextRequest) {
       mapImageUrl,
       routePhotos,
       title: socialTitleBody,
+      pace: paceBody,
+      description: descriptionBody,
+      totalMiles: totalMilesBody,
     } = body;
 
     if (!workoutId?.trim()) {
@@ -309,6 +318,17 @@ export async function POST(request: NextRequest) {
         ? workout.estimatedDistanceInMeters / 1609.34
         : null;
 
+    const totalMilesParsed =
+      totalMilesBody != null && Number.isFinite(Number(totalMilesBody)) && Number(totalMilesBody) > 0
+        ? Number(totalMilesBody)
+        : totalMilesFromWorkout;
+
+    const paceLabel = typeof paceBody === 'string' && paceBody.trim() ? paceBody.trim() : null;
+    const descriptionLabel =
+      typeof descriptionBody === 'string' && descriptionBody.trim()
+        ? descriptionBody.trim()
+        : null;
+
     const latNum =
       meetUpLat != null && meetUpLat !== ""
         ? Number(meetUpLat)
@@ -369,10 +389,10 @@ export async function POST(request: NextRequest) {
       endStreetAddress: null,
       endCity: null,
       endState: null,
-      totalMiles: totalMilesFromWorkout,
-      pace: null,
+      totalMiles: totalMilesParsed,
+      pace: paceLabel,
       stravaMapUrl: stravaMapUrlBody?.trim() || null,
-      description: null,
+      description: descriptionLabel,
       postRunActivity: null,
       routePhotos:
         Array.isArray(routePhotos) && routePhotos.length > 0
