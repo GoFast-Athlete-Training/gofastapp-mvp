@@ -2,7 +2,7 @@ import type { AttendedClubRunPayload } from '@/lib/gofast-with-me/attended-club-
 import type { ContainerHubMessage } from '@/lib/gofast-with-me/container-hub-service';
 import type { RecentAthleteActivityPayload } from '@/lib/gofast-with-me/recent-athlete-activities';
 
-export type HubStreamFeedItemKind = 'dailylog' | 'activity' | 'attendedRun';
+export type HubStreamFeedItemKind = 'dailylog' | 'activity';
 
 export type HubStreamDailyLogItem = {
   kind: 'dailylog';
@@ -15,41 +15,45 @@ export type HubStreamDailyLogItem = {
 export type HubStreamActivityItem = {
   kind: 'activity';
   id: string;
+  activityId: string;
   sortAt: string;
   headline: string;
   photoUrl: string | null;
+  reflection: string | null;
   distanceMiles: number | null;
   durationSeconds: number | null;
   startTime: string;
 };
 
-export type HubStreamAttendedRunItem = {
-  kind: 'attendedRun';
-  id: string;
-  sortAt: string;
-  run: AttendedClubRunPayload;
-};
+export type HubStreamFeedItem = HubStreamDailyLogItem | HubStreamActivityItem;
 
-export type HubStreamFeedItem =
-  | HubStreamDailyLogItem
-  | HubStreamActivityItem
-  | HubStreamAttendedRunItem;
+const PLANNED_DISTANCE_SUFFIX = /\s*[-–—]\s*\d+(\.\d+)?\s*(mi|mile|miles)\b.*$/i;
+
+function stripPlannedDistanceSuffix(title: string): string {
+  return title.replace(PLANNED_DISTANCE_SUFFIX, '').trim();
+}
 
 function activityHeadline(activity: RecentAthleteActivityPayload): string {
+  const hasActualMiles = activity.distanceMiles != null && activity.distanceMiles > 0;
   const publicTitle = activity.matchedWorkout?.publicTitle?.trim();
-  if (publicTitle) return publicTitle;
+  if (publicTitle) {
+    return hasActualMiles ? stripPlannedDistanceSuffix(publicTitle) : publicTitle;
+  }
   const planned = activity.matchedWorkout?.title?.trim();
-  if (planned) return planned;
+  if (planned) {
+    return hasActualMiles ? stripPlannedDistanceSuffix(planned) : planned;
+  }
   const name = activity.activityName?.trim();
   if (name) return name.replace(/_/g, ' ');
   return 'Run';
 }
 
-/** Hub member feed — activities, daily logs, and attended club runs only. */
+/** Hub recent stream — Garmin activities + daily logs only (no city_run_checkins). */
 export function composeHubStreamFeed(input: {
   updateMessages: ContainerHubMessage[];
   recentActivities: RecentAthleteActivityPayload[];
-  attendedClubRuns: AttendedClubRunPayload[];
+  /** @deprecated ignored — RSVP/check-ins do not belong in Recent */
+  attendedClubRuns?: AttendedClubRunPayload[];
   limit?: number;
 }): HubStreamFeedItem[] {
   const items: HubStreamFeedItem[] = [];
@@ -59,9 +63,11 @@ export function composeHubStreamFeed(input: {
     items.push({
       kind: 'activity',
       id: `activity-${activity.id}`,
+      activityId: activity.id,
       sortAt: activity.startTime,
       headline: activityHeadline(activity),
       photoUrl: activity.matchedWorkout?.workoutPhotoUrl ?? null,
+      reflection: activity.matchedWorkout?.reflection?.trim() || null,
       distanceMiles: activity.distanceMiles,
       durationSeconds: activity.durationSeconds,
       startTime: activity.startTime,
@@ -78,15 +84,6 @@ export function composeHubStreamFeed(input: {
     });
   }
 
-  for (const run of input.attendedClubRuns) {
-    items.push({
-      kind: 'attendedRun',
-      id: `attended-${run.id}`,
-      sortAt: run.checkedInAt,
-      run,
-    });
-  }
-
   items.sort((a, b) => new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime());
   return items.slice(0, input.limit ?? 50);
 }
@@ -94,11 +91,9 @@ export function composeHubStreamFeed(input: {
 export function hubStreamFeedItemLabel(kind: HubStreamFeedItemKind): string {
   switch (kind) {
     case 'dailylog':
-      return 'Daily log';
+      return 'Journal';
     case 'activity':
-      return 'Run';
-    case 'attendedRun':
-      return 'Club run';
+      return 'Workout';
     default:
       return 'Post';
   }

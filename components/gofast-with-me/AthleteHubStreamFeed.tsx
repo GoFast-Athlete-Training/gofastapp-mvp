@@ -81,25 +81,6 @@ export default function AthleteHubStreamFeed({ items, hostFirstName, emptyMessag
           );
         }
 
-        if (item.kind === 'attendedRun') {
-          const { run } = item;
-          return (
-            <article
-              key={item.id}
-              className="rounded-2xl border border-sky-200 bg-sky-50/40 p-4 shadow-sm"
-            >
-              <p className="text-[10px] font-bold uppercase tracking-wide text-sky-800">
-                {hubStreamFeedItemLabel(item.kind)} from {hostFirstName}
-              </p>
-              <h3 className="mt-1 text-base font-semibold text-gray-900">{run.label}</h3>
-              {run.meetUpPoint ? (
-                <p className="mt-1 text-xs text-gray-600">{run.meetUpPoint}</p>
-              ) : null}
-              <p className="mt-2 text-xs text-gray-400">{formatWhen(run.checkedInAt)}</p>
-            </article>
-          );
-        }
-
         return null;
       })}
     </section>

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { composeHubStreamFeed } from './hub-stream-feed';
 
-test('composeHubStreamFeed merges activities, daily logs, and attended club runs', () => {
+test('composeHubStreamFeed merges activities and daily logs without check-ins', () => {
   const feed = composeHubStreamFeed({
     updateMessages: [
       {
@@ -41,7 +41,7 @@ test('composeHubStreamFeed merges activities, daily logs, and attended club runs
           planName: 'Marathon Block',
           workoutDate: '2026-08-16T07:00:00.000Z',
           publicTitle: 'Easy miles before work',
-          reflection: 'Should not appear in hub feed',
+          reflection: 'Felt smooth',
           workoutPhotoUrl: null,
         },
       },
@@ -58,11 +58,49 @@ test('composeHubStreamFeed merges activities, daily logs, and attended club runs
     ],
   });
 
-  assert.equal(feed.length, 3);
+  assert.equal(feed.length, 2);
   assert.equal(feed[0]?.kind, 'activity');
-  assert.equal(feed[1]?.kind, 'attendedRun');
-  assert.equal(feed[2]?.kind, 'dailylog');
+  assert.equal(feed[1]?.kind, 'dailylog');
   if (feed[0]?.kind === 'activity') {
     assert.equal(feed[0].headline, 'Easy miles before work');
+    assert.equal(feed[0].activityId, 'act1');
+    assert.equal(feed[0].reflection, 'Felt smooth');
+  }
+});
+
+test('composeHubStreamFeed strips planned distance from headline when actual miles exist', () => {
+  const feed = composeHubStreamFeed({
+    updateMessages: [],
+    recentActivities: [
+      {
+        id: 'act2',
+        activityName: 'Long Run',
+        activityType: 'Run',
+        startTime: '2026-09-05T07:00:00.000Z',
+        distanceMiles: 18.6,
+        durationSeconds: 54000,
+        source: 'garmin',
+        summaryPolyline: null,
+        startLatitude: null,
+        startLongitude: null,
+        endLatitude: null,
+        endLongitude: null,
+        matchedWorkout: {
+          id: 'w2',
+          title: 'Saturday Long run - 19.6 Miles',
+          workoutType: 'LongRun',
+          planName: 'Marathon Block',
+          workoutDate: '2026-09-05T07:00:00.000Z',
+          publicTitle: null,
+          reflection: null,
+          workoutPhotoUrl: null,
+        },
+      },
+    ],
+  });
+
+  assert.equal(feed.length, 1);
+  if (feed[0]?.kind === 'activity') {
+    assert.equal(feed[0].headline, 'Saturday Long run');
   }
 });

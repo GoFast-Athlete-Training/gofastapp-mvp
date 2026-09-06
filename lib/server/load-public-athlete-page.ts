@@ -142,6 +142,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
         startTimeMinute: true,
         startTimePeriod: true,
         workoutId: true,
+        mapImageUrl: true,
+        routePhotos: true,
       },
     }),
     prisma.training_plans.findFirst({
@@ -245,6 +247,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
       startTimeMinute: r.startTimeMinute,
       startTimePeriod: r.startTimePeriod,
       workoutId: r.workoutId,
+      mapImageUrl: r.mapImageUrl,
+      routePhotos: r.routePhotos,
       gorunPath: `/gorun/${r.id}`,
       goingCount: stats?.count ?? 0,
       goingAvatars: (stats?.avatars ?? []).slice(0, 3),

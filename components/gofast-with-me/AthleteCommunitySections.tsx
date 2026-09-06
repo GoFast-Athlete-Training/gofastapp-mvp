@@ -32,7 +32,6 @@ export default function AthleteCommunitySections({
       composeHubStreamFeed({
         updateMessages: community.messages.filter((m) => m.topic === 'updates'),
         recentActivities: community.recentActivities ?? [],
-        attendedClubRuns: community.attendedClubRuns ?? [],
       }),
     [community]
   );
