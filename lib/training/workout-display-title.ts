@@ -259,6 +259,85 @@ export function resolveWorkoutDisplayTitle(workout: {
   );
 }
 
+/**
+ * Title lanes — do not mix:
+ * - `publicTitle` — athlete-facing title (reflection PATCH only). Wins in UI.
+ * - `workouts.title` — planner/materialize key (`Saturday Long run 19.6 miles`). Match + generic detection only.
+ * - Garmin send — `GF W{n}: …` — push/match only; never stack header or home card.
+ */
+export type PlanDisplayTitleInput = {
+  weekNumber?: number | null;
+  workoutType: string;
+  estimatedDistanceInMeters?: number | null;
+  catalogueName?: string | null;
+  publicTitle?: string | null;
+  title: string;
+};
+
+function formatPlannedHeadline(
+  workoutType: string,
+  estimatedDistanceInMeters: number | null | undefined
+): string {
+  const core = formatCorePlannedWorkoutTitle(workoutType, estimatedDistanceInMeters);
+  switch (workoutType) {
+    case "Easy":
+      return core === "Easy run" ? "Easy Run" : core.replace(/^Easy /, "Easy Run ");
+    case "Tempo":
+      return core.replace(/^Tempo work /, "Tempo Work ").replace(/^Tempo run$/, "Tempo Work");
+    case "LongRun":
+      return core.replace(/^Long run /, "Long Run ").replace(/^Long run$/, "Long Run");
+    case "Intervals":
+      return core;
+    default:
+      return core.replace(/^Run /, "Workout ").replace(/^Workout$/, "Workout");
+  }
+}
+
+function isPlannerKeyTitle(
+  raw: string,
+  workoutType: string,
+  estimatedDistanceInMeters: number | null | undefined
+): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed) return true;
+  if (/^GF\s+W\d/i.test(trimmed)) return true;
+  return isGeneratedGenericWorkoutTitle(trimmed, workoutType, estimatedDistanceInMeters ?? null);
+}
+
+function inferPlanHeadline(input: Omit<PlanDisplayTitleInput, "publicTitle" | "weekNumber">): string {
+  const raw = input.title.trim();
+  if (/^Race\s*—/i.test(raw)) return raw;
+
+  const catalogue = input.catalogueName?.trim();
+  if (catalogue) return catalogue;
+
+  const meters = input.estimatedDistanceInMeters ?? null;
+
+  if (!isPlannerKeyTitle(raw, input.workoutType, meters)) {
+    const stripped = stripLeadingDayNameFromTitle(raw);
+    const withoutMiles = stripped.replace(
+      /(?:\s*[-–—]\s*|\s+)\d+(\.\d+)?\s*(mi|mile|miles)\b.*$/i,
+      ""
+    ).trim();
+    return withoutMiles || formatPlannedHeadline(input.workoutType, meters);
+  }
+
+  return formatPlannedHeadline(input.workoutType, meters);
+}
+
+/** Athlete-facing plan title: publicTitle → Week {n}: headline. Never GF W# or raw planner key. */
+export function formatPlanDisplayTitle(input: PlanDisplayTitleInput): string {
+  const custom = input.publicTitle?.trim();
+  if (custom) return custom;
+
+  const headline = inferPlanHeadline(input);
+  const week = input.weekNumber;
+  if (week != null && Number.isFinite(week) && week > 0) {
+    return `Week ${week}: ${headline}`;
+  }
+  return headline;
+}
+
 /** Prefer stored race title; fix legacy "— Week N" titles; keep other custom titles. */
 export function displayWorkoutListTitle(workout: {
   title: string;

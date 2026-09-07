@@ -121,6 +121,10 @@ export async function GET(request: NextRequest) {
       actualDistanceMeters: true,
       actualAvgPaceSecPerMile: true,
       actualDurationSeconds: true,
+      actualAverageHeartRate: true,
+      garminDetailActivityId: true,
+      publicTitle: true,
+      weekNumber: true,
       _count: { select: { segments: true } },
     } as const;
 

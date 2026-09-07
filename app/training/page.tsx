@@ -29,7 +29,7 @@ import {
   raceCalendarBeforeTodayUtc,
 } from "@/lib/training/plan-utils";
 import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
-import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
+import { formatPlanDisplayTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
@@ -1233,7 +1233,12 @@ export default function TrainingHubPage() {
                           Workout complete
                         </p>
                         <h2 className="mt-1 text-2xl font-bold text-gray-900">
-                          {displayWorkoutListTitle(focusPlanDay)}
+                          {formatPlanDisplayTitle({
+                            weekNumber,
+                            workoutType: focusPlanDay.workoutType,
+                            estimatedDistanceInMeters: focusPlanDay.estimatedDistanceInMeters,
+                            title: focusPlanDay.title,
+                          })}
                         </h2>
                         <p className="mt-1 text-sm text-gray-600">
                           {formatPlanDateDisplay(focusPlanDay.dateKey || String(focusPlanDay.date), {
@@ -1265,7 +1270,12 @@ export default function TrainingHubPage() {
                     ) : (
                       <>
                         <h2 className="mt-2 text-2xl font-bold text-gray-900">
-                          {displayWorkoutListTitle(focusPlanDay)}
+                          {formatPlanDisplayTitle({
+                            weekNumber,
+                            workoutType: focusPlanDay.workoutType,
+                            estimatedDistanceInMeters: focusPlanDay.estimatedDistanceInMeters,
+                            title: focusPlanDay.title,
+                          })}
                         </h2>
                         <p className="mt-1 text-sm text-gray-600">
                           {formatPlanDateDisplay(focusPlanDay.dateKey || String(focusPlanDay.date), {
@@ -1363,7 +1373,12 @@ export default function TrainingHubPage() {
                             ) : null}
                             <WorkoutActivityMatchPanel
                               workoutId={matchTargetIdForHydrated(focusHydrated)}
-                              workoutTitle={displayWorkoutListTitle(focusPlanDay)}
+                              workoutTitle={formatPlanDisplayTitle({
+                                weekNumber,
+                                workoutType: focusPlanDay.workoutType,
+                                estimatedDistanceInMeters: focusPlanDay.estimatedDistanceInMeters,
+                                title: focusPlanDay.title,
+                              })}
                               plannedDistanceMeters={focusPlanDay.estimatedDistanceInMeters ?? null}
                               compact
                               onMatched={loadHub}

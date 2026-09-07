@@ -385,7 +385,7 @@ export function buildAthleteCataloguePayload(
   const isMP = form.paceAnchor === "goalRacePace" || form.paceAnchor === "mpSimulation";
 
   const wjsonBuilt = buildSegmentPaceDistance(form);
-  const wjson = isMP && (wt === "Tempo" || wt === "LongRun") ? null : wjsonBuilt;
+  const wjson = isMP && wt === "Tempo" ? null : wjsonBuilt;
 
   const body: Record<string, unknown> = {
     name: form.name.trim(),
@@ -407,31 +407,22 @@ export function buildAthleteCataloguePayload(
     body.warmupFraction = pctToFrac(form.warmupFractionPct);
     body.workFraction = pctToFrac(form.workFractionPct);
     body.cooldownFraction = pctToFrac(form.cooldownFractionPct);
-    if (wt === "LongRun") {
-      body.segmentPaceDist = null;
-      body.warmupMiles = null;
-      body.cooldownMiles = null;
-      body.warmupPaceOffsetSecPerMile = null;
-      body.cooldownPaceOffsetSecPerMile = null;
-    }
   }
 
-  if (!(wt === "LongRun" && isMP)) {
-    if (form.noWarmup) {
-      body.warmupMiles = null;
-      body.warmupPaceOffsetSecPerMile = null;
-    } else {
-      body.warmupMiles = n(form.warmupMiles) ?? null;
-      body.warmupPaceOffsetSecPerMile = ni(form.warmupPaceOffsetSecPerMile) ?? null;
-    }
+  if (form.noWarmup) {
+    body.warmupMiles = null;
+    body.warmupPaceOffsetSecPerMile = null;
+  } else {
+    body.warmupMiles = n(form.warmupMiles) ?? null;
+    body.warmupPaceOffsetSecPerMile = ni(form.warmupPaceOffsetSecPerMile) ?? null;
+  }
 
-    if (form.noCooldown) {
-      body.cooldownMiles = null;
-      body.cooldownPaceOffsetSecPerMile = null;
-    } else {
-      body.cooldownMiles = n(form.cooldownMiles) ?? null;
-      body.cooldownPaceOffsetSecPerMile = ni(form.cooldownPaceOffsetSecPerMile) ?? null;
-    }
+  if (form.noCooldown) {
+    body.cooldownMiles = null;
+    body.cooldownPaceOffsetSecPerMile = null;
+  } else {
+    body.cooldownMiles = n(form.cooldownMiles) ?? null;
+    body.cooldownPaceOffsetSecPerMile = ni(form.cooldownPaceOffsetSecPerMile) ?? null;
   }
 
   body.workPaceOffsetSecPerMile = ni(form.workPaceOffsetSecPerMile) ?? null;

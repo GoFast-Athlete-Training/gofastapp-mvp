@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   canonicalPlannedWorkoutTitle,
   displayWorkoutListTitle,
+  formatPlanDisplayTitle,
   formatPlannedWorkoutTitle,
   isGeneratedGenericWorkoutTitle,
   mergePlanDayTitle,
@@ -191,6 +192,45 @@ test("resolveWorkoutDisplayTitle refreshes stale embedded miles from live estima
     planId: "plan-1",
   });
   assert.equal(title, "Saturday Long run 21.5 miles");
+});
+
+test("formatPlanDisplayTitle uses Week prefix and strips planner weekday", () => {
+  const LR_19_6 = 19.6 * 1609.34;
+  assert.equal(
+    formatPlanDisplayTitle({
+      weekNumber: 2,
+      title: "Saturday Long run 19.6 miles",
+      workoutType: "LongRun",
+      estimatedDistanceInMeters: LR_19_6,
+    }),
+    "Week 2: Long Run 19.6 miles"
+  );
+});
+
+test("formatPlanDisplayTitle never shows Garmin push strings", () => {
+  const LR_19_6 = 19.6 * 1609.34;
+  assert.equal(
+    formatPlanDisplayTitle({
+      weekNumber: 2,
+      title: "GF W2: Long run 19.6 miles (Sat)",
+      workoutType: "LongRun",
+      estimatedDistanceInMeters: LR_19_6,
+    }),
+    "Week 2: Long Run 19.6 miles"
+  );
+});
+
+test("formatPlanDisplayTitle prefers publicTitle", () => {
+  assert.equal(
+    formatPlanDisplayTitle({
+      weekNumber: 2,
+      title: "Saturday Long run 19.6 miles",
+      workoutType: "LongRun",
+      estimatedDistanceInMeters: 19.6 * 1609.34,
+      publicTitle: "Legs were tired but I finished",
+    }),
+    "Legs were tired but I finished"
+  );
 });
 
 test("displayWorkoutListTitle preserves race titles", () => {
