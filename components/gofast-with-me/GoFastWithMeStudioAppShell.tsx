@@ -154,7 +154,7 @@ export default function GoFastWithMeStudioAppShell({
 
             <div>
               <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                Manage
+                Manage Community
               </p>
               <div className="space-y-0.5">
                 {STUDIO_MANAGE_NAV_ORDER.map((item) => (

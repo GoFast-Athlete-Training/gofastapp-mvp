@@ -73,7 +73,7 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
           />
           <TutorialRow
             icon={Users}
-            label="Manage on the left"
+            label="Manage Community on the left"
             description="Announcements, chatter, and your member roster."
           />
           <TutorialRow

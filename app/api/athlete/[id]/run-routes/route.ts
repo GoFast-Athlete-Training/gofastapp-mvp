@@ -8,6 +8,7 @@ import {
   listAthleteRunRoutesForOwner,
   mapAthleteRunRoute,
   normalizeRunRouteInput,
+  validateRunRouteOverlay,
 } from '@/lib/gofast-with-me/athlete-run-routes';
 
 const MAX_CAPTION = 2000;
@@ -36,10 +37,9 @@ async function requireOwnedAthlete(request: Request, athleteId: string) {
   return { athlete };
 }
 
-function validateRunRoute(routeId: string, caption: string | null) {
+function validateRunRoute(routeId: string, caption: string | null, description: string | null) {
   if (!routeId) return 'routeId is required';
-  if (caption && caption.length > MAX_CAPTION) return `Caption too long (max ${MAX_CAPTION})`;
-  return null;
+  return validateRunRouteOverlay(caption, description);
 }
 
 export async function GET(
@@ -77,7 +77,7 @@ export async function POST(
     if ('error' in auth) return auth.error;
 
     const input = normalizeRunRouteInput(await request.json().catch(() => ({})));
-    const validationError = validateRunRoute(input.routeId, input.caption);
+    const validationError = validateRunRoute(input.routeId, input.caption, input.description);
     if (validationError) {
       return NextResponse.json({ success: false, error: validationError }, { status: 400 });
     }
@@ -102,6 +102,7 @@ export async function POST(
           where: { id: existing.id },
           data: {
             caption: input.caption,
+            description: input.description,
             sortOrder: input.sortOrder,
             isPublished: input.isPublished,
             publishedAt:
@@ -135,6 +136,7 @@ export async function POST(
             athleteId,
             routeId: input.routeId,
             caption: input.caption,
+            description: input.description,
             sortOrder: input.sortOrder,
             isPublished: input.isPublished,
             publishedAt: input.isPublished ? new Date() : null,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { MapPin, Search, Trash2 } from 'lucide-react';
+import { MapPin, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import type { AthleteRunRoutePayload } from '@/lib/gofast-with-me/athlete-run-routes';
 
@@ -11,49 +11,30 @@ type Props = {
 
 type RouteCreateDraft = {
   name: string;
+  whyFavorite: string;
+  description: string;
   stravaUrl: string;
-  stravaMapUrl: string;
-  mapImageUrl: string;
-  distanceMiles: string;
-  citySlug: string;
-  routeNeighborhood: string;
-  caption: string;
-  sortOrder: string;
   isPublished: boolean;
 };
 
-type CatalogRouteHit = {
-  id: string;
-  name: string;
-  stravaUrl: string | null;
-  distanceMiles: number | null;
-  citySlug: string | null;
-  routeNeighborhood: string | null;
-};
-
 type RunRouteDraft = {
-  caption: string;
-  sortOrder: string;
+  whyFavorite: string;
+  description: string;
   isPublished: boolean;
 };
 
 const EMPTY_CREATE: RouteCreateDraft = {
   name: '',
+  whyFavorite: '',
+  description: '',
   stravaUrl: '',
-  stravaMapUrl: '',
-  mapImageUrl: '',
-  distanceMiles: '',
-  citySlug: '',
-  routeNeighborhood: '',
-  caption: '',
-  sortOrder: '0',
   isPublished: true,
 };
 
 function runRouteToDraft(row: AthleteRunRoutePayload): RunRouteDraft {
   return {
-    caption: row.caption ?? '',
-    sortOrder: String(row.sortOrder),
+    whyFavorite: row.whyFavorite ?? row.caption ?? '',
+    description: row.description ?? '',
     isPublished: row.visibility === 'published',
   };
 }
@@ -61,12 +42,8 @@ function runRouteToDraft(row: AthleteRunRoutePayload): RunRouteDraft {
 export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
   const [runRoutes, setRunRoutes] = useState<AthleteRunRoutePayload[]>([]);
   const [createDraft, setCreateDraft] = useState<RouteCreateDraft>(EMPTY_CREATE);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchCity, setSearchCity] = useState('');
-  const [searchResults, setSearchResults] = useState<CatalogRouteHit[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -78,7 +55,7 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
       setRunRoutes(Array.isArray(res.data?.runRoutes) ? res.data.runRoutes : []);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } }; message?: string };
-      setError(e.response?.data?.error || e.message || 'Could not load myRunRoutes.');
+      setError(e.response?.data?.error || e.message || 'Could not load routes.');
     } finally {
       setLoading(false);
     }
@@ -87,27 +64,6 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
   useEffect(() => {
     void loadRunRoutes();
   }, [loadRunRoutes]);
-
-  const featureRoute = async (
-    routeId: string,
-    opts: { caption?: string; sortOrder?: number; isPublished?: boolean }
-  ) => {
-    const res = await api.post(`/athlete/${athleteId}/run-routes`, {
-      routeId,
-      caption: opts.caption ?? null,
-      sortOrder: opts.sortOrder ?? 0,
-      isPublished: opts.isPublished ?? true,
-    });
-    if (res.data?.runRoute) {
-      const row = res.data.runRoute as AthleteRunRoutePayload;
-      setRunRoutes((prev) => {
-        const rest = prev.filter((r) => r.id !== row.id && r.routeId !== row.routeId);
-        return [row, ...rest];
-      });
-    } else {
-      await loadRunRoutes();
-    }
-  };
 
   const createAndFeature = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,23 +74,24 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
     try {
       const routeRes = await api.post('/routes', {
         name: createDraft.name.trim(),
-        stravaUrl: createDraft.stravaUrl.trim() || undefined,
-        stravaMapUrl: createDraft.stravaMapUrl.trim() || undefined,
-        mapImageUrl: createDraft.mapImageUrl.trim() || undefined,
-        distanceMiles: createDraft.distanceMiles.trim()
-          ? parseFloat(createDraft.distanceMiles)
-          : undefined,
-        citySlug: createDraft.citySlug.trim() || undefined,
-        routeNeighborhood: createDraft.routeNeighborhood.trim() || undefined,
+        stravaUrl: createDraft.stravaUrl.trim(),
       });
       const routeId = routeRes.data?.route?.id as string | undefined;
       if (!routeId) throw new Error('Could not create route');
 
-      await featureRoute(routeId, {
-        caption: createDraft.caption.trim() || undefined,
-        sortOrder: Number(createDraft.sortOrder) || 0,
+      const featureRes = await api.post(`/athlete/${athleteId}/run-routes`, {
+        routeId,
+        whyFavorite: createDraft.whyFavorite.trim() || null,
+        description: createDraft.description.trim() || null,
+        sortOrder: 0,
         isPublished: createDraft.isPublished,
       });
+      if (featureRes.data?.runRoute) {
+        const row = featureRes.data.runRoute as AthleteRunRoutePayload;
+        setRunRoutes((prev) => [row, ...prev.filter((r) => r.id !== row.id)]);
+      } else {
+        await loadRunRoutes();
+      }
 
       setCreateDraft(EMPTY_CREATE);
       setSuccess(createDraft.isPublished ? 'Route published.' : 'Route saved as draft.');
@@ -146,32 +103,14 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
     }
   };
 
-  const searchCatalog = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim() || searching) return;
-    setSearching(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ q: searchQuery.trim() });
-      if (searchCity.trim()) params.set('citySlug', searchCity.trim());
-      const res = await api.get(`/routes?${params.toString()}`);
-      setSearchResults(Array.isArray(res.data?.routes) ? res.data.routes : []);
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } }; message?: string };
-      setError(e.response?.data?.error || e.message || 'Could not search routes.');
-      setSearchResults([]);
-    } finally {
-      setSearching(false);
-    }
-  };
-
   const updateRunRoute = async (runRouteId: string, next: RunRouteDraft) => {
     setError(null);
     setSuccess(null);
     try {
       const res = await api.put(`/athlete/${athleteId}/run-routes/${runRouteId}`, {
-        caption: next.caption.trim() || null,
-        sortOrder: Number(next.sortOrder) || 0,
+        whyFavorite: next.whyFavorite.trim() || null,
+        description: next.description.trim() || null,
+        sortOrder: 0,
         isPublished: next.isPublished,
       });
       if (res.data?.runRoute) {
@@ -187,13 +126,13 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
   };
 
   const removeRunRoute = async (runRouteId: string) => {
-    if (!confirm('Remove this route from your page? The shared catalog entry stays for others.')) return;
+    if (!confirm('Remove this route from your favorites?')) return;
     setError(null);
     setSuccess(null);
     try {
       await api.delete(`/athlete/${athleteId}/run-routes/${runRouteId}`);
       setRunRoutes((prev) => prev.filter((r) => r.id !== runRouteId));
-      setSuccess('Route removed from your page.');
+      setSuccess('Route removed.');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } }; message?: string };
       setError(e.response?.data?.error || e.message || 'Could not remove route.');
@@ -207,8 +146,7 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
       <div>
         <h2 className="text-lg font-bold text-gray-900">Routes</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Share routes you love — Strava link plus map so followers can see the path. Same catalog
-          route can appear on many athletes&apos; pages.
+          Stuff you like — favorite routes you run and want followers to know about.
         </p>
       </div>
 
@@ -231,97 +169,51 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
         <div className="flex items-start gap-2">
           <MapPin className="h-5 w-5 text-violet-600 mt-0.5 shrink-0" />
           <div>
-            <h4 className="text-sm font-semibold text-gray-900">Add my route</h4>
-            <p className="text-xs text-gray-600 mt-1">
-              Paste a Strava route link — check out this run I did.
-            </p>
+            <h4 className="text-sm font-semibold text-gray-900">Add a favorite route</h4>
+            <p className="text-xs text-gray-600 mt-1">Name it, say why you love it, paste Strava.</p>
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block sm:col-span-2">
-            <span className="text-xs font-semibold text-gray-700">Route name</span>
-            <input
-              value={createDraft.name}
-              onChange={(e) => setCreateDraft((p) => ({ ...p, name: e.target.value }))}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              placeholder="Hains Point 5-mile loop"
-              required
-            />
-          </label>
-          <label className="block sm:col-span-2">
-            <span className="text-xs font-semibold text-gray-700">Strava route URL</span>
-            <input
-              value={createDraft.stravaUrl}
-              onChange={(e) => setCreateDraft((p) => ({ ...p, stravaUrl: e.target.value }))}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              placeholder="https://www.strava.com/routes/…"
-              required
-            />
-          </label>
-          <label className="block sm:col-span-2">
-            <span className="text-xs font-semibold text-gray-700">Strava map URL (optional)</span>
-            <input
-              value={createDraft.stravaMapUrl}
-              onChange={(e) => setCreateDraft((p) => ({ ...p, stravaMapUrl: e.target.value }))}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              placeholder="Embed or share map link"
-            />
-          </label>
-          <label className="block sm:col-span-2">
-            <span className="text-xs font-semibold text-gray-700">Map image URL (optional)</span>
-            <input
-              value={createDraft.mapImageUrl}
-              onChange={(e) => setCreateDraft((p) => ({ ...p, mapImageUrl: e.target.value }))}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              placeholder="https://… route preview image"
-            />
-            {createDraft.mapImageUrl.trim() ? (
-              <img
-                src={createDraft.mapImageUrl.trim()}
-                alt=""
-                className="mt-2 max-h-36 w-full rounded-lg object-cover"
-              />
-            ) : null}
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold text-gray-700">Neighborhood (optional)</span>
-            <input
-              value={createDraft.routeNeighborhood}
-              onChange={(e) => setCreateDraft((p) => ({ ...p, routeNeighborhood: e.target.value }))}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              placeholder="Hains Point"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold text-gray-700">Distance (mi)</span>
-            <input
-              value={createDraft.distanceMiles}
-              onChange={(e) => setCreateDraft((p) => ({ ...p, distanceMiles: e.target.value }))}
-              inputMode="decimal"
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold text-gray-700">City slug</span>
-            <input
-              value={createDraft.citySlug}
-              onChange={(e) => setCreateDraft((p) => ({ ...p, citySlug: e.target.value }))}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              placeholder="dc"
-            />
-          </label>
-          <label className="block sm:col-span-2">
-            <span className="text-xs font-semibold text-gray-700">Your caption</span>
-            <textarea
-              value={createDraft.caption}
-              onChange={(e) => setCreateDraft((p) => ({ ...p, caption: e.target.value }))}
-              rows={2}
-              className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm"
-              placeholder="My go-to long run when the weather is perfect."
-            />
-          </label>
-        </div>
+        <label className="block">
+          <span className="text-xs font-semibold text-gray-700">Name</span>
+          <input
+            value={createDraft.name}
+            onChange={(e) => setCreateDraft((p) => ({ ...p, name: e.target.value }))}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            placeholder="Hains Point 5-mile loop"
+            required
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-gray-700">Why it&apos;s my favorite</span>
+          <textarea
+            value={createDraft.whyFavorite}
+            onChange={(e) => setCreateDraft((p) => ({ ...p, whyFavorite: e.target.value }))}
+            rows={2}
+            className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm"
+            placeholder="My go-to when the weather is perfect."
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-gray-700">Description</span>
+          <textarea
+            value={createDraft.description}
+            onChange={(e) => setCreateDraft((p) => ({ ...p, description: e.target.value }))}
+            rows={2}
+            className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm"
+            placeholder="Flat, shaded, great for tempo work."
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-gray-700">Strava URL</span>
+          <input
+            value={createDraft.stravaUrl}
+            onChange={(e) => setCreateDraft((p) => ({ ...p, stravaUrl: e.target.value }))}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            placeholder="https://www.strava.com/routes/…"
+            required
+          />
+        </label>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -343,78 +235,6 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
         </div>
       </form>
 
-      <form
-        onSubmit={(e) => void searchCatalog(e)}
-        className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 space-y-3"
-      >
-        <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 text-gray-500" />
-          <h4 className="text-sm font-semibold text-gray-900">Feature a route from the catalog</h4>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-[1fr_7rem_auto]">
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white"
-            placeholder="Search route name"
-          />
-          <input
-            value={searchCity}
-            onChange={(e) => setSearchCity(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white"
-            placeholder="City"
-          />
-          <button
-            type="submit"
-            disabled={searching || !searchQuery.trim()}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100 disabled:opacity-50"
-          >
-            {searching ? '…' : 'Search'}
-          </button>
-        </div>
-        {searchResults.length > 0 ? (
-          <ul className="space-y-2">
-            {searchResults.map((hit) => (
-              <li
-                key={hit.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-              >
-                <div>
-                  <p className="font-medium text-gray-900">{hit.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {[hit.distanceMiles != null ? `${hit.distanceMiles} mi` : null, hit.citySlug]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() =>
-                    void (async () => {
-                      setSaving(true);
-                      setError(null);
-                      try {
-                        await featureRoute(hit.id, { isPublished: true });
-                        setSuccess('Route featured on your page.');
-                      } catch (err: unknown) {
-                        const e = err as { response?: { data?: { error?: string } }; message?: string };
-                        setError(e.response?.data?.error || e.message || 'Could not feature route.');
-                      } finally {
-                        setSaving(false);
-                      }
-                    })()
-                  }
-                  className="rounded-lg bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-900 hover:bg-violet-200 disabled:opacity-50"
-                >
-                  Feature
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </form>
-
       <div className="space-y-3">
         <p className="text-xs text-gray-600">
           {publishedCount} published · {runRoutes.length - publishedCount} draft
@@ -429,7 +249,6 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
               <RunRouteEditorCard
                 key={row.id}
                 row={row}
-                athleteId={athleteId}
                 onSave={updateRunRoute}
                 onDelete={removeRunRoute}
               />
@@ -437,7 +256,7 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
           </div>
         ) : (
           <p className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
-            No routes featured yet.
+            No favorite routes yet.
           </p>
         )}
       </div>
@@ -447,12 +266,10 @@ export default function GoFastWithMeRoutesPanel({ athleteId }: Props) {
 
 function RunRouteEditorCard({
   row,
-  athleteId,
   onSave,
   onDelete,
 }: {
   row: AthleteRunRoutePayload;
-  athleteId: string;
   onSave: (id: string, draft: RunRouteDraft) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
@@ -461,7 +278,6 @@ function RunRouteEditorCard({
   const [deleting, setDeleting] = useState(false);
   const route = row.route;
   const mapUrl = route.mapImageUrl || route.stravaMapUrl;
-  const isOwnRoute = route.createdByAthleteId === athleteId;
 
   useEffect(() => {
     setDraft(runRouteToDraft(row));
@@ -499,11 +315,14 @@ function RunRouteEditorCard({
             {row.visibility}
           </span>
           <h4 className="mt-2 text-sm font-semibold text-gray-900">{route.name}</h4>
-          {!isOwnRoute && route.contributorFirstName ? (
-            <p className="text-xs text-gray-500 mt-0.5">
-              Catalog route by {route.contributorFirstName}
-              {route.contributorHandle ? ` (@${route.contributorHandle})` : ''}
-            </p>
+          {route.stravaUrl ? (
+            <a
+              href={route.stravaUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 block text-xs text-sky-700 hover:underline">
+              Open on Strava
+            </a>
           ) : null}
         </div>
         <button
@@ -521,13 +340,24 @@ function RunRouteEditorCard({
         <img src={mapUrl} alt="" className="max-h-36 w-full rounded-lg object-cover" />
       ) : null}
 
-      <textarea
-        value={draft.caption}
-        onChange={(e) => setDraft((p) => ({ ...p, caption: e.target.value }))}
-        rows={2}
-        className="w-full rounded-lg border border-gray-300 p-3 text-sm"
-        placeholder="Your caption for this route"
-      />
+      <label className="block">
+        <span className="text-xs font-semibold text-gray-700">Why it&apos;s my favorite</span>
+        <textarea
+          value={draft.whyFavorite}
+          onChange={(e) => setDraft((p) => ({ ...p, whyFavorite: e.target.value }))}
+          rows={2}
+          className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm"
+        />
+      </label>
+      <label className="block">
+        <span className="text-xs font-semibold text-gray-700">Description</span>
+        <textarea
+          value={draft.description}
+          onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))}
+          rows={2}
+          className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm"
+        />
+      </label>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <label className="inline-flex items-center gap-2 text-sm text-gray-700">

@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
-import { mapAthleteRunRoute, normalizeRunRouteInput } from '@/lib/gofast-with-me/athlete-run-routes';
+import { mapAthleteRunRoute, normalizeRunRouteInput, validateRunRouteOverlay } from '@/lib/gofast-with-me/athlete-run-routes';
 
 const MAX_CAPTION = 2000;
 
@@ -32,10 +32,9 @@ async function requireOwnedAthlete(request: Request, athleteId: string) {
   return { athlete };
 }
 
-function validateRunRoute(routeId: string, caption: string | null) {
+function validateRunRoute(routeId: string, caption: string | null, description: string | null) {
   if (!routeId) return 'routeId is required';
-  if (caption && caption.length > MAX_CAPTION) return `Caption too long (max ${MAX_CAPTION})`;
-  return null;
+  return validateRunRouteOverlay(caption, description);
 }
 
 export async function PUT(
@@ -63,7 +62,7 @@ export async function PUT(
       ...(await request.json().catch(() => ({}))),
       routeId: existing.routeId,
     });
-    const validationError = validateRunRoute(input.routeId, input.caption);
+    const validationError = validateRunRoute(input.routeId, input.caption, input.description);
     if (validationError) {
       return NextResponse.json({ success: false, error: validationError }, { status: 400 });
     }
@@ -72,6 +71,7 @@ export async function PUT(
       where: { id: runRouteId },
       data: {
         caption: input.caption,
+        description: input.description,
         sortOrder: input.sortOrder,
         isPublished: input.isPublished,
         publishedAt:

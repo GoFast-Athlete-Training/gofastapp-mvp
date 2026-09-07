@@ -91,8 +91,10 @@ export type ContainerHubPayload = {
   }[];
   upcomingRuns: NonNullable<PublicAthletePayload>['upcomingRuns'];
   publishedPlan: {
+    planId: string;
     slug: string;
     name: string;
+    publicDescription: string | null;
     totalWeeks: number;
     currentWeekNumber: number;
     weeks: PublicPlanWeek[];
@@ -169,6 +171,7 @@ async function buildPlanStripFromTrainingPlan(plan: {
   athleteId: string;
   name: string;
   publicSlug: string | null;
+  publicDescription?: string | null;
   publicVisibility: PublicTrainingPlanVisibility | null;
   startDate: Date;
   totalWeeks: number;
@@ -198,8 +201,10 @@ async function buildPlanStripFromTrainingPlan(plan: {
   const raceRegistryId = resolvePlanRaceRegistryId(plan);
 
   return {
+    planId: plan.id,
     slug: plan.publicSlug?.trim() || plan.id,
     name: plan.name,
+    publicDescription: plan.publicDescription?.trim() || null,
     totalWeeks: effectiveWeeks,
     currentWeekNumber: currentTrainingWeekNumber(plan.startDate, effectiveWeeks),
     weeks,
@@ -245,6 +250,7 @@ async function loadHubPlanStrip(
       athleteId: true,
       name: true,
       publicSlug: true,
+      publicDescription: true,
       publicVisibility: true,
       startDate: true,
       totalWeeks: true,
@@ -356,7 +362,7 @@ export async function loadAthleteCommunityForHost(
       include: containerMessageInclude,
     }),
     listPublishedAthleteTips(host.id, 6, 'feed'),
-    listPublishedAthleteRunRoutes(host.id, 6),
+    listPublishedAthleteRunRoutes(host.id),
     listPublicInstagramMedia(host.id, 5),
     listPublishedWorkoutStories(host.id, 20),
     listPublishedActivityPosts(host.id, 20),

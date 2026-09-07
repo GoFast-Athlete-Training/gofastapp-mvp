@@ -103,15 +103,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
 
+    const stravaUrl =
+      typeof body.stravaUrl === 'string' ? body.stravaUrl.trim() || null : null;
+    const stravaMapUrlRaw =
+      typeof body.stravaMapUrl === 'string' ? body.stravaMapUrl.trim() || null : null;
+    const stravaMapUrl = stravaMapUrlRaw || stravaUrl;
+
     const route = await prisma.routes.create({
       data: {
         name,
-        stravaUrl: typeof body.stravaUrl === "string" ? body.stravaUrl.trim() || null : null,
+        stravaUrl,
         distanceMiles:
-          body.distanceMiles != null && body.distanceMiles !== ""
+          body.distanceMiles != null && body.distanceMiles !== ''
             ? parseFloat(String(body.distanceMiles))
             : null,
-        stravaMapUrl: typeof body.stravaMapUrl === "string" ? body.stravaMapUrl.trim() || null : null,
+        stravaMapUrl,
         mapImageUrl: typeof body.mapImageUrl === "string" ? body.mapImageUrl.trim() || null : null,
         routePhotos:
           Array.isArray(body.routePhotos) && body.routePhotos.length > 0

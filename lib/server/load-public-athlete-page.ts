@@ -185,7 +185,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
       _sum: { distance: true },
     }),
     listPublishedAthleteTips(athlete.id, 6, 'landing'),
-    listPublishedAthleteRunRoutes(athlete.id, 6),
+    listPublishedAthleteRunRoutes(athlete.id),
     listPublicInstagramMedia(athlete.id, 5),
   ]);
 

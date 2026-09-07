@@ -20,6 +20,9 @@ export type AthleteRunRoutePayload = {
   id: string;
   routeId: string;
   caption: string | null;
+  /** Alias of caption — why this route is a favorite. */
+  whyFavorite: string | null;
+  description: string | null;
   sortOrder: number;
   visibility: AthleteRunRouteVisibility;
   publishedAt: string | null;
@@ -54,6 +57,7 @@ type AthleteRunRouteRow = {
   id: string;
   routeId: string;
   caption: string | null;
+  description: string | null;
   sortOrder: number;
   isPublished: boolean;
   publishedAt: Date | null;
@@ -77,10 +81,13 @@ type AthleteRunRouteRow = {
 };
 
 export function mapAthleteRunRoute(row: AthleteRunRouteRow): AthleteRunRoutePayload {
+  const whyFavorite = row.caption?.trim() || null;
   return {
     id: row.id,
     routeId: row.routeId,
-    caption: row.caption?.trim() || null,
+    caption: whyFavorite,
+    whyFavorite,
+    description: row.description?.trim() || null,
     sortOrder: row.sortOrder,
     visibility: row.isPublished ? 'published' : 'draft',
     publishedAt: row.publishedAt?.toISOString() ?? null,
@@ -115,12 +122,12 @@ export async function listAthleteRunRoutesForOwner(
 
 export async function listPublishedAthleteRunRoutes(
   athleteId: string,
-  limit = 6
+  limit?: number
 ): Promise<AthleteRunRoutePayload[]> {
   const rows = await prisma.athlete_run_routes.findMany({
     where: { athleteId, isPublished: true },
     orderBy: [{ sortOrder: 'asc' }, { publishedAt: 'desc' }, { updatedAt: 'desc' }],
-    take: limit,
+    ...(limit != null ? { take: limit } : {}),
     include: routeInclude,
   });
   return rows.map(mapAthleteRunRoute);
@@ -129,18 +136,38 @@ export async function listPublishedAthleteRunRoutes(
 export function normalizeRunRouteInput(input: unknown): {
   routeId: string;
   caption: string | null;
+  description: string | null;
   sortOrder: number;
   isPublished: boolean;
 } {
   const value = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
   const routeId = String(value.routeId ?? '').trim();
   const captionRaw =
-    value.caption === null || value.caption === undefined
+    value.whyFavorite !== undefined
+      ? value.whyFavorite
+      : value.caption !== undefined
+        ? value.caption
+        : null;
+  const caption =
+    captionRaw === null || captionRaw === undefined
       ? null
-      : String(value.caption).trim() || null;
+      : String(captionRaw).trim() || null;
+  const descriptionRaw = value.description;
+  const description =
+    descriptionRaw === null || descriptionRaw === undefined
+      ? null
+      : String(descriptionRaw).trim() || null;
   const sortOrderRaw = Number(value.sortOrder ?? 0);
   const sortOrder = Number.isFinite(sortOrderRaw) ? Math.trunc(sortOrderRaw) : 0;
   const isPublished = Boolean(value.isPublished ?? value.visibility === 'published');
 
-  return { routeId, caption: captionRaw, sortOrder, isPublished };
+  return { routeId, caption, description, sortOrder, isPublished };
+}
+
+const MAX_TEXT = 2000;
+
+export function validateRunRouteOverlay(caption: string | null, description: string | null): string | null {
+  if (caption && caption.length > MAX_TEXT) return `Why favorite too long (max ${MAX_TEXT})`;
+  if (description && description.length > MAX_TEXT) return `Description too long (max ${MAX_TEXT})`;
+  return null;
 }
