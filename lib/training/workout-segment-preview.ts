@@ -8,6 +8,7 @@ import {
   isMultiStepRepeatGroup,
   type SegmentDisplayGroup,
   type SegmentLike,
+  type SegmentTitleContext,
 } from '@/lib/training/segment-summary';
 import {
   formatPaceTargetRangeForDisplay,
