@@ -1541,6 +1541,18 @@ model city_runs {
   @@map("city_runs")
 }
 
+/// Operator-editable in-app notification copy (App Management proxies CRUD here).
+model app_notification_templates {
+  id          String   @id @default(cuid())
+  templateKey String   @unique
+  name        String
+  title       String
+  body        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 /// Expo push token per device — app notification delivery endpoints only (not inbox content).
 model athlete_appnotification_devices {
   id            String   @id @default(cuid())

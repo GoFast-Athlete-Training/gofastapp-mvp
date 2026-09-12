@@ -1,3 +1,4 @@
+import { resolveDbTemplate } from '@/lib/app-notifications/template-store';
 import type { NotificationTemplateKey, RenderedNotification, TemplateFacts } from '@/lib/app-notifications/types';
 import type { ActivitySport } from '@/lib/training/activity-type-sets';
 
@@ -43,8 +44,7 @@ type TemplateDefinition = {
 };
 
 /**
- * Hardcoded notification templates.
- * Future state: resolveTemplate() can load copy from a content-managed table by templateKey.
+ * Hardcoded fallback when DB row is missing or inactive.
  */
 const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> = {
   'workout.tomorrow': {
@@ -132,20 +132,33 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
   },
 };
 
-/** Stub for future content-backed templates (Company/content repo). */
+function renderHardcoded(
+  templateKey: NotificationTemplateKey,
+  facts: TemplateFacts,
+): RenderedNotification {
+  const template = HARDCODED_TEMPLATES[templateKey];
+  const title =
+    typeof template.title === 'function' ? template.title(facts) : template.title;
+  return { title, body: template.body(facts) };
+}
+
+/** Prefer DB-backed copy; fall back to hardcoded map. */
 export async function resolveTemplate(
-  templateKey: NotificationTemplateKey
-): Promise<TemplateDefinition> {
-  // Future: fetch from notification_templates table or content API by templateKey.
-  return HARDCODED_TEMPLATES[templateKey];
+  templateKey: NotificationTemplateKey,
+  facts: TemplateFacts,
+): Promise<RenderedNotification> {
+  try {
+    const dbRendered = await resolveDbTemplate(templateKey, facts);
+    if (dbRendered) return dbRendered;
+  } catch (err) {
+    console.warn('[resolveTemplate] DB lookup failed, using hardcoded fallback:', templateKey, err);
+  }
+  return renderHardcoded(templateKey, facts);
 }
 
 export async function renderNotificationTemplate(
   templateKey: NotificationTemplateKey,
-  facts: TemplateFacts
+  facts: TemplateFacts,
 ): Promise<RenderedNotification> {
-  const template = await resolveTemplate(templateKey);
-  const title =
-    typeof template.title === 'function' ? template.title(facts) : template.title;
-  return { title, body: template.body(facts) };
+  return resolveTemplate(templateKey, facts);
 }
