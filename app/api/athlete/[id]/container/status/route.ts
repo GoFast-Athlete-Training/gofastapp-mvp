@@ -75,10 +75,10 @@ export async function GET(
       });
     }
 
-    const m = await prisma.gofast_container_memberships.findUnique({
+    const m = await prisma.gfwm_athlete.findUnique({
       where: {
-        containerAthleteId_memberAthleteId: {
-          containerAthleteId: host.id,
+        athleteId_memberAthleteId: {
+          athleteId: host.id,
           memberAthleteId: caller.id,
         },
       },

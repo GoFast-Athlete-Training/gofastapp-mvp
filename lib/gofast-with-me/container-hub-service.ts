@@ -292,10 +292,10 @@ async function resolveFollowRelationship(
       hasMembership: false,
     });
   }
-  const membership = await prisma.gofast_container_memberships.findUnique({
+  const membership = await prisma.gfwm_athlete.findUnique({
     where: {
-      containerAthleteId_memberAthleteId: {
-        containerAthleteId: hostAthleteId,
+      athleteId_memberAthleteId: {
+        athleteId: hostAthleteId,
         memberAthleteId: callerAthleteId,
       },
     },
@@ -334,8 +334,8 @@ export async function loadAthleteCommunityForHost(
     attendedClubRuns,
   ] =
     await Promise.all([
-    prisma.gofast_container_memberships.findMany({
-      where: { containerAthleteId: host.id },
+    prisma.gfwm_athlete.findMany({
+      where: { athleteId: host.id },
       orderBy: { joinedAt: 'desc' },
       take: 24,
       include: {
@@ -350,7 +350,7 @@ export async function loadAthleteCommunityForHost(
         },
       },
     }),
-    prisma.gofast_container_memberships.count({ where: { containerAthleteId: host.id } }),
+    prisma.gfwm_athlete.count({ where: { athleteId: host.id } }),
     loadHubPlanStrip(host.id, relationship.isOwner),
     prisma.gofast_container_messages.findMany({
       where: {

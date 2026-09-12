@@ -19,6 +19,7 @@ import { parseAthletePaceAdjuster } from "@/lib/training/athlete-pace-adjuster";
 import { ensureWorkoutPrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
 import { computeWorkoutPerformanceAnalysis } from "@/lib/training/workout-performance-analysis";
 import { loadPlannedWorkoutDetailForAthlete } from "@/lib/training/planned-workout-detail";
+import { resolveReadableWorkoutAthleteId, resolveWorkoutOwnerAthleteId } from "@/lib/training/gfwm-workout-read-access";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -133,8 +134,23 @@ export async function GET(request: NextRequest, context: Ctx) {
     }
     const { id } = await context.params;
 
+    const readScope = await resolveReadableWorkoutAthleteId(id, auth.athlete.id);
+    if (!readScope) {
+      const ownerAthleteId = await resolveWorkoutOwnerAthleteId(id);
+      if (!ownerAthleteId) {
+        return NextResponse.json({ error: "Workout not found" }, { status: 404 });
+      }
+      return NextResponse.json(
+        {
+          error: "This workout is only visible to the runner and their GoFast With Me members.",
+        },
+        { status: 403 }
+      );
+    }
+    const scopedAthleteId = readScope.athleteId;
+
     const athleteRow = await prisma.athlete.findUnique({
-      where: { id: auth.athlete.id },
+      where: { id: scopedAthleteId },
       select: {
         fiveKPace: true,
         goalRacePace: true,
@@ -147,7 +163,7 @@ export async function GET(request: NextRequest, context: Ctx) {
 
     const loadWorkout = () =>
       prisma.workouts.findFirst({
-        where: { id, athleteId: auth.athlete.id },
+        where: { id, athleteId: scopedAthleteId },
         include: {
           segments: {
             orderBy: { stepOrder: "asc" },
@@ -210,7 +226,7 @@ export async function GET(request: NextRequest, context: Ctx) {
     if (!workout) {
       const plannedDetail = await loadPlannedWorkoutDetailForAthlete({
         plannedWorkoutId: id,
-        athleteId: auth.athlete.id,
+        athleteId: scopedAthleteId,
       });
       if (!plannedDetail) {
         return NextResponse.json({ error: "Workout not found" }, { status: 404 });
@@ -259,7 +275,7 @@ export async function GET(request: NextRequest, context: Ctx) {
       }).goalPaceSecPerMile;
 
       const performanceSignals = await loadWorkoutPerformanceSignals({
-        athleteId: auth.athlete.id,
+        athleteId: scopedAthleteId,
         workout: {
           workoutType: plannedDetail.workoutType,
           paceSecPerMile: plannedDetail.actualAvgPaceSecPerMile,
@@ -388,7 +404,7 @@ export async function GET(request: NextRequest, context: Ctx) {
     if (shouldEnqueuePrescription) {
       void ensureWorkoutPrescriptionNarrative({
         workoutId: workout.id,
-        athleteId: auth.athlete.id,
+        athleteId: scopedAthleteId,
       }).catch((e) => console.warn("ensureWorkoutPrescriptionNarrative:", e));
     }
 

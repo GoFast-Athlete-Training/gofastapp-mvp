@@ -38,9 +38,9 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Container not found' }, { status: 404 });
     }
 
-    await prisma.gofast_container_memberships.deleteMany({
+    await prisma.gfwm_athlete.deleteMany({
       where: {
-        containerAthleteId: host.id,
+        athleteId: host.id,
         memberAthleteId: member.id,
       },
     });

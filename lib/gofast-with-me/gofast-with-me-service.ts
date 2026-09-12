@@ -28,6 +28,7 @@ export type GoFastWithMeRecord = {
   gofastWithMePhotoType: string | null;
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
+  instagramDescription: string | null;
 };
 
 export type GoFastWithMeIntroInput = {
@@ -44,6 +45,7 @@ export type GoFastWithMeIntroInput = {
   gofastWithMePhotoType?: string | null;
   creatorType?: GoFastWithMeCreatorType | string | null;
   coachSpecialty?: string | null;
+  instagramDescription?: string | null;
 };
 
 function trimOrNull(value: string | null | undefined): string | null {
@@ -76,6 +78,7 @@ type GoFastWithMeRow = {
   gofastWithMePhotoType: string | null;
   creatorType: string | null;
   coachSpecialty: string | null;
+  instagramDescription: string | null;
 };
 
 function toGoFastWithMeRecord(row: GoFastWithMeRow): GoFastWithMeRecord {
@@ -237,11 +240,23 @@ export async function updateGoFastWithMeIntro(
   if (input.coachSpecialty !== undefined) {
     data.coachSpecialty = trimOrNull(input.coachSpecialty);
   }
+  if (input.instagramDescription !== undefined) {
+    data.instagramDescription = trimOrNull(input.instagramDescription);
+  }
 
-  return prisma.gofast_with_me.update({
+  const updated = await prisma.gofast_with_me.update({
     where: { athleteId },
     data,
   });
+
+  if (input.welcome !== undefined && trimOrNull(input.welcome)) {
+    await prisma.athlete.update({
+      where: { id: athleteId },
+      data: { isGoFastContainer: true },
+    });
+  }
+
+  return updated;
 }
 
 /** Set a custom GoFast With Me URL slug (disables handle sync). */

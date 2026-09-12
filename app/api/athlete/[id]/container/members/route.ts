@@ -27,12 +27,12 @@ export async function GET(
       });
     }
 
-    const count = await prisma.gofast_container_memberships.count({
-      where: { containerAthleteId: host.id },
+    const count = await prisma.gfwm_athlete.count({
+      where: { athleteId: host.id },
     });
 
-    const rows = await prisma.gofast_container_memberships.findMany({
-      where: { containerAthleteId: host.id },
+    const rows = await prisma.gfwm_athlete.findMany({
+      where: { athleteId: host.id },
       orderBy: { joinedAt: 'desc' },
       take: 24,
       include: {

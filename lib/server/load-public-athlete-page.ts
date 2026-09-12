@@ -97,6 +97,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
     gofastWithMePhotoType: gwmRow.gofastWithMePhotoType,
     creatorType: gwmRow.creatorType,
     coachSpecialty: gwmRow.coachSpecialty,
+    instagramDescription: gwmRow.instagramDescription,
   };
 
   const now = new Date();
@@ -375,11 +376,11 @@ export async function loadPublicAthletePage(rawHandle: string) {
 
   if (athlete.isGoFastContainer) {
     const [count, memberRows] = await Promise.all([
-      prisma.gofast_container_memberships.count({
-        where: { containerAthleteId: athlete.id },
+      prisma.gfwm_athlete.count({
+        where: { athleteId: athlete.id },
       }),
-      prisma.gofast_container_memberships.findMany({
-        where: { containerAthleteId: athlete.id },
+      prisma.gfwm_athlete.findMany({
+        where: { athleteId: athlete.id },
         orderBy: { joinedAt: 'desc' },
         take: 6,
         include: {

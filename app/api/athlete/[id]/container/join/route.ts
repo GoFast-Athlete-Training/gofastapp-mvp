@@ -50,15 +50,15 @@ export async function POST(
       );
     }
 
-    await prisma.gofast_container_memberships.upsert({
+    await prisma.gfwm_athlete.upsert({
       where: {
-        containerAthleteId_memberAthleteId: {
-          containerAthleteId: host.id,
+        athleteId_memberAthleteId: {
+          athleteId: host.id,
           memberAthleteId: member.id,
         },
       },
       create: {
-        containerAthleteId: host.id,
+        athleteId: host.id,
         memberAthleteId: member.id,
         role: 'member',
       },

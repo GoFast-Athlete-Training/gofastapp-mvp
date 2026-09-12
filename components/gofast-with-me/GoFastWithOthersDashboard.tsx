@@ -35,6 +35,10 @@ import {
   shouldShowStudioExplainer,
 } from "@/lib/gofast-with-me/studio-intro";
 import {
+  markStudioReady,
+  readStudioReady,
+} from "@/lib/gofast-with-me/studio-ready";
+import {
   isWelcomeContentComplete,
   type ContentEditorFocus,
   type StudioSection,
@@ -99,6 +103,7 @@ export default function GoFastWithOthersDashboard() {
   const [followerCount, setFollowerCount] = useState<number | null>(null);
   const [shareHubStatus, setShareHubStatus] = useState<ShareHubStatus | null>(null);
   const [introDismissed, setIntroDismissed] = useState(() => readStudioIntroDismissed());
+  const [studioReady, setStudioReady] = useState(() => readStudioReady());
   const [shareCopied, setShareCopied] = useState(false);
 
   const landingValues = ownerRowToLanding(ownerGwm);
@@ -232,24 +237,11 @@ export default function GoFastWithOthersDashboard() {
     setIntroDismissed(true);
   }, []);
 
-  const handleProgramReady = useCallback(async () => {
-    if (!athleteId || gateLoading) return;
-    setGateLoading(true);
+  const handleProgramReady = useCallback(() => {
+    markStudioReady();
+    setStudioReady(true);
     setError(null);
-    try {
-      const res = await api.post(`/athlete/${athleteId}/container/toggle`, { value: true });
-      if (res.data?.isGoFastContainer) {
-        setIsGoFastContainer(true);
-        setFollowerCount(0);
-      } else {
-        setError("Could not enable GoFast With Me. Try again.");
-      }
-    } catch {
-      setError("Could not enable GoFast With Me. Try again.");
-    } finally {
-      setGateLoading(false);
-    }
-  }, [athleteId, gateLoading]);
+  }, []);
 
   if (loading) {
     return (
@@ -299,12 +291,12 @@ export default function GoFastWithOthersDashboard() {
     );
   }
 
-  if (isGoFastContainer === false) {
+  if (!studioReady) {
     return (
       <GoFastWithMeProgramGate
         loading={gateLoading}
         error={error}
-        onReady={() => void handleProgramReady()}
+        onReady={() => handleProgramReady()}
       />
     );
   }

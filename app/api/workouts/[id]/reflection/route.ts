@@ -8,6 +8,10 @@ import {
   saveWorkoutReflection,
   validateWorkoutReflectionInput,
 } from '@/lib/gofast-with-me/workout-stories';
+import {
+  resolveReadableWorkoutAthleteId,
+  resolveWorkoutOwnerAthleteId,
+} from '@/lib/training/gfwm-workout-read-access';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -26,7 +30,22 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       return NextResponse.json({ success: false, error: 'Missing workout id' }, { status: 400 });
     }
 
-    const reflection = await getWorkoutReflectionForOwner(auth.athlete.id, workoutId);
+    const readScope = await resolveReadableWorkoutAthleteId(workoutId, auth.athlete.id);
+    if (!readScope) {
+      const ownerAthleteId = await resolveWorkoutOwnerAthleteId(workoutId);
+      if (!ownerAthleteId) {
+        return NextResponse.json({ success: false, error: 'Workout not found' }, { status: 404 });
+      }
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'This workout is only visible to the runner and their GoFast With Me members.',
+        },
+        { status: 403 }
+      );
+    }
+
+    const reflection = await getWorkoutReflectionForOwner(readScope.athleteId, workoutId);
     if (!reflection) {
       return NextResponse.json({ success: false, error: 'Workout not found' }, { status: 404 });
     }

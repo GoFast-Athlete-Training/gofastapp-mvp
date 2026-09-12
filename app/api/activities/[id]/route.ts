@@ -3,11 +3,23 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { projectActivityDetailResponse } from "@/lib/training/activity-detail-projection";
+import { canAccessGfwmHostContent } from "@/lib/gfwm-member-access";
 import { prisma } from "@/lib/prisma";
+
+const activityInclude = {
+  garmin_detail_workout: {
+    include: {
+      segments: { orderBy: { stepOrder: "asc" as const } },
+      training_plans: {
+        select: { id: true, name: true, currentFiveKPace: true },
+      },
+    },
+  },
+} as const;
 
 /**
  * GET /api/activities/[id]
- * Single athlete_activity for the authenticated athlete, with optional matched workout + segments.
+ * Owner read, or gfwm_athlete member read for the host's activity.
  */
 export async function GET(
   request: NextRequest,
@@ -24,25 +36,25 @@ export async function GET(
   }
 
   try {
+    const activityId = id.trim();
     const row = await prisma.athlete_activities.findFirst({
-      where: {
-        id: id.trim(),
-        athleteId: auth.athlete.id,
-      },
-      include: {
-        garmin_detail_workout: {
-          include: {
-            segments: { orderBy: { stepOrder: "asc" } },
-            training_plans: {
-              select: { id: true, name: true, currentFiveKPace: true },
-            },
-          },
-        },
-      },
+      where: { id: activityId },
+      include: activityInclude,
     });
 
     if (!row) {
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
+    }
+
+    const isOwner = row.athleteId === auth.athlete.id;
+    if (!isOwner) {
+      const allowed = await canAccessGfwmHostContent(row.athleteId, auth.athlete.id);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: "This activity is only visible to the runner and their GoFast With Me members." },
+          { status: 403 }
+        );
+      }
     }
 
     const { garmin_detail_workout, ...activityRow } = row;

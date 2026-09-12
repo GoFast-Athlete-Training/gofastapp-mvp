@@ -26,6 +26,7 @@ export type GoFastWithMeLandingValues = {
   gofastWithMePhotoFocusY: number | null;
   gofastWithMePhotoZoom: number | null;
   gofastWithMePhotoType: GoFastWithMePhotoType | null;
+  instagramDescription?: string | null;
 };
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';

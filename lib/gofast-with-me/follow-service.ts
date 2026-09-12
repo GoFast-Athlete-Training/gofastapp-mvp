@@ -57,15 +57,15 @@ export async function followAthleteBySlug(
 
   await ensureFollowSurfaceForOwner(target.hostAthleteId);
 
-  await prisma.gofast_container_memberships.upsert({
+  await prisma.gfwm_athlete.upsert({
     where: {
-      containerAthleteId_memberAthleteId: {
-        containerAthleteId: target.hostAthleteId,
+      athleteId_memberAthleteId: {
+        athleteId: target.hostAthleteId,
         memberAthleteId,
       },
     },
     create: {
-      containerAthleteId: target.hostAthleteId,
+      athleteId: target.hostAthleteId,
       memberAthleteId,
       role: 'member',
     },
@@ -79,10 +79,10 @@ export async function isFollowingHost(
   hostAthleteId: string,
   memberAthleteId: string
 ): Promise<boolean> {
-  const row = await prisma.gofast_container_memberships.findUnique({
+  const row = await prisma.gfwm_athlete.findUnique({
     where: {
-      containerAthleteId_memberAthleteId: {
-        containerAthleteId: hostAthleteId,
+      athleteId_memberAthleteId: {
+        athleteId: hostAthleteId,
         memberAthleteId,
       },
     },

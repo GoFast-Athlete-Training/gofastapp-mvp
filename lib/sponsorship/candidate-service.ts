@@ -66,8 +66,8 @@ async function resolveCandidateStats(athleteId: string): Promise<{
       where: { id: athleteId },
       select: { gofastHandle: true },
     }),
-    prisma.gofast_container_memberships.count({
-      where: { containerAthleteId: athleteId },
+    prisma.gfwm_athlete.count({
+      where: { athleteId: athleteId },
     }),
     prisma.city_run_checkins.count({
       where: { athleteId },

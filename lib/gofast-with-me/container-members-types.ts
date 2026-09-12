@@ -1,4 +1,4 @@
-/** Row from GET /api/athlete/[id]/container/members (gofast_container_memberships junction). */
+/** Row from GET /api/athlete/[id]/container/members (gfwm_athlete junction). */
 export type ContainerMemberRow = {
   id: string;
   firstName: string | null;
