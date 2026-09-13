@@ -43,6 +43,12 @@ export async function GET(
           slug: true,
           name: true,
           dayOfWeek: true,
+          description: true,
+          seriesRunRawText: true,
+          routeNeighborhood: true,
+          runType: true,
+          workoutDescription: true,
+          postRunActivity: true,
         },
       },
       route: {
@@ -137,6 +143,7 @@ export async function GET(
         pace: run.pace,
         description: run.description,
         meetUpNote: run.meetUpNote ?? null,
+        directionsText: run.directionsText ?? null,
         postRunActivity: run.postRunActivity ?? null,
         stravaMapUrl: run.stravaMapUrl,
         routePhotos: run.routePhotos as string[] | null ?? null,
@@ -182,12 +189,20 @@ export async function GET(
             }
           : null,
         runClub: run.runClub || null,
-        runSeries: run.runSeries ? {
-          id: run.runSeries.id,
-          slug: run.runSeries.slug,
-          name: run.runSeries.name,
-          dayOfWeek: run.runSeries.dayOfWeek,
-        } : null,
+        runSeries: run.runSeries
+          ? {
+              id: run.runSeries.id,
+              slug: run.runSeries.slug,
+              name: run.runSeries.name,
+              dayOfWeek: run.runSeries.dayOfWeek,
+              description: run.runSeries.description ?? null,
+              seriesRunRawText: run.runSeries.seriesRunRawText ?? null,
+              routeNeighborhood: run.runSeries.routeNeighborhood ?? null,
+              runType: run.runSeries.runType ?? null,
+              workoutDescription: run.runSeries.workoutDescription ?? null,
+              postRunActivity: run.runSeries.postRunActivity ?? null,
+            }
+          : null,
         instanceType: run.runSeriesId ? 'SERIES' : 'STANDALONE',
         cityRunSetup: run.runSeries ? {
           id: run.runSeries.id,
