@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { GOFAST_COMPANY_ID } from '@/lib/goFastCompanyConfig';
-import { fireCompanyNotificationTrigger } from '@/lib/company-notification-trigger';
+import { publishProductEvent } from '@/lib/publish-product-event';
 import {
   emailContactability,
   isExternallyContactableEmail,
@@ -282,7 +282,7 @@ export async function POST(request: Request) {
     // New athlete only — fire transactional email trigger on Company stack
     if (!existingAthlete) {
       const contactEmail = isExternallyContactableEmail(athlete.email) ? athlete.email : null;
-      fireCompanyNotificationTrigger('athlete.created', {
+      publishProductEvent('athlete.created', {
         athleteId: athlete.id,
         email: contactEmail,
         contactEmail,
