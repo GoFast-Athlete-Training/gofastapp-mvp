@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
  *
  * Public endpoint to get a single CityRun (no authentication required).
  * [runId] can be run id or slug.
- * Returns public-safe data only (excludes staffNotes, staffGeneratedId, etc).
+ * Returns public-safe city_run copy + meta only (no workout/plannedWorkout joins).
  *
  * Model C: reads city_runs directly. No event resolver.
  */
@@ -65,57 +65,16 @@ export async function GET(
           citySlug: true,
         },
       },
-        workout: {
-          select: {
-            id: true,
-            title: true,
-            workoutType: true,
-            description: true,
-            workoutNarrative: true,
-            scope: true,
-            segments: {
-            orderBy: { stepOrder: "asc" as const },
-            select: {
-              id: true,
-              stepOrder: true,
-              title: true,
-              durationType: true,
-              durationValue: true,
-              targets: true,
-              repeatCount: true,
-              notes: true,
-              paceTargetEncodingVersion: true,
-            },
-          },
-        },
-      },
-      plannedWorkout: {
-        select: {
-          id: true,
-          title: true,
-          workoutType: true,
-          description: true,
-          segments: {
-            orderBy: { stepOrder: "asc" as const },
-            select: {
-              id: true,
-              stepOrder: true,
-              title: true,
-              durationType: true,
-              durationValue: true,
-              targets: true,
-              repeatCount: true,
-              notes: true,
-              paceTargetEncodingVersion: true,
-            },
-          },
-        },
-      },
     };
 
     let run = await prisma.city_runs.findUnique({ where: { id: segment }, include });
     if (!run) run = await prisma.city_runs.findUnique({ where: { slug: segment }, include });
     if (!run) return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+
+    const runDescription = run.description ?? run.runSeries?.description ?? null;
+    const routeDirections = run.directionsText ?? run.runSeries?.seriesRunRawText ?? null;
+    const routeDescription =
+      run.workoutDescription ?? run.runSeries?.workoutDescription ?? null;
 
     return NextResponse.json({
       success: true,
@@ -141,19 +100,17 @@ export async function GET(
         timezone: run.timezone,
         totalMiles: run.totalMiles,
         pace: run.pace,
-        description: run.description,
+        runDescription,
+        routeDirections,
+        routeDescription,
         meetUpNote: run.meetUpNote ?? null,
-        directionsText: run.directionsText ?? null,
         postRunActivity: run.postRunActivity ?? null,
         stravaMapUrl: run.stravaMapUrl,
         routePhotos: run.routePhotos as string[] | null ?? null,
         mapImageUrl: run.mapImageUrl ?? null,
         routeNeighborhood: run.routeNeighborhood ?? null,
         runType: run.runType ?? null,
-        workoutDescription: run.workoutDescription ?? null,
         routeId: run.routeId ?? null,
-        workoutId: run.workoutId ?? null,
-        plannedWorkoutId: run.plannedWorkoutId ?? null,
         route: run.route
           ? {
               id: run.route.id,
@@ -166,26 +123,6 @@ export async function GET(
               routeNeighborhood: run.route.routeNeighborhood,
               runType: run.route.runType,
               citySlug: run.route.citySlug,
-            }
-          : null,
-        workout: run.workout
-          ? {
-              id: run.workout.id,
-              title: run.workout.title,
-              workoutType: run.workout.workoutType,
-              description: run.workout.description,
-              workoutNarrative: run.workout.workoutNarrative ?? null,
-              scope: run.workout.scope,
-              segments: run.workout.segments ?? [],
-            }
-          : null,
-        plannedWorkout: run.plannedWorkout
-          ? {
-              id: run.plannedWorkout.id,
-              title: run.plannedWorkout.title,
-              workoutType: run.plannedWorkout.workoutType,
-              description: run.plannedWorkout.description,
-              segments: run.plannedWorkout.segments ?? [],
             }
           : null,
         runClub: run.runClub || null,
@@ -204,11 +141,13 @@ export async function GET(
             }
           : null,
         instanceType: run.runSeriesId ? 'SERIES' : 'STANDALONE',
-        cityRunSetup: run.runSeries ? {
-          id: run.runSeries.id,
-          dayOfWeek: run.runSeries.dayOfWeek,
-          name: run.runSeries.name,
-        } : null,
+        cityRunSetup: run.runSeries
+          ? {
+              id: run.runSeries.id,
+              dayOfWeek: run.runSeries.dayOfWeek,
+              name: run.runSeries.name,
+            }
+          : null,
       },
     });
   } catch (error: any) {
