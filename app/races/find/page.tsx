@@ -18,6 +18,7 @@ import {
   isRegistrationOrganizerCtaOpen,
   registrationOrganizerStatusLabel,
 } from "@/lib/registration-status";
+import { getPublicRacePageUrl } from "@/lib/public-race-url";
 
 const BOSTON_TAG = "boston-qualifier";
 
@@ -243,6 +244,7 @@ export default function RacesFindPage() {
       (race.distanceMeters != null
         ? `${(race.distanceMeters / 1609.344).toFixed(1)} mi`
         : null);
+    const publicRaceUrl = getPublicRacePageUrl(race.slug);
 
     return (
       <li
@@ -348,6 +350,17 @@ export default function RacesFindPage() {
             <span className="inline-flex items-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600">
               {registrationStatusLabel}
             </span>
+          ) : null}
+          {publicRaceUrl ? (
+            <a
+              href={publicRaceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm font-medium text-gray-800 hover:underline"
+            >
+              Full race info
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
           ) : null}
           {race.registrationUrl && !registrationClosed ? (
             <a

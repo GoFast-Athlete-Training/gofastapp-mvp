@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { discoverCatalogWhere } from '@/lib/race-catalog-discoverability';
 
 const BOSTON_QUALIFIER_TAG = 'boston-qualifier';
 
@@ -121,14 +122,12 @@ export async function GET(request: NextRequest) {
       if (lte != null) raceDateFilter.lte = lte;
     }
 
-    const where: Prisma.race_registryWhereInput = {
-      isActive: true,
-      isCancelled: false,
+    const where: Prisma.race_registryWhereInput = discoverCatalogWhere({
       ...(Object.keys(raceDateFilter).length > 0 ? { raceDate: raceDateFilter } : {}),
       ...(hasQ ? { name: { contains: q!.trim(), mode: 'insensitive' } } : {}),
       ...(hasCity ? { city: { contains: city, mode: 'insensitive' } } : {}),
       ...(bostonQualifier ? { tags: { has: BOSTON_QUALIFIER_TAG } } : {}),
-    };
+    });
 
     const take = Math.min(
       200,
@@ -183,14 +182,12 @@ export async function POST(request: NextRequest) {
     }
 
     const races = await searchRaces(
-      {
-        isActive: true,
-        isCancelled: false,
+      discoverCatalogWhere({
         name: {
           contains: query,
           mode: 'insensitive',
         },
-      },
+      }),
       20
     );
 

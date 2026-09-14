@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ExternalLink } from "lucide-react";
 import api from "@/lib/api";
+import { getPublicRacePageUrl } from "@/lib/public-race-url";
 import { formatRaceListDate } from "@/lib/races-display";
 import {
   raceSelectorDescription,
@@ -24,11 +26,6 @@ type CatalogRace = {
   summaryPhrase?: string | null;
   description?: string | null;
 };
-
-function hubHrefForCatalogRace(race: CatalogRace): string {
-  const s = race.slug?.trim();
-  return s ? `/myrace/${encodeURIComponent(s)}` : `/race-hub/${race.id}`;
-}
 
 type DiscoverRacesSectionProps = {
   signedRaceIds: Set<string>;
@@ -155,16 +152,14 @@ export default function DiscoverRacesSection({
           const location = [race.city, race.state].filter(Boolean).join(", ");
           const dateLine = formatRaceListDate(race.raceDate);
           const distance = race.distanceLabel?.trim() || null;
+          const publicRaceUrl = getPublicRacePageUrl(race.slug);
 
           return (
             <li
               key={race.id}
               className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex flex-col"
             >
-              <Link
-                href={hubHrefForCatalogRace(race)}
-                className="flex min-w-0 flex-1 items-start gap-3"
-              >
+              <div className="flex min-w-0 flex-1 items-start gap-3">
                 {race.logoUrl ? (
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-100">
                     <img
@@ -197,15 +192,28 @@ export default function DiscoverRacesSection({
                     </p>
                   ) : null}
                 </div>
-              </Link>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void onClaimRace(race.id, race.name)}
-                className="mt-3 inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-xs font-semibold px-2.5 py-1.5 w-full"
-              >
-                {busy ? "Saving…" : "I'm running this race"}
-              </button>
+              </div>
+              <div className="mt-3 flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onClaimRace(race.id, race.name)}
+                  className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-xs font-semibold px-2.5 py-1.5 w-full"
+                >
+                  {busy ? "Saving…" : "I'm running this race"}
+                </button>
+                {publicRaceUrl ? (
+                  <a
+                    href={publicRaceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 w-full"
+                  >
+                    Full race info
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                ) : null}
+              </div>
             </li>
           );
         })}

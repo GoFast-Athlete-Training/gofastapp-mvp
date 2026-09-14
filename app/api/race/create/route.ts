@@ -4,6 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { metersToMiles } from '@/lib/pace-utils';
+import {
+  findRegistryByNameAndDate,
+  findStaffPromotedRegistryByNameAndDate,
+} from '@/lib/race-registry-identity';
 
 const PRESET_BY_KEY: Record<
   string,
@@ -102,17 +106,20 @@ export async function POST(request: NextRequest) {
     const raceDate = new Date(date);
     raceDate.setUTCHours(0, 0, 0, 0);
 
-    // REGISTRY PATTERN: Find or create race (upsert)
-    // Check for existing race with same name and date
-    let race = await prisma.race_registry.findFirst({
-      where: {
-        name: name.trim(),
-        raceDate: raceDate,
-      },
-    });
+    // Prefer an existing staff-promoted catalog row (athlete claims canonical race).
+    let race =
+      (await findStaffPromotedRegistryByNameAndDate(
+        prisma,
+        name.trim(),
+        raceDate
+      )) ??
+      (await findRegistryByNameAndDate(prisma, name.trim(), raceDate, {
+        companyRaceId: null,
+        isActive: false,
+      }));
 
     if (!race) {
-      // Create new race in registry
+      // User-scoped personal row — not visible in Discover until staff promote.
       race = await prisma.race_registry.create({
         data: {
           id: generateId(),
@@ -123,6 +130,7 @@ export async function POST(request: NextRequest) {
           city: city || null,
           state: state || null,
           country: country || 'USA',
+          isActive: false,
           updatedAt: new Date(),
         },
       });
