@@ -23,6 +23,7 @@ import {
   weekCycleMeta,
 } from "@/lib/training/cycle-blocks";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
+import { raceDayRoleOn } from "@/lib/training/race-day-service";
 
 export type WorkoutDayInput = {
   planStartDate: Date;
@@ -62,7 +63,7 @@ const DAY_NAMES = [
   "Sunday",
 ] as const;
 
-type DayKind = "tempo" | "interval" | "long" | "easy" | "race";
+type DayKind = "tempo" | "interval" | "long" | "easy" | "race" | "shakeout";
 
 type SkeletonEntry = {
   kind: DayKind;
@@ -160,9 +161,6 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
     Math.max(1, taperStartWeekNumber - 1);
   const calculatedLongRunMax = longRunCapMilesFromPeakWeekly(input.peakWeeklyMilesForCap);
 
-  const blockedDates = new Set<string>();
-  blockedDates.add(ymdFromDate(addDaysUtc(raceUtc, -1)));
-
   const out: PlanWeekSchedule[] = [];
   let tempoSessionOrdinal = 0;
   let intervalSessionOrdinal = 0;
@@ -196,12 +194,26 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
 
     const placement = new Map<number, SkeletonEntry>();
 
+    const raceRoleForSlot = (ourDowArg: number): ReturnType<typeof raceDayRoleOn> => {
+      const slotDate = dateForDayInWeek(input.planStartDate, weekNumber, ourDowArg);
+      return raceDayRoleOn(raceUtc, ymdFromDate(slotDate));
+    };
+
     const tryPlaceEntrySkeleton = (ourDowArg: number, entry: SkeletonEntry): boolean => {
       if (placement.has(ourDowArg)) return false;
       const slotDate = dateForDayInWeek(input.planStartDate, weekNumber, ourDowArg);
       if (slotDate.getTime() < planStart.getTime()) return false;
       if (nOffset !== 0 && slotDate.getTime() > raceUtc.getTime()) return false;
-      if (blockedDates.has(ymdFromDate(slotDate))) return false;
+      const role = raceDayRoleOn(raceUtc, ymdFromDate(slotDate));
+      if (role === "rest") return false;
+      if (role === "race" && entry.kind !== "race") return false;
+      if (role === "shakeout" && entry.kind !== "easy" && entry.kind !== "shakeout") return false;
+      if (
+        (role === "shakeout" || role === "race") &&
+        (entry.kind === "long" || entry.kind === "tempo" || entry.kind === "interval")
+      ) {
+        return false;
+      }
       placement.set(ourDowArg, entry);
       return true;
     };
@@ -217,24 +229,32 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
       return false;
     };
 
-    /** Race-week focus */
-    if (nOffset === 0) {
-      if (
-        raceUtc.getTime() >= weekAnchor.getTime() &&
-        raceUtc.getTime() <= weekEnd.getTime()
-      ) {
-        days.push({
-          dow: raceOurDow,
-          workoutType: WT.Race,
-          miles: 0,
+    /** Reserve race-window days before generic placement. */
+    for (let dow = 1; dow <= 7; dow++) {
+      if (!dayInPlanWindow(dow)) continue;
+      const role = raceRoleForSlot(dow);
+      if (role === "rest") continue;
+      if (role === "shakeout") {
+        const eRotMod = Math.max(input.easyPositions.length, 1);
+        const ordBefore = easySessionOrdinal;
+        const pci = ordBefore % eRotMod;
+        const easyCatId = catalogueIdForRotation(input.easyPositions, ordBefore);
+        if (
+          tryPlaceEntrySkeleton(dow, {
+            kind: "shakeout",
+            catalogueWorkoutId: easyCatId,
+            planCycleIndex: pci,
+          })
+        ) {
+          easySessionOrdinal++;
+        }
+      } else if (role === "race") {
+        tryPlaceEntrySkeleton(dow, {
+          kind: "race",
           catalogueWorkoutId: null,
           planCycleIndex: null,
         });
       }
-      if (days.length > 0) {
-        out.push({ weekNumber, days });
-      }
-      continue;
     }
 
     const partialWeek1 = weekNumber === 1 && planStart.getTime() > weekAnchor.getTime();
@@ -247,29 +267,30 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
       lrCycleIndex % lrMod
     );
 
-    const skipLongOnLongRunDay = nOffset === -1;
-    if (!skipLongOnLongRunDay) {
-      if (partialWeek1) {
-        const other = longRunIdeal === 6 ? 7 : 6;
-        const lrDay =
-          preferred.includes(longRunIdeal) && dayInPlanWindow(longRunIdeal)
-            ? longRunIdeal
-            : preferred.includes(other) && dayInPlanWindow(other)
-              ? other
-              : null;
-        const longEntry: SkeletonEntry = {
-          kind: "long",
-          catalogueWorkoutId: null,
-          planCycleIndex: lrCycleIndex,
-        };
-        if (lrDay != null) tryPlaceEntrySkeleton(lrDay, longEntry);
-      } else {
-        tryPlaceSessionEntry(longRunIdeal, {
+    if (partialWeek1) {
+      const other = longRunIdeal === 6 ? 7 : 6;
+      const lrDay =
+        preferred.includes(longRunIdeal) && dayInPlanWindow(longRunIdeal)
+          ? longRunIdeal
+          : preferred.includes(other) && dayInPlanWindow(other)
+            ? other
+            : null;
+      const longEntry: SkeletonEntry = {
+        kind: "long",
+        catalogueWorkoutId: null,
+        planCycleIndex: lrCycleIndex,
+      };
+      if (lrDay != null) tryPlaceEntrySkeleton(lrDay, longEntry);
+    } else {
+      tryPlaceSessionEntry(
+        longRunIdeal,
+        {
           kind: "long",
           catalogueWorkoutId: longCatId,
           planCycleIndex: lrCycleIndex,
-        }, true);
-      }
+        },
+        true
+      );
     }
 
     const tRotMod = Math.max(input.tempoPositions.length, 1);
@@ -316,9 +337,11 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
     }
 
     const used = new Set(placement.keys());
-    const easyDayList = preferred.filter(
-      (d) => !used.has(d) && dayInPlanWindow(d) && !blockedDates.has(slotYmd(d))
-    );
+    const easyDayList = preferred.filter((d) => {
+      if (used.has(d) || !dayInPlanWindow(d)) return false;
+      const role = raceRoleForSlot(d);
+      return role !== "rest" && role !== "race";
+    });
     const eRotMod = Math.max(input.easyPositions.length, 1);
     for (const d of easyDayList) {
       if (input.easyPositions.length > 0) {
@@ -345,13 +368,15 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
     for (const dow of sortedDows) {
       const ent = placement.get(dow)!;
       const workoutType: WorkoutType =
-        ent.kind === "tempo"
-          ? WT.Tempo
-          : ent.kind === "interval"
-            ? WT.Intervals
-            : ent.kind === "long"
-              ? WT.LongRun
-              : WT.Easy;
+        ent.kind === "race"
+          ? WT.Race
+          : ent.kind === "tempo"
+            ? WT.Tempo
+            : ent.kind === "interval"
+              ? WT.Intervals
+              : ent.kind === "long"
+                ? WT.LongRun
+                : WT.Easy;
 
       days.push({
         dow,

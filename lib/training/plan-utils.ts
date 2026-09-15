@@ -287,7 +287,7 @@ export function nOffsetFromWeekAnchor(weekAnchor: Date, raceUtc: Date): number {
   );
   if (dayDiff < 0) return 0;
   if (dayDiff <= 6) return 0;
-  return -Math.ceil(dayDiff / 7);
+  return -Math.floor(dayDiff / 7);
 }
 
 /** Phase key for a calendar week — matches plan generator / plan schedule display. */

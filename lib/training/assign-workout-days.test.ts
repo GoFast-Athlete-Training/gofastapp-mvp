@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assignWorkoutDays } from "@/lib/training/assign-workout-days";
+import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
+import { ymdFromDate } from "@/lib/training/plan-utils";
 
 const baseInput = {
   planStartDate: new Date("2026-05-20T00:00:00.000Z"),
@@ -90,4 +92,82 @@ test("weeklyWorkoutComposition tempo:0 still places intervals when configured", 
   const types = week2.days.map((d) => d.workoutType);
   assert.ok(!types.includes("Tempo"));
   assert.ok(types.includes("Intervals"));
+});
+
+function workoutTypeOnDate(
+  schedule: ReturnType<typeof assignWorkoutDays>["schedule"],
+  planStart: Date,
+  dateKey: string
+): string | null {
+  for (const week of schedule) {
+    for (const day of week.days) {
+      const dt = dateForDayInWeek(planStart, week.weekNumber, day.dow);
+      if (ymdFromDate(dt) === dateKey) return day.workoutType;
+    }
+  }
+  return null;
+}
+
+function hasLongRunNearRace(
+  schedule: ReturnType<typeof assignWorkoutDays>["schedule"],
+  planStart: Date,
+  raceDate: Date
+): boolean {
+  const shakeout = ymdFromDate(new Date(raceDate.getTime() - 2 * 86400000));
+  const rest = ymdFromDate(new Date(raceDate.getTime() - 86400000));
+  const raceKey = ymdFromDate(raceDate);
+  for (const key of [shakeout, rest, raceKey]) {
+    if (workoutTypeOnDate(schedule, planStart, key) === "LongRun") return true;
+  }
+  return false;
+}
+
+test("Sunday race: Friday shakeout Saturday rest Sunday race", () => {
+  const planStart = new Date("2026-10-06T00:00:00.000Z");
+  const raceDate = new Date("2026-10-25T00:00:00.000Z");
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    planStartDate: planStart,
+    raceDate,
+    totalWeeks: 4,
+    preferredDays: [2, 4, 5, 6],
+  });
+
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Easy");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-24"), null);
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Race");
+  assert.equal(hasLongRunNearRace(schedule, planStart, raceDate), false);
+});
+
+test("Monday race: Saturday shakeout Sunday rest Monday race", () => {
+  const planStart = new Date("2026-10-06T00:00:00.000Z");
+  const raceDate = new Date("2026-10-27T00:00:00.000Z");
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    planStartDate: planStart,
+    raceDate,
+    totalWeeks: 4,
+    preferredDays: [2, 4, 5, 6],
+  });
+
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Easy");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-26"), null);
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-27"), "Race");
+  assert.equal(hasLongRunNearRace(schedule, planStart, raceDate), false);
+});
+
+test("Saturday race: Thursday shakeout Friday rest", () => {
+  const planStart = new Date("2026-10-06T00:00:00.000Z");
+  const raceDate = new Date("2026-10-25T00:00:00.000Z");
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    planStartDate: planStart,
+    raceDate,
+    totalWeeks: 3,
+    preferredDays: [2, 4, 5, 6],
+  });
+
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Easy");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-24"), null);
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Race");
 });

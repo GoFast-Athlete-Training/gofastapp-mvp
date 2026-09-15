@@ -791,3 +791,121 @@ test("long run with MP and aligned segment actuals shows work segment comparison
   assert.ok(analysis.scorecard.workSegmentDeltas.length > 0);
   assert.equal(analysis.paceForPaceError, null);
 });
+
+test("easy completion yields mostly_on_target verdict and headline", () => {
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "Easy",
+    targetPaceSecPerMile: 467,
+    targetPaceSecPerMileHigh: 499,
+    paceDeltaSecPerMile: 10,
+    actualAvgPaceSecPerMile: 480,
+    actualDistanceMeters: 6.8 * 1609.34,
+    estimatedDistanceInMeters: 6.8 * 1609.34,
+    actualDurationSeconds: 3720,
+    garminDetailActivityId: "act-easy-done",
+    garmin_detail_activity: { detailData: null, hydratedAt: null },
+    segments: [
+      {
+        id: "easy-1",
+        title: "Easy",
+        stepOrder: 1,
+        targets: [{ type: "PACE", valueLow: 335, valueHigh: 354 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [],
+      },
+    ],
+  });
+
+  assert.equal(analysis.executionVerdict?.category, "EASY");
+  assert.equal(analysis.executionVerdict?.verdict, "mostly_on_target");
+  assert.ok(analysis.executionHeadline);
+});
+
+test("long run completion verdict uses LONG category", () => {
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "LongRun",
+    targetPaceSecPerMile: 480,
+    targetPaceSecPerMileHigh: 510,
+    paceDeltaSecPerMile: -15,
+    actualAvgPaceSecPerMile: 520,
+    actualDistanceMeters: 12 * 1609.34,
+    estimatedDistanceInMeters: 12 * 1609.34,
+    actualDurationSeconds: 6000,
+    garminDetailActivityId: "act-lr-done",
+    garmin_detail_activity: { detailData: null, hydratedAt: null },
+    segments: [
+      {
+        id: "lr-1",
+        title: "Long Run",
+        stepOrder: 1,
+        targets: [{ type: "PACE", valueLow: 298, valueHigh: 317 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [],
+      },
+    ],
+  });
+
+  assert.equal(analysis.executionVerdict?.category, "LONG");
+  assert.equal(analysis.executionHeadline, "Pace slower than target");
+});
+
+test("hybrid easy with multiple work segments classifies HYBRID", () => {
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "Easy",
+    targetPaceSecPerMile: 420,
+    targetPaceSecPerMileHigh: 430,
+    paceDeltaSecPerMile: -20,
+    actualAvgPaceSecPerMile: 500,
+    completedActivityDetailJson: { laps: [] },
+    garminDetailActivityId: "act-hybrid",
+    garmin_detail_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    segments: [
+      {
+        id: "s1",
+        title: "Warmup",
+        stepOrder: 1,
+        targets: null,
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 540,
+        actualDurationSeconds: 600,
+        actualDistanceMiles: 1,
+        segment_laps: [{ lapIndex: 0 }],
+      },
+      {
+        id: "s2",
+        title: "400m",
+        stepOrder: 2,
+        targets: [{ type: "PACE", valueLow: 260, valueHigh: 270 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 400,
+        actualDurationSeconds: 90,
+        actualDistanceMiles: 0.25,
+        segment_laps: [{ lapIndex: 0 }],
+      },
+      {
+        id: "s3",
+        title: "400m",
+        stepOrder: 3,
+        targets: [{ type: "PACE", valueLow: 260, valueHigh: 270 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 410,
+        actualDurationSeconds: 92,
+        actualDistanceMiles: 0.25,
+        segment_laps: [{ lapIndex: 0 }],
+      },
+    ],
+  });
+
+  assert.equal(analysis.executionVerdict?.category, "HYBRID");
+  if (analysis.canJudgeTargetPace) {
+    assert.ok(analysis.executionHeadline?.includes("work reps"));
+  } else {
+    assert.ok(analysis.executionHeadline || analysis.executionVerdict?.verdict);
+  }
+});

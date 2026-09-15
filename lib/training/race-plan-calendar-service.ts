@@ -21,6 +21,7 @@ import {
   planRaceSnapshotsToPrismaJson,
 } from "@/lib/training/plan-race-snapshots";
 import { utcDateOnly, ymdFromDate, currentTrainingWeekNumber } from "@/lib/training/plan-utils";
+import { applyRaceDayRolesOnSchedule } from "@/lib/training/race-day-service";
 
 export type PlanRaceCalendarEntry = {
   athleteRaceId: string;
@@ -341,19 +342,6 @@ function replaceDayWithSecondaryRace(
   };
 }
 
-function removeHardSessionsNearRace(week: PlanWeekSchedule, raceDow: number): void {
-  for (const day of week.days) {
-    if (day.dow === raceDow) continue;
-    const dist = Math.abs(day.dow - raceDow);
-    const wrapDist = Math.min(dist, 7 - dist);
-    if (wrapDist <= 1 && (day.workoutType === WT.Tempo || day.workoutType === WT.Intervals)) {
-      day.workoutType = WT.Easy;
-      day.catalogueWorkoutId = null;
-      day.planCycleIndex = null;
-    }
-  }
-}
-
 function applyRecoveryAfterRace(
   schedule: PlanWeekSchedule[],
   startWeekNumber: number,
@@ -440,7 +428,19 @@ export function imprintPlanRaceCalendarOnSchedule(params: {
       replacedWorkoutType: replacedType,
     });
 
-    removeHardSessionsNearRace(week, pos.dow);
+    applyRaceDayRolesOnSchedule({
+      planStart: params.planStart,
+      totalWeeks: params.totalWeeks,
+      schedule,
+      raceDate: event.raceDate,
+      raceDayPatch: {
+        athleteRaceId: event.athleteRaceId,
+        raceRegistryId: event.raceRegistryId,
+        planRaceEventRole: "SECONDARY",
+        raceName: event.raceName,
+        replacedWorkoutType: replacedType,
+      },
+    });
     applyRecoveryAfterRace(
       schedule,
       pos.weekNumber,

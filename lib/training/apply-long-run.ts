@@ -13,6 +13,12 @@ import {
   type LongRunFitnessPhase,
 } from "@/lib/training/long-run-cup-setter";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
+import {
+  defaultTaperLongRunsForWeeks,
+  isTaperVolumeWeek,
+  TAPER_CALENDAR_WEEKS,
+  TAPER_LR_TEMPLATE_PEAK_MILES,
+} from "@/lib/training/preset-volume-helpers";
 
 export type ApplyLongRunInput = {
   planSchedule: PlanWeekSchedule[];
@@ -85,6 +91,25 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     fitnessPhase,
   });
 
+  let buildPeakLrMiles = 0;
+  for (const week of planSchedule) {
+    const wn = week.weekNumber;
+    if (isTaperVolumeWeek(wn, totalWeeks)) continue;
+    const cycleIdx = Math.min(nCycles - 1, Math.floor((wn - 1) / len));
+    const weeksInBlock = weeksInCycle[cycleIdx] ?? len;
+    const cyclePos = (wn - 1) % len;
+    if (cyclePos >= weeksInBlock) continue;
+    const macroPool = poolMilesByCycle[cycleIdx] ?? 0;
+    const { weightNorm } = weightNormInMacroBlock(longRunPositions, cyclePos, weeksInBlock);
+    buildPeakLrMiles = Math.max(buildPeakLrMiles, round1(macroPool * weightNorm));
+  }
+
+  const taperDefaults = defaultTaperLongRunsForWeeks(TAPER_CALENDAR_WEEKS);
+  const taperScale =
+    buildPeakLrMiles > 0
+      ? buildPeakLrMiles / TAPER_LR_TEMPLATE_PEAK_MILES
+      : 1;
+
   for (const week of planSchedule) {
     const wn = week.weekNumber;
     const cycleIdx = Math.min(nCycles - 1, Math.floor((wn - 1) / len));
@@ -92,13 +117,19 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     const cyclePos = (wn - 1) % len;
     if (cyclePos >= weeksInBlock) continue;
 
-    const macroPool = poolMilesByCycle[cycleIdx] ?? 0;
-    const { weightNorm, catalogueWorkoutId } = weightNormInMacroBlock(
-      longRunPositions,
-      cyclePos,
-      weeksInBlock
-    );
-    const lrMi = round1(macroPool * weightNorm);
+    let lrMi: number;
+    let catalogueWorkoutId: string | null;
+    if (isTaperVolumeWeek(wn, totalWeeks)) {
+      const taperIdx = wn - (totalWeeks - TAPER_CALENDAR_WEEKS + 1);
+      const templateMi = taperDefaults[taperIdx] ?? taperDefaults[taperDefaults.length - 1] ?? 8;
+      lrMi = round1(templateMi * taperScale);
+      catalogueWorkoutId = null;
+    } else {
+      const macroPool = poolMilesByCycle[cycleIdx] ?? 0;
+      const weighted = weightNormInMacroBlock(longRunPositions, cyclePos, weeksInBlock);
+      catalogueWorkoutId = weighted.catalogueWorkoutId;
+      lrMi = round1(macroPool * weighted.weightNorm);
+    }
 
     for (const d of week.days) {
       if (d.workoutType === "Race") continue;

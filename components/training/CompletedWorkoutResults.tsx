@@ -58,6 +58,18 @@ export function CompletedWorkoutResults({
     workout.garmin_detail_activity?.activityName?.trim() || workout.title || "Activity";
   const planDescription = workout.description?.trim() || null;
   const actualsLine = buildActualsLine(workout);
+  const headline = performanceAnalysis?.executionHeadline?.trim() || null;
+  const verdict = performanceAnalysis?.executionVerdict ?? null;
+  const verdictLabel =
+    verdict?.verdict === "mostly_on_target"
+      ? "Mostly on target"
+      : verdict?.verdict === "partial"
+        ? "Partially on target"
+        : verdict?.verdict === "off_plan"
+          ? "Off plan"
+          : verdict?.verdict === "completed_only"
+            ? "Run complete"
+            : null;
 
   return (
     <div className="mb-6 space-y-4">
@@ -69,6 +81,31 @@ export function CompletedWorkoutResults({
         </p>
         {planDescription ? <p className="mt-1 text-sm text-gray-600">{planDescription}</p> : null}
       </div>
+
+      {headline || verdict ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-emerald-800">
+            How&apos;d you do?
+          </p>
+          {headline ? (
+            <p className="mt-2 text-base font-semibold text-gray-900">{headline}</p>
+          ) : null}
+          {verdictLabel ? (
+            <p className="mt-1 text-sm font-medium text-emerald-900">{verdictLabel}</p>
+          ) : null}
+          {verdict?.plannedSummary ? (
+            <p className="mt-2 text-xs text-gray-600">Plan: {verdict.plannedSummary}</p>
+          ) : null}
+          {verdict?.actualSummary ? (
+            <p className="mt-1 text-xs text-gray-600">Actual: {verdict.actualSummary}</p>
+          ) : null}
+          {verdict?.notes.map((note) => (
+            <p key={note} className="mt-1 text-xs text-gray-600">
+              {note}
+            </p>
+          ))}
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5">
         <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Actuals</p>

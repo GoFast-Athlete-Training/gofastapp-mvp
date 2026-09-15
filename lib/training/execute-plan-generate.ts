@@ -331,6 +331,7 @@ export async function executePlanGenerate(params: {
     catalogueRowsById,
     typicalWeekPreferredCount: preferredDays.length,
     taperStartWeekNumber: placement.taperStartWeekNumber,
+    totalWeeks: weekCount,
     secondaryRaceDistanceMilesByRegistryId,
   });
 

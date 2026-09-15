@@ -53,6 +53,24 @@ test("easy runs never exceed maxMiles when filling toward weekly target", () => 
   assert.ok(easy.miles <= 10);
 });
 
+test("taper weeks use reduced target and skip fill toward old weekly cup", () => {
+  const schedule = [
+    week(4, [
+      { dow: 2, workoutType: "Tempo", miles: 6, catalogueWorkoutId: null, planCycleIndex: null },
+      { dow: 4, workoutType: "Intervals", miles: 5, catalogueWorkoutId: null, planCycleIndex: null },
+      { dow: 6, workoutType: "LongRun", miles: 12, catalogueWorkoutId: null, planCycleIndex: null },
+      { dow: 5, workoutType: "Easy", miles: 0, catalogueWorkoutId: null, planCycleIndex: null },
+    ]),
+  ];
+
+  const out = runDistribute(schedule, 45, { totalWeeks: 5, taperStartWeekNumber: 5 });
+  const easy = out[0]!.days.find((d) => d.workoutType === "Easy")!;
+  const weekTotal = out[0]!.days.reduce((s, d) => s + d.miles, 0);
+
+  assert.ok(easy.miles <= 6.5, `taper easy inflated to ${easy.miles}`);
+  assert.ok(weekTotal < 40, `taper week total ${weekTotal} still near full cup`);
+});
+
 test("insufficient easy capacity leaves week under target instead of breaking cap", () => {
   const schedule = [
     week(1, [

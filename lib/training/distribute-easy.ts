@@ -10,6 +10,10 @@ import {
   estimateCatalogueWorkoutMiles,
   type CatalogueMileEstimateInput,
 } from "@/lib/training/catalogue-mile-estimate";
+import {
+  isTaperVolumeWeek,
+  taperWeeklyMileageTarget,
+} from "@/lib/training/preset-volume-helpers";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -30,6 +34,8 @@ export type DistributeEasyInput = {
   typicalWeekPreferredCount: number;
   /** Weeks at or after this number skip fill-toward-target (taper/race). */
   taperStartWeekNumber?: number | null;
+  /** Plan length — enables last-two-week taper volume policy. */
+  totalWeeks?: number | null;
   /** Secondary race distances keyed by raceRegistryId for multi-race plans. */
   secondaryRaceDistanceMilesByRegistryId?: Map<string, number>;
 };
@@ -85,6 +91,16 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
       weeklyCap = Math.min(weeklyCap, Number(input.maxWeeklyMiles));
     }
     weeklyCap = round2(weeklyCap * w1Scale);
+
+    const totalWeeks =
+      input.totalWeeks != null && Number.isFinite(Number(input.totalWeeks))
+        ? Math.max(1, Math.floor(Number(input.totalWeeks)))
+        : null;
+    const inTaperVolume =
+      totalWeeks != null && isTaperVolumeWeek(weekNum, totalWeeks);
+    if (inTaperVolume) {
+      weeklyCap = taperWeeklyMileageTarget(weeklyCap);
+    }
 
     const trimThreshold =
       Math.min(100, weeklyCap + cfg.weeklyTargetBufferMiles) + 0.05;
@@ -152,7 +168,7 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
       weekTotalMiles: weekSum(),
       previousWeekTotalMiles,
     });
-    const shouldFillTowardTarget = beforeTaper && !deloadWeek;
+    const shouldFillTowardTarget = beforeTaper && !deloadWeek && !inTaperVolume;
 
     if (shouldFillTowardTarget) {
       const increment = 0.25;
