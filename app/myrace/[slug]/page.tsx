@@ -38,6 +38,8 @@ type ResolvedRace = {
   distanceLabel: string | null;
   distanceMeters: number | null;
   registrationUrl: string | null;
+  summaryPhrase?: string | null;
+  description?: string | null;
 };
 
 type RaceExtras = {
@@ -173,6 +175,8 @@ export default function MyRacePage() {
   const [chatterPreview, setChatterPreview] = useState<ChatterPreviewMessage[] | null>(null);
   const [chatterBlocked, setChatterBlocked] = useState(false);
   const [hubMemberCount, setHubMemberCount] = useState<number | null>(null);
+  const [addingToCalendar, setAddingToCalendar] = useState(false);
+  const [addCalendarError, setAddCalendarError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug.trim()) {
@@ -344,6 +348,31 @@ export default function MyRacePage() {
     return () => unsub();
   }, [race?.id, slug, router, loadSignupAndGoal]);
 
+  async function handleAddToCalendar() {
+    if (!race) return;
+    setAddingToCalendar(true);
+    setAddCalendarError(null);
+    try {
+      const claimRes = await api.post<{ signup?: Signup; athleteRace?: Signup }>(
+        "/athlete-races",
+        { raceRegistryId: race.id },
+      );
+      const athleteRace =
+        claimRes.data.athleteRace ?? claimRes.data.signup ?? null;
+      if (!athleteRace?.id) {
+        throw new Error("Could not add this race to your calendar");
+      }
+      setSignup({ id: athleteRace.id, raceRegistryId: race.id });
+      void loadSignupAndGoal(race.id);
+    } catch (err: unknown) {
+      setAddCalendarError(
+        err instanceof Error ? err.message : "Failed to add race — try again",
+      );
+    } finally {
+      setAddingToCalendar(false);
+    }
+  }
+
   async function handleMakeGoalRace() {
     if (!race) return;
     setMakingGoal(true);
@@ -473,14 +502,66 @@ export default function MyRacePage() {
       {loadingUser ? (
         <p className="text-gray-500 text-sm">Loading your race…</p>
       ) : !hasSignup ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950">
-          <p className="font-medium">This race isn&apos;t on your calendar yet.</p>
-          <Link
-            href="/races/find"
-            className="mt-2 inline-block font-semibold text-orange-700 hover:underline"
-          >
-            Find the race and add it
-          </Link>
+        <div className="space-y-4">
+          {(race.summaryPhrase?.trim() || race.description?.trim()) ? (
+            <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              {race.summaryPhrase?.trim() ? (
+                <p className="text-base font-medium text-gray-900">{race.summaryPhrase.trim()}</p>
+              ) : null}
+              {race.description?.trim() ? (
+                <p
+                  className={`text-sm text-gray-700 leading-relaxed ${
+                    race.summaryPhrase?.trim() ? "mt-2" : ""
+                  }`}
+                >
+                  {race.description.trim().length > 320
+                    ? `${race.description.trim().slice(0, 320)}…`
+                    : race.description.trim()}
+                </p>
+              ) : null}
+              {publicRaceUrl ? (
+                <a
+                  href={publicRaceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                >
+                  See more
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              ) : null}
+            </section>
+          ) : publicRaceUrl ? (
+            <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <a
+                href={publicRaceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                See full race info
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </section>
+          ) : null}
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950">
+            <p className="font-medium">This race isn&apos;t on your calendar yet.</p>
+            <p className="mt-1 text-amber-900/90">
+              Add it to track training and goal race settings.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleAddToCalendar()}
+              disabled={addingToCalendar}
+              className="mt-3 inline-flex items-center justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+            >
+              {addingToCalendar ? "Adding…" : "Add to calendar"}
+            </button>
+            {addCalendarError ? (
+              <p className="mt-2 text-xs text-red-700">{addCalendarError}</p>
+            ) : null}
+          </div>
         </div>
       ) : (
         <>
