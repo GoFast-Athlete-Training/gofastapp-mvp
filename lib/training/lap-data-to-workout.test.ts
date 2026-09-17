@@ -4,6 +4,7 @@ import type { DerivedLap } from "./lap-converter";
 import { assignLapsForTest } from "./lap-data-to-workout";
 
 const M400 = 400 / 1609.34;
+const M800 = 800 / 1609.34;
 
 function lap(
   lapIndex: number,
@@ -251,6 +252,131 @@ test("collapsed 400x8: one work row with repeatCount 8 consumes eight 400m laps"
   for (const workLap of result.bySegment.get("work")!) {
     assert.ok(workLap.distanceMiles != null && workLap.distanceMiles < 0.9);
   }
+});
+
+test("800 repeats: modular W/R assigns work and recovery jogs separately", () => {
+  const segments = [
+    {
+      id: "w",
+      stepOrder: 1,
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "int",
+      stepOrder: 2,
+      title: "Interval",
+      durationType: "DISTANCE",
+      durationValue: M800,
+      repeatCount: 4,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "r",
+      stepOrder: 3,
+      title: "Recovery",
+      durationType: "TIME",
+      durationValue: 2,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "c",
+      stepOrder: 4,
+      title: "Cooldown",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+  ];
+  const derived = [
+    lap(0, 540, 1.0),
+    lap(1, 372, M800),
+    lap(2, 522, 0.2),
+    lap(3, 377, M800),
+    lap(4, 563, 0.13),
+    lap(5, 370, M800),
+    lap(6, 327, 0.32),
+    lap(7, 346, M800),
+    lap(8, 594, 0.4),
+    lap(9, 416, 1.0),
+  ];
+  const result = assignLapsForTest(derived, segments, "Intervals");
+  assert.ok(result);
+  assert.equal(result.bySegment.get("w")!.length, 1);
+  assert.equal(result.bySegment.get("int")!.length, 4);
+  assert.equal(result.bySegment.get("r")!.length, 4);
+  assert.equal(result.bySegment.get("c")!.length, 1);
+  assert.deepEqual(
+    result.bySegment.get("int")!.map((l) => l.lapIndex),
+    [1, 3, 5, 7]
+  );
+  assert.deepEqual(
+    result.bySegment.get("r")!.map((l) => l.lapIndex),
+    [2, 4, 6, 8]
+  );
+});
+
+test("800 repeats without recovery row: short jogs bolt via sub-mile modular", () => {
+  const segments = [
+    {
+      id: "w",
+      stepOrder: 1,
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "int",
+      stepOrder: 2,
+      title: "Interval",
+      durationType: "DISTANCE",
+      durationValue: M800,
+      repeatCount: 3,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "c",
+      stepOrder: 3,
+      title: "Cooldown",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+  ];
+  const derived = [
+    lap(0, 540, 1.0),
+    lap(1, 372, M800),
+    lap(2, 522, 0.2),
+    lap(3, 377, M800),
+    lap(4, 563, 0.13),
+    lap(5, 370, M800),
+    lap(6, 327, 0.32),
+    lap(7, 416, 1.0),
+  ];
+  const result = assignLapsForTest(derived, segments, "Intervals");
+  assert.ok(result);
+  assert.equal(result.bySegment.get("w")!.length, 1);
+  assert.equal(result.bySegment.get("int")!.length, 6);
+  assert.equal(result.bySegment.get("c")!.length, 1);
+  assert.deepEqual(
+    result.bySegment.get("int")!.map((l) => l.lapIndex),
+    [1, 2, 3, 4, 5, 6]
+  );
 });
 
 test("mile repeats: modular W/R until five work miles, all laps assigned", () => {

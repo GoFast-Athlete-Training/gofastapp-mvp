@@ -21,7 +21,6 @@ import {
   requiresSegmentLevelPaceForPace,
 } from "@/lib/training/workout-paced-segments";
 import { NO_DETAIL_SUPPORT_MESSAGE, workoutHasLapPaceDeltas } from "./workout-pace-analyzer";
-import { deriveActivityLapsForDisplay } from "./activity-lap-display";
 import { formatSecPerMile } from "@/lib/training/race-projection";
 import {
   deriveWorkoutVisualCategory,
@@ -852,34 +851,6 @@ export function buildPhaseAwareLapRows(params: {
   return rows;
 }
 
-function buildActivityFallbackLaps(
-  workout: PerformanceAnalysisWorkoutInput
-): PhaseAwareLapRow[] {
-  const derived = deriveActivityLapsForDisplay({
-    detailData: workout.garmin_detail_activity?.detailData,
-    hydratedAt: workout.garmin_detail_activity?.hydratedAt,
-    distanceMeters: workout.actualDistanceMeters,
-    durationSeconds: workout.actualDurationSeconds,
-  });
-  if (derived.length === 0) return [];
-
-  return derived.map((lap, index) => ({
-    lapOrder: index + 1,
-    lapIndex: lap.lapIndex,
-    segmentId: 'activity',
-    segmentTitle: 'Run',
-    phase: 'activity' as SegmentPhase,
-    paceSecPerMile: lap.paceSecPerMile,
-    avgHr: null,
-    distanceMiles: lap.distanceMiles,
-    targetPaceSecPerMile: null,
-    targetPaceSecPerMileHigh: null,
-    vsPlanPaceLabel: '—',
-    vsPlanTone: 'neutral' as const,
-    paceDeltaSecPerMile: null,
-  }));
-}
-
 export function computeWorkSegmentActual(
   segments: PerformanceAnalysisSegmentInput[],
   workoutTargetLow: number | null,
@@ -1174,14 +1145,9 @@ export function computeWorkoutPerformanceAnalysis(
         workoutTargetLow: workout.targetPaceSecPerMile,
         workoutTargetHigh: workout.targetPaceSecPerMileHigh,
       })
-    : buildActivityFallbackLaps(workout);
+    : [];
 
-  const resolvedLapSource =
-    hasSegmentLaps
-      ? lapSource
-      : phaseAwareLaps.length > 0
-        ? ('activity_detail' as LapSource)
-        : lapSource;
+  const resolvedLapSource = hasSegmentLaps ? lapSource : null;
 
   const analysisWithoutScorecard = {
     hasActivityDetail,

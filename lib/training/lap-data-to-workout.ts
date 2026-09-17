@@ -105,15 +105,89 @@ function inferModularMileRepeats(seg: BaseSeg): boolean {
   return miles >= 0.9 && miles <= 1.1;
 }
 
+/** ~800m / half-mile repeat band — Garmin W/R stream like mile repeats. */
+function inferModularSubMileRepeats(seg: BaseSeg): boolean {
+  const reps = seg.repeatCount ?? 1;
+  if (reps <= 1) return false;
+  const miles = seg.durationValue;
+  return miles >= 0.45 && miles <= 0.55;
+}
+
+function isLikelyRecoveryJog(
+  lap: DerivedLap,
+  workDistanceMiles: number
+): boolean {
+  if (isGarminRecoveryIntensity(lap.intensity)) return true;
+  if (isGarminWorkIntensity(lap.intensity)) return false;
+  if (lap.distanceMiles == null || lap.distanceMiles <= 0) return false;
+  const ratio = workDistanceMiles < 0.9 ? 0.9 : 0.75;
+  return lap.distanceMiles < workDistanceMiles * ratio;
+}
+
+/** Remaining Garmin laps alternate long rep / short jog (not consecutive work). */
+function garminLapsAlternateWorkRecovery(
+  derived: DerivedLap[],
+  startIdx: number,
+  workDistanceMiles: number,
+  minPairs: number
+): boolean {
+  let pairs = 0;
+  let i = startIdx;
+  while (i < derived.length - 1 && pairs < minPairs) {
+    const work = derived[i]!;
+    if (isLikelyRecoveryJog(work, workDistanceMiles)) {
+      i++;
+      continue;
+    }
+    const recovery = derived[i + 1];
+    if (!recovery) break;
+    if (
+      isLikelyRecoveryJog(recovery, workDistanceMiles) ||
+      isGarminRecoveryIntensity(recovery.intensity)
+    ) {
+      pairs++;
+      i += 2;
+      continue;
+    }
+    if (
+      isGarminWorkIntensity(recovery.intensity) &&
+      !isLikelyRecoveryJog(recovery, workDistanceMiles)
+    ) {
+      return false;
+    }
+    break;
+  }
+  return pairs >= 1;
+}
+
 function usesModularWorkRecovery(
   seg: BaseSeg,
   sorted: BaseSeg[],
-  segIndex: number
+  segIndex: number,
+  derived?: DerivedLap[],
+  lapIdxRef?: { value: number }
 ): boolean {
   if (!isRepeatedRepSegment(seg)) return false;
   if (hasInlineRecovery(seg)) return true;
   if (findPairedRecoverySegmentId(sorted, segIndex)) return true;
-  return inferModularMileRepeats(seg);
+  if (inferModularMileRepeats(seg)) return true;
+  if (inferModularSubMileRepeats(seg)) return true;
+  const reps = seg.repeatCount ?? 1;
+  if (
+    reps > 1 &&
+    seg.durationValue > 0 &&
+    seg.durationValue < 0.9 &&
+    derived &&
+    lapIdxRef != null
+  ) {
+    return garminLapsAlternateWorkRecovery(
+      derived,
+      lapIdxRef.value,
+      seg.durationValue,
+      2
+    );
+  }
+  return false;
 }
 
 function isGarminRecoveryIntensity(intensity: string | null | undefined): boolean {
@@ -155,7 +229,10 @@ function consumeModularWorkRecovery(params: {
 
   while (workPlaced < reps && lapIdxRef.value < derived.length) {
     const workLap = derived[lapIdxRef.value]!;
-    if (isGarminRecoveryIntensity(workLap.intensity)) {
+    if (
+      isGarminRecoveryIntensity(workLap.intensity) ||
+      isLikelyRecoveryJog(workLap, intervalSeg.durationValue)
+    ) {
       bySeg.get(recoverySegId)!.push(workLap);
       lapIdxRef.value++;
       continue;
@@ -165,18 +242,32 @@ function consumeModularWorkRecovery(params: {
     lapIdxRef.value++;
     workPlaced++;
 
-    if (workPlaced >= reps || lapIdxRef.value >= derived.length) break;
+    if (lapIdxRef.value >= derived.length) break;
 
     const recLap = derived[lapIdxRef.value]!;
-    if (isGarminWorkIntensity(recLap.intensity) && workPlaced < reps) {
+    if (
+      isGarminWorkIntensity(recLap.intensity) &&
+      !isLikelyRecoveryJog(recLap, intervalSeg.durationValue) &&
+      workPlaced < reps
+    ) {
       bySeg.get(intervalSeg.id)!.push(recLap);
       lapIdxRef.value++;
       workPlaced++;
       continue;
     }
 
-    bySeg.get(recoverySegId)!.push(recLap);
-    lapIdxRef.value++;
+    if (workPlaced < reps) {
+      bySeg.get(recoverySegId)!.push(recLap);
+      lapIdxRef.value++;
+    } else if (
+      isGarminRecoveryIntensity(recLap.intensity) ||
+      isLikelyRecoveryJog(recLap, intervalSeg.durationValue)
+    ) {
+      bySeg.get(recoverySegId)!.push(recLap);
+      lapIdxRef.value++;
+    }
+
+    if (workPlaced >= reps) break;
   }
 }
 
@@ -228,7 +319,7 @@ function assignByStepOrderConsumption(
     if (isRepeatedRepSegment(seg)) {
       const reps = Math.max(1, seg.repeatCount ?? 1);
 
-      if (usesModularWorkRecovery(seg, sorted, segIndex)) {
+      if (usesModularWorkRecovery(seg, sorted, segIndex, derived, lapIdxRef)) {
         const recoverySegId =
           findPairedRecoverySegmentId(sorted, segIndex) ?? seg.id;
         consumeModularWorkRecovery({

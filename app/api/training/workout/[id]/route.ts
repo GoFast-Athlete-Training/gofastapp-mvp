@@ -18,6 +18,10 @@ import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
 import { parseAthletePaceAdjuster } from "@/lib/training/athlete-pace-adjuster";
 import { ensureWorkoutPrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
 import { computeWorkoutPerformanceAnalysis } from "@/lib/training/workout-performance-analysis";
+import {
+  retrySegmentBoltIfNeeded,
+  type WorkoutWithAnalysis,
+} from "@/lib/training/load-workout-analysis";
 import { loadPlannedWorkoutDetailForAthlete } from "@/lib/training/planned-workout-detail";
 import { resolveReadableWorkoutAthleteId, resolveWorkoutOwnerAthleteId } from "@/lib/training/gfwm-workout-read-access";
 
@@ -222,6 +226,9 @@ export async function GET(request: NextRequest, context: Ctx) {
       });
 
     let workout = await loadWorkout();
+    if (workout) {
+      workout = await retrySegmentBoltIfNeeded(workout as WorkoutWithAnalysis);
+    }
 
     if (!workout) {
       const plannedDetail = await loadPlannedWorkoutDetailForAthlete({

@@ -88,42 +88,6 @@ function recomputeSegmentAggregates(laps: DerivedLap[]) {
   };
 }
 
-async function clearWorkoutSegmentExecution(
-  tx: Prisma.TransactionClient,
-  workout: { id: string; segments: { id: string }[] },
-  activityId: string
-): Promise<void> {
-  await tx.workout_segment_laps.deleteMany({
-    where: {
-      activityId,
-      segment: { workoutId: workout.id },
-    },
-  });
-  for (const seg of workout.segments) {
-    await tx.workout_segments.update({
-      where: { id: seg.id },
-      data: {
-        actualPaceSecPerMile: null,
-        actualDistanceMiles: null,
-        actualDurationSeconds: null,
-        updatedAt: new Date(),
-      },
-    });
-  }
-  await tx.workouts.update({
-    where: { id: workout.id },
-    data: {
-      paceDeltaSecPerMile: null,
-      evaluationEligibleFlag: false,
-      splitsStamped: false,
-      segmentExecutionStatus: null,
-      segmentExecutionLapCount: null,
-      segmentExecutionSegmentCount: null,
-      updatedAt: new Date(),
-    },
-  });
-}
-
 async function mutateSegmentExecution(params: {
   activityId: string;
   workout: {
@@ -137,10 +101,10 @@ async function mutateSegmentExecution(params: {
   const { activityId, workout, derived, assignment } = params;
   const { mode, bySegment } = assignment;
 
-  const toCreate: Prisma.workout_segment_lapsCreateManyInput[] = [];
+  const toUpsert: Prisma.workout_segment_lapsCreateManyInput[] = [];
   for (const [segmentId, laps] of bySegment) {
     for (const d of laps) {
-      toCreate.push({
+      toUpsert.push({
         id: randomUUID(),
         activityId,
         segmentId,
@@ -155,11 +119,46 @@ async function mutateSegmentExecution(params: {
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    await clearWorkoutSegmentExecution(tx, workout, activityId);
+  const newLapIndexes = toUpsert.map((row) => row.lapIndex);
 
-    if (toCreate.length > 0) {
-      await tx.workout_segment_laps.createMany({ data: toCreate });
+  await prisma.$transaction(async (tx) => {
+    if (newLapIndexes.length > 0) {
+      await tx.workout_segment_laps.deleteMany({
+        where: {
+          activityId,
+          segment: { workoutId: workout.id },
+          lapIndex: { notIn: newLapIndexes },
+        },
+      });
+    } else {
+      await tx.workout_segment_laps.deleteMany({
+        where: {
+          activityId,
+          segment: { workoutId: workout.id },
+        },
+      });
+    }
+
+    for (const row of toUpsert) {
+      await tx.workout_segment_laps.upsert({
+        where: {
+          activityId_lapIndex: {
+            activityId,
+            lapIndex: row.lapIndex,
+          },
+        },
+        create: row,
+        update: {
+          segmentId: row.segmentId,
+          startTimeInSeconds: row.startTimeInSeconds,
+          endTimeInSeconds: row.endTimeInSeconds,
+          avgPaceSecPerMile: row.avgPaceSecPerMile,
+          avgHeartRate: row.avgHeartRate,
+          distanceMiles: row.distanceMiles,
+          durationSeconds: row.durationSeconds,
+          updatedAt: new Date(),
+        },
+      });
     }
 
     for (const seg of workout.segments) {
@@ -175,16 +174,15 @@ async function mutateSegmentExecution(params: {
       });
     }
 
-    const workoutUpdate: Prisma.workoutsUpdateInput = {
-      segmentExecutionStatus: "ALIGNED",
-      segmentExecutionLapCount: derived.length,
-      segmentExecutionSegmentCount: workout.segments.length,
-      splitsStamped: toCreate.length > 0,
-      updatedAt: new Date(),
-    };
     await tx.workouts.update({
       where: { id: workout.id },
-      data: workoutUpdate,
+      data: {
+        segmentExecutionStatus: "ALIGNED",
+        segmentExecutionLapCount: derived.length,
+        segmentExecutionSegmentCount: workout.segments.length,
+        splitsStamped: toUpsert.length > 0,
+        updatedAt: new Date(),
+      },
     });
   });
 }

@@ -4,6 +4,8 @@
 
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { parseActivityToSegmentExecution } from "./activity-to-segment-execution";
+import { stampPaceDeltasAfterSplits } from "./stamp-pace-deltas";
 import {
   computeWorkoutPerformanceAnalysis,
   type PerformanceAnalysisWorkoutInput,
@@ -44,16 +46,51 @@ export type LoadedWorkoutForAnalysis = {
   performanceAnalysis: WorkoutPerformanceAnalysis;
 };
 
+export async function retrySegmentBoltIfNeeded(
+  workout: WorkoutWithAnalysis
+): Promise<WorkoutWithAnalysis> {
+  const hasLaps = workout.segments.some((s) => s.segment_laps.length > 0);
+  const hasDetail =
+    workout.garmin_detail_activity?.detailData != null ||
+    workout.completedActivityDetailJson != null;
+  const activityId = workout.garminDetailActivityId;
+
+  if (
+    !activityId ||
+    hasLaps ||
+    !hasDetail ||
+    workout.segmentExecutionStatus === "ALIGNED"
+  ) {
+    return workout;
+  }
+
+  const parseResult = await parseActivityToSegmentExecution({
+    activityId,
+    workoutId: workout.id,
+  });
+  if (!parseResult.ok) return workout;
+
+  await stampPaceDeltasAfterSplits({ workoutId: workout.id, activityId });
+
+  const reloaded = await prisma.workouts.findFirst({
+    where: { id: workout.id },
+    include: workoutAnalysisInclude,
+  });
+  return reloaded ?? workout;
+}
+
 export async function loadWorkoutForAnalysis(params: {
   workoutId: string;
   athleteId: string;
 }): Promise<LoadedWorkoutForAnalysis | null> {
-  const workout = await prisma.workouts.findFirst({
+  let workout = await prisma.workouts.findFirst({
     where: { id: params.workoutId, athleteId: params.athleteId },
     include: workoutAnalysisInclude,
   });
 
   if (!workout) return null;
+
+  workout = await retrySegmentBoltIfNeeded(workout);
 
   const analysisInput: PerformanceAnalysisWorkoutInput = {
     workoutType: workout.workoutType,
