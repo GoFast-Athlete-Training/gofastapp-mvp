@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 
 /** UTC midnight window for a calendar race date. */
 export function raceDateUtcWindow(raceDate: Date): { gte: Date; lt: Date } {
@@ -17,7 +17,7 @@ export async function findRegistryByNameAndDate(
   prisma: PrismaClient,
   name: string,
   raceDate: Date,
-  whereExtra?: Parameters<PrismaClient['race_registry']['findFirst']>[0]['where']
+  whereExtra?: Prisma.race_registryWhereInput
 ) {
   const trimmed = name.trim();
   if (!trimmed) return null;
