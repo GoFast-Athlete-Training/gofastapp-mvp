@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -12,9 +12,18 @@ import {
   isRegistrationOrganizerCtaOpen,
   registrationOrganizerStatusLabel,
 } from "@/lib/registration-status";
+import {
+  RACE_HUB_JOIN_INTENT_KEY,
+  RACE_HUB_JOIN_INTENT_SLUG_KEY,
+  clearRaceHubReturnTo,
+  persistRaceHubReturnTo,
+  raceCommitmentConfirmPath,
+  raceCommitmentSignupPath,
+  raceHubPath,
+  readRaceHubReturnTo,
+  resolveRaceHubReturnTo,
+} from "@/lib/race-hub-urls";
 
-const RACE_HUB_JOIN_INTENT_KEY = "raceHubJoinIntent";
-const RACE_HUB_JOIN_INTENT_SLUG_KEY = "raceHubJoinIntentSlug";
 const RACE_DIRECTORY_PATH = "/races/find";
 
 type PublicRace = {
@@ -51,13 +60,15 @@ function cardShell(className = "") {
 }
 
 /**
- * Race Hub guard door — /join/race/[slug]
+ * Race commitment door — /commitment/race/[slug]
  * Confirms the athlete is running this race before creating signup + hub membership.
  */
-export default function RaceHubJoinFrontDoorPage() {
+export default function RaceCommitmentFrontDoorPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
+  const returnTo = resolveRaceHubReturnTo(searchParams.get("returnTo"), slug.trim());
 
   const [race, setRace] = useState<PublicRace | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,6 +77,10 @@ export default function RaceHubJoinFrontDoorPage() {
   const [registrationNudge, setRegistrationNudge] = useState(false);
   const [joining, setJoining] = useState(false);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(() => auth.currentUser);
+
+  useEffect(() => {
+    persistRaceHubReturnTo(returnTo);
+  }, [returnTo]);
 
   useEffect(() => {
     if (!slug?.trim()) {
@@ -98,7 +113,7 @@ export default function RaceHubJoinFrontDoorPage() {
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          console.error("Race join guard door load:", err);
+          console.error("Race commitment door load:", err);
           if ((err as Error)?.message === "not_found") {
             setError("not_found");
           } else {
@@ -129,14 +144,14 @@ export default function RaceHubJoinFrontDoorPage() {
       const joinIntent = localStorage.getItem(RACE_HUB_JOIN_INTENT_KEY);
       const joinIntentSlug = localStorage.getItem(RACE_HUB_JOIN_INTENT_SLUG_KEY);
       if (joinIntent && joinIntentSlug === slug.trim()) {
-        router.replace(`/join/race/${encodeURIComponent(slug.trim())}/confirm`);
+        router.replace(raceCommitmentConfirmPath(slug.trim(), returnTo));
         return;
       }
 
       try {
         const memberCheck = await api.get(`/race-hub/${r.id}/members`);
         if (memberCheck.data?.success) {
-          router.replace(`/race-hub/${r.id}`);
+          router.replace(readRaceHubReturnTo(slug.trim()));
         }
       } catch (err: unknown) {
         const status = (err as { response?: { status?: number } })?.response?.status;
@@ -145,7 +160,7 @@ export default function RaceHubJoinFrontDoorPage() {
         }
       }
     },
-    [router, slug]
+    [router, slug, returnTo]
   );
 
   useEffect(() => {
@@ -164,15 +179,15 @@ export default function RaceHubJoinFrontDoorPage() {
   const handleRunningClick = () => {
     if (!race) return;
 
+    localStorage.setItem(RACE_HUB_JOIN_INTENT_KEY, race.id);
+    localStorage.setItem(RACE_HUB_JOIN_INTENT_SLUG_KEY, slug.trim());
+    persistRaceHubReturnTo(returnTo);
+
     if (!firebaseUser) {
-      localStorage.setItem(RACE_HUB_JOIN_INTENT_KEY, race.id);
-      localStorage.setItem(RACE_HUB_JOIN_INTENT_SLUG_KEY, slug.trim());
-      router.push(`/join/race/${encodeURIComponent(slug.trim())}/signup`);
+      router.push(raceCommitmentSignupPath(slug.trim(), returnTo));
       return;
     }
 
-    localStorage.setItem(RACE_HUB_JOIN_INTENT_KEY, race.id);
-    localStorage.setItem(RACE_HUB_JOIN_INTENT_SLUG_KEY, slug.trim());
     setShowJoinConfirmation(true);
   };
 
@@ -184,6 +199,8 @@ export default function RaceHubJoinFrontDoorPage() {
       await api.post("/athlete-races", { raceRegistryId: race.id });
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_KEY);
       localStorage.removeItem(RACE_HUB_JOIN_INTENT_SLUG_KEY);
+      const hubDestination = readRaceHubReturnTo(slug.trim());
+      clearRaceHubReturnTo();
       if (
         race.registrationUrl?.trim() &&
         isRegistrationOrganizerCtaOpen({
@@ -194,7 +211,7 @@ export default function RaceHubJoinFrontDoorPage() {
       ) {
         setRegistrationNudge(true);
       } else {
-        router.replace(`/race-hub/${race.id}`);
+        router.replace(hubDestination);
       }
     } catch (err) {
       console.error("Race signup:", err);
@@ -212,8 +229,8 @@ export default function RaceHubJoinFrontDoorPage() {
   };
 
   const goToRaceHub = () => {
-    if (!race) return;
-    router.replace(`/race-hub/${race.id}`);
+    clearRaceHubReturnTo();
+    router.replace(readRaceHubReturnTo(slug.trim()));
   };
 
   if (loading) {
@@ -438,13 +455,6 @@ export default function RaceHubJoinFrontDoorPage() {
                 Official registration link not available for this race yet.
               </p>
             )}
-
-            <Link
-              href={RACE_DIRECTORY_PATH}
-              className="block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-xl font-semibold text-base transition"
-            >
-              No — just checking things out
-            </Link>
           </div>
         </div>
       </div>

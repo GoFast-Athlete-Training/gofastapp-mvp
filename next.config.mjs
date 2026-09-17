@@ -8,6 +8,21 @@ const nextConfig = {
         destination: '/athlete-home',
         permanent: true,
       },
+      {
+        source: '/join/race/:slug',
+        destination: '/commitment/race/:slug',
+        permanent: true,
+      },
+      {
+        source: '/join/race/:slug/signup',
+        destination: '/commitment/race/:slug/signup',
+        permanent: true,
+      },
+      {
+        source: '/join/race/:slug/confirm',
+        destination: '/commitment/race/:slug/confirm',
+        permanent: true,
+      },
     ];
   },
 };

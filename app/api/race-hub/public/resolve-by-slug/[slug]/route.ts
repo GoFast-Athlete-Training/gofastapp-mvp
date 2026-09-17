@@ -2,11 +2,30 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isRaceRegistryUuid } from "@/lib/race-hub-urls";
+
+const raceSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  logoUrl: true,
+  raceDate: true,
+  city: true,
+  state: true,
+  distanceLabel: true,
+  distanceMeters: true,
+  registrationUrl: true,
+  registrationCloseDate: true,
+  registrationSoldOut: true,
+  transferDeadline: true,
+  summaryPhrase: true,
+  description: true,
+} as const;
 
 /**
  * GET /api/race-hub/public/resolve-by-slug/[slug]
  * Public race card for invite flow — no auth.
- * MVP1: exact canonical slug only (case-insensitive fallback).
+ * Accepts canonical slug or race_registry UUID.
  */
 export async function GET(
   _request: Request,
@@ -24,24 +43,19 @@ export async function GET(
       isCancelled: false,
     } as const;
 
-    let race = await prisma.race_registry.findFirst({
-      where: { slug, ...activeWhere },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        logoUrl: true,
-        raceDate: true,
-        city: true,
-        state: true,
-        distanceLabel: true,
-        distanceMeters: true,
-        registrationUrl: true,
-        registrationCloseDate: true,
-        registrationSoldOut: true,
-        transferDeadline: true,
-      },
-    });
+    let race = isRaceRegistryUuid(slug)
+      ? await prisma.race_registry.findFirst({
+          where: { id: slug, ...activeWhere },
+          select: raceSelect,
+        })
+      : null;
+
+    if (!race) {
+      race = await prisma.race_registry.findFirst({
+        where: { slug, ...activeWhere },
+        select: raceSelect,
+      });
+    }
 
     if (!race) {
       race = await prisma.race_registry.findFirst({
@@ -49,21 +63,7 @@ export async function GET(
           slug: { equals: slug, mode: "insensitive" },
           ...activeWhere,
         },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          logoUrl: true,
-          raceDate: true,
-          city: true,
-          state: true,
-          distanceLabel: true,
-          distanceMeters: true,
-          registrationUrl: true,
-          registrationCloseDate: true,
-          registrationSoldOut: true,
-          transferDeadline: true,
-        },
+        select: raceSelect,
       });
     }
 
@@ -87,6 +87,8 @@ export async function GET(
         registrationCloseDate: race.registrationCloseDate?.toISOString() ?? null,
         registrationSoldOut: race.registrationSoldOut,
         transferDeadline: race.transferDeadline?.toISOString() ?? null,
+        summaryPhrase: race.summaryPhrase,
+        description: race.description,
       },
     });
   } catch (err) {

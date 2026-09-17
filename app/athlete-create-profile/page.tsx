@@ -224,7 +224,7 @@ function AthleteCreateProfileInner() {
           const raceHubJoinIntent = localStorage.getItem('raceHubJoinIntent');
           const raceHubJoinIntentSlug = localStorage.getItem('raceHubJoinIntentSlug');
           if (raceHubJoinIntent && raceHubJoinIntentSlug) {
-            nextPath = `/join/race/${encodeURIComponent(raceHubJoinIntentSlug)}/confirm`;
+            nextPath = `/commitment/race/${encodeURIComponent(raceHubJoinIntentSlug)}/confirm`;
           } else {
             const joinIntent = localStorage.getItem('runCrewJoinIntent');
             const joinIntentHandle = localStorage.getItem('runCrewJoinIntentHandle');

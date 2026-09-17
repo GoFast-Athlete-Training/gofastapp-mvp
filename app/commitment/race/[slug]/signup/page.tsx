@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   createUserWithEmailAndPassword,
@@ -14,8 +14,14 @@ import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { registrationOrganizerStatusLabel } from "@/lib/registration-status";
 
-const RACE_HUB_JOIN_INTENT_KEY = "raceHubJoinIntent";
-const RACE_HUB_JOIN_INTENT_SLUG_KEY = "raceHubJoinIntentSlug";
+import {
+  RACE_HUB_JOIN_INTENT_KEY,
+  RACE_HUB_JOIN_INTENT_SLUG_KEY,
+  persistRaceHubReturnTo,
+  raceCommitmentConfirmPath,
+  raceCommitmentPath,
+  resolveRaceHubReturnTo,
+} from "@/lib/race-hub-urls";
 
 type PublicRace = {
   id: string;
@@ -34,12 +40,14 @@ type PublicRace = {
 
 /**
  * Race Hub join — signup explainer
- * Route: /join/race/[slug]/signup
+ * Route: /commitment/race/[slug]/signup
  */
-export default function RaceHubJoinSignupExplainerPage() {
+export default function RaceCommitmentSignupExplainerPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
+  const returnTo = resolveRaceHubReturnTo(searchParams.get("returnTo"), slug.trim());
 
   const [race, setRace] = useState<PublicRace | null>(null);
   const [loading, setLoading] = useState(false);
@@ -96,7 +104,11 @@ export default function RaceHubJoinSignupExplainerPage() {
     void fetchRace();
   }, [slug]);
 
-  const confirmPath = `/join/race/${encodeURIComponent(slug.trim())}/confirm`;
+  const confirmPath = raceCommitmentConfirmPath(slug.trim(), returnTo);
+
+  useEffect(() => {
+    persistRaceHubReturnTo(returnTo);
+  }, [returnTo]);
 
   const handleGoogleSignUp = async () => {
     if (!race) return;
@@ -315,7 +327,7 @@ export default function RaceHubJoinSignupExplainerPage() {
   };
 
   const handleNotNow = () => {
-    router.push(`/join/race/${encodeURIComponent(slug.trim())}`);
+    router.push(raceCommitmentPath(slug.trim(), returnTo));
   };
 
   if (fetchingRace) {

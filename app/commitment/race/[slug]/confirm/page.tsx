@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { LocalStorageAPI } from "@/lib/localstorage";
@@ -12,8 +12,15 @@ import {
   registrationOrganizerStatusLabel,
 } from "@/lib/registration-status";
 
-const RACE_HUB_JOIN_INTENT_KEY = "raceHubJoinIntent";
-const RACE_HUB_JOIN_INTENT_SLUG_KEY = "raceHubJoinIntentSlug";
+import {
+  RACE_HUB_JOIN_INTENT_KEY,
+  RACE_HUB_JOIN_INTENT_SLUG_KEY,
+  clearRaceHubReturnTo,
+  persistRaceHubReturnTo,
+  raceCommitmentPath,
+  readRaceHubReturnTo,
+  resolveRaceHubReturnTo,
+} from "@/lib/race-hub-urls";
 
 type PublicRace = {
   id: string;
@@ -40,12 +47,14 @@ function cardShell(className = "") {
 
 /**
  * Race Hub — confirm participant signup after auth
- * Route: /join/race/[slug]/confirm
+ * Route: /commitment/race/[slug]/confirm
  */
-export default function RaceHubJoinConfirmPage() {
+export default function RaceCommitmentConfirmPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const slug = (params.slug as string) || "";
+  const returnTo = resolveRaceHubReturnTo(searchParams.get("returnTo"), slug.trim());
 
   const [race, setRace] = useState<PublicRace | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +64,11 @@ export default function RaceHubJoinConfirmPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [registrationNudge, setRegistrationNudge] = useState(false);
 
-  const frontDoorPath = `/join/race/${encodeURIComponent(slug.trim())}`;
+  const frontDoorPath = raceCommitmentPath(slug.trim(), returnTo);
+
+  useEffect(() => {
+    persistRaceHubReturnTo(returnTo);
+  }, [returnTo]);
 
   const loadRace = useCallback(async () => {
     const res = await fetch(
@@ -154,7 +167,8 @@ export default function RaceHubJoinConfirmPage() {
       })) {
         setRegistrationNudge(true);
       } else {
-        router.replace(`/race-hub/${race.id}`);
+        clearRaceHubReturnTo();
+        router.replace(readRaceHubReturnTo(slug.trim()));
       }
     } catch (err) {
       console.error("Race signup confirm:", err);
@@ -165,8 +179,8 @@ export default function RaceHubJoinConfirmPage() {
   };
 
   const goToRaceHub = () => {
-    if (!race) return;
-    router.replace(`/race-hub/${race.id}`);
+    clearRaceHubReturnTo();
+    router.replace(readRaceHubReturnTo(slug.trim()));
   };
 
   const handleNotNow = () => {
@@ -187,7 +201,7 @@ export default function RaceHubJoinConfirmPage() {
       .get(`/race-hub/${race.id}/members`)
       .then(() => {
         if (!cancelled) {
-          router.replace(`/race-hub/${race.id}`);
+          router.replace(readRaceHubReturnTo(slug.trim()));
         }
       })
       .catch(() => {

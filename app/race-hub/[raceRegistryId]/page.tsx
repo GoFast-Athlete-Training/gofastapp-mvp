@@ -39,13 +39,21 @@ import {
 } from "@/lib/public-race-url";
 import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
 import { raceCalendarOnOrBeforeTodayUtc } from "@/lib/training/plan-utils";
+import {
+  isRaceRegistryUuid,
+  raceCommitmentPath,
+  raceHubPath,
+} from "@/lib/race-hub-urls";
 import { Calendar, Copy, MapPin, Trophy } from "lucide-react";
 
 function RaceHubPageInner() {
   const params = useParams();
   const router = useRouter();
-  const raceRegistryId = params.raceRegistryId as string;
+  const routeParam = (params.raceRegistryId as string)?.trim() || "";
 
+  const [resolvedRegistryId, setResolvedRegistryId] = useState<string | null>(null);
+  const [raceSlug, setRaceSlug] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(true);
   const [race, setRace] = useState<RaceSummary | null>(null);
   const [memberships, setMemberships] = useState<MembershipRow[]>([]);
   const [announcements, setAnnouncements] = useState<AnnouncementRow[]>([]);
@@ -70,7 +78,7 @@ function RaceHubPageInner() {
   const isAdmin = myMembership?.role === "ADMIN";
 
   const loadHubData = useCallback(async (): Promise<HubGateResult> => {
-    const id = raceRegistryId?.trim();
+    const id = resolvedRegistryId?.trim();
     if (!id) {
       setRace(null);
       return { canAccessHub: false, loadedRace: null };
@@ -182,14 +190,74 @@ function RaceHubPageInner() {
       }
       throw e;
     }
-  }, [raceRegistryId]);
+  }, [resolvedRegistryId]);
 
   useEffect(() => {
-    if (!raceRegistryId?.trim()) {
+    if (!routeParam) {
       setError("Missing race id");
+      setResolving(false);
       setLoading(false);
       return;
     }
+
+    let cancelled = false;
+
+    async function resolveRouteParam() {
+      try {
+        setResolving(true);
+        const res = await fetch(
+          `/api/race-hub/public/resolve-by-slug/${encodeURIComponent(routeParam)}`
+        );
+        if (!res.ok) {
+          if (!cancelled) {
+            setError("error");
+            setResolving(false);
+            setLoading(false);
+          }
+          return;
+        }
+        const data = await res.json();
+        const resolved = data.race as { id: string; slug: string | null } | undefined;
+        if (!data.success || !resolved?.id) {
+          if (!cancelled) {
+            setError("error");
+            setResolving(false);
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setResolvedRegistryId(resolved.id);
+          const slug = resolved.slug?.trim() || null;
+          setRaceSlug(slug);
+
+          if (slug && isRaceRegistryUuid(routeParam) && slug !== routeParam) {
+            router.replace(raceHubPath(slug));
+          }
+        }
+      } catch (e) {
+        console.error("Race hub resolve:", e);
+        if (!cancelled) {
+          setError("error");
+          setLoading(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setResolving(false);
+        }
+      }
+    }
+
+    void resolveRouteParam();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [routeParam, router]);
+
+  useEffect(() => {
+    if (!resolvedRegistryId || resolving) return;
 
     let cancelled = false;
 
@@ -208,10 +276,10 @@ function RaceHubPageInner() {
         if (cancelled) return;
 
         if (!gate.canAccessHub) {
-          const slug = gate.loadedRace?.slug?.trim();
+          const slug = raceSlug || gate.loadedRace?.slug?.trim();
           if (slug) {
             setJoinRedirecting(true);
-            router.replace(`/join/race/${encodeURIComponent(slug)}`);
+            router.replace(raceCommitmentPath(slug, raceHubPath(slug)));
             return;
           }
           setError("no_join_path");
@@ -231,7 +299,7 @@ function RaceHubPageInner() {
       cancelled = true;
       unsub();
     };
-  }, [raceRegistryId, router, loadHubData]);
+  }, [resolvedRegistryId, resolving, raceSlug, router, loadHubData]);
 
   useEffect(() => {
     if (loading || joinRedirecting || !race?.raceDate || !hubSignupId) return;
@@ -248,17 +316,17 @@ function RaceHubPageInner() {
 
   const postAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!raceRegistryId || !announceTitle.trim() || !announceBody.trim()) return;
+    if (!resolvedRegistryId || !announceTitle.trim() || !announceBody.trim()) return;
     setPostingAnnounce(true);
     try {
-      await api.post(`/race-hub/${encodeURIComponent(raceRegistryId.trim())}/announcements`, {
+      await api.post(`/race-hub/${encodeURIComponent(resolvedRegistryId.trim())}/announcements`, {
         title: announceTitle.trim(),
         content: announceBody.trim(),
       });
       setAnnounceTitle("");
       setAnnounceBody("");
       setShowAnnounceForm(false);
-      const aRes = await api.get(`/race-hub/${encodeURIComponent(raceRegistryId.trim())}/announcements`);
+      const aRes = await api.get(`/race-hub/${encodeURIComponent(resolvedRegistryId.trim())}/announcements`);
       setAnnouncements((aRes.data?.announcements as AnnouncementRow[]) || []);
     } catch (err) {
       console.error(err);
@@ -268,13 +336,13 @@ function RaceHubPageInner() {
   };
 
   const setRsvp = async (eventId: string, status: "going" | "not-going" | "maybe") => {
-    if (!raceRegistryId) return;
+    if (!resolvedRegistryId) return;
     try {
       await api.post(
-        `/race-hub/${encodeURIComponent(raceRegistryId.trim())}/events/${encodeURIComponent(eventId)}/rsvp`,
+        `/race-hub/${encodeURIComponent(resolvedRegistryId.trim())}/events/${encodeURIComponent(eventId)}/rsvp`,
         { status }
       );
-      const eRes = await api.get(`/race-hub/${encodeURIComponent(raceRegistryId.trim())}/events`);
+      const eRes = await api.get(`/race-hub/${encodeURIComponent(resolvedRegistryId.trim())}/events`);
       setEvents((eRes.data?.events as RaceEventRow[]) || []);
     } catch (err) {
       console.error(err);
@@ -282,7 +350,7 @@ function RaceHubPageInner() {
   };
 
   const setShakeoutRunRsvp = async (runId: string, status: "going" | "not-going") => {
-    const id = raceRegistryId?.trim();
+    const id = resolvedRegistryId?.trim();
     if (!id) return;
     try {
       await api.post(`/runs/${encodeURIComponent(runId)}/rsvp`, { status });
@@ -293,24 +361,26 @@ function RaceHubPageInner() {
     }
   };
 
-  if (loading || joinRedirecting) {
+  if (resolving || loading || joinRedirecting) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4" />
-          <p className="text-gray-600">{joinRedirecting ? "Redirecting to join…" : "Loading…"}</p>
+          <p className="text-gray-600">{joinRedirecting ? "Redirecting…" : "Loading…"}</p>
         </div>
       </div>
     );
   }
 
   if (error === "unauthorized") {
+    const hubReturnPath = raceSlug ? raceHubPath(raceSlug) : routeParam ? raceHubPath(routeParam) : "/athlete-home";
+    const signupHref = `/signup?redirect=${encodeURIComponent(hubReturnPath)}`;
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Sign in required</h2>
-          <p className="text-gray-600 mb-4">Open the GoFast app and sign in to join this race hub.</p>
-          <Link href="/signup" className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg">
+          <p className="text-gray-600 mb-4">Sign in to open the Race Hub for this event.</p>
+          <Link href={signupHref} className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg">
             Sign in
           </Link>
         </div>
@@ -375,9 +445,9 @@ function RaceHubPageInner() {
     : "/races";
 
   const copyInviteLink = async () => {
-    const s = race.slug?.trim();
+    const s = race.slug?.trim() || raceSlug?.trim();
     if (!s || typeof window === "undefined") return;
-    const url = `${window.location.origin}/join/race/${encodeURIComponent(s)}`;
+    const url = `${window.location.origin}${raceHubPath(s)}`;
     try {
       await navigator.clipboard.writeText(url);
       setInviteCopied(true);
@@ -394,7 +464,7 @@ function RaceHubPageInner() {
   };
 
   const sharedSectionProps = {
-    raceRegistryId,
+    raceRegistryId: resolvedRegistryId ?? "",
     announcements,
     isAdmin,
     showAnnounceForm,
@@ -504,7 +574,7 @@ function RaceHubPageInner() {
 
         <div className="hidden lg:grid grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
           <div className="lg:col-span-6 space-y-6 min-w-0 order-1">
-            <RaceHubChatterSection raceRegistryId={raceRegistryId} />
+            <RaceHubChatterSection raceRegistryId={resolvedRegistryId ?? ""} />
             <RaceHubAnnouncementsSection
               announcements={announcements}
               isAdmin={isAdmin}

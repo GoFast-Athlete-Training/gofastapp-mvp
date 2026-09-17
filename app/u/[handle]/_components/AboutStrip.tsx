@@ -80,7 +80,7 @@ export default function AboutStrip(props: Props) {
               return race.slug ? (
                 <Link
                   key={race.id}
-                  href={`/join/race/${race.slug}`}
+                  href={`/race-hub/${encodeURIComponent(race.slug)}`}
                   className="inline-flex items-center px-3 py-2 rounded-xl bg-stone-50 hover:bg-stone-100 border border-stone-200 transition-colors"
                 >
                   {inner}
