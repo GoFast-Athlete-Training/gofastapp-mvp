@@ -515,7 +515,6 @@ export async function POST(request: NextRequest) {
           data: {
             id: newId,
             country: "USA",
-            isActive: true,
             isCancelled: false,
             ...updateData,
             slug: slugVal,
