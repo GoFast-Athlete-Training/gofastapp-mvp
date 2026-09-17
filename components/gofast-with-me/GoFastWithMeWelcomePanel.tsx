@@ -4,6 +4,7 @@ import { ExternalLink } from 'lucide-react';
 import GoFastWithMeLandingForm, {
   type GoFastWithMeLandingValues,
 } from '@/components/gofast-with-me/GoFastWithMeLandingForm';
+import GoFastWithMeCompanyPanel from '@/components/gofast-with-me/GoFastWithMeCompanyPanel';
 import {
   STUDIO_MY_STORY_LABEL,
   isWelcomeContentComplete,
@@ -80,6 +81,8 @@ export default function GoFastWithMeWelcomePanel({
         onSaved={onSaved}
         onAvatarSaved={onAvatarSaved}
       />
+
+      <GoFastWithMeCompanyPanel />
     </section>
   );
 }

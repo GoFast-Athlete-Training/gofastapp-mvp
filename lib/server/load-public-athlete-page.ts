@@ -16,6 +16,10 @@ import {
   buildPublicTrainingFor,
   serializePublicAthleteRace,
 } from '@/lib/gofast-with-me/public-training-for';
+import {
+  getAthleteCompanyForAthlete,
+  toPublicAthleteCompany,
+} from '@/lib/athlete-company/athlete-company-service';
 
 const METERS_PER_MILE = 1609.344;
 
@@ -406,6 +410,9 @@ export async function loadPublicAthletePage(rawHandle: string) {
     }));
   }
 
+  const athleteCompanyRow = await getAthleteCompanyForAthlete(athlete.id);
+  const athleteCompany = toPublicAthleteCompany(athleteCompanyRow);
+
   const joinableGroupTrainingRaw = await getJoinableCohortForHost(athlete.id);
   const publishedPlanRows = await listPublicPlansForAthlete(athlete.id);
   const activeSponsorship = athlete.isGoFastContainer
@@ -521,5 +528,6 @@ export async function loadPublicAthletePage(rawHandle: string) {
     athleteRunRoutes,
     instagramMedia,
     activeSponsorship,
+    athleteCompany,
   };
 }

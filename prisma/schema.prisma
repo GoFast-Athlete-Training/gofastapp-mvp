@@ -192,6 +192,7 @@ model Athlete {
   planned_workouts             planned_workouts[]
   athlete_appnotification_devices     athlete_appnotification_devices[]
   gofast_with_me              gofast_with_me?
+  athlete_company             athlete_companies?
   athlete_tips                athlete_tips[]
   athlete_run_routes          athlete_run_routes[]
   athlete_activity_posts      athlete_activity_posts[]
@@ -410,6 +411,21 @@ model gofast_with_me {
   athlete            Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@map("gofast_with_me")
+}
+
+/// Athlete-owned business entity — logo, name, website for GoFast With Me (not go_fast_companies tenant).
+model athlete_companies {
+  id          String   @id @default(cuid())
+  athleteId   String   @unique
+  name        String
+  slug        String?  @unique
+  logoUrl     String?
+  websiteUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  athlete     Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@map("athlete_companies")
 }
 
 /// Athlete-scoped durable public tips (CMS content — not container feed posts).
