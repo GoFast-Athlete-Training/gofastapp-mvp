@@ -89,3 +89,43 @@ export async function isFollowingHost(
   });
   return !!row;
 }
+
+export type FollowingHostRow = {
+  hostAthleteId: string;
+  gofastHandle: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  photoURL: string | null;
+  joinedAt: string;
+};
+
+/** Hosts the member follows (gfwm_athlete rows where memberAthleteId = viewer). */
+export async function listFollowingForMember(
+  memberAthleteId: string
+): Promise<FollowingHostRow[]> {
+  const rows = await prisma.gfwm_athlete.findMany({
+    where: { memberAthleteId },
+    orderBy: { joinedAt: 'desc' },
+    select: {
+      joinedAt: true,
+      hostAthlete: {
+        select: {
+          id: true,
+          gofastHandle: true,
+          firstName: true,
+          lastName: true,
+          photoURL: true,
+        },
+      },
+    },
+  });
+
+  return rows.map((row) => ({
+    hostAthleteId: row.hostAthlete.id,
+    gofastHandle: row.hostAthlete.gofastHandle,
+    firstName: row.hostAthlete.firstName,
+    lastName: row.hostAthlete.lastName,
+    photoURL: row.hostAthlete.photoURL,
+    joinedAt: row.joinedAt.toISOString(),
+  }));
+}

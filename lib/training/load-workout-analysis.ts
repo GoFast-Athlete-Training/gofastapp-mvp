@@ -46,9 +46,19 @@ export type LoadedWorkoutForAnalysis = {
   performanceAnalysis: WorkoutPerformanceAnalysis;
 };
 
+export type RetrySegmentBoltInput = {
+  id: string;
+  garminDetailActivityId: string | null;
+  completedActivityDetailJson: unknown;
+  segmentExecutionStatus: string | null;
+  segments: Array<{ segment_laps: unknown[] }>;
+  garmin_detail_activity: { detailData: unknown } | null;
+};
+
+/** Run bolt + pace stamp when detail exists but segment_laps are empty. Returns true if bolt succeeded. */
 export async function retrySegmentBoltIfNeeded(
-  workout: WorkoutWithAnalysis
-): Promise<WorkoutWithAnalysis> {
+  workout: RetrySegmentBoltInput
+): Promise<boolean> {
   const hasLaps = workout.segments.some((s) => s.segment_laps.length > 0);
   const hasDetail =
     workout.garmin_detail_activity?.detailData != null ||
@@ -61,22 +71,17 @@ export async function retrySegmentBoltIfNeeded(
     !hasDetail ||
     workout.segmentExecutionStatus === "ALIGNED"
   ) {
-    return workout;
+    return false;
   }
 
   const parseResult = await parseActivityToSegmentExecution({
     activityId,
     workoutId: workout.id,
   });
-  if (!parseResult.ok) return workout;
+  if (!parseResult.ok) return false;
 
   await stampPaceDeltasAfterSplits({ workoutId: workout.id, activityId });
-
-  const reloaded = await prisma.workouts.findFirst({
-    where: { id: workout.id },
-    include: workoutAnalysisInclude,
-  });
-  return reloaded ?? workout;
+  return true;
 }
 
 export async function loadWorkoutForAnalysis(params: {
@@ -90,7 +95,13 @@ export async function loadWorkoutForAnalysis(params: {
 
   if (!workout) return null;
 
-  workout = await retrySegmentBoltIfNeeded(workout);
+  if (await retrySegmentBoltIfNeeded(workout)) {
+    const reloaded = await prisma.workouts.findFirst({
+      where: { id: params.workoutId, athleteId: params.athleteId },
+      include: workoutAnalysisInclude,
+    });
+    if (reloaded) workout = reloaded;
+  }
 
   const analysisInput: PerformanceAnalysisWorkoutInput = {
     workoutType: workout.workoutType,

@@ -326,8 +326,7 @@ export default function AthleteCommunityView({ handle }: Props) {
                     <User className="h-4 w-4" />
                   </div>
                   <p className="text-sm text-gray-700">
-                    Follow {firstName} to join Chatter and get updates when they post. Following is
-                    free — it is not training-plan enrollment.
+                    Follow {firstName} to join Chatter and get updates when they post.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

@@ -283,7 +283,7 @@ export default function PublicGroupsPage() {
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <Link href="/" className="flex items-center gap-3">
-            <img src="/logo.jpg" alt="GoFast" className="w-8 h-8 rounded-full" />
+            <img src="/logo.png" alt="GoFast" className="w-8 h-8 rounded-full" />
             <span className="text-xl font-bold text-gray-900">GoFast</span>
           </Link>
         </div>

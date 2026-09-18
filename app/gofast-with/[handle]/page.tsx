@@ -138,10 +138,6 @@ export default function GoFastWithFollowExplainerPage() {
             </ul>
           </div>
 
-          <p className="text-sm text-gray-600 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-            Following is free. It is not paid coaching, private training-plan enrollment, or
-            automatic program signup.
-          </p>
         </section>
 
         <GoFastWithAppAllusion />

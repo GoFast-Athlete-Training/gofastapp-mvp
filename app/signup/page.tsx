@@ -474,7 +474,7 @@ function SignupPageContent() {
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/20">
             <div className="text-center mb-8">
               <Image
-                src="/logo.jpg"
+                src="/logo.png"
                 alt="GoFast Logo"
                 width={128}
                 height={128}
