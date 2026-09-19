@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   description: 'GoFast Running App',
   manifest: '/manifest.json',
   icons: {
-    icon: '/logo.png',
-    shortcut: '/logo.png',
-    apple: '/logo.png',
+    icon: '/icons/icon-192.png',
+    shortcut: '/icons/icon-192.png',
+    apple: '/icons/icon-512.png',
   },
 };
 
