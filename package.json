@@ -38,6 +38,7 @@
     "test:athlete-company": "tsx --test lib/athlete-company/athlete-company-service.test.ts"
   },
   "dependencies": {
+    "@garmin/fitsdk": "^21.214.0",
     "@gofast/shared-db": "file:./packages/shared-db",
     "@prisma/client": "^6.16.3",
     "@stripe/connect-js": "^3.4.6",

@@ -194,9 +194,11 @@ export function convertPaceToSecondsPerKm(paceString: string): number {
 }
 
 /**
- * Convert miles to meters
+ * Convert miles to meters (Garmin Training API expects meters for DISTANCE steps).
  */
 export function convertMilesToMeters(miles: number): number {
+  // Lazy import avoided — caller should normalize via normalizeStoredDistanceMiles when
+  // converting segment durationValue. This helper stays a pure miles→meters multiply.
   return Math.round(miles * 1609.34);
 }
 

@@ -13,6 +13,7 @@ import {
   activityLocalYmdFromSummary,
   activityMatchCandidateUtcRange,
   activityNameContainsPushedWorkoutTitle,
+  activityNameHasPushedWorkoutMarker,
 } from "@/lib/training/garmin-activity-match-helpers";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 import {
@@ -74,7 +75,9 @@ export function isManualMatchOnlyWorkout(workout: { planId: string | null }): bo
 export function canAutoMatchPlannedWorkout(params: {
   scored: Pick<ScoredActivityCandidate, "reasons"> | null;
   titleMatchCount: number;
+  activityName: string | null | undefined;
 }): boolean {
+  if (!activityNameHasPushedWorkoutMarker(params.activityName)) return false;
   if (params.titleMatchCount !== 1) return false;
   if (!params.scored) return false;
   return isHighConfidenceActivityCandidate(params.scored);
@@ -237,21 +240,6 @@ export function selectPlannedWorkoutCandidate(params: {
   return { candidate: null, scored: null, titleMatchCount: 0 };
 }
 
-/**
- * Single unconsumed same-day run bolts onto the sole planned row even when
- * title/distance do not match (e.g. 7.7 mi completes a 4 mi Easy day).
- * Two or more same-day planned rows stay unmatched.
- */
-export function canSameDaySingleRunBolt(params: {
-  planCandidates: Array<{ workoutType: string; workoutCompleted?: boolean }>;
-}): boolean {
-  if (params.planCandidates.length !== 1) return false;
-  const sole = params.planCandidates[0]!;
-  if (sole.workoutType === "Rest") return false;
-  if (sole.workoutCompleted) return false;
-  return true;
-}
-
 /** Planned rows on the activity's local calendar day (excludes Rest). */
 export function filterSameDayPlanCandidates<T extends { date: Date | null; workoutType: string }>(
   planCandidates: T[],
@@ -330,7 +318,6 @@ export async function tryMatchActivityToTrainingWorkout(
   let standaloneCandidate: WorkoutMatchRow | null = null;
   let precomputedScored: ScoredActivityCandidate | null = null;
   let precomputedTitleMatchCount = 0;
-  let sameDaySingleRunBolt = false;
 
   {
     const activityYmd = activityLocalYmdFromSummary(activity.startTime, summaryBlob);
@@ -348,8 +335,6 @@ export async function tryMatchActivityToTrainingWorkout(
       orderBy: [{ workoutPushed: "desc" }, { updatedAt: "desc" }],
     });
 
-    const sameDayPlanCandidates = filterSameDayPlanCandidates(planCandidates, activityYmd);
-
     const selected = selectPlannedWorkoutCandidate({
       planCandidates,
       activity: {
@@ -362,38 +347,6 @@ export async function tryMatchActivityToTrainingWorkout(
     precomputedScored = selected.scored;
     precomputedTitleMatchCount = selected.titleMatchCount;
 
-    const autoMatchFromSelection =
-      plannedCandidate != null &&
-      precomputedScored != null &&
-      canAutoMatchPlannedWorkout({
-        scored: precomputedScored,
-        titleMatchCount: precomputedTitleMatchCount,
-      });
-
-    if (
-      !autoMatchFromSelection &&
-      canSameDaySingleRunBolt({ planCandidates: sameDayPlanCandidates })
-    ) {
-      const sole = sameDayPlanCandidates[0]!;
-      if (
-        !(await plannedDayConsumedByOtherActivity({
-          plannedWorkoutId: sole.id,
-          activityId: activity.id,
-        }))
-      ) {
-        plannedCandidate = sole;
-        precomputedScored =
-          scoreActivityCandidateForWorkout({
-            workout: plannedScoreInput(sole),
-            activity: activityCandidateInput({
-              ...activity,
-              startTime: activity.startTime,
-            }),
-          }) ?? precomputedScored;
-        precomputedTitleMatchCount = 0;
-        sameDaySingleRunBolt = true;
-      }
-    }
   }
 
   if (!plannedCandidate && !standaloneCandidate) {
@@ -453,9 +406,11 @@ export async function tryMatchActivityToTrainingWorkout(
         }),
       });
 
-    const autoMatchEligible =
-      sameDaySingleRunBolt ||
-      canAutoMatchPlannedWorkout({ scored, titleMatchCount });
+    const autoMatchEligible = canAutoMatchPlannedWorkout({
+      scored,
+      titleMatchCount,
+      activityName: activity.activityName,
+    });
 
     if (autoMatchEligible && scored) {
       const existingLink =

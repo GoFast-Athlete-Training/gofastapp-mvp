@@ -654,6 +654,8 @@ model athlete_activities {
   summaryPolyline  String?
   summaryData      Json?
   detailData       Json?
+  /// Structured lap intervals from Garmin FIT activity file (Warm Up / Run / Recovery).
+  fitLapData       Json?
   hydratedAt       DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime

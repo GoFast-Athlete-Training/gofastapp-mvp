@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   canAutoMatchPlannedWorkout,
-  canSameDaySingleRunBolt,
   filterSameDayPlanCandidates,
   isManualMatchOnlyWorkout,
   selectPlannedWorkoutCandidate,
@@ -50,7 +49,14 @@ test("canAutoMatchPlannedWorkout allows single title-match high-confidence candi
     activity: baseActivity(),
   });
   assert.ok(scored);
-  assert.equal(canAutoMatchPlannedWorkout({ scored, titleMatchCount: 1 }), true);
+  assert.equal(
+    canAutoMatchPlannedWorkout({
+      scored,
+      titleMatchCount: 1,
+      activityName: "Arlington County - GF W1: Long run 12.3 miles",
+    }),
+    true
+  );
 });
 
 test("canAutoMatchPlannedWorkout rejects ambiguous title matches", () => {
@@ -59,7 +65,33 @@ test("canAutoMatchPlannedWorkout rejects ambiguous title matches", () => {
     activity: baseActivity(),
   });
   assert.ok(scored);
-  assert.equal(canAutoMatchPlannedWorkout({ scored, titleMatchCount: 2 }), false);
+  assert.equal(
+    canAutoMatchPlannedWorkout({
+      scored,
+      titleMatchCount: 2,
+      activityName: "Arlington County - GF W1: Long run 12.3 miles",
+    }),
+    false
+  );
+});
+
+test("canAutoMatchPlannedWorkout rejects activity without GF W marker", () => {
+  const scored = scoreActivityCandidateForWorkout({
+    workout: baseWorkout,
+    activity: baseActivity({
+      activityName: "Arlington County Run",
+      distance: 12.3 * 1609.34,
+    }),
+  });
+  assert.ok(scored);
+  assert.equal(
+    canAutoMatchPlannedWorkout({
+      scored,
+      titleMatchCount: 0,
+      activityName: "Arlington County Run",
+    }),
+    false
+  );
 });
 
 test("canAutoMatchPlannedWorkout rejects same-day tiny run for long workout", () => {
@@ -71,7 +103,14 @@ test("canAutoMatchPlannedWorkout rejects same-day tiny run for long workout", ()
     }),
   });
   assert.ok(scored);
-  assert.equal(canAutoMatchPlannedWorkout({ scored, titleMatchCount: 0 }), false);
+  assert.equal(
+    canAutoMatchPlannedWorkout({
+      scored,
+      titleMatchCount: 0,
+      activityName: "Arlington County Run",
+    }),
+    false
+  );
 });
 
 const tempoWorkout = {
@@ -131,6 +170,7 @@ test("selectPlannedWorkoutCandidate auto-match eligible for Falmouth tempo title
     canAutoMatchPlannedWorkout({
       scored: result.scored,
       titleMatchCount: result.titleMatchCount,
+      activityName: "Falmouth - GF W6: 2-1 Tempo",
     }),
     true
   );
@@ -163,6 +203,7 @@ test("selectPlannedWorkoutCandidate matches Saturday long run by catalogue push 
     canAutoMatchPlannedWorkout({
       scored: result.scored,
       titleMatchCount: result.titleMatchCount,
+      activityName: "Arlington County - GF W13: Long Run (Sat)",
     }),
     true
   );
@@ -174,7 +215,14 @@ test("same-day close distance without title does not qualify for auto-match", ()
     activity: tempoActivity({ activityName: "Arlington County Running" }),
   });
   assert.ok(scored);
-  assert.equal(canAutoMatchPlannedWorkout({ scored, titleMatchCount: 0 }), false);
+  assert.equal(
+    canAutoMatchPlannedWorkout({
+      scored,
+      titleMatchCount: 0,
+      activityName: "Arlington County Running",
+    }),
+    false
+  );
 });
 
 test("activityMatchCandidateUtcRange spans three UTC days around activity local date", () => {
@@ -183,31 +231,32 @@ test("activityMatchCandidateUtcRange spans three UTC days around activity local 
   assert.equal(range.end.toISOString(), "2026-06-19T00:00:00.000Z");
 });
 
-test("canSameDaySingleRunBolt allows sole unconsumed same-day planned row", () => {
-  assert.equal(
-    canSameDaySingleRunBolt({
-      planCandidates: [{ workoutType: "Easy", workoutCompleted: false }],
+test("sole same-day Easy run without GF W marker does not auto-match", () => {
+  const wedEasy = {
+    id: "w-wed-easy",
+    title: "Wednesday Easy 4 miles",
+    weekNumber: 2,
+    date: new Date("2026-09-03T12:00:00.000Z"),
+    estimatedDistanceInMeters: 4 * 1609.34,
+    workoutType: "Easy",
+    dayAssigned: "Wednesday",
+    planId: "plan-1",
+    catalogueName: "Easy Run",
+  };
+  const scored = scoreActivityCandidateForWorkout({
+    workout: wedEasy,
+    activity: baseActivity({
+      activityName: "Arlington County Run",
+      startTime: new Date("2026-09-03T14:00:00.000Z"),
+      distance: 4 * 1609.34,
     }),
-    true
-  );
-});
-
-test("canSameDaySingleRunBolt rejects multiple same-day planned rows", () => {
+  });
+  assert.ok(scored);
   assert.equal(
-    canSameDaySingleRunBolt({
-      planCandidates: [
-        { workoutType: "Easy", workoutCompleted: false },
-        { workoutType: "Intervals", workoutCompleted: false },
-      ],
-    }),
-    false
-  );
-});
-
-test("canSameDaySingleRunBolt rejects already completed planned row", () => {
-  assert.equal(
-    canSameDaySingleRunBolt({
-      planCandidates: [{ workoutType: "Easy", workoutCompleted: true }],
+    canAutoMatchPlannedWorkout({
+      scored,
+      titleMatchCount: 0,
+      activityName: "Arlington County Run",
     }),
     false
   );
@@ -243,11 +292,7 @@ test("filterSameDayPlanCandidates ignores adjacent-day rows in query window", ()
     "2026-09-03"
   );
   assert.equal(sameDay.length, 1);
-  assert.equal(canSameDaySingleRunBolt({ planCandidates: sameDay }), true);
-  assert.equal(
-    canSameDaySingleRunBolt({ planCandidates: [tueTempo, wedEasy, thuIntervals] }),
-    false
-  );
+  assert.equal(sameDay[0]!.workoutType, "Easy");
 });
 
 test("Wednesday Easy 7.7 mi auto-match eligible via title and same day", () => {
@@ -276,6 +321,7 @@ test("Wednesday Easy 7.7 mi auto-match eligible via title and same day", () => {
     canAutoMatchPlannedWorkout({
       scored: result.scored,
       titleMatchCount: result.titleMatchCount,
+      activityName: "Arlington County - GF W2: Easy Run (Wed)",
     }),
     true
   );

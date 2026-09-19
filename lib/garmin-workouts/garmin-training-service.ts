@@ -22,7 +22,10 @@ import {
   normalizePaceTargetEncodingVersion,
   paceTargetStoredToGarminSecPerKm,
 } from "../workout-generator/pace-calculator";
-import { isPairRecovery } from "@/lib/training/segment-summary";
+import {
+  isPairRecovery,
+  normalizeStoredDistanceMiles,
+} from "@/lib/training/segment-summary";
 
 /** Garmin running SPEED targets: meters per second (approx. 1.2–7.5 m/s). */
 const MIN_RUN_SPEED_MPS = 1.2;
@@ -145,12 +148,14 @@ export function assembleGarminWorkout(workout: Workout): GarminWorkout {
   const totalDistanceMeters = workout.segments.reduce((sum, seg) => {
     if (seg.durationType === "DISTANCE") {
       const reps = seg.repeatCount && seg.repeatCount > 1 ? seg.repeatCount : 1;
-      let segmentMeters = convertMilesToMeters(seg.durationValue) * reps;
+      let segmentMeters =
+        convertMilesToMeters(normalizeStoredDistanceMiles(seg.durationValue)) * reps;
       if (seg.repeatCount && seg.repeatCount > 1 && hasInlineRecovery(seg)) {
         const rt = seg.recoveryDurationType;
         const rv = seg.recoveryDurationValue;
         if (rt === "DISTANCE" && rv != null && Number(rv) > 0) {
-          segmentMeters += convertMilesToMeters(Number(rv)) * reps;
+          segmentMeters +=
+            convertMilesToMeters(normalizeStoredDistanceMiles(Number(rv))) * reps;
         }
       }
       return sum + segmentMeters;
@@ -255,8 +260,8 @@ function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWor
       ? GarminDurationType.DISTANCE 
       : GarminDurationType.TIME,
     durationValue: segment.durationType === "DISTANCE"
-      ? convertMilesToMeters(segment.durationValue) // Convert miles to meters
-      : convertMinutesToSeconds(segment.durationValue), // Convert minutes to seconds
+      ? convertMilesToMeters(normalizeStoredDistanceMiles(segment.durationValue))
+      : convertMinutesToSeconds(segment.durationValue),
   };
   
   // Parse targets JSON array

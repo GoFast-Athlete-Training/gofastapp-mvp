@@ -7,6 +7,7 @@ import {
   formatRepeatBlockLabel,
   formatSegmentDistance,
   formatStructuredMilesTotal,
+  normalizeStoredDistanceMiles,
   groupSegmentsInDisplayOrder,
   isMultiStepRepeatGroup,
   humanDisplayGroupTitle,
@@ -159,6 +160,16 @@ test("humanizeSegmentTitle replaces raw Work with athlete-facing labels", () => 
 test("3 mile MP blocks display as miles not 4850m", () => {
   assert.equal(formatSegmentDistance(3), "3 mi");
   assert.equal(formatSegmentDistance(3.01), "3 mi");
+});
+
+test("corrupted durationValue 400 (meters in miles column) displays as 400m", () => {
+  assert.equal(formatSegmentDistance(400), "400m");
+  assert.equal(normalizeStoredDistanceMiles(400), M400);
+});
+
+test("normalizeStoredDistanceMiles leaves real mile blocks unchanged", () => {
+  assert.equal(normalizeStoredDistanceMiles(3), 3);
+  assert.equal(normalizeStoredDistanceMiles(12.3), 12.3);
 });
 
 test("humanizeSegmentTitle maps Long run to Marathon pace under mpSimulation", () => {

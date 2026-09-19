@@ -228,14 +228,6 @@ export function workoutTitleMatchVariants(params: {
     });
     if (canonical) variants.add(canonical);
 
-    const workoutType = params.workoutType.trim();
-    if (workoutType === "Easy") {
-      variants.add("Easy");
-      variants.add("Easy Run");
-      const withoutDay = stripLeadingDayNameFromTitle(stored);
-      const withoutMiles = withoutDay.replace(/\s+\d+(\.\d+)?\s*miles?\s*$/i, "").trim();
-      if (withoutMiles.length > 0) variants.add(withoutMiles);
-    }
   }
 
   return [...variants];
@@ -288,13 +280,6 @@ export function activityNameContainsPushedWorkoutTitle(params: {
     )
   ) {
     return true;
-  }
-
-  if (params.workoutType?.trim() === "Easy") {
-    const activityCore = normalizeActivityNameForMatch(params.activityName);
-    if (activityCore === "easy" || activityCore === "easy run") {
-      return true;
-    }
   }
 
   return false;

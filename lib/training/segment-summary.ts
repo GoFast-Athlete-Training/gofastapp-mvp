@@ -15,9 +15,27 @@ export type SegmentLike = {
 export const SEGMENT_METERS_PER_MILE = 1609.34;
 
 /** Standard track rep lengths — only these display as meters (not ~3 mi MP blocks). */
-const STANDARD_TRACK_REP_METERS = [
+export const STANDARD_TRACK_REP_METERS = [
   200, 400, 600, 800, 1000, 1200, 1500, 1600, 2000, 3000, 5000,
 ] as const;
+
+function isWholeNumber(value: number): boolean {
+  return Number.isFinite(value) && Math.abs(value - Math.round(value)) < 1e-9;
+}
+
+/**
+ * Heal corrupted segment rows where meters were written into durationValue (miles column).
+ * Whole-number values matching standard track rep lengths are reinterpreted as meters.
+ */
+export function normalizeStoredDistanceMiles(miles: number): number {
+  if (!Number.isFinite(miles) || miles <= 0) return miles;
+  if (!isWholeNumber(miles)) return miles;
+  const asInt = Math.round(miles);
+  if ((STANDARD_TRACK_REP_METERS as readonly number[]).includes(asInt)) {
+    return asInt / SEGMENT_METERS_PER_MILE;
+  }
+  return miles;
+}
 
 function isStandardTrackRepMeters(meters: number): boolean {
   if (!Number.isFinite(meters) || meters <= 0) return false;
@@ -42,14 +60,15 @@ function formatMilesWithOptionalTenth(miles: number): string {
 
 export function formatSegmentDistance(miles: number): string {
   if (!Number.isFinite(miles) || miles < 0) return "—";
-  const meters = miles * SEGMENT_METERS_PER_MILE;
+  const normalizedMiles = normalizeStoredDistanceMiles(miles);
+  const meters = normalizedMiles * SEGMENT_METERS_PER_MILE;
   if (isStandardTrackRepMeters(meters)) {
     const match = STANDARD_TRACK_REP_METERS.find(
       (target) => Math.abs(meters - target) / target <= 0.005
     );
     if (match) return `${match}m`;
   }
-  return formatMilesWithOptionalTenth(miles);
+  return formatMilesWithOptionalTenth(normalizedMiles);
 }
 
 /** DISTANCE → formatted distance; TIME → rounded minutes. */
@@ -87,7 +106,8 @@ export type SegmentDisplayGroup<T extends SegmentLike = SegmentLike> = {
 /** Miles → meters for editable inputs; snaps to 50m track reps like formatSegmentDistance. */
 export function milesToDisplayMeters(miles: number): number {
   if (!Number.isFinite(miles) || miles <= 0) return 0;
-  const meters = miles * SEGMENT_METERS_PER_MILE;
+  const normalizedMiles = normalizeStoredDistanceMiles(miles);
+  const meters = normalizedMiles * SEGMENT_METERS_PER_MILE;
   if (isStandardTrackRepMeters(meters)) {
     const match = STANDARD_TRACK_REP_METERS.find(
       (target) => Math.abs(meters - target) / target <= 0.005

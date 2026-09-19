@@ -1,23 +1,55 @@
 /**
  * Handle ACTIVITY_FILE webhook events
- * Processes activity file uploads from Garmin
+ * Downloads Garmin FIT files, decodes lap structure, persists fitLapData.
  */
 
 import { prisma } from '../prisma';
 import { getAthleteByGarminUserId } from '../domain-garmin';
-import { activityFileExists, markActivityFileProcessed } from './dedupe';
+import {
+  activityFileAlreadyProcessed,
+  activityFileExists,
+} from './dedupe';
+import { downloadGarminFitFile } from './download-garmin-fit-file';
+import type { FitLapDataPayload } from './fit-lap-types';
+import { findActivityRowForFit } from './match-activity-for-fit';
+import { parseFitActivityLaps } from './parse-fit-activity-laps';
 
 export interface ActivityFile {
-  activityId: string | number;
+  activityId?: string | number;
   userId?: string;
   fileType?: string;
   fileUrl?: string;
-  fileData?: any;
-  [key: string]: any;
+  callbackURL?: string;
+  summaryId?: string;
+  [key: string]: unknown;
+}
+
+function readDownloadUrl(file: ActivityFile): string | null {
+  const callback =
+    typeof file.callbackURL === 'string' && file.callbackURL.length > 0
+      ? file.callbackURL
+      : null;
+  const legacy =
+    typeof file.fileUrl === 'string' && file.fileUrl.length > 0 ? file.fileUrl : null;
+  return callback ?? legacy;
+}
+
+function readCandidateActivityId(file: ActivityFile): string | null {
+  if (file.activityId != null && String(file.activityId).length > 0) {
+    return String(file.activityId);
+  }
+  if (typeof file.summaryId === 'string' && file.summaryId.endsWith('-detail')) {
+    return file.summaryId.slice(0, -'-detail'.length);
+  }
+  return null;
+}
+
+function isFitFileType(fileType: string | undefined): boolean {
+  return String(fileType ?? '').trim().toUpperCase() === 'FIT';
 }
 
 /**
- * Process activity file webhook
+ * Process activity file webhook (FIT only in this pass).
  */
 export async function handleActivityFile(
   files: ActivityFile[],
@@ -29,6 +61,20 @@ export async function handleActivityFile(
 
   for (const file of files) {
     try {
+      const fileType = String(file.fileType ?? 'unknown').trim();
+      if (!isFitFileType(fileType)) {
+        console.log(`⏭️ Skipping non-FIT activity file type: ${fileType}`);
+        skipped++;
+        continue;
+      }
+
+      const downloadUrl = readDownloadUrl(file);
+      if (!downloadUrl) {
+        console.warn('⚠️ Activity file missing callbackURL / fileUrl');
+        skipped++;
+        continue;
+      }
+
       const garminUserId = userId || file.userId;
       if (!garminUserId) {
         console.warn('⚠️ No userId found in activity file');
@@ -43,68 +89,82 @@ export async function handleActivityFile(
         continue;
       }
 
-      const activityId = file.activityId?.toString();
-      const fileType = file.fileType || 'unknown';
-      
-      if (!activityId) {
-        console.warn('⚠️ No activityId found in activity file');
+      const candidateActivityId = readCandidateActivityId(file);
+      if (
+        candidateActivityId &&
+        (await activityFileExists(candidateActivityId, fileType))
+      ) {
+        console.log(
+          `⏭️ FIT file for activity ${candidateActivityId} already processed`
+        );
         skipped++;
         continue;
       }
 
-      // Check if file already processed
-      if (await activityFileExists(activityId, fileType)) {
-        console.log(`⏭️ File ${fileType} for activity ${activityId} already processed`);
+      const bytes = await downloadGarminFitFile(athlete.id, downloadUrl);
+      const parsed = parseFitActivityLaps(bytes);
+
+      if (parsed.laps.length === 0) {
+        console.warn('⚠️ FIT file contained no lap messages');
         skipped++;
         continue;
       }
 
-      // TODO: Activities will be reintroduced in Schema Phase 3
-      // Update activity with file data
-      // const activity = await prisma.athleteActivity.findUnique({
-      //   where: { sourceActivityId: activityId }
-      // });
+      if (parsed.decodeErrors.length > 0) {
+        console.warn('⚠️ FIT decode warnings:', parsed.decodeErrors.slice(0, 3));
+      }
 
-      // if (!activity) {
-      //   console.warn(`⚠️ Activity ${activityId} not found for file processing`);
-      //   skipped++;
-      //   continue;
-      // }
+      const activityRow = await findActivityRowForFit({
+        athleteId: athlete.id,
+        sourceActivityId: candidateActivityId,
+        sessionStartTimeInSeconds: parsed.sessionStartTimeInSeconds,
+      });
 
-      // const detailData = (activity.detailData || {}) as any;
-      // const files = detailData.files || [];
+      if (!activityRow) {
+        console.warn(
+          `⚠️ No athlete_activities row for FIT (candidate=${candidateActivityId ?? 'none'}, sessionStart=${parsed.sessionStartTimeInSeconds ?? 'none'})`
+        );
+        skipped++;
+        continue;
+      }
 
-      // // Add file to files array
-      // files.push({
-      //   type: fileType,
-      //   url: file.fileUrl,
-      //   data: file.fileData,
-      //   processedAt: new Date().toISOString()
-      // });
+      const lapStartTimes = parsed.laps.map((lap) => lap.startTimeInSeconds);
+      if (
+        await activityFileAlreadyProcessed(
+          activityRow.id,
+          fileType,
+          lapStartTimes
+        )
+      ) {
+        console.log(
+          `⏭️ FIT laps unchanged for activity ${activityRow.sourceActivityId}`
+        );
+        skipped++;
+        continue;
+      }
 
-      // await prisma.athleteActivity.update({
-      //   where: { sourceActivityId: activityId },
-      //   data: {
-      //     detailData: {
-      //       ...detailData,
-      //       files
-      //     }
-      //   }
-      // });
+      const fitLapData: FitLapDataPayload = {
+        fileType: 'FIT',
+        processedAt: new Date().toISOString(),
+        sourceActivityId: activityRow.sourceActivityId,
+        sessionStartTimeInSeconds: parsed.sessionStartTimeInSeconds,
+        laps: parsed.laps,
+      };
 
-      // // Mark as processed
-      // await markActivityFileProcessed(activityId, fileType);
+      await prisma.athlete_activities.update({
+        where: { id: activityRow.id },
+        data: { fitLapData },
+      });
 
-      // processed++;
-      // console.log(`✅ Activity file ${fileType} for ${activityId} processed`);
-      skipped++;
-
-    } catch (error: any) {
+      processed++;
+      console.log(
+        `✅ FIT laps persisted for activity ${activityRow.sourceActivityId} (${parsed.laps.length} laps)`
+      );
+    } catch (error: unknown) {
       errors++;
-      console.error(`❌ Error processing activity file:`, error);
+      console.error('❌ Error processing activity file:', error);
     }
   }
 
   return { processed, skipped, errors };
 }
-

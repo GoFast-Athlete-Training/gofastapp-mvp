@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Calendar, MapPin, User, ListTree } from "lucide-react";
+import { formatSegmentDuration } from "@/lib/training/segment-summary";
 
 type Segment = {
   id: string;
@@ -197,7 +198,7 @@ export default function MyTrainingRunPublicPage() {
                   <span className="font-medium text-slate-800">{s.title}</span>
                   <span className="text-slate-500">
                     {" "}
-                    · {s.durationType === "DISTANCE" ? `${s.durationValue} mi` : `${s.durationValue} min`}
+                    · {formatSegmentDuration(s)}
                     {s.repeatCount != null && s.repeatCount > 1 ? ` ×${s.repeatCount}` : ""}
                   </span>
                 </li>

@@ -96,7 +96,7 @@ test("tiny same-day activity is not a high-confidence match for long planned wor
   assert.equal(isHighConfidenceActivityCandidate(scored!), false);
 });
 
-test("distance-close same-day activity can be high-confidence without title match", () => {
+test("distance-close same-day activity is not high-confidence without title match", () => {
   const longRunWorkout = {
     id: "w-long",
     title: "Long run 10.5 miles",
@@ -115,7 +115,7 @@ test("distance-close same-day activity can be high-confidence without title matc
     activity: closeRun,
   });
   assert.ok(scored);
-  assert.equal(isHighConfidenceActivityCandidate(scored!), true);
+  assert.equal(isHighConfidenceActivityCandidate(scored!), false);
 });
 
 test("Wednesday Easy title match stays high-confidence when distance is far off", () => {

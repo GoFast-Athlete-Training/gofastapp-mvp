@@ -98,14 +98,6 @@ export function isHighConfidenceActivityCandidate(
   ) {
     return true;
   }
-  if (candidate.reasons.includes("distance_far_off")) return false;
-  if (candidate.reasons.includes("title_match")) return true;
-  if (
-    candidate.reasons.includes("distance_close") &&
-    candidate.reasons.includes("same_day")
-  ) {
-    return true;
-  }
   return false;
 }
 

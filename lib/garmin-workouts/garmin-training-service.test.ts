@@ -67,3 +67,25 @@ test("assembleGarminWorkout nests work + recovery inside repeat block", () => {
   assert.equal(repeat.steps![0]!.description, "Interval");
   assert.equal(repeat.steps![1]!.description, "Recovery");
 });
+
+test("assembleGarminWorkout heals corrupted durationValue 400 (meters stored as miles)", () => {
+  const workout = assembleGarminWorkout({
+    id: "w1",
+    title: "Rolling 400s",
+    workoutType: "Intervals",
+    segments: [
+      {
+        id: "s1",
+        workoutId: "w1",
+        stepOrder: 1,
+        title: "Interval",
+        durationType: "DISTANCE",
+        durationValue: 400,
+        repeatCount: 8,
+      },
+    ],
+  });
+
+  const repeat = workout.steps[0]!;
+  assert.equal(repeat.steps![0]!.durationValue, 400);
+});
