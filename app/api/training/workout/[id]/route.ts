@@ -211,6 +211,7 @@ export async function GET(request: NextRequest, context: Ctx) {
               duration: true,
               averageSpeed: true,
               detailData: true,
+              fitLapData: true,
               hydratedAt: true,
             },
           },

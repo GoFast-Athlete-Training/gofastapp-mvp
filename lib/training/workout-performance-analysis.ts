@@ -121,7 +121,7 @@ export type PhaseAwareLapRow = {
   paceDeltaSecPerMile: number | null;
 };
 
-export type LapSource = "step" | "auto" | "activity_detail" | null;
+export type LapSource = "step" | "auto" | "activity_detail" | "fit" | null;
 
 export type WorkoutPerformanceAnalysis = {
   hasActivityDetail: boolean;
@@ -196,6 +196,7 @@ export type PerformanceAnalysisWorkoutInput = {
   garminDetailActivityId?: string | null;
   garmin_detail_activity?: {
     detailData?: unknown;
+    fitLapData?: unknown;
     hydratedAt?: Date | null;
   } | null;
   segmentExecutionStatus?: string | null;
@@ -1057,18 +1058,25 @@ export function structuredSegmentExecutionReady(
 export function resolveLapSource(params: {
   requiresDetail: boolean;
   hasSegmentLaps: boolean;
+  hasFitLapData?: boolean;
+  hasDetailLapData?: boolean;
 }): LapSource {
   if (!params.hasSegmentLaps) return null;
+  if (params.hasFitLapData && !params.hasDetailLapData) return "fit";
   return params.requiresDetail ? "step" : "auto";
 }
 
 export function computeWorkoutPerformanceAnalysis(
   workout: PerformanceAnalysisWorkoutInput
 ): WorkoutPerformanceAnalysis {
-  const hasActivityDetail =
+  const hasDetailLapData =
     workout.completedActivityDetailJson != null ||
     workout.garmin_detail_activity?.detailData != null ||
     workout.garmin_detail_activity?.hydratedAt != null;
+  const hasFitLapData =
+    workout.garmin_detail_activity?.fitLapData != null &&
+    typeof workout.garmin_detail_activity.fitLapData === "object";
+  const hasActivityDetail = hasDetailLapData || hasFitLapData;
 
   const workSegments = workout.segments.filter((s) => isWorkSegmentTitle(s.title));
   const hasSegmentActuals = workout.segments.some(segmentHasActuals);
@@ -1097,6 +1105,8 @@ export function computeWorkoutPerformanceAnalysis(
   const lapSource = resolveLapSource({
     requiresDetail: requiresSegmentLevel,
     hasSegmentLaps,
+    hasFitLapData,
+    hasDetailLapData,
   });
 
   let analysisMode: AnalysisMode = "completion_only";

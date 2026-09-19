@@ -2,7 +2,10 @@
  * Display-only lap rows from Garmin detail or summary actuals (unplanned / spawned workouts).
  */
 
-import { normalizeActivityLapsFromDetail, type DerivedLap } from '@/lib/training/lap-converter';
+import {
+  normalizeActivityLapsPreferDetail,
+  type DerivedLap,
+} from '@/lib/training/lap-converter';
 
 const METERS_PER_MILE = 1609.34;
 
@@ -17,14 +20,18 @@ export type ActivityDerivedLapRow = {
 
 export function deriveActivityLapsForDisplay(params: {
   detailData?: unknown;
+  fitLapData?: unknown;
   hydratedAt?: Date | null;
   distanceMeters?: number | null;
   durationSeconds?: number | null;
   startTime?: Date | string | null;
 }): ActivityDerivedLapRow[] {
   const fromDetail =
-    params.detailData != null && params.hydratedAt
-      ? normalizeActivityLapsFromDetail(params.detailData)
+    params.detailData != null || params.fitLapData != null
+      ? normalizeActivityLapsPreferDetail({
+          detailData: params.detailData,
+          fitLapData: params.fitLapData,
+        })
       : [];
 
   if (fromDetail.length > 0) {

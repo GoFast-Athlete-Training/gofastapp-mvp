@@ -11,8 +11,30 @@ import {
 } from './dedupe';
 import { downloadGarminFitFile } from './download-garmin-fit-file';
 import type { FitLapDataPayload } from './fit-lap-types';
+import { parseMatchedActivityToSegmentExecution } from '@/lib/training/activity-to-segment-execution';
+import { stampPaceDeltasAfterSplits } from '@/lib/training/stamp-pace-deltas';
 import { findActivityRowForFit } from './match-activity-for-fit';
 import { parseFitActivityLaps } from './parse-fit-activity-laps';
+
+async function runFitHydrationPipeline(activityRowId: string): Promise<void> {
+  try {
+    const workout = await prisma.workouts.findFirst({
+      where: { garminDetailActivityId: activityRowId },
+      select: { id: true },
+    });
+    if (!workout) return;
+
+    const result = await parseMatchedActivityToSegmentExecution(activityRowId);
+    if (result.ok && result.status === 'ALIGNED') {
+      await stampPaceDeltasAfterSplits({
+        workoutId: workout.id,
+        activityId: activityRowId,
+      });
+    }
+  } catch (lapErr) {
+    console.warn('FIT activity-to-segment pipeline:', lapErr);
+  }
+}
 
 export interface ActivityFile {
   activityId?: string | number;
@@ -155,6 +177,8 @@ export async function handleActivityFile(
         where: { id: activityRow.id },
         data: { fitLapData },
       });
+
+      await runFitHydrationPipeline(activityRow.id);
 
       processed++;
       console.log(

@@ -1,4 +1,7 @@
-import { normalizeActivityLapsFromDetail, type DerivedLap } from "./lap-converter";
+import {
+  normalizeActivityLapsPreferDetail,
+  type DerivedLap,
+} from "./lap-converter";
 import { extractActivityRouteFromDetail } from "./activity-route-from-detail";
 
 export type ActivityDerivedLapRow = {
@@ -21,6 +24,7 @@ export function mapDerivedLapsForClient(laps: DerivedLap[]): ActivityDerivedLapR
 
 type ActivityRow = {
   detailData: unknown;
+  fitLapData?: unknown;
   hydratedAt: Date | null;
   summaryPolyline: string | null;
   startLatitude: number | null;
@@ -42,8 +46,10 @@ export function projectActivityDetailResponse<T extends ActivityRow>(row: T): {
   derivedLaps: ActivityDerivedLapRow[];
   hasDetail: boolean;
 } {
-  const { detailData, summaryData: _summaryData, ...rest } = row;
-  const hasDetail = row.hydratedAt != null && detailData != null;
+  const { detailData, fitLapData, summaryData: _summaryData, ...rest } = row;
+  const hasDetail =
+    (row.hydratedAt != null && detailData != null) ||
+    (fitLapData != null && typeof fitLapData === "object");
 
   let summaryPolyline = row.summaryPolyline;
   let startLatitude = row.startLatitude;
@@ -61,7 +67,9 @@ export function projectActivityDetailResponse<T extends ActivityRow>(row: T): {
   }
 
   const derivedLaps = hasDetail
-    ? mapDerivedLapsForClient(normalizeActivityLapsFromDetail(detailData))
+    ? mapDerivedLapsForClient(
+        normalizeActivityLapsPreferDetail({ detailData, fitLapData })
+      )
     : [];
 
   return {

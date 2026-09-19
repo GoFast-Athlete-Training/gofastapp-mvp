@@ -31,6 +31,7 @@ const workoutAnalysisInclude = {
       averageSpeed: true,
       averageHeartRate: true,
       detailData: true,
+      fitLapData: true,
       hydratedAt: true,
     },
   },
@@ -52,7 +53,7 @@ export type RetrySegmentBoltInput = {
   completedActivityDetailJson: unknown;
   segmentExecutionStatus: string | null;
   segments: Array<{ segment_laps: unknown[] }>;
-  garmin_detail_activity: { detailData: unknown } | null;
+  garmin_detail_activity: { detailData: unknown; fitLapData?: unknown } | null;
 };
 
 /** Run bolt + pace stamp when detail exists but segment_laps are empty. Returns true if bolt succeeded. */
@@ -62,6 +63,7 @@ export async function retrySegmentBoltIfNeeded(
   const hasLaps = workout.segments.some((s) => s.segment_laps.length > 0);
   const hasDetail =
     workout.garmin_detail_activity?.detailData != null ||
+    workout.garmin_detail_activity?.fitLapData != null ||
     workout.completedActivityDetailJson != null;
   const activityId = workout.garminDetailActivityId;
 

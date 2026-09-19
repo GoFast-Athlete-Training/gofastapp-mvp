@@ -14,7 +14,10 @@ import {
   type LapAssignment,
   type LapAssignmentMode,
 } from "./lap-data-to-workout";
-import { normalizeActivityLapsFromDetail, type DerivedLap } from "./lap-converter";
+import {
+  normalizeActivityLapsPreferDetail,
+  type DerivedLap,
+} from "./lap-converter";
 import {
   normalizePaceTargetEncodingVersion,
   storedPaceSecondsKmToSecondsPerMile,
@@ -212,13 +215,13 @@ export async function parseActivityToSegmentExecution(params: {
 }): Promise<SegmentExecutionResult> {
   const activity = await prisma.athlete_activities.findUnique({
     where: { id: params.activityId },
-    select: { id: true, detailData: true },
+    select: { id: true, detailData: true, fitLapData: true },
   });
-  if (!activity?.detailData || typeof activity.detailData !== "object") {
+  if (!activity) {
     return {
       ok: false,
       status: "NO_DETAIL",
-      message: "No activity detail available",
+      message: "Activity not found",
     };
   }
 
@@ -261,8 +264,14 @@ export async function parseActivityToSegmentExecution(params: {
     };
   }
 
-  const derived = normalizeActivityLapsFromDetail(activity.detailData);
+  const derived = normalizeActivityLapsPreferDetail({
+    detailData: activity.detailData,
+    fitLapData: activity.fitLapData,
+  });
   if (derived.length === 0) {
+    const hasAnyLapSource =
+      (activity.detailData != null && typeof activity.detailData === "object") ||
+      (activity.fitLapData != null && typeof activity.fitLapData === "object");
     await recordAlignmentFailure({
       workout,
       lapCount: 0,
@@ -270,10 +279,12 @@ export async function parseActivityToSegmentExecution(params: {
     });
     return {
       ok: false,
-      status: "NO_LAPS",
+      status: hasAnyLapSource ? "NO_LAPS" : "NO_DETAIL",
       lapCount: 0,
       segmentCount: workout.segments.length,
-      message: "Activity detail has no usable laps",
+      message: hasAnyLapSource
+        ? "Activity has no usable laps"
+        : "No activity detail or FIT laps available",
     };
   }
 

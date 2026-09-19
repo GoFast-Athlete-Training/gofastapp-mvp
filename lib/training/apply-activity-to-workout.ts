@@ -413,9 +413,13 @@ export async function clearWorkoutDerivedActuals(workoutId: string): Promise<voi
 async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<void> {
   const activity = await prisma.athlete_activities.findUnique({
     where: { id: activityId },
-    select: { id: true, detailData: true },
+    select: { id: true, detailData: true, fitLapData: true },
   });
-  if (!activity?.detailData || typeof activity.detailData !== "object") return;
+  const hasDetail =
+    activity?.detailData != null && typeof activity.detailData === "object";
+  const hasFit =
+    activity?.fitLapData != null && typeof activity.fitLapData === "object";
+  if (!activity || (!hasDetail && !hasFit)) return;
 
   const workout = await prisma.workouts.findFirst({
     where: { garminDetailActivityId: activity.id },
@@ -423,10 +427,12 @@ async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<vo
   });
   if (!workout) return;
 
-  await prisma.workouts.update({
-    where: { id: workout.id },
-    data: { completedActivityDetailJson: activity.detailData as object },
-  });
+  if (hasDetail) {
+    await prisma.workouts.update({
+      where: { id: workout.id },
+      data: { completedActivityDetailJson: activity.detailData as object },
+    });
+  }
 
   try {
     const result = await parseActivityToSegmentExecution({

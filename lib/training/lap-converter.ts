@@ -3,6 +3,7 @@
  * Pure: no DB.
  */
 
+import type { FitLapDataPayload } from "@/lib/garmin-events/fit-lap-types";
 import type { LapRow, SampleRow } from "./detail-data-parser";
 import { lapsHaveFlatSummaries, parseDetailData } from "./detail-data-parser";
 
@@ -62,6 +63,60 @@ function derivedFromFlatLap(lap: LapRow, lapIndex: number): DerivedLap {
 export function normalizeActivityLapsFromDetail(blob: unknown): DerivedLap[] {
   const parsed = parseDetailData(blob);
   return convertLapsToDerived(parsed.laps, parsed.samples);
+}
+
+function derivedFromFitLap(
+  lap: FitLapDataPayload["laps"][number],
+  lapIndex: number
+): DerivedLap {
+  const durationSeconds = Math.max(
+    0,
+    Math.round(lap.timerSeconds ?? lap.elapsedSeconds ?? 0)
+  );
+  const distanceMiles =
+    lap.distanceMeters != null && lap.distanceMeters > 0
+      ? Math.round((lap.distanceMeters / METERS_PER_MILE) * 100) / 100
+      : null;
+  let paceSec: number | null = null;
+  if (lap.avgSpeedMps != null && lap.avgSpeedMps > 0) {
+    paceSec = Math.round(METERS_PER_MILE / lap.avgSpeedMps);
+  } else if (distanceMiles != null && durationSeconds > 0) {
+    paceSec = Math.round(durationSeconds / distanceMiles);
+  }
+  const endTimeInSeconds =
+    durationSeconds > 0
+      ? lap.startTimeInSeconds + durationSeconds
+      : lap.startTimeInSeconds;
+  return {
+    lapIndex,
+    startTimeInSeconds: lap.startTimeInSeconds,
+    endTimeInSeconds,
+    avgPaceSecPerMile: paceSec,
+    avgHeartRate: lap.avgHeartRate ?? null,
+    distanceMiles,
+    durationSeconds,
+    intensity: lap.type ?? null,
+  };
+}
+
+/** Normalize structured FIT lap rows persisted on athlete_activities.fitLapData. */
+export function normalizeActivityLapsFromFit(fitLapData: unknown): DerivedLap[] {
+  if (fitLapData == null || typeof fitLapData !== "object") return [];
+  const payload = fitLapData as FitLapDataPayload;
+  if (!Array.isArray(payload.laps) || payload.laps.length === 0) return [];
+  return payload.laps.map((lap, index) => derivedFromFitLap(lap, index));
+}
+
+/** Prefer Activity Detail laps; fall back to FIT when detail is missing or empty. */
+export function normalizeActivityLapsPreferDetail(params: {
+  detailData?: unknown;
+  fitLapData?: unknown;
+}): DerivedLap[] {
+  if (params.detailData != null && typeof params.detailData === "object") {
+    const fromDetail = normalizeActivityLapsFromDetail(params.detailData);
+    if (fromDetail.length > 0) return fromDetail;
+  }
+  return normalizeActivityLapsFromFit(params.fitLapData);
 }
 
 /**
