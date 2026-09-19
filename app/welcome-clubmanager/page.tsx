@@ -109,7 +109,7 @@ export default function WelcomeClubManagerPage() {
             alt="GoFast Logo"
             width={112}
             height={112}
-            className="mx-auto h-28 w-28 rounded-full object-cover shadow-xl"
+            className="mx-auto h-28 w-28 rounded-full object-contain shadow-xl"
             priority
           />
           <p className="mt-6 text-xs font-bold uppercase tracking-wide text-white/80">Club Manager</p>
@@ -146,7 +146,7 @@ export default function WelcomeClubManagerPage() {
           alt="GoFast Logo"
           width={112}
           height={112}
-          className="mx-auto h-28 w-28 rounded-full object-cover shadow-xl"
+          className="mx-auto h-28 w-28 rounded-full object-contain shadow-xl"
           priority
         />
 

@@ -211,7 +211,7 @@ export default function CoachSignupPage() {
               alt="GoFast"
               width={96}
               height={96}
-              className="w-24 h-24 rounded-full shadow-xl mx-auto mb-4 object-cover"
+              className="w-24 h-24 rounded-full shadow-xl mx-auto mb-4 object-contain"
               priority
             />
             <h1 className="text-3xl font-bold text-white mb-2">Coach sign up</h1>

@@ -23,7 +23,7 @@ export default function CoachTopNav() {
     <header className="bg-white/95 border-b border-amber-200 sticky top-0 z-50 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
         <Link href="/coach-hub" className="flex items-center gap-2">
-          <img src="/logo.png" alt="GoFast Coach" className="w-9 h-9 rounded-full" />
+          <img src="/logo.png" alt="GoFast Coach" className="w-9 h-9 rounded-full object-contain" />
           <span className="text-lg font-bold text-amber-900">GoFast Coach</span>
         </Link>
         <nav className="flex items-center gap-2 sm:gap-4 text-sm font-medium">

@@ -119,7 +119,7 @@ export default function AthleteSidebar() {
               alt="GoFast"
               width={32}
               height={32}
-              className="w-8 h-8 rounded-full object-cover"
+              className="w-8 h-8 rounded-full object-contain"
             />
             <span className="text-lg font-bold text-gray-900">GoFast</span>
           </Link>

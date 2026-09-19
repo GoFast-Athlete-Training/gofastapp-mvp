@@ -121,7 +121,7 @@ function RunCrewSuccessContent() {
               alt="GoFast" 
               width={24}
               height={24}
-              className="w-6 h-6 rounded-full"
+              className="w-6 h-6 rounded-full object-contain"
             />
             <span className="text-xl font-bold text-gray-900 ml-3">GoFast</span>
           </div>

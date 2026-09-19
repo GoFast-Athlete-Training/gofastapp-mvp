@@ -280,7 +280,7 @@ function AthleteCreateProfileInner() {
               alt="GoFast"
               width={64}
               height={64}
-              className="w-16 h-16 rounded-full mx-auto mb-4"
+              className="w-16 h-16 rounded-full object-contain mx-auto mb-4"
             />
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
               Hey, we&apos;re here — let&apos;s go
@@ -339,7 +339,7 @@ function AthleteCreateProfileInner() {
               alt="GoFast"
               width={64}
               height={64}
-              className="w-16 h-16 rounded-full mx-auto mb-4"
+              className="w-16 h-16 rounded-full object-contain mx-auto mb-4"
             />
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
               You&apos;re in! Here&apos;s what&apos;s waiting for you
@@ -417,7 +417,7 @@ function AthleteCreateProfileInner() {
             alt="GoFast"
             width={64}
             height={64}
-            className="w-16 h-16 rounded-full mx-auto mb-4"
+            className="w-16 h-16 rounded-full object-contain mx-auto mb-4"
           />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Hey, we&apos;re here</h1>
           <p className="text-gray-600 text-sm">

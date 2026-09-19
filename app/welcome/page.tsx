@@ -301,7 +301,7 @@ export default function WelcomePage() {
           alt="GoFast Logo"
           width={112}
           height={112}
-          className="mx-auto h-28 w-28 rounded-full object-cover shadow-xl"
+          className="mx-auto h-28 w-28 rounded-full object-contain shadow-xl"
           priority
         />
 

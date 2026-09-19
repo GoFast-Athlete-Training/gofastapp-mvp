@@ -478,7 +478,7 @@ function SignupPageContent() {
                 alt="GoFast Logo"
                 width={128}
                 height={128}
-                className="w-32 h-32 rounded-full shadow-xl mx-auto mb-6 object-cover"
+                className="w-32 h-32 rounded-full shadow-xl mx-auto mb-6 object-contain"
                 priority
               />
               <h1 className="text-4xl font-bold text-white mb-2">

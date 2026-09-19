@@ -38,7 +38,7 @@ export default function ExplainerPage() {
           width={256}
           height={256}
           aria-hidden
-          className={`w-64 h-64 rounded-full shadow-xl object-cover transition-all ease-out ${
+          className={`w-64 h-64 rounded-full shadow-xl object-contain transition-all ease-out ${
             revealed ? 'scale-90 -translate-y-10 opacity-0' : 'scale-100 translate-y-0 opacity-100'
           }`}
           style={{ transitionDuration: `${TRANSITION_MS}ms` }}
@@ -60,7 +60,7 @@ export default function ExplainerPage() {
               alt="GoFast Logo"
               width={128}
               height={128}
-              className="w-24 h-24 sm:w-32 sm:h-32 rounded-full shadow-xl mx-auto mb-4 sm:mb-6 object-cover"
+              className="w-24 h-24 sm:w-32 sm:h-32 rounded-full shadow-xl mx-auto mb-4 sm:mb-6 object-contain"
               priority
             />
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-3">

@@ -50,7 +50,7 @@ export default function ClubManagerConfirmWelcome({
             alt="GoFast Logo"
             width={88}
             height={88}
-            className="mx-auto h-20 w-20 rounded-full object-cover shadow-xl"
+            className="mx-auto h-20 w-20 rounded-full object-contain shadow-xl"
             priority
           />
           <p className="mt-5 text-xs font-bold uppercase tracking-wide text-white/80">Club Manager</p>

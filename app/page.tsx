@@ -19,7 +19,7 @@ function SplashLogo({ pulse = false }: { pulse?: boolean }) {
       alt="GoFast Logo"
       width={256}
       height={256}
-      className={`w-64 h-64 rounded-full shadow-xl object-cover ${pulse ? 'animate-pulse' : ''}`}
+      className={`w-64 h-64 rounded-full shadow-xl object-contain ${pulse ? 'animate-pulse' : ''}`}
       priority
     />
   );

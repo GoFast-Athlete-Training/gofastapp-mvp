@@ -315,7 +315,7 @@ export default function AthleteProgramSignupPage() {
               alt="GoFast"
               width={56}
               height={56}
-              className="mx-auto rounded-full mb-4"
+              className="mx-auto rounded-full object-contain mb-4"
             />
             <p className="text-xs font-semibold uppercase tracking-widest text-orange-600 mb-2">
               GoFast Amateur Athlete Program
