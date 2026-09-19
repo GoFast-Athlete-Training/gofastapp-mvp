@@ -3,6 +3,10 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getDiscoveryRuns } from '@/lib/domain-runs';
+import {
+  hasDiscoveryLocationScope,
+  parseDiscoveryLocationParams,
+} from '@/lib/discovery-location';
 
 /**
  * GET /api/runs/discovery
@@ -11,7 +15,8 @@ import { getDiscoveryRuns } from '@/lib/domain-runs';
  * Returns Product club runs without SEO `published` gating.
  *
  * Query params:
- * - citySlug (optional)
+ * - citySlug | gofastCity | athleteCity (+ athleteState)
+ * - regionSlug — metro reel-in (e.g. dc)
  * - day (optional) — weekday name
  * - runClubSlug (optional)
  */
@@ -29,14 +34,22 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const citySlug =
-      searchParams.get('citySlug')?.trim() ||
-      searchParams.get('gofastCity')?.trim() ||
-      undefined;
+    const location = parseDiscoveryLocationParams(searchParams);
     const day = searchParams.get('day') || undefined;
-    const runClubSlug = searchParams.get('runClubSlug') || undefined;
 
-    const runs = await getDiscoveryRuns({ citySlug, day, runClubSlug });
+    if (!hasDiscoveryLocationScope(location)) {
+      return NextResponse.json(
+        { success: false, error: 'citySlug, regionSlug, or runClubSlug is required' },
+        { status: 400 }
+      );
+    }
+
+    const runs = await getDiscoveryRuns({
+      citySlug: location.citySlug,
+      regionSlug: location.regionSlug,
+      day,
+      runClubSlug: location.runClubSlug,
+    });
 
     return NextResponse.json({
       success: true,

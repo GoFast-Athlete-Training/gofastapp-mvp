@@ -1489,6 +1489,8 @@ model city_runs {
   athleteGeneratedId  String?
   staffGeneratedId    String?
   citySlug            String
+  /// Inferred metro/region for discover reel-in (e.g. arlington → dc). Not a rewrite of citySlug.
+  regionSlug          String?
   cityId              String?
   cities              cities?              @relation(fields: [cityId], references: [id], onDelete: SetNull)
   slug                String?              @unique // URL-friendly slug: "title-of-run" (generated from title)
@@ -1539,6 +1541,7 @@ model city_runs {
 
   @@index([athleteGeneratedId])
   @@index([citySlug])
+  @@index([regionSlug])
   @@index([cityId])
   @@index([slug])
   @@index([date])

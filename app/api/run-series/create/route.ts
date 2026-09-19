@@ -7,6 +7,7 @@ import {
   findOrCreateCityBySlug,
   resolveCityFieldsFromMeetUp,
 } from '@/lib/resolve-city';
+import { inferRegionSlugFromCitySlug } from '@/lib/region-slug';
 
 export const dynamic = 'force-dynamic';
 
@@ -406,6 +407,7 @@ export async function POST(request: NextRequest) {
         dayOfWeek: canonicalDay,
         date: runDate,
         citySlug: finalCitySlug,
+        regionSlug: inferRegionSlugFromCitySlug(finalCitySlug),
         meetUpPoint: setup.meetUpPoint || '',
         meetUpStreetAddress: setup.meetUpStreetAddress || null,
         meetUpCity: setup.meetUpCity || null,

@@ -14,6 +14,7 @@ import { autoRsvpHostRole, buildJoinRunSignupUrl } from "@/lib/host-run-rsvp";
 import { stampPlannedWorkoutCityRun } from "@/lib/city-run/stamp-planned-city-run";
 import { resolveSpawnedWorkoutForPlanned } from '@/lib/training/match-planned-workout';
 import { resolveWorkoutTargetForAthlete } from '@/lib/training/workout-or-planned-resolve';
+import { inferRegionSlugFromCitySlug } from '@/lib/region-slug';
 
 export const dynamic = "force-dynamic";
 
@@ -359,6 +360,7 @@ export async function POST(request: NextRequest) {
     const createData: Record<string, unknown> = {
       id: generateId(),
       citySlug: finalCitySlug,
+      regionSlug: inferRegionSlugFromCitySlug(finalCitySlug),
       slug: runSlug,
       runCrewId: null,
       runClubId: null,

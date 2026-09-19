@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { normalizeCrewResponse } from './normalize-prisma';
 import { secondsToPace } from '@/utils/formatPace';
 import { sendAppNotification } from '@/lib/app-notifications/send';
+import { inferRegionSlugFromCitySlug } from '@/lib/region-slug';
 
 /**
  * Generate a shareable invite link for a RunCrew using handle
@@ -1046,6 +1047,7 @@ export async function createRun(data: {
     data: {
       id: generateRunId(),
       citySlug,
+      regionSlug: inferRegionSlugFromCitySlug(citySlug),
       runCrewId: data.runCrewId,
       athleteGeneratedId: data.athleteId,
       cityRunType: 'RUN_CREW' as const,

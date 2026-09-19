@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolveCityRunType } from "@/lib/city-run-type";
+import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
 
 export const dynamic = "force-dynamic";
 
@@ -176,6 +177,7 @@ export async function POST(request: NextRequest) {
           startTimeMinute: minute,
           startTimePeriod: period,
           citySlug,
+          regionSlug: inferRegionSlugFromCitySlug(citySlug),
           raceRegistryId: reg.id,
           runClubId,
           runSeriesId: null,

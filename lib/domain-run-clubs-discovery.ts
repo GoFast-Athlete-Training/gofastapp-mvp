@@ -1,8 +1,10 @@
 import { prisma } from './prisma';
 import { getDiscoveryRuns, type GetRunsFilters } from '@/lib/domain-runs';
+import { citySlugsForRegion } from '@/lib/region-slug';
 
 export type DiscoveryRunClubFilters = {
   citySlug?: string;
+  regionSlug?: string;
 };
 
 export type DiscoveryRunClubItem = {
@@ -25,7 +27,12 @@ export async function getDiscoveryRunClubs(
   filters: DiscoveryRunClubFilters = {}
 ): Promise<DiscoveryRunClubItem[]> {
   const clubWhere: Record<string, unknown> = {};
-  if (filters.citySlug) {
+  if (filters.regionSlug) {
+    const slugs = citySlugsForRegion(filters.regionSlug);
+    if (slugs.length > 0) {
+      clubWhere.citySlug = { in: slugs };
+    }
+  } else if (filters.citySlug) {
     clubWhere.citySlug = filters.citySlug;
   }
 
@@ -43,7 +50,9 @@ export async function getDiscoveryRunClubs(
   });
 
   const runFilters: GetRunsFilters = {};
-  if (filters.citySlug) {
+  if (filters.regionSlug) {
+    runFilters.regionSlug = filters.regionSlug;
+  } else if (filters.citySlug) {
     runFilters.citySlug = filters.citySlug;
   }
 

@@ -5,6 +5,7 @@ import { sameDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 
 export interface GetRunsFilters {
   citySlug?: string;
+  regionSlug?: string;
   day?: string;
   runClubSlug?: string; // Filter by slug (for URL compatibility)
   runClubId?: string; // Filter by ID (preferred)
@@ -172,7 +173,9 @@ function mapCityRunForResponse(run: Awaited<ReturnType<typeof queryCityRunsForDi
 async function buildCityRunDiscoverWhere(filters: GetRunsFilters, mode: GetRunsMode) {
   const andParts: Record<string, unknown>[] = [];
 
-  if (filters.citySlug) {
+  if (filters.regionSlug) {
+    andParts.push({ regionSlug: filters.regionSlug });
+  } else if (filters.citySlug) {
     andParts.push({ citySlug: filters.citySlug });
   }
 

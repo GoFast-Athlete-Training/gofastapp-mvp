@@ -7,6 +7,7 @@ import {
 } from "@/lib/calendar-date";
 import { prisma } from "@/lib/prisma";
 import { generateUniqueCityRunSlug } from "@/lib/slug-utils";
+import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
 
 export type RunInstanceSummary = {
   id: string;
@@ -156,6 +157,7 @@ const CLUB_RUN_SELECT = {
   runSeriesId: true,
   runClubId: true,
   citySlug: true,
+  regionSlug: true,
   slug: true,
   dayOfWeek: true,
   timezone: true,
@@ -322,6 +324,7 @@ async function duplicateRunForward(
   const createData: Record<string, unknown> = {
     id: generateId(),
     citySlug: prior.citySlug,
+    regionSlug: prior.regionSlug ?? inferRegionSlugFromCitySlug(prior.citySlug),
     slug: runSlug,
     runClubId: prior.runClubId,
     runSeriesId: prior.runSeriesId,

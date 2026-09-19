@@ -12,6 +12,7 @@ import { parseCalendarDateForWrite } from "@/lib/calendar-date";
 import { autoRsvpHostRole } from "@/lib/host-run-rsvp";
 import { stampPlannedWorkoutCityRun } from "@/lib/city-run/stamp-planned-city-run";
 import { resolveWorkoutTargetForAthlete } from "@/lib/training/workout-or-planned-resolve";
+import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
 
 export const dynamic = "force-dynamic";
 
@@ -525,6 +526,7 @@ export async function POST(request: NextRequest) {
     const createData: Record<string, unknown> = {
       id: generateId(),
       citySlug: finalCitySlug,
+      regionSlug: inferRegionSlugFromCitySlug(finalCitySlug),
       slug: runSlug, // URL-friendly slug for better shareability
       runCrewId: runCrewId?.trim() || null,
       runClubId: finalRunClubId, // ✅ Use FK instead of runClubSlug

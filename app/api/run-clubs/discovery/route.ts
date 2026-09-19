@@ -3,6 +3,10 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { getDiscoveryRunClubs } from '@/lib/domain-run-clubs-discovery';
+import {
+  hasDiscoveryLocationScope,
+  parseDiscoveryLocationParams,
+} from '@/lib/discovery-location';
 
 /**
  * GET /api/run-clubs/discovery
@@ -11,7 +15,8 @@ import { getDiscoveryRunClubs } from '@/lib/domain-run-clubs-discovery';
  * Lists Product run_clubs with upcoming discovery run metadata.
  *
  * Query params:
- * - citySlug (optional)
+ * - citySlug | gofastCity | athleteCity (+ athleteState)
+ * - regionSlug
  */
 export async function GET(request: Request) {
   try {
@@ -27,12 +32,19 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const citySlug =
-      searchParams.get('citySlug')?.trim() ||
-      searchParams.get('gofastCity')?.trim() ||
-      undefined;
+    const location = parseDiscoveryLocationParams(searchParams);
 
-    const clubs = await getDiscoveryRunClubs({ citySlug });
+    if (!hasDiscoveryLocationScope(location)) {
+      return NextResponse.json(
+        { success: false, error: 'citySlug, regionSlug, or runClubSlug is required' },
+        { status: 400 }
+      );
+    }
+
+    const clubs = await getDiscoveryRunClubs({
+      citySlug: location.citySlug,
+      regionSlug: location.regionSlug,
+    });
 
     return NextResponse.json({
       success: true,
