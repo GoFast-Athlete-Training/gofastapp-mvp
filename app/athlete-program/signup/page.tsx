@@ -311,7 +311,7 @@ export default function AthleteProgramSignupPage() {
         <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-gray-200">
           <div className="text-center mb-6">
             <Image
-              src="/logo.png"
+              src="/logo.jpg"
               alt="GoFast"
               width={56}
               height={56}

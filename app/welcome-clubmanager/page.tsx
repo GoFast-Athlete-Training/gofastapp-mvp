@@ -105,7 +105,7 @@ export default function WelcomeClubManagerPage() {
       <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center px-4">
         <div className="max-w-lg w-full text-center">
           <Image
-            src="/logo.png"
+            src="/logo.jpg"
             alt="GoFast Logo"
             width={112}
             height={112}
@@ -142,7 +142,7 @@ export default function WelcomeClubManagerPage() {
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center px-4">
       <div className="max-w-lg w-full text-center">
         <Image
-          src="/logo.png"
+          src="/logo.jpg"
           alt="GoFast Logo"
           width={112}
           height={112}

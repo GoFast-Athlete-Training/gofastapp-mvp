@@ -77,7 +77,7 @@ export default function ProfileHero(props: Props) {
           <div className="flex items-center gap-2 shrink-0">
             <Link href="/welcome" className="hidden sm:block shrink-0" aria-label="GoFast home">
               <Image
-                src="/logo.png"
+                src="/logo.jpg"
                 alt="GoFast"
                 width={36}
                 height={36}

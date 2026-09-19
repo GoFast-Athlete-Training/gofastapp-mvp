@@ -46,7 +46,7 @@ export default function ClubManagerConfirmWelcome({
       <div className="w-full max-w-lg">
         <div className="text-center mb-6">
           <Image
-            src="/logo.png"
+            src="/logo.jpg"
             alt="GoFast Logo"
             width={88}
             height={88}

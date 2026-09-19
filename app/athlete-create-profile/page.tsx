@@ -276,7 +276,7 @@ function AthleteCreateProfileInner() {
         <div className="max-w-lg w-full bg-white rounded-2xl shadow-lg p-8">
           <div className="text-center mb-8">
             <Image
-              src="/logo.png"
+              src="/logo.jpg"
               alt="GoFast"
               width={64}
               height={64}
@@ -335,7 +335,7 @@ function AthleteCreateProfileInner() {
         <div className="max-w-2xl w-full bg-white rounded-2xl shadow-lg p-8">
           <div className="text-center mb-8">
             <Image
-              src="/logo.png"
+              src="/logo.jpg"
               alt="GoFast"
               width={64}
               height={64}
@@ -413,7 +413,7 @@ function AthleteCreateProfileInner() {
       <div className="max-w-lg w-full bg-white rounded-2xl shadow-lg p-8">
         <div className="text-center mb-8">
           <Image
-            src="/logo.png"
+            src="/logo.jpg"
             alt="GoFast"
             width={64}
             height={64}

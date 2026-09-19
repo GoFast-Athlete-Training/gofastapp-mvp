@@ -33,7 +33,7 @@ export default function ExplainerPage() {
         style={{ transitionDuration: `${TRANSITION_MS}ms` }}
       >
         <Image
-          src="/logo.png"
+          src="/logo.jpg"
           alt=""
           width={256}
           height={256}
@@ -56,7 +56,7 @@ export default function ExplainerPage() {
         <div className="max-w-2xl w-full mx-auto px-4 py-8 sm:py-12">
           <div className="text-center mb-8 sm:mb-10">
             <Image
-              src="/logo.png"
+              src="/logo.jpg"
               alt="GoFast Logo"
               width={128}
               height={128}

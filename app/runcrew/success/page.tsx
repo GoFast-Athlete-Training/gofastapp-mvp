@@ -117,7 +117,7 @@ function RunCrewSuccessContent() {
         <div className="max-w-md mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-center">
             <Image 
-              src="/logo.png" 
+              src="/logo.jpg" 
               alt="GoFast" 
               width={24}
               height={24}

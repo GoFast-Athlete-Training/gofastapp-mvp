@@ -115,7 +115,7 @@ export default function AthleteSidebar() {
             className="flex items-center gap-3 mb-2 rounded-md outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
           >
             <Image
-              src="/logo.png"
+              src="/logo.jpg"
               alt="GoFast"
               width={32}
               height={32}

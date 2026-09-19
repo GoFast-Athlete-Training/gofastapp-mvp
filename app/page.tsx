@@ -15,7 +15,7 @@ import {
 function SplashLogo({ pulse = false }: { pulse?: boolean }) {
   return (
     <Image
-      src="/logo.png"
+      src="/logo.jpg"
       alt="GoFast Logo"
       width={256}
       height={256}

@@ -297,7 +297,7 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center p-6">
       <div className="w-full max-w-sm text-center">
         <Image
-          src="/logo.png"
+          src="/logo.jpg"
           alt="GoFast Logo"
           width={112}
           height={112}
