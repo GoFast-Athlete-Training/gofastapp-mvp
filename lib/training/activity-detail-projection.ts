@@ -36,7 +36,7 @@ type ActivityRow = {
 };
 
 export function projectActivityDetailResponse<T extends ActivityRow>(row: T): {
-  activity: Omit<T, "detailData" | "summaryData"> & {
+  activity: Omit<T, "detailData" | "summaryData" | "fitLapData"> & {
     summaryPolyline: string | null;
     startLatitude: number | null;
     startLongitude: number | null;
