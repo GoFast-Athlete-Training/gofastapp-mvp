@@ -511,29 +511,30 @@ export async function applyActivityToWorkout(params: {
     data: { ingestionStatus: "MATCHED" },
   });
 
-  try {
-    await sendAppNotification({
-      athleteId: activity.athleteId,
-      templateKey: "workout.complete",
-      objectType: "workout",
-      objectId: workout.id,
-      deeplink: `/workouts/${workout.id}`,
-      payload: {
-        workoutId: workout.id,
-        activityId: activity.id,
-        planId: workout.planId ?? undefined,
-        type: "workout_complete",
-        screen: "workout",
+  const stampedCompleteInbox = await stampWorkoutCompleteInbox(workout.id);
+  if (stampedCompleteInbox) {
+    try {
+      await sendAppNotification({
+        athleteId: activity.athleteId,
+        templateKey: "workout.complete",
         objectType: "workout",
         objectId: workout.id,
-      },
-      facts: { workoutTitle: workout.title },
-    });
-  } catch (err) {
-    console.error("workout_complete push:", err);
+        deeplink: `/workouts/${workout.id}`,
+        payload: {
+          workoutId: workout.id,
+          activityId: activity.id,
+          planId: workout.planId ?? undefined,
+          type: "workout_complete",
+          screen: "workout",
+          objectType: "workout",
+          objectId: workout.id,
+        },
+        facts: { workoutTitle: workout.title },
+      });
+    } catch (err) {
+      console.error("workout_complete push:", err);
+    }
   }
-
-  await stampWorkoutCompleteInbox(workout.id);
 
   try {
     await syncActivityDetailToLinkedWorkout(activity.id);

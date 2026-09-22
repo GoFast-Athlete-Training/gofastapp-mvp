@@ -9,7 +9,12 @@ export async function sendFinishWorkoutSurfacingPush(params: {
   athleteId: string;
   workoutId: string;
   workoutTitle?: string | null;
-}): Promise<void> {
+}): Promise<boolean> {
+  const stampedCompleteInbox = await stampWorkoutCompleteInbox(params.workoutId);
+  if (!stampedCompleteInbox) {
+    return false;
+  }
+
   const title =
     params.workoutTitle?.trim() ||
     (
@@ -39,7 +44,7 @@ export async function sendFinishWorkoutSurfacingPush(params: {
     console.error("finish_workout_surfacing push:", err);
   }
 
-  await stampWorkoutCompleteInbox(params.workoutId);
+  return true;
 }
 
 /**
@@ -68,12 +73,12 @@ export async function surfaceFinishedRunningActivity(params: {
   });
   if (linked) {
     workoutId = linked.id;
-    await sendFinishWorkoutSurfacingPush({
+    const pushSent = await sendFinishWorkoutSurfacingPush({
       athleteId: params.athleteId,
       workoutId: linked.id,
       workoutTitle: linked.title,
     });
-    return { workoutId, pushSent: true };
+    return { workoutId, pushSent };
   }
 
   if (await activityHasPlausiblePlannedWorkoutNearby(params.activityId)) {
@@ -83,11 +88,11 @@ export async function surfaceFinishedRunningActivity(params: {
   const seeded = await seedSpawnedWorkoutFromActivity(params.activityId);
   if (seeded.workoutId) {
     workoutId = seeded.workoutId;
-    await sendFinishWorkoutSurfacingPush({
+    const pushSent = await sendFinishWorkoutSurfacingPush({
       athleteId: params.athleteId,
       workoutId: seeded.workoutId,
     });
-    return { workoutId, pushSent: true };
+    return { workoutId, pushSent };
   }
 
   return { workoutId: null, pushSent: false };
