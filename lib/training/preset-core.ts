@@ -111,7 +111,7 @@ export function mergeCoachPlanOverviewForCore(
     totalQualitySessionsPerWeek?: number;
   },
 ): Record<string, unknown> {
-  const base =
+  const base: Record<string, unknown> =
     existing != null && typeof existing === "object" && !Array.isArray(existing)
       ? { ...(existing as Record<string, unknown>) }
       : { summary: "Build preset" };
