@@ -27,9 +27,7 @@ const presetInclude = {
       positions: {
         orderBy: { cyclePosition: "asc" as const },
         include: {
-          workout_catalogue: {
-            select: { id: true, name: true, workoutType: true, slug: true },
-          },
+          workout_catalogue: true,
         },
       },
     },
@@ -39,9 +37,7 @@ const presetInclude = {
       positions: {
         orderBy: { cyclePosition: "asc" as const },
         include: {
-          workout_catalogue: {
-            select: { id: true, name: true, workoutType: true, slug: true },
-          },
+          workout_catalogue: true,
         },
       },
     },
@@ -51,9 +47,7 @@ const presetInclude = {
       positions: {
         orderBy: { cyclePosition: "asc" as const },
         include: {
-          workout_catalogue: {
-            select: { id: true, name: true, workoutType: true, slug: true },
-          },
+          workout_catalogue: true,
         },
       },
     },
@@ -63,9 +57,7 @@ const presetInclude = {
       positions: {
         orderBy: { cyclePosition: "asc" as const },
         include: {
-          workout_catalogue: {
-            select: { id: true, name: true, workoutType: true, slug: true },
-          },
+          workout_catalogue: true,
         },
       },
     },
