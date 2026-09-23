@@ -35,7 +35,8 @@
     "test:sponsorship": "tsx --test lib/sponsorship/stripe-webhook-service.test.ts lib/sponsorship/company-finance-projection-client.test.ts lib/sponsorship/commitment-service.test.ts lib/gofast-with-me/payout-panel-utils.test.ts lib/sponsorship/sponsorship-history.test.ts",
     "test:athlete-races": "tsx --test lib/athlete-race-claim.test.ts lib/training/race-plan-calendar-service.test.ts lib/races/my-races-hero.test.ts lib/gofast-with-me/public-training-for.test.ts",
     "test:athlete-tips": "tsx --test lib/gofast-with-me/draft-athlete-tip.test.ts lib/gofast-with-me/athlete-tips.test.ts",
-    "test:athlete-company": "tsx --test lib/athlete-company/athlete-company-service.test.ts"
+    "test:athlete-company": "tsx --test lib/athlete-company/athlete-company-service.test.ts",
+    "test:plan-generate": "tsx --test lib/training/assign-workout-days.test.ts lib/training/plan-utils.test.ts lib/training/race-day-service.test.ts"
   },
   "dependencies": {
     "@garmin/fitsdk": "^21.214.0",

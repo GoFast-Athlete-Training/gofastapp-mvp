@@ -43,6 +43,7 @@ export async function planGeneratePostHandler(
       );
     }
 
+    /** Regenerate replaces stale planSchedule JSON (e.g. pre–race-week-fix last week that was race-only). */
     const scheduleExists =
       plan.planSchedule != null &&
       Array.isArray(plan.planSchedule) &&

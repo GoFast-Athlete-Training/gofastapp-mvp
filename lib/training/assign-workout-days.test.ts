@@ -171,3 +171,60 @@ test("Saturday race: Thursday shakeout Friday rest", () => {
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-24"), null);
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Race");
 });
+
+test("5-week Sunday race: last week is a normal training week, not race-only", () => {
+  const planStart = new Date("2026-09-21T00:00:00.000Z");
+  const raceDate = new Date("2026-10-25T00:00:00.000Z");
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    planStartDate: planStart,
+    raceDate,
+    totalWeeks: 5,
+    preferredDays: [1, 2, 3, 4, 5, 6],
+  });
+
+  const lastWeek = schedule.find((w) => w.weekNumber === 5);
+  assert.ok(lastWeek, "week 5 exists");
+  assert.ok(lastWeek!.days.length >= 5, "last week has multiple workouts, not race-only");
+  assert.equal(
+    lastWeek!.days.every((d) => d.workoutType === "Race"),
+    false,
+    "last week must not be only Race"
+  );
+
+  const typesBeforeRace = lastWeek!.days
+    .filter((d) => d.dow < 7)
+    .map((d) => d.workoutType);
+  assert.ok(typesBeforeRace.includes("Tempo") || typesBeforeRace.includes("Intervals"));
+  assert.ok(typesBeforeRace.includes("Easy"));
+
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Easy");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-24"), null);
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Race");
+});
+
+test("Monday race fold: last week still has normal training days, not race-only", () => {
+  const planStart = new Date("2026-09-21T00:00:00.000Z");
+  const raceDate = new Date("2026-10-26T00:00:00.000Z");
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    planStartDate: planStart,
+    raceDate,
+    totalWeeks: 5,
+    preferredDays: [1, 2, 3, 4, 5, 6],
+  });
+
+  const lastWeek = schedule.find((w) => w.weekNumber === 5);
+  assert.ok(lastWeek, "week 5 exists");
+  assert.ok(lastWeek!.days.length >= 4, "folded last week still has training days");
+  assert.equal(
+    lastWeek!.days.every((d) => d.workoutType === "Race"),
+    false,
+    "Monday fold must not collapse last week to race-only"
+  );
+  const preRaceTraining = lastWeek!.days.filter(
+    (d) => d.workoutType === "Tempo" || d.workoutType === "Intervals" || d.workoutType === "Easy"
+  );
+  assert.ok(preRaceTraining.length >= 2, "tempo/interval/easy still placed in folded last week");
+  assert.ok(lastWeek!.days.some((d) => d.workoutType === "Race"), "race row present in last week");
+});
