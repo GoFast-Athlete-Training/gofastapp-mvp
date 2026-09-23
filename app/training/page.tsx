@@ -666,7 +666,13 @@ export default function TrainingHubPage() {
                 Your goal, this week&apos;s plan, and what to do next.
               </p>
             </div>
-            <div className="flex shrink-0 flex-col items-end gap-2">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <Link
+                href="/build-a-run"
+                className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-900 shadow-sm hover:bg-orange-100"
+              >
+                Build my own workout
+              </Link>
               <Link
                 href="/training/past-plans"
                 className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm hover:border-gray-300 hover:text-gray-900"
