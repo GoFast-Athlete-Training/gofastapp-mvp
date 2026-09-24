@@ -70,7 +70,11 @@ import {
   displayWorkoutListTitle,
   formatPlannedWorkoutTitle,
 } from "@/lib/training/workout-display-title";
-import { formatPlanDateDisplay, localYmd } from "@/lib/training/plan-utils";
+import {
+  formatPlanDateDisplay,
+  isScheduledDayBeforeLocalToday,
+  localYmd,
+} from "@/lib/training/plan-utils";
 import { formatPaceTargetRangeDisplay } from "@/lib/training/pace-comparison-display";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
 import WorkoutSkipActions from "@/components/training/WorkoutSkipActions";
@@ -126,6 +130,7 @@ interface MatchedActivitySummary {
   duration: number | null;
   averageSpeed: number | null;
   detailData?: unknown;
+  fitLapData?: unknown;
   hydratedAt?: string | null;
 }
 
@@ -179,6 +184,7 @@ interface Workout {
   segmentExecutionSegmentCount?: number | null;
   garmin_detail_activity?: MatchedActivitySummary | null;
   planId?: string | null;
+  plannedWorkoutId?: string | null;
   weekNumber?: number | null;
   dayAssigned?: string | null;
   training_plans?: {
@@ -917,6 +923,7 @@ export default function WorkoutDetailPage() {
   const [showCreatedBanner, setShowCreatedBanner] = useState(false);
   const [garminToast, setGarminToast] = useState<string | null>(null);
   const [showMatchPanel, setShowMatchPanel] = useState(false);
+  const [deletingRecordedRun, setDeletingRecordedRun] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [savingEdits, setSavingEdits] = useState(false);
@@ -945,6 +952,8 @@ export default function WorkoutDetailPage() {
     if (!workout) return null;
     return computeWorkoutPerformanceAnalysis({
       workoutType: workout.workoutType,
+      planId: workout.planId ?? null,
+      plannedWorkoutId: workout.plannedWorkoutId ?? null,
       targetPaceSecPerMile: workout.targetPaceSecPerMile ?? null,
       targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh ?? null,
       paceDeltaSecPerMile: workout.paceDeltaSecPerMile ?? null,
@@ -957,6 +966,7 @@ export default function WorkoutDetailPage() {
       garmin_detail_activity: workout.garmin_detail_activity
         ? {
             detailData: workout.garmin_detail_activity.detailData,
+            fitLapData: workout.garmin_detail_activity.fitLapData,
             hydratedAt: workout.garmin_detail_activity.hydratedAt
               ? new Date(workout.garmin_detail_activity.hydratedAt)
               : null,
@@ -1260,6 +1270,10 @@ export default function WorkoutDetailPage() {
   }, [quickOrderIds, defaultSegmentOrderIds]);
 
   const isLogged = Boolean(workout?.garminDetailActivityId ?? workout?.garmin_detail_activity);
+  const showFindMissingGarmin = useMemo(
+    () => isScheduledDayBeforeLocalToday(workout?.date ?? null),
+    [workout?.date]
+  );
   const segmentDisplayGroups = useMemo(() => {
     const ordered = isLogged ? sortedSegments : getQuickOrderedSegments();
     return groupSegmentsInDisplayOrder(ordered);
@@ -1533,6 +1547,31 @@ export default function WorkoutDetailPage() {
     editTitleDraft,
     garminConnected,
   ]);
+
+  const handleDeleteRecordedStandalone = async () => {
+    if (!workout || workout.planId) return;
+    if (
+      !window.confirm(
+        "Remove this recorded run from GoFast? This deletes the workout and the linked activity row. It does not delete from Garmin."
+      )
+    ) {
+      return;
+    }
+    setDeletingRecordedRun(true);
+    try {
+      await api.delete(`/training/workout/${workoutId}`);
+      router.push("/workouts");
+    } catch (error: unknown) {
+      console.error("Error deleting recorded run:", error);
+      const err = error as { response?: { data?: { error?: string } } };
+      setPushStatus({
+        success: false,
+        message: err.response?.data?.error || "Could not delete recorded run",
+      });
+    } finally {
+      setDeletingRecordedRun(false);
+    }
+  };
 
   const fetchWorkout = async () => {
     try {
@@ -2009,33 +2048,35 @@ export default function WorkoutDetailPage() {
               skippedAt={workout.skippedAt}
               workoutType={workout.workoutType}
               title={workout.title}
-              showMissedPrompt
+              showMissedPrompt={showFindMissingGarmin}
               onUpdated={fetchWorkout}
             />
-            {showMatchPanel ? (
-              <WorkoutActivityMatchPanel
-                workoutId={workoutId}
-                workoutTitle={workout.title}
-                plannedDistanceMeters={workout.estimatedDistanceInMeters ?? null}
-                onMatched={fetchWorkout}
-                onClose={() => setShowMatchPanel(false)}
-              />
-            ) : (
-              <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 space-y-3">
-                <p className="text-sm text-gray-700 leading-relaxed">
-                  After your run, sync Garmin Connect — GoFast should link the activity to this
-                  workout automatically. Use manual matching only if it does not show up.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowMatchPanel(true)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-800 hover:bg-sky-50"
-                >
-                  <Watch className="h-4 w-4" />
-                  Find missing Garmin activity
-                </button>
-              </div>
-            )}
+            {showFindMissingGarmin ? (
+              showMatchPanel ? (
+                <WorkoutActivityMatchPanel
+                  workoutId={workoutId}
+                  workoutTitle={workout.title}
+                  plannedDistanceMeters={workout.estimatedDistanceInMeters ?? null}
+                  onMatched={fetchWorkout}
+                  onClose={() => setShowMatchPanel(false)}
+                />
+              ) : (
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 space-y-3">
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    After your run, sync Garmin Connect — GoFast should link the activity to this
+                    workout automatically. Use manual matching only if it does not show up.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowMatchPanel(true)}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-800 hover:bg-sky-50"
+                  >
+                    <Watch className="h-4 w-4" />
+                    Find missing Garmin activity
+                  </button>
+                </div>
+              )
+            ) : null}
           </div>
         ) : null}
 
@@ -2045,7 +2086,7 @@ export default function WorkoutDetailPage() {
               workout={workout}
               performanceAnalysis={displayAnalysis}
             />
-            {workoutId ? (
+            {workoutId && workout.planId ? (
               <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5">
                 <p className="mb-2 text-xs font-semibold uppercase text-gray-500">
                   Not the right run?
@@ -2056,6 +2097,22 @@ export default function WorkoutDetailPage() {
                   plannedDistanceMeters={workout.estimatedDistanceInMeters ?? null}
                   onMatched={fetchWorkout}
                 />
+              </div>
+            ) : null}
+            {!workout.planId ? (
+              <div className="mb-6 rounded-xl border border-red-100 bg-red-50/40 p-5">
+                <h2 className="text-sm font-semibold text-red-900">Remove from GoFast</h2>
+                <p className="mt-1 text-sm text-red-800/90">
+                  Delete this recorded run from GoFast. Your activity stays in Garmin Connect.
+                </p>
+                <button
+                  type="button"
+                  disabled={deletingRecordedRun}
+                  onClick={() => void handleDeleteRecordedStandalone()}
+                  className="mt-3 inline-flex rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  {deletingRecordedRun ? "Deleting…" : "Delete recorded run"}
+                </button>
               </div>
             ) : null}
           </>

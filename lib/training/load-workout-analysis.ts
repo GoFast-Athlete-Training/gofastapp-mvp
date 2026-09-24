@@ -107,6 +107,8 @@ export async function loadWorkoutForAnalysis(params: {
 
   const analysisInput: PerformanceAnalysisWorkoutInput = {
     workoutType: workout.workoutType,
+    planId: workout.planId,
+    plannedWorkoutId: workout.plannedWorkoutId,
     targetPaceSecPerMile: workout.targetPaceSecPerMile,
     targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
     paceDeltaSecPerMile: workout.paceDeltaSecPerMile,

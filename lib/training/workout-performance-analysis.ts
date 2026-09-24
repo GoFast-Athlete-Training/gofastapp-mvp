@@ -20,6 +20,10 @@ import {
   requiresPaceForPaceAnalysis,
   requiresSegmentLevelPaceForPace,
 } from "@/lib/training/workout-paced-segments";
+import {
+  buildActivityMileLapsFromActivityDetail,
+  type ActivityMileLapRow,
+} from "@/lib/training/activity-mile-laps";
 import { NO_DETAIL_SUPPORT_MESSAGE, workoutHasLapPaceDeltas } from "./workout-pace-analyzer";
 import { formatSecPerMile } from "@/lib/training/race-projection";
 import {
@@ -143,8 +147,13 @@ export type WorkoutPerformanceAnalysis = {
   executionHeadline: string | null;
   executionVerdict: WorkoutExecutionVerdict | null;
   phaseAwareLaps: PhaseAwareLapRow[];
+  /** Mile splits for general runs (no prescribed segments); display-only. */
+  activityMileLaps: ActivityMileLapRow[];
+  hasRealPrescription: boolean;
   scorecard: WorkoutScorecard;
 };
+
+export type { ActivityMileLapRow } from "@/lib/training/activity-mile-laps";
 
 export type WorkoutExecutionVerdictKind =
   | "mostly_on_target"
@@ -183,8 +192,21 @@ export type PerformanceAnalysisSegmentInput = {
   }>;
 };
 
+/** True when the workout row reflects a training prescription (not a spawned general run). */
+export function workoutHasRealPrescription(workout: {
+  planId?: string | null;
+  plannedWorkoutId?: string | null;
+  segments?: readonly unknown[] | null;
+}): boolean {
+  if (workout.plannedWorkoutId) return true;
+  if (workout.planId) return true;
+  return (workout.segments?.length ?? 0) > 0;
+}
+
 export type PerformanceAnalysisWorkoutInput = {
   workoutType: string;
+  planId?: string | null;
+  plannedWorkoutId?: string | null;
   targetPaceSecPerMile: number | null;
   targetPaceSecPerMileHigh: number | null;
   paceDeltaSecPerMile: number | null;
@@ -472,21 +494,21 @@ function computeWorkEffortScorecard(params: {
 
 export function computeWorkoutScorecard(params: {
   workout: PerformanceAnalysisWorkoutInput;
-  analysis: Omit<WorkoutPerformanceAnalysis, "scorecard">;
+  analysis: Omit<WorkoutPerformanceAnalysis, "scorecard" | "activityMileLaps" | "hasRealPrescription">;
+  hasRealPrescription: boolean;
 }): WorkoutScorecard {
-  const { workout, analysis } = params;
+  const { workout, analysis, hasRealPrescription } = params;
   const actualMiles =
     workout.actualDistanceMeters != null && workout.actualDistanceMeters > 0
       ? workout.actualDistanceMeters / 1609.34
       : null;
-  const plannedMiles =
-    workout.estimatedDistanceInMeters != null && workout.estimatedDistanceInMeters > 0
-      ? workout.estimatedDistanceInMeters / 1609.34
+  const plannedMeters =
+    hasRealPrescription && workout.estimatedDistanceInMeters != null
+      ? workout.estimatedDistanceInMeters
       : null;
-  const distStatus = distanceStatus(
-    workout.estimatedDistanceInMeters,
-    workout.actualDistanceMeters
-  );
+  const plannedMiles =
+    plannedMeters != null && plannedMeters > 0 ? plannedMeters / 1609.34 : null;
+  const distStatus = distanceStatus(plannedMeters, workout.actualDistanceMeters);
 
   const workEffort =
     analysis.analysisMode === "completion_only" && !analysis.canJudgeTargetPace
@@ -506,10 +528,7 @@ export function computeWorkoutScorecard(params: {
       plannedMiles,
       status: distStatus,
       badge: distanceStatusBadgeText(distStatus),
-      message: distanceStatusMessage(
-        workout.estimatedDistanceInMeters,
-        workout.actualDistanceMeters
-      ),
+      message: distanceStatusMessage(plannedMeters, workout.actualDistanceMeters),
     },
     workEffort,
     workSegmentDeltas: buildWorkSegmentDeltas(analysis.workSegmentActual),
@@ -566,6 +585,7 @@ export function buildWorkoutExecutionVerdict(params: {
   actualAvgPaceSecPerMile: number | null;
   actualDistanceMeters?: number | null;
   actualDurationSeconds?: number | null;
+  hasRealPrescription: boolean;
 }): WorkoutExecutionVerdict | null {
   const category = deriveWorkoutVisualCategory(params.workoutType, params.segments);
   const notes: string[] = [];
@@ -573,15 +593,6 @@ export function buildWorkoutExecutionVerdict(params: {
   const plannedMiles = params.scorecard.totalMiles.plannedMiles;
   const actualMiles = params.scorecard.totalMiles.actualMiles;
   const distStatus = params.scorecard.totalMiles.status;
-
-  const plannedParts: string[] = [];
-  if (plannedMiles != null) plannedParts.push(`${plannedMiles.toFixed(1)} mi planned`);
-  const pacePlan = paceRangeSummary(
-    params.targetPaceSecPerMile,
-    params.targetPaceSecPerMileHigh
-  );
-  if (pacePlan) plannedParts.push(pacePlan);
-  const plannedSummary = plannedParts.length > 0 ? plannedParts.join(" · ") : null;
 
   const actualParts: string[] = [];
   if (actualMiles != null) actualParts.push(`${actualMiles.toFixed(1)} mi`);
@@ -592,6 +603,25 @@ export function buildWorkoutExecutionVerdict(params: {
     actualParts.push(`${Math.round(params.actualDurationSeconds / 60)} min`);
   }
   const actualSummary = actualParts.length > 0 ? actualParts.join(" · ") : null;
+
+  if (!params.hasRealPrescription) {
+    return {
+      verdict: "completed_only",
+      plannedSummary: null,
+      actualSummary,
+      notes: [],
+      category,
+    };
+  }
+
+  const plannedParts: string[] = [];
+  if (plannedMiles != null) plannedParts.push(`${plannedMiles.toFixed(1)} mi planned`);
+  const pacePlan = paceRangeSummary(
+    params.targetPaceSecPerMile,
+    params.targetPaceSecPerMileHigh
+  );
+  if (pacePlan) plannedParts.push(pacePlan);
+  const plannedSummary = plannedParts.length > 0 ? plannedParts.join(" · ") : null;
 
   if (params.analysisMode === "completion_only" && !params.canJudgeTargetPace) {
     return {
@@ -1069,6 +1099,8 @@ export function resolveLapSource(params: {
 export function computeWorkoutPerformanceAnalysis(
   workout: PerformanceAnalysisWorkoutInput
 ): WorkoutPerformanceAnalysis {
+  const hasRealPrescription = workoutHasRealPrescription(workout);
+
   const hasDetailLapData =
     workout.completedActivityDetailJson != null ||
     workout.garmin_detail_activity?.detailData != null ||
@@ -1157,6 +1189,16 @@ export function computeWorkoutPerformanceAnalysis(
       })
     : [];
 
+  const activityMileLaps =
+    !hasRealPrescription && !hasSegmentLaps
+      ? buildActivityMileLapsFromActivityDetail({
+          detailData:
+            workout.completedActivityDetailJson ??
+            workout.garmin_detail_activity?.detailData,
+          fitLapData: workout.garmin_detail_activity?.fitLapData,
+        })
+      : [];
+
   const resolvedLapSource = hasSegmentLaps ? lapSource : null;
 
   const analysisWithoutScorecard = {
@@ -1176,19 +1218,24 @@ export function computeWorkoutPerformanceAnalysis(
     executionHeadline: null,
     executionVerdict: null,
     phaseAwareLaps,
+    activityMileLaps,
+    hasRealPrescription,
   };
 
   const scorecard = computeWorkoutScorecard({
     workout,
     analysis: analysisWithoutScorecard,
+    hasRealPrescription,
   });
 
-  const executionHeadline = buildExecutionHeadline({
-    scorecard,
-    workRepsOnTarget,
-    canJudgeTargetPace,
-    completionOnlyMessage,
-  });
+  const executionHeadline = hasRealPrescription
+    ? buildExecutionHeadline({
+        scorecard,
+        workRepsOnTarget,
+        canJudgeTargetPace,
+        completionOnlyMessage,
+      })
+    : completionOnlyMessage;
 
   const executionVerdict = buildWorkoutExecutionVerdict({
     scorecard,
@@ -1202,6 +1249,7 @@ export function computeWorkoutPerformanceAnalysis(
     actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
     actualDistanceMeters: workout.actualDistanceMeters,
     actualDurationSeconds: workout.actualDurationSeconds,
+    hasRealPrescription,
   });
 
   return {

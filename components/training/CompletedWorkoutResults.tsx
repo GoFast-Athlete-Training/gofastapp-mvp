@@ -22,6 +22,8 @@ type WorkoutLike = {
   id: string;
   title: string;
   description?: string | null;
+  planId?: string | null;
+  plannedWorkoutId?: string | null;
   garminDetailActivityId?: string | null;
   garmin_detail_activity?: MatchedActivity | null;
   actualDistanceMeters?: number | null;
@@ -58,8 +60,15 @@ export function CompletedWorkoutResults({
     workout.garmin_detail_activity?.activityName?.trim() || workout.title || "Activity";
   const planDescription = workout.description?.trim() || null;
   const actualsLine = buildActualsLine(workout);
-  const headline = performanceAnalysis?.executionHeadline?.trim() || null;
-  const verdict = performanceAnalysis?.executionVerdict ?? null;
+  const showPlanComparison = performanceAnalysis?.hasRealPrescription ?? true;
+  const headline = showPlanComparison
+    ? performanceAnalysis?.executionHeadline?.trim() || null
+    : null;
+  const verdict = showPlanComparison ? performanceAnalysis?.executionVerdict ?? null : null;
+  const completedOnlyVerdict =
+    !showPlanComparison && performanceAnalysis?.executionVerdict?.verdict === "completed_only"
+      ? performanceAnalysis.executionVerdict
+      : null;
   const verdictLabel =
     verdict?.verdict === "mostly_on_target"
       ? "Mostly on target"
@@ -75,12 +84,32 @@ export function CompletedWorkoutResults({
     <div className="mb-6 space-y-4">
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-bold uppercase tracking-widest text-gray-500">{activityTitle}</p>
-        <p className="mt-3 text-sm text-gray-600">
-          Plan workout:{" "}
-          <span className="font-semibold text-gray-900">{workout.title}</span>
-        </p>
-        {planDescription ? <p className="mt-1 text-sm text-gray-600">{planDescription}</p> : null}
+        {showPlanComparison ? (
+          <>
+            <p className="mt-3 text-sm text-gray-600">
+              Plan workout:{" "}
+              <span className="font-semibold text-gray-900">{workout.title}</span>
+            </p>
+            {planDescription ? (
+              <p className="mt-1 text-sm text-gray-600">{planDescription}</p>
+            ) : null}
+          </>
+        ) : (
+          <p className="mt-3 text-sm font-semibold text-gray-900">{workout.title}</p>
+        )}
       </div>
+
+      {completedOnlyVerdict ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-emerald-800">
+            Recorded run
+          </p>
+          <p className="mt-2 text-sm font-medium text-emerald-900">Run complete</p>
+          {completedOnlyVerdict.actualSummary ? (
+            <p className="mt-2 text-xs text-gray-600">{completedOnlyVerdict.actualSummary}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {headline || verdict ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">

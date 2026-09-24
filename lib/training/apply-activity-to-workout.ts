@@ -762,6 +762,46 @@ export async function reassignActivityToWorkout(params: {
   };
 }
 
+/**
+ * Remove a spawned general run: deletes the workout row and linked athlete_activities row.
+ * Only allowed when the workout is not on a training plan.
+ */
+export async function deleteRecordedStandaloneWorkout(params: {
+  workoutId: string;
+  athleteId: string;
+}): Promise<{ deleted: boolean; error?: string }> {
+  const workout = await prisma.workouts.findFirst({
+    where: { id: params.workoutId, athleteId: params.athleteId },
+    select: {
+      id: true,
+      planId: true,
+      plannedWorkoutId: true,
+      garminDetailActivityId: true,
+    },
+  });
+  if (!workout) {
+    return { deleted: false, error: "Workout not found" };
+  }
+  if (workout.planId != null || workout.plannedWorkoutId != null) {
+    return {
+      deleted: false,
+      error: "Only recorded general runs can be deleted from here",
+    };
+  }
+
+  const activityId = workout.garminDetailActivityId;
+
+  await prisma.workouts.delete({ where: { id: workout.id } });
+
+  if (activityId) {
+    await prisma.athlete_activities.deleteMany({
+      where: { id: activityId, athleteId: params.athleteId },
+    });
+  }
+
+  return { deleted: true };
+}
+
 /** Hard-delete a GoFast activity row (not Garmin). Clears any owning workout link first. */
 export async function deleteAthleteActivity(params: {
   activityId: string;

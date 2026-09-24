@@ -82,6 +82,8 @@ export async function GET(request: NextRequest) {
       targetPaceSecPerMile: w.targetPaceSecPerMile,
       targetPaceSecPerMileHigh: w.targetPaceSecPerMileHigh,
       paceDeltaSecPerMile: w.paceDeltaSecPerMile,
+      planId: w.planId,
+      plannedWorkoutId: w.plannedWorkoutId,
       actualAvgPaceSecPerMile: w.actualAvgPaceSecPerMile,
       actualDistanceMeters: w.actualDistanceMeters,
       actualDurationSeconds: w.actualDurationSeconds,

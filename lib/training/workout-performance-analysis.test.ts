@@ -855,6 +855,28 @@ test("long run completion verdict uses LONG category", () => {
   assert.equal(analysis.executionHeadline, "Pace slower than target");
 });
 
+test("spawned general run skips plan-vs-actual even when estimated equals actual", () => {
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "Easy",
+    planId: null,
+    plannedWorkoutId: null,
+    targetPaceSecPerMile: null,
+    targetPaceSecPerMileHigh: null,
+    paceDeltaSecPerMile: null,
+    actualAvgPaceSecPerMile: 480,
+    actualDistanceMeters: 6.8 * 1609.34,
+    estimatedDistanceInMeters: 6.8 * 1609.34,
+    actualDurationSeconds: 3720,
+    garminDetailActivityId: "act-general",
+    garmin_detail_activity: { detailData: null, hydratedAt: null },
+    segments: [],
+  });
+
+  assert.equal(analysis.hasRealPrescription, false);
+  assert.equal(analysis.executionVerdict?.verdict, "completed_only");
+  assert.equal(analysis.executionVerdict?.plannedSummary, null);
+});
+
 test("hybrid easy with multiple work segments classifies HYBRID", () => {
   const analysis = computeWorkoutPerformanceAnalysis({
     workoutType: "Easy",

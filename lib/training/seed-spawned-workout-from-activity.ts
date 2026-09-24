@@ -54,7 +54,6 @@ export async function seedSpawnedWorkoutFromActivity(
       date: activity.startTime,
       catalogueWorkoutId: null,
       garminDetailActivityId: activity.id,
-      estimatedDistanceInMeters: distanceMeters,
       actualDistanceMeters: distanceMeters,
       actualAvgPaceSecPerMile: paceSecPerMile,
       actualAverageHeartRate: activity.averageHeartRate,

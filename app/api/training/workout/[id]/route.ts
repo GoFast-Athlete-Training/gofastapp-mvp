@@ -459,6 +459,8 @@ export async function GET(request: NextRequest, context: Ctx) {
 
     const performanceAnalysis = computeWorkoutPerformanceAnalysis({
       workoutType: workout.workoutType,
+      planId: workout.planId,
+      plannedWorkoutId: workout.plannedWorkoutId,
       targetPaceSecPerMile: workout.targetPaceSecPerMile,
       targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
       paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
@@ -499,5 +501,41 @@ export async function GET(request: NextRequest, context: Ctx) {
   } catch (e: unknown) {
     console.error("GET /api/training/workout/[id]", e);
     return NextResponse.json({ error: "Failed to load workout" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/training/workout/[id]
+ * Remove a spawned general run (workout + linked Garmin activity row).
+ */
+export async function DELETE(request: NextRequest, { params }: Ctx) {
+  const auth = await requireAthleteFromBearer(request);
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  const { id } = await params;
+  if (!id?.trim()) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+
+  try {
+    const { deleteRecordedStandaloneWorkout } = await import(
+      "@/lib/training/apply-activity-to-workout"
+    );
+    const result = await deleteRecordedStandaloneWorkout({
+      workoutId: id.trim(),
+      athleteId: auth.athlete.id,
+    });
+    if (!result.deleted) {
+      return NextResponse.json(
+        { error: result.error ?? "Could not delete workout" },
+        { status: result.error === "Workout not found" ? 404 : 400 }
+      );
+    }
+    return NextResponse.json({ success: true, deleted: true });
+  } catch (e: unknown) {
+    console.error("DELETE /api/training/workout/[id]", e);
+    return NextResponse.json({ error: "Failed to delete workout" }, { status: 500 });
   }
 }
