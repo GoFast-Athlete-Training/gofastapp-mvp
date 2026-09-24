@@ -25,6 +25,8 @@ const PACE_SLOT_ENC = 2 as const;
 
 export interface SlotData {
   miles: number;
+  /** Prescription step title from catalogue (e.g. Work) — preserved on save. */
+  segmentTitle?: string;
   /** PACE API valueLow (sec/km, v2) — faster bound; same as detail editor “Pace low”. */
   paceValueLow?: number;
   /** PACE API valueHigh (sec/km, v2) — slower bound; “Pace high”. */
@@ -180,6 +182,7 @@ function apiSegmentsToSlots(segments: ApiSegment[]): {
     }
     const slot: SlotData = {
       miles,
+      segmentTitle: seg.title?.trim() || undefined,
       paceValueLow,
       paceValueHigh,
       hrMin,
@@ -188,9 +191,9 @@ function apiSegmentsToSlots(segments: ApiSegment[]): {
     };
 
     if (/warmup|warm.up|warm up/.test(title)) {
-      warmup = slot;
+      warmup = { ...slot, segmentTitle: slot.segmentTitle ?? "Warmup" };
     } else if (/cooldown|cool.down|cool down/.test(title)) {
-      cooldown = slot;
+      cooldown = { ...slot, segmentTitle: slot.segmentTitle ?? "Cooldown" };
     } else {
       mainSegments.push(slot);
     }
@@ -647,7 +650,7 @@ function CreateWorkoutPageInner() {
       if (warmup && warmup.miles > 0) {
         segments.push({
           stepOrder: step++,
-          title: "Warmup",
+          title: warmup.segmentTitle?.trim() || "Warmup",
           durationType: "DISTANCE",
           durationValue: warmup.miles,
           targets: buildTargets(warmup),
@@ -659,9 +662,11 @@ function CreateWorkoutPageInner() {
       for (const slot of mainSegments) {
         if (slot.miles > 0) {
           mainOrdinal++;
+          const defaultMainTitle =
+            mainsWithMiles.length === 1 ? "Work" : `Segment ${mainOrdinal}`;
           segments.push({
             stepOrder: step++,
-            title: mainsWithMiles.length === 1 ? "Main Work" : `Segment ${mainOrdinal}`,
+            title: slot.segmentTitle?.trim() || defaultMainTitle,
             durationType: "DISTANCE",
             durationValue: slot.miles,
             targets: buildTargets(slot),
@@ -672,7 +677,7 @@ function CreateWorkoutPageInner() {
       if (cooldown && cooldown.miles > 0) {
         segments.push({
           stepOrder: step++,
-          title: "Cooldown",
+          title: cooldown.segmentTitle?.trim() || "Cooldown",
           durationType: "DISTANCE",
           durationValue: cooldown.miles,
           targets: buildTargets(cooldown),

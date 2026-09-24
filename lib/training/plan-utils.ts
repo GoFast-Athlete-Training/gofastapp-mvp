@@ -134,6 +134,21 @@ export function localTodayKey(): string {
   return localYmd(new Date());
 }
 
+/** True when the workout schedule day is strictly before the user's local today. */
+export function isScheduledDayBeforeLocalToday(
+  scheduled: Date | string | null | undefined
+): boolean {
+  if (scheduled == null) return false;
+  let ymd: string;
+  if (typeof scheduled === "string") {
+    ymd = scheduled.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+  } else {
+    ymd = ymdFromDate(scheduled);
+  }
+  return ymd < localTodayKey();
+}
+
 /**
  * Display a plan date string without shifting the calendar day (avoids UTC midnight / local tz bugs).
  * `ymd` is `YYYY-MM-DD` or any value parseable after appending local noon.

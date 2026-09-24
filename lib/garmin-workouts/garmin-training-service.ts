@@ -426,8 +426,9 @@ function mapIntensityFromTitle(title: string): GarminIntensity {
   if (lower.includes("interval") || lower.includes("repeat")) {
     return GarminIntensity.INTERVAL;
   }
-  if (/\bmain\b/.test(lower)) {
-    return GarminIntensity.MAIN;
+  // Running workouts must not use MAIN (Garmin: swimming only). "Main Work" / "Work" → ACTIVE.
+  if (/\bwork\b/.test(lower) || /\bmain\b/.test(lower)) {
+    return GarminIntensity.ACTIVE;
   }
 
   return GarminIntensity.ACTIVE;

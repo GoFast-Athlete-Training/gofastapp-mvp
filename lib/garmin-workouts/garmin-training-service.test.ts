@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assembleGarminWorkout } from "./garmin-training-service";
-import { GarminRepeatType } from "./types";
+import { GarminIntensity, GarminRepeatType } from "./types";
 
 const M400 = 400 / 1609.34;
 
@@ -66,6 +66,28 @@ test("assembleGarminWorkout nests work + recovery inside repeat block", () => {
   assert.equal(repeat.steps!.length, 2);
   assert.equal(repeat.steps![0]!.description, "Interval");
   assert.equal(repeat.steps![1]!.description, "Recovery");
+});
+
+test("assembleGarminWorkout maps Main Work and Work to ACTIVE for running", () => {
+  for (const title of ["Main Work", "Work"]) {
+    const workout = assembleGarminWorkout({
+      id: "w1",
+      title: "Easy Run",
+      workoutType: "Easy",
+      segments: [
+        {
+          id: "s1",
+          workoutId: "w1",
+          stepOrder: 1,
+          title,
+          durationType: "DISTANCE",
+          durationValue: 6,
+        },
+      ],
+    });
+    assert.equal(workout.steps.length, 1);
+    assert.equal(workout.steps[0]!.intensity, GarminIntensity.ACTIVE);
+  }
 });
 
 test("assembleGarminWorkout heals corrupted durationValue 400 (meters stored as miles)", () => {

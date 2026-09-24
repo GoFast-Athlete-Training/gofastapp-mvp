@@ -10,22 +10,20 @@ import {
   planScheduleDayForDateKey,
   type PlanScheduleDay,
 } from "./plan-schedule";
-import {
-  prescribe,
-  type WorkoutStep,
-} from "./prescription";
-import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
+import { type WorkoutStep } from "./prescription";
 import { metersToMiles } from "@/lib/pace-utils";
 import {
   segmentSnapshotDocumentFromApiSegments,
   type SegmentSnapshotSource,
 } from "./workout-segment-snapshot";
-import { resolveGoalRacePace } from "./goal-pace-calculator";
 import { buildTempoPrescriptionGoalBenchmark } from "./goal-threshold-from-mp";
 import { EASY_RUN_NOT_CONFIGURED } from "./run-type-config-validation";
 import { ensurePlannedWorkoutPrescriptionNarrative } from "./prescription-narrative-service";
 import { loadCatalogueTitleByIdFromPlanSchedule } from "./catalogue-title-map";
-import { parseAthletePaceAdjuster } from "./athlete-pace-adjuster";
+import {
+  athleteContextFromRow,
+  prescribeCatalogueEntry,
+} from "./standalone-catalogue-prescription";
 
 export class MaterializeWorkoutError extends Error {
   constructor(message: string) {
@@ -232,30 +230,30 @@ async function buildPrescriptionSteps(params: {
     return { steps: [], goalRacePaceSecPerMile: null };
   }
 
-  const anchorSecPerMile = parsePaceToSecondsPerMile(athleteFiveKPace);
-  const goalFinishTime = plan.athlete_race?.goalTime?.trim() || null;
-  const racePaceSec = resolveGoalRacePace({
-    goalTime: goalFinishTime,
-    dbGoalRacePaceSecPerMile: plan.athlete_race?.goalRacePace ?? null,
-    athleteSnapGoalRacePace: athlete?.goalRacePace ?? null,
-    distanceMeters: race?.distanceMeters ?? null,
-    distanceLabel: race?.distanceLabel ?? null,
-    goalDistance: plan.athlete_race?.goalDistance ?? null,
-  }).goalPaceSecPerMile;
-
-  const paceAdjuster = parseAthletePaceAdjuster(athlete);
+  const prescribed = prescribeCatalogueEntry({
+    entry: catalogueEntryForDay,
+    scheduleMiles: miles,
+    athlete: athleteContextFromRow({
+      fiveKPace: athleteFiveKPace,
+      goalRacePace: athlete?.goalRacePace ?? null,
+      paceAdjusterEasySecPerMile: athlete?.paceAdjusterEasySecPerMile ?? null,
+      paceAdjusterLongRunSecPerMile: athlete?.paceAdjusterLongRunSecPerMile ?? null,
+      paceAdjusterThresholdSecPerMile: athlete?.paceAdjusterThresholdSecPerMile ?? null,
+      paceAdjusterIntervalSecPerMile: athlete?.paceAdjusterIntervalSecPerMile ?? null,
+    }),
+    goal: {
+      goalTime: plan.athlete_race?.goalTime?.trim() || null,
+      dbGoalRacePaceSecPerMile: plan.athlete_race?.goalRacePace ?? null,
+      goalDistance: plan.athlete_race?.goalDistance ?? null,
+      distanceMeters: race?.distanceMeters ?? null,
+      distanceLabel: race?.distanceLabel ?? null,
+    },
+    planCycleIndex: scheduled.planCycleIndex ?? null,
+  });
 
   return {
-    steps: prescribe({
-      entry: catalogueEntryForDay,
-      scheduleMiles: miles,
-      anchorSecondsPerMile: anchorSecPerMile,
-      racePaceSecondsPerMile: racePaceSec,
-      planCycleIndex: scheduled.planCycleIndex ?? null,
-      easyWorkPaceOffsetOverrideSecPerMile: null,
-      paceAdjuster,
-    }),
-    goalRacePaceSecPerMile: racePaceSec,
+    steps: prescribed.steps,
+    goalRacePaceSecPerMile: prescribed.goalRacePaceSecPerMile,
   };
 }
 
