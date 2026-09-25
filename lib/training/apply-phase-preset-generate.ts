@@ -2,6 +2,7 @@ import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
 import type { PhaseWeekRow } from "@/lib/training/phase-week-pins";
 import type { TrainingManagePresetForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
 import { TAPER_CALENDAR_WEEKS } from "@/lib/training/preset-volume-helpers";
+import { mapPositionRow } from "@/lib/training/plan-generate-presets-loader";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
 
 function round1(n: number): number {
@@ -10,13 +11,9 @@ function round1(n: number): number {
 
 export function positionsFromPhaseRotation(
   config: TrainingManagePresetForGenerate["build"]["longRunConfig"],
-): RunTypePosition[] {
+): ReturnType<typeof mapPositionRow>[] {
   if (!config?.positions?.length) return [];
-  return config.positions.map((p) => ({
-    cyclePosition: p.cyclePosition,
-    catalogueWorkoutId: p.catalogueWorkoutId,
-    distributionWeight: p.distributionWeight,
-  }));
+  return config.positions.map(mapPositionRow);
 }
 
 /** Interpolate build-phase long runs from start → peak (replaces pool-derived LR miles). */
