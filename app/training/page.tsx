@@ -67,6 +67,7 @@ type PlanDetailHub = {
   race_registry: { id?: string; name: string; raceDate?: string } | null;
   training_plan_preset?: {
     minWeeklyMiles?: number | null;
+    maxWeeklyMiles?: number | null;
     peakLongRunPoolMiles?: number;
     longRunConfig?: {
       positions?: Array<{
@@ -632,6 +633,14 @@ export default function TrainingHubPage() {
     return 40;
   }, [planDetail?.training_plan_preset?.minWeeklyMiles]);
 
+  const presetMaxWeeklyMiles = useMemo(() => {
+    const raw = planDetail?.training_plan_preset?.maxWeeklyMiles;
+    if (raw != null && Number.isFinite(Number(raw))) {
+      return Math.max(1, Math.round(Number(raw)));
+    }
+    return null;
+  }, [planDetail?.training_plan_preset?.maxWeeklyMiles]);
+
   async function getHubToken() {
     const u = auth.currentUser;
     if (!u) throw new Error("Sign in required");
@@ -1121,8 +1130,12 @@ export default function TrainingHubPage() {
                     <p className="mt-1 text-gray-600">This week: schedule loading…</p>
                   )}
                   <p className="mt-2 text-xs text-gray-600">
-                    Target is the weekly volume your plan aims toward. Planned miles are
-                    the workouts generated for this specific week.
+                    Your weekly target stays in the preset band
+                    {presetMaxWeeklyMiles != null
+                      ? ` (${presetMinWeeklyMiles}–${presetMaxWeeklyMiles} mi)`
+                      : ` (from ${presetMinWeeklyMiles} mi up)`}
+                    . Most weeks build toward the peak week at the top of the range, then taper
+                    and race week take over. Planned miles are what was generated for this week.
                   </p>
                 </div>
                 <Link

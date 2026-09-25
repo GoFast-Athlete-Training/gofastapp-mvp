@@ -36,6 +36,8 @@ export type DistributeEasyInput = {
   taperStartWeekNumber?: number | null;
   /** Plan length — enables last-two-week taper volume policy. */
   totalWeeks?: number | null;
+  /** When set, overrides flat weeklyMileageTarget per calendar week (build climb + taper caps). */
+  weeklyMileageByWeek?: Map<number, number> | null;
   /** Secondary race distances keyed by raceRegistryId for multi-race plans. */
   secondaryRaceDistanceMilesByRegistryId?: Map<string, number>;
 };
@@ -83,10 +85,12 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
         ? Math.min(1, week.days.length / typicalWeekPreferredCount)
         : 1;
 
-    let weeklyCap = Math.max(
-      input.minWeeklyMiles,
-      Math.min(100, input.weeklyMileageTarget)
-    );
+    const weekTargetOverride = input.weeklyMileageByWeek?.get(weekNum);
+    const baseTarget =
+      weekTargetOverride != null && Number.isFinite(weekTargetOverride)
+        ? weekTargetOverride
+        : input.weeklyMileageTarget;
+    let weeklyCap = Math.max(input.minWeeklyMiles, Math.min(100, baseTarget));
     if (input.maxWeeklyMiles != null && Number.isFinite(input.maxWeeklyMiles)) {
       weeklyCap = Math.min(weeklyCap, Number(input.maxWeeklyMiles));
     }

@@ -64,7 +64,7 @@ export async function planGeneratePostHandler(
     });
 
     const rawMin = body.minWeeklyMiles;
-    const minWeeklyMiles =
+    let minWeeklyMiles =
       typeof rawMin === "number" && Number.isFinite(rawMin)
         ? Math.max(25, Math.min(70, Math.round(rawMin)))
         : 40;
@@ -79,6 +79,24 @@ export async function planGeneratePostHandler(
       minWeeklyMiles,
       Math.min(100, weeklyMileageTarget)
     );
+
+    if (plan.presetId) {
+      const presetBand = await prisma.training_plan_preset.findUnique({
+        where: { id: plan.presetId },
+        select: { minWeeklyMiles: true, maxWeeklyMiles: true },
+      });
+      if (presetBand) {
+        const bandMin = Math.max(1, presetBand.minWeeklyMiles);
+        minWeeklyMiles = Math.max(minWeeklyMiles, bandMin);
+        weeklyMileageTarget = Math.max(bandMin, weeklyMileageTarget);
+        if (
+          presetBand.maxWeeklyMiles != null &&
+          Number.isFinite(presetBand.maxWeeklyMiles)
+        ) {
+          weeklyMileageTarget = Math.min(presetBand.maxWeeklyMiles, weeklyMileageTarget);
+        }
+      }
+    }
 
     const rawIncluded =
       body.includedSecondaryAthleteRaceIds ?? body.includedSecondarySignupIds;

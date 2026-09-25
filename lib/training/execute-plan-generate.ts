@@ -43,6 +43,15 @@ import {
   resolvePlanRaceCalendar,
 } from "@/lib/training/race-plan-calendar-service";
 import { resolveGoalRaceMetersForGenerate } from "@/lib/training/resolve-goal-race-meters";
+import { fetchTrainingManagePresetForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
+import { buildWeeklyMileageTargetsByWeek } from "@/lib/training/build-weekly-mileage-curve";
+import {
+  applyBuildPhaseLongRunMiles,
+  applyPhaseTaperAndRaceLongRunCaps,
+  applyPhaseWeekCataloguePins,
+  positionsFromPhaseRotation,
+} from "@/lib/training/apply-phase-preset-generate";
+import { weeklyVolumePeakFromPreset } from "@/lib/training/preset-core";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -112,13 +121,26 @@ export async function executePlanGenerate(params: {
 
   const planConfig = blueprintToPlanGenConfig(blueprint);
 
-  const longRunPositions =
+  const phasePreset =
+    plan.presetId != null
+      ? await fetchTrainingManagePresetForGenerate(plan.presetId)
+      : null;
+  const phaseBuild = phasePreset?.build ?? null;
+
+  let longRunPositions =
     rawPreset.longRunConfig?.positions.map(mapPositionRow) ?? [];
-  const intervalsPositions =
+  let intervalsPositions =
     rawPreset.intervalsConfig?.positions.map(mapPositionRow) ?? [];
-  const tempoPositions =
+  let tempoPositions =
     rawPreset.tempoConfig?.positions.map(mapPositionRow) ?? [];
-  const easyPositions = rawPreset.easyConfig?.positions.map(mapPositionRow) ?? [];
+  let easyPositions = rawPreset.easyConfig?.positions.map(mapPositionRow) ?? [];
+
+  if (phaseBuild) {
+    longRunPositions = positionsFromPhaseRotation(phaseBuild.longRunConfig);
+    intervalsPositions = positionsFromPhaseRotation(phaseBuild.intervalsConfig);
+    tempoPositions = positionsFromPhaseRotation(phaseBuild.tempoConfig);
+    easyPositions = positionsFromPhaseRotation(phaseBuild.easyConfig);
+  }
 
   if (rotationMissingCatalogueWorkout(longRunPositions)) {
     throw new Error(
@@ -159,14 +181,25 @@ export async function executePlanGenerate(params: {
     params.minWeeklyMiles,
     Math.min(100, params.weeklyMileageTarget)
   );
+  const bandMin = phasePreset?.minWeeklyMiles ?? Number(vol.minWeeklyMiles);
+  const bandMax =
+    phasePreset?.maxWeeklyMiles ??
+    phaseBuild?.peakWeeklyMiles ??
+    planConfig.maxWeeklyMiles ??
+    null;
+  const presetPeakMiles = weeklyVolumePeakFromPreset({
+    minWeeklyMiles: Math.max(1, bandMin),
+    maxWeeklyMiles: bandMax,
+  });
+
   let weeklyMileageTarget = requestedWeeklyMileageTarget;
-  const cap = planConfig.maxWeeklyMiles;
-  if (cap != null && Number.isFinite(cap) && cap > 0) {
-    weeklyMileageTarget = Math.min(weeklyMileageTarget, cap);
+  weeklyMileageTarget = Math.max(bandMin, weeklyMileageTarget);
+  if (bandMax != null && Number.isFinite(bandMax) && bandMax > 0) {
+    weeklyMileageTarget = Math.min(weeklyMileageTarget, bandMax);
   }
   weeklyMileageTarget = Math.max(
     params.minWeeklyMiles,
-    Math.min(100, weeklyMileageTarget)
+    Math.min(100, weeklyMileageTarget),
   );
 
   const preferredDays =
@@ -259,13 +292,20 @@ export async function executePlanGenerate(params: {
     }
   }
 
-  const vp = Number(planRow.peakLongRunPoolMiles ?? vol.peakLongRunPoolMiles);
-  if (!Number.isFinite(vp) || vp <= 0) {
+  const peakLongRunSingle =
+    phaseBuild?.peakLongRunMiles != null && Number.isFinite(phaseBuild.peakLongRunMiles)
+      ? Number(phaseBuild.peakLongRunMiles)
+      : null;
+  const vpLegacy = Number(planRow.peakLongRunPoolMiles ?? vol.peakLongRunPoolMiles);
+  const peakLongRunPoolMiles =
+    peakLongRunSingle != null && peakLongRunSingle > 0
+      ? peakLongRunSingle * cLen
+      : vpLegacy;
+  if (!Number.isFinite(peakLongRunPoolMiles) || peakLongRunPoolMiles <= 0) {
     throw new Error(
-      `Training preset "${presetLabel}" has invalid peakLongRunPoolMiles. Fix this preset in GoFast Company.`
+      `Training preset "${presetLabel}" has invalid peak long-run volume. Fix the build phase in Training Manage.`
     );
   }
-  const peakLongRunPoolMiles = vp;
   const { derivedBaseLongRunPoolMiles, derivedTaperLongRunPoolMiles } = longRunCupSetter({
     totalWeeks: weekCount,
     longRunCycleWeeks: cLen,
@@ -273,14 +313,37 @@ export async function executePlanGenerate(params: {
     fitnessPhase: blueprint.fitnessPhase,
   });
 
-  applyLongRunSchedule({
-    planSchedule: schedule,
-    totalWeeks: weekCount,
-    longRunCycleWeeks: cLen,
-    peakLongRunPoolMiles,
-    fitnessPhase: blueprint.fitnessPhase,
-    longRunPositions,
-  });
+  if (phaseBuild) {
+    applyBuildPhaseLongRunMiles({
+      planSchedule: schedule,
+      taperStartWeekNumber: placement.taperStartWeekNumber,
+      peakWeekNumber: placement.peakWeekNumber ?? placement.taperStartWeekNumber - 1,
+      startLongRunMiles: phaseBuild.startLongRunMiles,
+      peakLongRunMiles: phaseBuild.peakLongRunMiles,
+      longRunPositions,
+    });
+    applyPhaseTaperAndRaceLongRunCaps({
+      planSchedule: schedule,
+      totalWeeks: weekCount,
+      taperWeeks: phasePreset?.taper?.weeks,
+      raceWeek: phasePreset?.raceWeek?.weeks,
+    });
+    applyPhaseWeekCataloguePins({
+      planSchedule: schedule,
+      totalWeeks: weekCount,
+      taperWeeks: phasePreset?.taper?.weeks,
+      raceWeek: phasePreset?.raceWeek?.weeks,
+    });
+  } else {
+    applyLongRunSchedule({
+      planSchedule: schedule,
+      totalWeeks: weekCount,
+      longRunCycleWeeks: cLen,
+      peakLongRunPoolMiles,
+      fitnessPhase: blueprint.fitnessPhase,
+      longRunPositions,
+    });
+  }
 
   const cupResult = longRunCupSetter({
     totalWeeks: weekCount,
@@ -318,14 +381,25 @@ export async function executePlanGenerate(params: {
   applyIntervalSchedule({ planSchedule: schedule, catalogueRowsById });
   assertScheduleEasyDaysHaveCatalogue(schedule);
 
+  const weeklyMileageByWeek = phaseBuild
+    ? buildWeeklyMileageTargetsByWeek({
+        totalWeeks: weekCount,
+        taperStartWeekNumber: placement.taperStartWeekNumber,
+        peakWeekNumber: placement.peakWeekNumber ?? placement.taperStartWeekNumber - 1,
+        athleteStartMiles: weeklyMileageTarget,
+        presetMinMiles: Math.max(minWeeklyFromPreset, bandMin),
+        presetPeakMiles,
+        taperWeeks: phasePreset?.taper?.weeks,
+        raceWeek: phasePreset?.raceWeek?.weeks,
+      })
+    : null;
+
   distributeEasyMiles({
     planSchedule: schedule,
     weeklyMileageTarget,
     minWeeklyMiles: Math.max(minWeeklyFromPreset, params.minWeeklyMiles),
     maxWeeklyMiles:
-      vol.maxWeeklyMiles != null && Number.isFinite(Number(vol.maxWeeklyMiles))
-        ? Number(vol.maxWeeklyMiles)
-        : undefined,
+      bandMax != null && Number.isFinite(Number(bandMax)) ? Number(bandMax) : undefined,
     raceDistanceMiles,
     easyRunConfig: easyRunResolved,
     catalogueRowsById,
@@ -333,6 +407,7 @@ export async function executePlanGenerate(params: {
     taperStartWeekNumber: placement.taperStartWeekNumber,
     totalWeeks: weekCount,
     secondaryRaceDistanceMilesByRegistryId,
+    weeklyMileageByWeek,
   });
 
   const syncedFiveKPace =
