@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAthleteFromBearer } from "@/lib/race-container-auth";
 import { requireRaceMembership } from "@/lib/race-container-membership";
+import { serializeHubShakeout } from "@/lib/race-hub-shakeout-utils";
 
 /** GET — race hub members; lists synced shakeout `city_runs` for this registry. */
 export async function GET(
@@ -34,10 +35,7 @@ export async function GET(
     }
 
     const runs = await prisma.city_runs.findMany({
-      where: {
-        raceRegistryId: race.id,
-        shakeoutDedupeKey: { not: null },
-      },
+      where: { raceRegistryId: race.id },
       orderBy: { date: "asc" },
       include: {
         city_run_rsvps: true,
@@ -45,26 +43,7 @@ export async function GET(
       },
     });
 
-    const shakeouts = runs.map((r) => ({
-      id: r.id,
-      title: r.title,
-      date: r.date.toISOString(),
-      meetUpPoint: r.meetUpPoint,
-      meetUpLat: r.meetUpLat,
-      meetUpLng: r.meetUpLng,
-      totalMiles: r.totalMiles,
-      pace: r.pace,
-      description: r.description,
-      postRunActivity: r.postRunActivity,
-      startTimeHour: r.startTimeHour,
-      startTimeMinute: r.startTimeMinute,
-      startTimePeriod: r.startTimePeriod,
-      workflowStatus: r.workflowStatus,
-      gorunPath: `/gorun/${r.id}`,
-      runClub: r.runClub,
-      rsvpCount: r.city_run_rsvps.filter((rv) => rv.status === "going").length,
-      myRsvp: r.city_run_rsvps.find((rv) => rv.athleteId === auth.athlete.id) ?? null,
-    }));
+    const shakeouts = runs.map((r) => serializeHubShakeout(r, auth.athlete.id));
 
     return NextResponse.json({ success: true, shakeouts });
   } catch (err) {

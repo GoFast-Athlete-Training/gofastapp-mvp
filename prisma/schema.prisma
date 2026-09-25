@@ -969,19 +969,21 @@ model race_memberships {
 
 /// Race-scoped chatter (mirrors run_crew_messages).
 model race_messages {
-  id        String   @id @default(cuid())
-  raceId    String
-  athleteId String
-  content   String
-  topic     String   @default("general")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(cuid())
+  raceId           String
+  athleteId        String?
+  staffGeneratedId String?
+  content          String
+  topic            String   @default("general")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   race_registry race_registry @relation(fields: [raceId], references: [id], onDelete: Cascade)
-  Athlete       Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  Athlete       Athlete?      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@index([raceId])
   @@index([athleteId])
+  @@index([staffGeneratedId])
   @@map("race_messages")
 }
 
@@ -1008,7 +1010,8 @@ model race_announcements {
 model race_events {
   id                String   @id @default(cuid())
   raceId            String
-  organizerId       String
+  organizerId       String?
+  staffGeneratedId  String?
   title             String
   date              DateTime
   time              String
@@ -1021,11 +1024,12 @@ model race_events {
   updatedAt         DateTime @updatedAt
 
   race_registry     race_registry      @relation(fields: [raceId], references: [id], onDelete: Cascade)
-  organizer         Athlete            @relation("RaceEventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  organizer         Athlete?           @relation("RaceEventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
   race_event_rsvps  race_event_rsvps[]
 
   @@index([raceId])
   @@index([date])
+  @@index([staffGeneratedId])
   @@map("race_events")
 }
 
