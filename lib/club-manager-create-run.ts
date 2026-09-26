@@ -24,7 +24,7 @@ export type LeaderCreateRunInput = {
 
 export async function createCityRunForClubLeader(opts: {
   runClubId: string;
-  athleteGeneratedId: string;
+  athleteGeneratedId?: string | null;
   input: LeaderCreateRunInput;
 }) {
   const title = opts.input.title.trim();
@@ -43,6 +43,7 @@ export async function createCityRunForClubLeader(opts: {
   const citySlug =
     club.city?.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') ||
     'unknown';
+  const athleteGeneratedId = opts.athleteGeneratedId?.trim() || null;
   const id = generateId();
   const slug = await generateUniqueCityRunSlug(title, { date: runDate, clubSlug: club.slug });
 
@@ -59,7 +60,7 @@ export async function createCityRunForClubLeader(opts: {
       totalMiles: parseRunTotalMiles(opts.input.totalMiles),
       pace: opts.input.pace?.trim() || null,
       runClubId: club.id,
-      athleteGeneratedId: opts.athleteGeneratedId,
+      athleteGeneratedId,
       citySlug,
       regionSlug: inferRegionSlugFromCitySlug(citySlug),
       workflowStatus: 'DEVELOP',
@@ -67,7 +68,7 @@ export async function createCityRunForClubLeader(opts: {
       cityRunType: resolveCityRunType({
         runClubId: club.id,
         runCrewId: null,
-        athleteGeneratedId: opts.athleteGeneratedId,
+        athleteGeneratedId,
       }),
       routePhotos: Prisma.JsonNull,
       updatedAt: new Date(),

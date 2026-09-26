@@ -15,6 +15,7 @@ import {
 import TopNav from '@/components/shared/TopNav';
 import { clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { ensureClubManagerAthleteId } from '@/lib/club-manager-bootstrap-athlete';
 import api from '@/lib/api';
 import { isClubManagerClubWelcomed, parseClubManagerState } from '@/lib/club-manager-state';
 import ClubManagerConfirmWelcome from '@/components/runclub/manager/ClubManagerConfirmWelcome';
@@ -70,7 +71,8 @@ export default function ClubManagerShell({
     let cancelled = false;
 
     async function loadWelcomeState() {
-      const athleteId = LocalStorageAPI.getAthleteId();
+      const athleteId =
+        LocalStorageAPI.getAthleteId() ?? (await ensureClubManagerAthleteId());
       if (!athleteId) {
         if (!cancelled) setWelcomeGate('needs_ack');
         return;

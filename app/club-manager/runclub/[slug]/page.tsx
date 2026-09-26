@@ -167,7 +167,7 @@ export default function ClubManagerOverviewPage() {
       </div>
 
       <div className="space-y-4 mb-10">
-        <p className="text-xs font-bold uppercase tracking-[0.15em] text-gray-400">Secondary</p>
+        <p className="text-xs font-bold uppercase tracking-[0.15em] text-gray-500">Member hub builders</p>
         <ManagerWizardCard
           priority="secondary"
           title="Announcements"
@@ -180,8 +180,17 @@ export default function ClubManagerOverviewPage() {
           detail={
             announcementsSummary.latest
               ? `Latest: ${announcementsSummary.latest.title ?? announcementsSummary.latest.body.slice(0, 60)}…`
-              : 'Share news after profile and runs are set.'
+              : 'Share news with members on your club page.'
           }
+        />
+        <ManagerWizardCard
+          priority="secondary"
+          title="Events"
+          description="Socials, clinics, and non-run club gatherings."
+          href={clubManagerClubPath(slug, 'events')}
+          statusLabel="Open builder"
+          statusTone="neutral"
+          detail="Add events members see alongside weekly runs."
         />
       </div>
 

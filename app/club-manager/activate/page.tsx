@@ -7,6 +7,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { ensureClubManagerAthleteId } from '@/lib/club-manager-bootstrap-athlete';
 import { clubManagerActivatePath, clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
 import { resolveClubManagerEntryPath, managerAlreadyActiveForClub } from '@/lib/club-manager-entry-route';
 import type { LeaderContextClub } from '@/lib/run-club-leader-context';
@@ -41,7 +42,7 @@ function ClubManagerActivateContent() {
 
   const redirectIfAlreadyManager = useCallback(
     async (runClubId: string) => {
-      const athleteId = LocalStorageAPI.getAthleteId();
+      const athleteId = LocalStorageAPI.getAthleteId() ?? (await ensureClubManagerAthleteId());
       if (!athleteId) return false;
 
       try {

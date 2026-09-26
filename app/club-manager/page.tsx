@@ -7,6 +7,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { ensureClubManagerAthleteId } from '@/lib/club-manager-bootstrap-athlete';
 import { clubManagerActivatePath, clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
 import { resolveClubManagerHomePath } from '@/lib/club-manager-home-route';
 import ClubManagerHubShell from '@/components/runclub/manager/ClubManagerHubShell';
@@ -24,7 +25,7 @@ export default function ClubManagerHubPage() {
         return;
       }
 
-      const athleteId = LocalStorageAPI.getAthleteId();
+      const athleteId = await ensureClubManagerAthleteId();
       if (!athleteId) {
         router.replace('/welcome');
         return;
@@ -94,35 +95,52 @@ export default function ClubManagerHubPage() {
           </div>
         ) : (
           <div className="mt-8 space-y-3">
-            {clubs.map((club) => (
-              <Link
-                key={club.runClubId}
-                href={clubManagerClubPath(club.runClubSlug ?? club.runClubId)}
-                className="block rounded-xl border border-gray-200 bg-white p-5 hover:border-orange-300 hover:shadow-sm transition"
-              >
-                <div className="flex items-center gap-4">
-                  {club.logoUrl ? (
-                    <img
-                      src={club.logoUrl}
-                      alt=""
-                      className="h-14 w-14 rounded-lg object-contain bg-gray-50"
-                    />
-                  ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-orange-100 text-2xl">
-                      🏃
+            {clubs.map((club) => {
+              const slug = club.runClubSlug ?? club.runClubId;
+              return (
+                <div
+                  key={club.runClubId}
+                  className="rounded-xl border border-gray-200 bg-white p-5"
+                >
+                  <div className="flex items-center gap-4">
+                    {club.logoUrl ? (
+                      <img
+                        src={club.logoUrl}
+                        alt=""
+                        className="h-14 w-14 rounded-lg object-contain bg-gray-50"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-orange-100 text-2xl">
+                        🏃
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-lg font-bold text-gray-900">{club.runClubName}</h2>
+                      <p className="text-sm text-gray-500 capitalize">
+                        {[club.city, club.state].filter(Boolean).join(', ') || 'Location TBD'} ·{' '}
+                        {club.role}
+                      </p>
                     </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-lg font-bold text-gray-900">{club.runClubName}</h2>
-                    <p className="text-sm text-gray-500 capitalize">
-                      {[club.city, club.state].filter(Boolean).join(', ') || 'Location TBD'} ·{' '}
-                      {club.role}
-                    </p>
                   </div>
-                  <span className="shrink-0 text-sm font-semibold text-orange-600">Manage →</span>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <a
+                      href={`/runclub/${slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-100"
+                    >
+                      View as member
+                    </a>
+                    <Link
+                      href={clubManagerClubPath(slug)}
+                      className="inline-flex rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                    >
+                      Manage
+                    </Link>
+                  </div>
                 </div>
-              </Link>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
