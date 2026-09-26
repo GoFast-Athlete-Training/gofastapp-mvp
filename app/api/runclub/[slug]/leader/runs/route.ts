@@ -8,6 +8,7 @@ import {
   completedRunFeedWindowStart,
   formatCompletedRunFeedItem,
 } from '@/lib/runclub/completed-run-feed';
+import { createCityRunForClubLeader } from '@/lib/club-manager-create-run';
 
 /**
  * GET /api/runclub/[slug]/leader/runs
@@ -93,5 +94,54 @@ export async function GET(
   } catch (error: unknown) {
     console.error('[GET leader runs] Error:', error);
     return NextResponse.json({ success: false, error: 'Failed to load runs' }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/runclub/[slug]/leader/runs
+ * Create a club city run (same prod surface Company uses via /api/runs/create).
+ */
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  try {
+    const { slug } = await params;
+    const auth = await requireRunClubLeader(request, { slug });
+    if ('error' in auth) {
+      return leaderAuthFailureResponse(auth);
+    }
+
+    const body = (await request.json()) as {
+      title?: string;
+      date?: string;
+      meetUpPoint?: string;
+      meetUpCity?: string | null;
+      meetUpState?: string | null;
+      description?: string | null;
+      totalMiles?: number | string | null;
+      pace?: string | null;
+    };
+
+    const run = await createCityRunForClubLeader({
+      runClubId: auth.club.id,
+      athleteGeneratedId: auth.athlete.id,
+      input: {
+        title: body.title ?? '',
+        date: body.date ?? '',
+        meetUpPoint: body.meetUpPoint ?? '',
+        meetUpCity: body.meetUpCity,
+        meetUpState: body.meetUpState,
+        description: body.description,
+        totalMiles: body.totalMiles,
+        pace: body.pace,
+      },
+    });
+
+    return NextResponse.json({ success: true, run });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to create run';
+    console.error('[POST leader runs]', error);
+    return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }

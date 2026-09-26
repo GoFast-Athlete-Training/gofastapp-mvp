@@ -17,6 +17,7 @@ import {
   mergeRelationshipSnapshot,
   relationshipPatchFromBody,
 } from '@/lib/city-run-type';
+import { syncCityRunRouteFromFields } from '@/lib/city-run/ensure-city-run-route';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -909,6 +910,49 @@ export async function PUT(
         where: { id: resolvedId },
         data: updateData as Parameters<typeof prisma.city_runs.update>[0]['data'],
       });
+    }
+
+    const routeMirrorKeys = [
+      'stravaMapUrl',
+      'mapImageUrl',
+      'routePhotos',
+      'routeNeighborhood',
+      'runType',
+      'totalMiles',
+      'title',
+    ] as const;
+    if (routeMirrorKeys.some((k) => updateData[k] !== undefined)) {
+      try {
+        await syncCityRunRouteFromFields(resolvedId, {
+          stravaMapUrl:
+            updateData.stravaMapUrl !== undefined
+              ? (updateData.stravaMapUrl as string | null)
+              : undefined,
+          mapImageUrl:
+            updateData.mapImageUrl !== undefined
+              ? (updateData.mapImageUrl as string | null)
+              : undefined,
+          routePhotos:
+            updateData.routePhotos !== undefined
+              ? (Array.isArray(updateData.routePhotos)
+                  ? (updateData.routePhotos as string[])
+                  : null)
+              : undefined,
+          routeNeighborhood:
+            updateData.routeNeighborhood !== undefined
+              ? (updateData.routeNeighborhood as string | null)
+              : undefined,
+          runType:
+            updateData.runType !== undefined ? (updateData.runType as string | null) : undefined,
+          totalMiles:
+            updateData.totalMiles !== undefined
+              ? (updateData.totalMiles as number | null)
+              : undefined,
+          title: updateData.title !== undefined ? (updateData.title as string) : undefined,
+        });
+      } catch (routeSyncErr: unknown) {
+        console.warn('[PUT /api/runs/[runId]] route sync failed (non-blocking):', routeSyncErr);
+      }
     }
 
     if (run.runClubId && Object.keys(runClubUpdateData).length > 0) {

@@ -7,6 +7,7 @@ import {
   fieldsWhenSettingWorkflowStatus,
   type RunWorkflowStatus,
 } from '@/lib/runInstanceApprovalPublish';
+import { ensureCityRunRoute } from '@/lib/city-run/ensure-city-run-route';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -95,6 +96,20 @@ export async function GET(
       run = await prisma.city_runs.findUnique({
         where: { id: runId },
         include: {
+          route: {
+            select: {
+              id: true,
+              name: true,
+              stravaUrl: true,
+              stravaMapUrl: true,
+              mapImageUrl: true,
+              routePhotos: true,
+              routeNeighborhood: true,
+              runType: true,
+              distanceMiles: true,
+              citySlug: true,
+            },
+          },
           runClub: {
             select: {
               id: true,
@@ -152,6 +167,20 @@ export async function GET(
       run = await prisma.city_runs.findUnique({
         where: { id: runId },
         include: {
+          route: {
+            select: {
+              id: true,
+              name: true,
+              stravaUrl: true,
+              stravaMapUrl: true,
+              mapImageUrl: true,
+              routePhotos: true,
+              routeNeighborhood: true,
+              runType: true,
+              distanceMiles: true,
+              citySlug: true,
+            },
+          },
           runClub: {
             select: {
               id: true,
@@ -203,6 +232,34 @@ export async function GET(
 
     if (!run) {
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+    }
+
+    await ensureCityRunRoute(runId);
+    if (!run.routeId) {
+      const refreshed = await prisma.city_runs.findUnique({
+        where: { id: runId },
+        select: {
+          routeId: true,
+          route: {
+            select: {
+              id: true,
+              name: true,
+              stravaUrl: true,
+              stravaMapUrl: true,
+              mapImageUrl: true,
+              routePhotos: true,
+              routeNeighborhood: true,
+              runType: true,
+              distanceMiles: true,
+              citySlug: true,
+            },
+          },
+        },
+      });
+      if (refreshed?.routeId) {
+        run.routeId = refreshed.routeId;
+        run.route = refreshed.route;
+      }
     }
 
     return NextResponse.json({
