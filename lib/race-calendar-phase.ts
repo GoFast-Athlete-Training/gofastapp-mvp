@@ -1,6 +1,6 @@
 import { utcDateOnly } from "@/lib/training/plan-utils";
 
-export type RacePhase = "pre" | "race_day" | "post_early" | "post_cooled";
+export type RacePhase = "pre" | "day_before" | "race_day" | "post_early" | "post_cooled";
 
 function localDateOnly(d: Date): Date {
   const x = new Date(d);
@@ -40,7 +40,8 @@ export function getRacePhase(raceDateIso: string | null | undefined): RacePhase 
   if (!raceDateIso || typeof raceDateIso !== "string") return "pre";
   const diffDays = raceCalendarDaysFromTodayUtc(raceDateIso);
   if (diffDays === null || Number.isNaN(diffDays)) return "pre";
-  if (diffDays > 0) return "pre";
+  if (diffDays > 1) return "pre";
+  if (diffDays === 1) return "day_before";
   if (diffDays === 0) return "race_day";
   if (diffDays >= -6) return "post_early";
   return "post_cooled";
@@ -62,7 +63,8 @@ export function getRacePhaseLocal(raceDateIso: string | null | undefined): RaceP
   if (!raceDateIso || typeof raceDateIso !== "string") return "pre";
   const diffDays = raceCalendarDaysFromTodayLocal(raceDateIso);
   if (diffDays === null || Number.isNaN(diffDays)) return "pre";
-  if (diffDays > 0) return "pre";
+  if (diffDays > 1) return "pre";
+  if (diffDays === 1) return "day_before";
   if (diffDays === 0) return "race_day";
   if (diffDays >= -6) return "post_early";
   return "post_cooled";

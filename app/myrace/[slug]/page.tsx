@@ -128,7 +128,7 @@ export default function MyRacePage() {
   const [loadingUser, setLoadingUser] = useState(true);
   const [makingGoal, setMakingGoal] = useState(false);
   const [makeGoalError, setMakeGoalError] = useState<string | null>(null);
-  const paceSectionRef = useRef<HTMLElement | null>(null);
+  const paceSectionRef = useRef<HTMLDivElement | null>(null);
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [trainingPlanId, setTrainingPlanId] = useState<string | null>(null);
   const [nextSession, setNextSession] = useState<UpcomingSession | null>(null);

@@ -328,6 +328,23 @@ export async function materializeWorkoutForPlanDay(params: {
 
   const raceCtx = planRaceScheduleContextFromPlan(plan);
 
+  const race =
+    plan.athlete_race != null
+      ? {
+          raceDate: plan.athlete_race.raceDate,
+          name: plan.athlete_race.name,
+          distanceMeters: plan.athlete_race.distanceMeters,
+          distanceLabel: plan.athlete_race.distanceLabel ?? null,
+        }
+      : plan.race_registry != null
+        ? {
+            raceDate: plan.race_registry.raceDate,
+            name: plan.race_registry.name,
+            distanceMeters: plan.race_registry.distanceMeters,
+            distanceLabel: plan.race_registry.distanceLabel ?? null,
+          }
+        : null;
+
   const catalogueTitleById = await loadCatalogueTitleByIdFromPlanSchedule(
     plan.planSchedule
   );
