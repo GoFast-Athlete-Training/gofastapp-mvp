@@ -232,6 +232,8 @@ export default function TrainingPlanDayPreviewPage() {
   const [loggedPlannedDistanceMeters, setLoggedPlannedDistanceMeters] = useState<number | null>(
     null
   );
+  /** Plan schedule marks this date as Race (may not have a materialized workout yet). */
+  const [raceDayOnSchedule, setRaceDayOnSchedule] = useState(false);
 
   const hubBackHref =
     sourceSetup && planDetail
@@ -257,6 +259,18 @@ export default function TrainingPlanDayPreviewPage() {
     return s ? `?${s}` : "";
   }, [planIdFromQuery, sourceSetup, sourceHome]);
 
+  const raceDayBuilderHref = useMemo(() => {
+    if (!planDetail?.id || !dateKey) return null;
+    const back = `/training/day/${dateKey}${querySuffix}`;
+    const params = new URLSearchParams({
+      raceDay: "1",
+      planId: planDetail.id,
+      date: dateKey,
+      back,
+    });
+    return `/workouts/create?${params.toString()}`;
+  }, [planDetail?.id, dateKey, querySuffix]);
+
   const load = useCallback(async () => {
     if (!dateKey) {
       setError("Invalid date");
@@ -279,6 +293,7 @@ export default function TrainingPlanDayPreviewPage() {
     setLoggedPlannedDistanceMeters(null);
     setLoggedTargetPaceSecPerMile(null);
     setLoggedTargetPaceSecPerMileHigh(null);
+    setRaceDayOnSchedule(false);
     try {
       const u = auth.currentUser;
       if (!u) throw new Error("Sign in required");
@@ -311,6 +326,73 @@ export default function TrainingPlanDayPreviewPage() {
 
       setWorkoutLoading(true);
       try {
+        const raceSlotRes = await fetch(
+          `/api/training/race-day?planId=${encodeURIComponent(plan.id)}&date=${encodeURIComponent(dateKey)}`,
+          { headers: athleteBearerFetchHeaders(token) }
+        );
+        if (raceSlotRes.ok) {
+          const raceSlot = (await raceSlotRes.json()) as {
+            scheduled?: { title?: string; workoutType?: string; weekNumber?: number };
+            plannedWorkoutId?: string | null;
+          };
+          setRaceDayOnSchedule(true);
+          const scheduledTitle =
+            typeof raceSlot.scheduled?.title === "string"
+              ? raceSlot.scheduled.title.trim()
+              : "Race";
+          const wid =
+            typeof raceSlot.plannedWorkoutId === "string" ? raceSlot.plannedWorkoutId : null;
+          if (wid) {
+            setWorkoutId(wid);
+          } else {
+            setWorkoutId(null);
+            setWorkout({
+              title: scheduledTitle || "Race",
+              workoutType: "Race",
+              description: null,
+              weekNumber: raceSlot.scheduled?.weekNumber ?? null,
+              segments: [],
+            });
+          }
+          setWorkoutError(null);
+          let raceDayPayload: ReturnType<typeof pickWorkoutPayload> | null = null;
+          if (wid) {
+            try {
+              const { workout: rawW } = await fetchTrainingWorkoutDetail(wid, token);
+              raceDayPayload = pickWorkoutPayload(rawW);
+              setWorkout(raceDayPayload);
+            } catch (e) {
+              setWorkout(null);
+              setWorkoutDetailError(
+                e instanceof Error ? e.message : "Could not load workout detail"
+              );
+            }
+          }
+          const regId = (plan as PlanDetail).race_registry?.id;
+          if (regId) {
+            try {
+              const rr = await fetch(
+                `/api/race-results?raceRegistryId=${encodeURIComponent(regId)}`,
+                { headers: athleteBearerFetchHeaders(token) }
+              );
+              const rrJson = (await rr.json()) as {
+                results?: { id: string; officialFinishTime: string | null }[];
+              };
+              if (rr.ok && Array.isArray(rrJson.results) && rrJson.results[0]) {
+                setRaceResultRow({
+                  id: rrJson.results[0].id,
+                  officialFinishTime: rrJson.results[0].officialFinishTime ?? null,
+                });
+              }
+            } catch {
+              setRaceResultRow(null);
+            }
+          }
+          setWorkoutLoading(false);
+          setLoading(false);
+          return;
+        }
+
         const wid = await resolveWorkoutForPlanDay(plan.id, dateKey, token);
         setWorkoutId(wid);
         setWorkoutError(null);
@@ -377,7 +459,13 @@ export default function TrainingPlanDayPreviewPage() {
       } catch (e) {
         setWorkoutId(null);
         setWorkout(null);
-        setWorkoutError(e instanceof Error ? e.message : "Could not load workout");
+        const msg = e instanceof Error ? e.message : "Could not load workout";
+        if (msg.includes("RACE_DAY_USE_BUILDER")) {
+          setRaceDayOnSchedule(true);
+          setWorkoutError(null);
+        } else {
+          setWorkoutError(msg);
+        }
       } finally {
         setWorkoutLoading(false);
       }
@@ -405,7 +493,7 @@ export default function TrainingPlanDayPreviewPage() {
     void load();
   }, [authReady, dateKey, load]);
 
-  const isRaceDay = workout?.workoutType === "Race";
+  const isRaceDay = workout?.workoutType === "Race" || raceDayOnSchedule;
   const title = workout?.title?.trim() || "Workout";
   const typeDisplay = formatPreviewWorkoutTypeLabel(
     workout?.workoutType ?? "",
@@ -700,7 +788,25 @@ export default function TrainingPlanDayPreviewPage() {
                   {garminPushMessage}
                 </p>
               )}
-              {!isLogged && !workoutLoading && workout && workout.segments.length === 0 && (
+              {!isLogged && !workoutLoading && isRaceDay && !workoutId && raceDayBuilderHref ? (
+                <div className="rounded-xl border border-orange-200 bg-orange-50/80 px-4 py-3 space-y-2">
+                  <p className="text-sm text-gray-800">
+                    Plan your race with mile splits and goal pace. This day stays locked as{" "}
+                    <span className="font-semibold">Race</span> on your plan — no catalogue workout.
+                  </p>
+                  <Link
+                    href={raceDayBuilderHref}
+                    className="inline-flex w-full items-center justify-center rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+                  >
+                    Build race plan
+                  </Link>
+                </div>
+              ) : null}
+              {!isLogged &&
+                !workoutLoading &&
+                workout &&
+                workout.segments.length === 0 &&
+                !isRaceDay && (
                 <p className="text-sm text-gray-600">
                   No structured steps yet for this workout type. You can still open the full workout
                   to set up your run or see more detail.
@@ -847,7 +953,15 @@ export default function TrainingPlanDayPreviewPage() {
                   workout automatically.
                 </p>
               ) : null}
-              {!isLogged && isActionableWorkout ? (
+              {!isLogged && isRaceDay && raceDayBuilderHref ? (
+                <Link
+                  href={raceDayBuilderHref}
+                  className="block w-full text-center rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+                >
+                  {workoutId ? "Edit race plan" : "Build race plan"}
+                </Link>
+              ) : null}
+              {!isLogged && isActionableWorkout && !isRaceDay ? (
                 <button
                   type="button"
                   onClick={() => void handlePushToGarmin()}
@@ -857,7 +971,7 @@ export default function TrainingPlanDayPreviewPage() {
                   {pushingGarmin ? "Adding to calendar…" : "Add to Garmin calendar"}
                 </button>
               ) : null}
-              {!isLogged ? (
+              {!isLogged && !isRaceDay ? (
                 <button
                   type="button"
                   onClick={() => void handleDoThisWorkout()}
@@ -865,6 +979,16 @@ export default function TrainingPlanDayPreviewPage() {
                   className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
                 >
                   {openingWorkout ? "Opening…" : "Details"}
+                </button>
+              ) : null}
+              {!isLogged && isRaceDay && workoutId ? (
+                <button
+                  type="button"
+                  onClick={() => void handleDoThisWorkout()}
+                  disabled={openingWorkout || workoutLoading}
+                  className="w-full rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {openingWorkout ? "Opening…" : "Open race plan"}
                 </button>
               ) : null}
               {!isLogged && workoutId && dateKey ? (

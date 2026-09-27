@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import api from "@/lib/api";
 import type { RaceForGoal, InlineGoalRow } from "@/components/races/InlineGoalForm";
 import { InlineGoalForm } from "@/components/races/InlineGoalForm";
 import { PaceContextCard } from "@/components/athlete/PaceContextCard";
@@ -10,6 +11,7 @@ import {
   parseRaceTimeToSeconds,
 } from "@/lib/workout-generator/pace-calculator";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
+import { formatFinishClock } from "@/lib/training/race-projection";
 
 export type PacingStrategy = "even" | "negative" | "positive";
 
@@ -64,13 +66,123 @@ function buildMileRows(
   return rows;
 }
 
+function PaceAdjustForm({
+  race,
+  goal,
+  totalMiles,
+  paceSec,
+  onSaved,
+}: {
+  race: RaceForGoal;
+  goal: InlineGoalRow | null;
+  totalMiles: number;
+  paceSec: number | null;
+  onSaved: (g: InlineGoalRow) => void;
+}) {
+  const [min, setMin] = useState(paceSec != null ? String(Math.floor(paceSec / 60)) : "");
+  const [sec, setSec] = useState(
+    paceSec != null ? String(Math.round(paceSec % 60)).padStart(2, "0") : ""
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (paceSec == null) return;
+    setMin(String(Math.floor(paceSec / 60)));
+    setSec(String(Math.round(paceSec % 60)).padStart(2, "0"));
+  }, [paceSec]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const m = Number(min);
+    const s = Number(sec);
+    if (!Number.isFinite(m) || !Number.isFinite(s) || m < 0 || s < 0 || s > 59 || m * 60 + s <= 0) {
+      setError("Enter pace as minutes and seconds per mile.");
+      return;
+    }
+    if (!Number.isFinite(totalMiles) || totalMiles <= 0) {
+      setError("Race distance is missing, so pace cannot set a finish time.");
+      return;
+    }
+    const pace = m * 60 + s;
+    const goalTime = formatFinishClock(pace * totalMiles);
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = {
+        goalTime,
+        athleteRaceId: race.athleteRaceId,
+        name: race.name,
+        distance: race.distanceLabel ?? undefined,
+        targetByDate: race.raceDate,
+      };
+      const saved = goal?.id
+        ? (await api.put<{ goal: InlineGoalRow }>(`/goals/${goal.id}`, payload)).data.goal
+        : (await api.post<{ goal: InlineGoalRow }>(`/goals`, payload)).data.goal;
+      onSaved(saved);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Save failed — try again");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-lg border border-violet-100 bg-white p-4 mb-4">
+      <p className="text-xs text-gray-600 mb-2">
+        Minutes and seconds per mile. Saving updates your finish goal to match.
+      </p>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-xs text-gray-500">
+          Min
+          <input
+            inputMode="numeric"
+            value={min}
+            onChange={(e) => setMin(e.target.value.replace(/\D/g, "").slice(0, 2))}
+            className="mt-1 block w-16 rounded-lg border border-gray-300 px-2 py-2 text-center text-sm"
+          />
+        </label>
+        <span className="pb-2 text-gray-400">:</span>
+        <label className="text-xs text-gray-500">
+          Sec
+          <input
+            inputMode="numeric"
+            value={sec}
+            onChange={(e) => setSec(e.target.value.replace(/\D/g, "").slice(0, 2))}
+            className="mt-1 block w-16 rounded-lg border border-gray-300 px-2 py-2 text-center text-sm"
+          />
+        </label>
+        <span className="pb-2 text-sm text-gray-600">/mi</span>
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Update pace"}
+        </button>
+      </div>
+      {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
+    </form>
+  );
+}
+
 type Props = {
   race: RaceForGoal;
   goal: InlineGoalRow | null;
   onGoalSaved: (g: InlineGoalRow) => void;
+  /** Parent renders goal in a separate block. */
+  hideGoalForm?: boolean;
+  /** Render inside My Race Hub without duplicate page chrome. */
+  embedded?: boolean;
 };
 
-export function RacePlanSection({ race, goal, onGoalSaved }: Props) {
+export function RacePlanSection({
+  race,
+  goal,
+  onGoalSaved,
+  hideGoalForm,
+  embedded,
+}: Props) {
   const [strategy, setStrategy] = useState<PacingStrategy>("even");
 
   const derived = useMemo(() => {
@@ -133,20 +245,41 @@ export function RacePlanSection({ race, goal, onGoalSaved }: Props) {
   }
   const rowsSumSec = mileRows.reduce((a, r) => a + r.splitSec, 0);
 
-  return (
-    <section className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-5 shadow-sm mb-6">
-      <h2 className="text-lg font-bold text-gray-900 mb-1">Plan your race</h2>
-      <p className="text-sm text-gray-600 mb-4">
-        Lock in your goal time, pick a pacing style, and see target splits by mile.
-      </p>
+  const Wrapper = embedded ? "div" : "section";
+  const wrapperClass = embedded
+    ? ""
+    : "rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-5 shadow-sm mb-6";
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 mb-4">
-        <InlineGoalForm race={race} goal={goal} onSaved={onGoalSaved} />
-      </div>
+  return (
+    <Wrapper className={wrapperClass}>
+      {!embedded ? (
+        <>
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Plan your race</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Lock in your goal time, pick a pacing style, and see target splits by mile.
+          </p>
+        </>
+      ) : null}
+
+      {hideGoalForm ? null : (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 mb-4">
+          <InlineGoalForm race={race} goal={goal} onSaved={onGoalSaved} />
+        </div>
+      )}
+
+      {goalTimeDisplay && goalRacePace != null ? (
+        <PaceAdjustForm
+          race={race}
+          goal={goal}
+          totalMiles={totalMiles}
+          paceSec={goalRacePace}
+          onSaved={onGoalSaved}
+        />
+      ) : null}
 
       {!goalTimeDisplay || goalRacePace == null ? (
         <p className="text-sm text-gray-600">
-          Add a goal finish time above to generate per-mile targets.
+          Add a goal finish time in Your goal to generate per-mile targets and adjust pace.
         </p>
       ) : (
         <>
@@ -233,6 +366,6 @@ export function RacePlanSection({ race, goal, onGoalSaved }: Props) {
           title="Check a recent effort"
         />
       </div>
-    </section>
+    </Wrapper>
   );
 }

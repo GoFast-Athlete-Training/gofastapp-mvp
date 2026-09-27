@@ -281,6 +281,10 @@ function CreateWorkoutPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromBuildARun = searchParams.get("from") === "build-a-run";
+  const raceDayMode = searchParams.get("raceDay") === "1";
+  const racePlanId = searchParams.get("planId")?.trim() ?? "";
+  const raceDateKey = searchParams.get("date")?.trim() ?? "";
+  const raceDayBackHref = searchParams.get("back")?.trim() || "/training";
   const [workoutType, setWorkoutType] = useState<string>("Easy");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -335,6 +339,59 @@ function CreateWorkoutPageInner() {
   }, [catalogueItems]);
 
   useEffect(() => {
+    if (!raceDayMode) return;
+    setWorkoutType("Race");
+    if (raceDateKey) setScheduledDate(raceDateKey);
+  }, [raceDayMode, raceDateKey]);
+
+  useEffect(() => {
+    if (!raceDayMode || !racePlanId || !raceDateKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get<{
+          scheduled?: { title?: string };
+          segments?: Array<{
+            title: string;
+            durationType: string;
+            durationValue: number;
+            targets?: Array<{
+              type: string;
+              valueLow?: number;
+              valueHigh?: number;
+            }>;
+            repeatCount?: number | null;
+          }>;
+        }>(`training/race-day?planId=${encodeURIComponent(racePlanId)}&date=${encodeURIComponent(raceDateKey)}`);
+        if (cancelled) return;
+        const scheduledTitle = data.scheduled?.title?.trim();
+        if (scheduledTitle) setName(scheduledTitle);
+        const segs = data.segments ?? [];
+        if (segs.length > 0) {
+          setMainSegments(
+            segs.map((seg) => {
+              const paceTarget = seg.targets?.find((t) => t.type === "PACE");
+              return {
+                miles: seg.durationType === "DISTANCE" ? seg.durationValue : 0,
+                segmentTitle: seg.title,
+                paceValueLow: paceTarget?.valueLow,
+                paceValueHigh: paceTarget?.valueHigh,
+                repeatCount: seg.repeatCount ?? undefined,
+              };
+            })
+          );
+        }
+      } catch {
+        /* optional preload */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [raceDayMode, racePlanId, raceDateKey]);
+
+  useEffect(() => {
+    if (raceDayMode) return;
     let cancelled = false;
     (async () => {
       try {
@@ -354,7 +411,7 @@ function CreateWorkoutPageInner() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [raceDayMode]);
 
   useEffect(() => {
     if (!editingTarget) return;
@@ -685,6 +742,29 @@ function CreateWorkoutPageInner() {
         });
       }
 
+      if (raceDayMode) {
+        if (!racePlanId || !raceDateKey) {
+          alert("Missing plan or race date — open this builder from your training plan.");
+          return;
+        }
+        const response = await api.post("training/race-day", {
+          planId: racePlanId,
+          date: raceDateKey,
+          title: name.trim() || "Race",
+          segments,
+        });
+        const wid =
+          typeof response.data?.plannedWorkoutId === "string"
+            ? response.data.plannedWorkoutId
+            : response.data?.workoutId;
+        if (typeof wid === "string" && wid.trim()) {
+          router.push(raceDayBackHref);
+        } else {
+          router.push(raceDayBackHref);
+        }
+        return;
+      }
+
       const workoutData = {
         title: name,
         description,
@@ -720,16 +800,30 @@ function CreateWorkoutPageInner() {
         <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <Link
-          href={fromBuildARun ? "/build-a-run" : "/workouts"}
+          href={raceDayMode ? raceDayBackHref : fromBuildARun ? "/build-a-run" : "/workouts"}
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
-          {fromBuildARun ? "Back to Build a Run" : "Back to Workouts"}
+          {raceDayMode
+            ? "Back to race day"
+            : fromBuildARun
+              ? "Back to Build a Run"
+              : "Back to Workouts"}
         </Link>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">Create Workout</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">
+            {raceDayMode ? "Plan your race" : "Create Workout"}
+          </h1>
 
+          {raceDayMode ? (
+            <p className="mb-6 text-sm text-gray-600">
+              Build mile splits and pace bands for race day. Saved on your plan as{" "}
+              <span className="font-semibold">Race</span> — no catalogue workout.
+            </p>
+          ) : null}
+
+          {!raceDayMode ? (
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="workout-schedule-date">
               Schedule (optional)
@@ -745,7 +839,9 @@ function CreateWorkoutPageInner() {
               Leave blank to default to today. Pick a date to schedule this for a specific day.
             </p>
           </div>
+          ) : null}
 
+          {!raceDayMode ? (
           <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Coach catalogue presets</h2>
             <p className="text-sm text-gray-600 mb-3">
@@ -791,7 +887,9 @@ function CreateWorkoutPageInner() {
               mileage (long-run / easy templates).
             </p>
           </div>
+          ) : null}
 
+          {!raceDayMode ? (
           <details className="mb-8 rounded-lg border border-orange-100 bg-orange-50/50 p-4">
             <summary className="text-lg font-semibold text-gray-900 cursor-pointer">
               Generic mileage template <span className="text-xs font-normal text-gray-500">(optional)</span>
@@ -879,6 +977,7 @@ function CreateWorkoutPageInner() {
               )}
             </div>
           </details>
+          ) : null}
 
           {!hasSlots && (
             <div className="mb-8">

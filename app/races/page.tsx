@@ -132,10 +132,7 @@ function countdownChipLabel(iso: string): string {
 }
 
 function heroPrimaryCta(row: AthleteRaceRow): { href: string; label: string } {
-  if (row.goalTime?.trim()) {
-    return { href: plannerHref(row), label: "Plan your race →" };
-  }
-  return { href: personalRaceHref(row), label: "Set your goal →" };
+  return { href: plannerHref(row), label: "Plan my race →" };
 }
 
 function trainingPlanSecondaryCta(row: AthleteRaceRow): { href: string; label: string } | null {
@@ -324,21 +321,12 @@ function AthleteRaceCard({
             Make this my Goal race
           </button>
         )}
-        {row.goalTime?.trim() ? (
-          <Link
-            href={plannerHref(row)}
-            className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
-          >
-            Plan your race →
-          </Link>
-        ) : (
-          <Link
-            href={personalRaceHref(row)}
-            className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
-          >
-            Set your goal →
-          </Link>
-        )}
+        <Link
+          href={plannerHref(row)}
+          className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
+        >
+          Plan my race →
+        </Link>
         {(() => {
           const training = trainingPlanSecondaryCta(row);
           if (!training || !row.goalTime?.trim()) return null;
@@ -352,12 +340,6 @@ function AthleteRaceCard({
             </Link>
           );
         })()}
-        <Link
-          href={`/race-hub/${row.raceRegistryId}`}
-          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
-        >
-          Race hub
-        </Link>
         <button
           type="button"
           disabled={removing}
@@ -718,12 +700,6 @@ export default function MyRacesPage() {
                               {heroRace.trainingPlanId ? "Training plan →" : "Add training plan →"}
                             </Link>
                           ) : null}
-                          <Link
-                            href={`/race-hub/${heroRace.raceRegistryId}`}
-                            className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-                          >
-                            Race hub
-                          </Link>
                           <Link
                             href={personalRaceHref(heroRace)}
                             className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:underline"

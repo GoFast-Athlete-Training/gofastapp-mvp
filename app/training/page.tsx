@@ -1016,7 +1016,7 @@ export default function TrainingHubPage() {
                     href={planRacePlannerHref}
                     className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600"
                   >
-                    Plan your race
+                    Plan my race
                   </Link>
                 ) : null}
                 <div className="relative">

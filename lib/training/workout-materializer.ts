@@ -33,6 +33,8 @@ export class MaterializeWorkoutError extends Error {
 }
 
 export const NO_PRESCRIPTION_STEPS = "NO_PRESCRIPTION_STEPS";
+/** Race plan days use the segment builder — never catalogue materialize. */
+export const RACE_DAY_USE_BUILDER = "RACE_DAY_USE_BUILDER";
 
 export type MaterializeWorkoutForPlanDayResult = {
   plannedWorkoutId: string;
@@ -347,6 +349,24 @@ export async function materializeWorkoutForPlanDay(params: {
 
   if (scheduled.title === "Rest") {
     throw new MaterializeWorkoutError("No scheduled workout for this date");
+  }
+
+  if (scheduled.workoutType === "Race") {
+    const raceExisting = await prisma.planned_workouts.findFirst({
+      where: {
+        planId,
+        athleteId,
+        date: { gte, lte },
+      },
+      select: { id: true, _count: { select: { segments: true } } },
+    });
+    if (raceExisting && raceExisting._count.segments > 0) {
+      enqueuePrescriptionNarrative(raceExisting.id, athleteId);
+      return resultFromPlannedId(raceExisting.id, "already_ready");
+    }
+    throw new MaterializeWorkoutError(
+      `${RACE_DAY_USE_BUILDER}: Build your race plan on this day — no catalogue prescription.`
+    );
   }
 
   let existing = await prisma.planned_workouts.findFirst({

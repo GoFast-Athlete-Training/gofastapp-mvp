@@ -115,12 +115,16 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
       weekNum < Number(taperStartWeekNumber);
 
     for (const d of week.days.filter((x) => x.workoutType === "Race")) {
+      if (d.planRaceEventRole !== "SECONDARY") {
+        d.miles = 0;
+        continue;
+      }
       let raceMi = input.raceDistanceMiles;
       if (d.raceRegistryId) {
         const secondary = input.secondaryRaceDistanceMilesByRegistryId?.get(d.raceRegistryId);
         if (secondary != null && Number.isFinite(secondary)) {
           raceMi = secondary;
-        } else if (d.planRaceEventRole === "SECONDARY" && secondary != null) {
+        } else if (secondary != null) {
           raceMi = secondary;
         }
       }

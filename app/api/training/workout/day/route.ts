@@ -5,6 +5,7 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import {
   MaterializeWorkoutError,
   materializeWorkoutForPlanDay,
+  RACE_DAY_USE_BUILDER,
 } from "@/lib/training/workout-materializer";
 
 /**
@@ -43,6 +44,12 @@ export async function GET(request: NextRequest) {
         : e instanceof Error
           ? e.message
           : "Failed to resolve workout";
+    if (msg.includes(RACE_DAY_USE_BUILDER)) {
+      return NextResponse.json(
+        { error: msg, code: RACE_DAY_USE_BUILDER },
+        { status: 422 }
+      );
+    }
     const lower = msg.toLowerCase();
     const status =
       lower.includes("not found") || lower.includes("no scheduled")

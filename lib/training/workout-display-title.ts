@@ -103,6 +103,9 @@ export function formatCorePlannedWorkoutTitle(
   if (opts?.isRace && opts.raceName?.trim()) {
     return `Race — ${opts.raceName.trim()}`;
   }
+  if (workoutType === "Race" || opts?.isRace) {
+    return "Race";
+  }
 
   const dist = formatMilesFromMeters(estimatedDistanceInMeters);
   const d = dist ? ` ${dist}` : "";
@@ -288,6 +291,8 @@ function formatPlannedHeadline(
       return core.replace(/^Long run /, "Long Run ").replace(/^Long run$/, "Long Run");
     case "Intervals":
       return core;
+    case "Race":
+      return core.startsWith("Race") ? core : "Race";
     default:
       return core.replace(/^Run /, "Workout ").replace(/^Workout$/, "Workout");
   }

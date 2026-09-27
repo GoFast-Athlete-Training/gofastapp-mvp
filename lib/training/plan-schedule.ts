@@ -321,11 +321,8 @@ function expandStructuredDays(params: {
       (onPrimaryRaceDate && workoutType === "LongRun")
     ) {
       workoutType = "Race";
-      distMeters =
-        raceDistanceMiles != null
-          ? milesToMeters(raceDistanceMiles)
-          : estMeters;
-      title = formatPlannedWorkoutTitle("LongRun", distMeters, {
+      distMeters = 0;
+      title = formatPlannedWorkoutTitle("Race", 0, {
         isRace: true,
         raceName: raceName ?? undefined,
       });

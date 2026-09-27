@@ -75,7 +75,7 @@ export function SignupRaceDayBeforeBanner({
               href={planHref}
               className="mt-3 inline-flex items-center justify-center rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
             >
-              Set your race pace
+              Plan my race
             </Link>
           </div>
         </div>

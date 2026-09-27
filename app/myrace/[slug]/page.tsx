@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
@@ -10,11 +10,8 @@ import {
   MapPin,
   Flag,
   ChevronLeft,
-  ChevronDown,
-  ChevronUp,
   Zap,
   Trash2,
-  MessageCircle,
   ExternalLink,
   Route,
 } from "lucide-react";
@@ -25,8 +22,6 @@ import {
   getPublicCoursePageUrl,
   getPublicRacePageUrl,
 } from "@/lib/public-race-url";
-import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
-
 type ResolvedRace = {
   id: string;
   name: string;
@@ -87,24 +82,6 @@ type TrainingPlanRow = {
   athleteRaceId: string | null;
 };
 
-type ChatterPreviewMessage = {
-  id: string;
-  content: string;
-  createdAt: string;
-  athlete: {
-    firstName: string | null;
-    lastName: string | null;
-    gofastHandle: string | null;
-  };
-};
-
-function formatSecPerMile(sec: number | null | undefined): string {
-  if (sec == null || !Number.isFinite(sec) || sec <= 0) return "—";
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return `${m}:${s.toString().padStart(2, "0")}/mi`;
-}
-
 function formatSessionWhen(iso: string): string {
   try {
     return new Date(iso).toLocaleString(undefined, {
@@ -129,28 +106,6 @@ function countdownChipLabel(iso: string): string {
   return `${w} week${w === 1 ? "" : "s"} to go`;
 }
 
-function displayName(a: ChatterPreviewMessage["athlete"]): string {
-  const handle = a.gofastHandle?.trim();
-  if (handle) return `@${handle}`;
-  const name = [a.firstName, a.lastName].filter(Boolean).join(" ").trim();
-  return name || "Runner";
-}
-
-function normalizePreviewMessage(raw: Record<string, unknown>): ChatterPreviewMessage | null {
-  const a = (raw.Athlete ?? raw.athlete) as ChatterPreviewMessage["athlete"] | undefined;
-  if (!raw.id || typeof raw.content !== "string" || !a) return null;
-  return {
-    id: String(raw.id),
-    content: raw.content,
-    createdAt: String(raw.createdAt),
-    athlete: {
-      firstName: a.firstName ?? null,
-      lastName: a.lastName ?? null,
-      gofastHandle: a.gofastHandle ?? null,
-    },
-  };
-}
-
 export default function MyRacePage() {
   const params = useParams();
   const router = useRouter();
@@ -168,30 +123,23 @@ export default function MyRacePage() {
   const [loadingUser, setLoadingUser] = useState(true);
   const [makingGoal, setMakingGoal] = useState(false);
   const [makeGoalError, setMakeGoalError] = useState<string | null>(null);
-  const [goalExpanded, setGoalExpanded] = useState(false);
+  const paceSectionRef = useRef<HTMLElement | null>(null);
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [trainingPlanId, setTrainingPlanId] = useState<string | null>(null);
   const [nextSession, setNextSession] = useState<UpcomingSession | null>(null);
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [removingGoal, setRemovingGoal] = useState(false);
   const [removeGoalError, setRemoveGoalError] = useState<string | null>(null);
-  const [chatterPreview, setChatterPreview] = useState<ChatterPreviewMessage[] | null>(null);
-  const [chatterBlocked, setChatterBlocked] = useState(false);
-  const [hubMemberCount, setHubMemberCount] = useState<number | null>(null);
   const [addingToCalendar, setAddingToCalendar] = useState(false);
   const [addCalendarError, setAddCalendarError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (expandPlanFromQuery) {
-      setGoalExpanded(true);
-      return;
-    }
-    if (race?.raceDate) {
-      if (daysUntilRace(race.raceDate) === 1) {
-        setGoalExpanded(true);
-      }
-    }
-  }, [expandPlanFromQuery, race?.raceDate]);
+    if (!expandPlanFromQuery || loadingUser || !signup?.id) return;
+    const t = window.setTimeout(() => {
+      paceSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 200);
+    return () => window.clearTimeout(t);
+  }, [expandPlanFromQuery, loadingUser, signup?.id]);
 
   useEffect(() => {
     if (!slug.trim()) {
@@ -245,38 +193,6 @@ export default function MyRacePage() {
       });
     } catch {
       setRaceExtras(null);
-    }
-  }, []);
-
-  const loadChatterPreview = useCallback(async (raceRegistryId: string) => {
-    setChatterPreview(null);
-    setChatterBlocked(false);
-    setHubMemberCount(null);
-    try {
-      const msgRes = await api.get(`/race-hub/${encodeURIComponent(raceRegistryId)}/messages`);
-      const rawList = msgRes.data?.messages;
-      if (Array.isArray(rawList)) {
-        const normalized = rawList
-          .map((m: Record<string, unknown>) => normalizePreviewMessage(m))
-          .filter((m): m is ChatterPreviewMessage => m != null);
-        setChatterPreview(normalized.slice(-3).reverse());
-      } else {
-        setChatterPreview([]);
-      }
-    } catch {
-      setChatterBlocked(true);
-      setChatterPreview([]);
-      try {
-        const membersRes = await api.get(
-          `/race-hub/${encodeURIComponent(raceRegistryId)}/members`
-        );
-        const list = membersRes.data?.memberships;
-        if (Array.isArray(list)) {
-          setHubMemberCount(list.length);
-        }
-      } catch {
-        /* teaser without count */
-      }
     }
   }, []);
 
@@ -334,7 +250,6 @@ export default function MyRacePage() {
 
         if (su) {
           void loadRaceExtras(raceRegistryId);
-          void loadChatterPreview(raceRegistryId);
         }
       } catch {
         setSignup(null);
@@ -346,7 +261,7 @@ export default function MyRacePage() {
         setLoadingUser(false);
       }
     },
-    [loadRaceExtras, loadChatterPreview]
+    [loadRaceExtras]
   );
 
   useEffect(() => {
@@ -460,18 +375,20 @@ export default function MyRacePage() {
   const hasSignup = Boolean(signup);
   const goalTimeDisplay =
     goal?.goalTime?.trim() || signup?.goalTime?.trim() || null;
-  const resolvedGoalRacePace = resolveGoalRacePace({
-    goalTime: goal?.goalTime,
-    dbGoalRacePaceSecPerMile: goal?.goalRacePace ?? null,
-    distanceMeters: race.distanceMeters,
-    distanceLabel: race.distanceLabel,
-  });
-  const goalPaceDisplay = formatSecPerMile(resolvedGoalRacePace.goalPaceSecPerMile);
   const courseTipsUrl = getPublicCoursePageUrl(raceExtras?.courseSlug);
   const publicRaceUrl = getPublicRacePageUrl(race.slug);
   const hasCourseSection = Boolean(
     courseTipsUrl || raceExtras?.courseMapUrl || race.registrationUrl || publicRaceUrl
   );
+  const raceForGoal = signup
+    ? {
+        athleteRaceId: signup.id,
+        name: race.name,
+        raceDate: race.raceDate,
+        distanceLabel: race.distanceLabel,
+        distanceMeters: race.distanceMeters,
+      }
+    : null;
 
   return (
     <div className="space-y-5">
@@ -490,7 +407,8 @@ export default function MyRacePage() {
           </div>
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-orange-700">My Race Hub</p>
+          <div className="flex flex-wrap items-center gap-2 mt-0.5">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{race.name}</h1>
             <span className="inline-flex items-center rounded-full bg-orange-100 text-orange-900 px-2.5 py-0.5 text-xs font-bold tabular-nums">
               {countdownChipLabel(race.raceDate)}
@@ -580,120 +498,11 @@ export default function MyRacePage() {
         </div>
       ) : (
         <>
-          {hasSignup ? (
-            <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-900 flex items-center gap-2">
-                <Zap className="w-4 h-4" />
-                Training
-              </h2>
-              {hasPlanForRace &&
-              activePlanSummary?.hasSchedule &&
-              activePlanSummary.weekNumber != null &&
-              activePlanSummary.totalWeeks != null ? (
-                <>
-                  <p className="mt-2 text-base font-semibold text-gray-900">{activePlanSummary.name}</p>
-                  <span className="mt-2 inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 px-3 py-1 text-xs font-bold">
-                    Week {activePlanSummary.weekNumber} of {activePlanSummary.totalWeeks}
-                  </span>
-                  {nextSession ? (
-                    <div className="mt-3 rounded-lg border border-emerald-100 bg-white/80 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase text-gray-500">Next session</p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">{nextSession.title}</p>
-                      <p className="text-xs text-gray-600 mt-0.5">{formatSessionWhen(nextSession.date)}</p>
-                    </div>
-                  ) : null}
-                  <Link
-                    href="/training"
-                    className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-                  >
-                    View full plan →
-                  </Link>
-                </>
-              ) : hasPlanForRace ? (
-                <>
-                  <p className="mt-2 text-sm text-gray-800">
-                    You already have a training plan for this race — finish setup or review your schedule.
-                  </p>
-                  <Link
-                    href={
-                      activePlanSummary?.hasSchedule
-                        ? "/training"
-                        : `/training-setup/${encodeURIComponent(trainingPlanId!)}`
-                    }
-                    className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-                  >
-                    {activePlanSummary?.hasSchedule ? "View plan →" : "Finish plan setup →"}
-                  </Link>
-                </>
-              ) : goalTimeDisplay ? (
-                <>
-                  <p className="mt-2 text-sm text-gray-800">
-                    You have a <span className="font-bold tabular-nums">{goalTimeDisplay}</span> goal —
-                    build the plan to get race-ready.
-                  </p>
-                  <Link
-                    href={`/training-setup?athleteRaceId=${encodeURIComponent(signup!.id)}`}
-                    className="mt-4 inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
-                  >
-                    Add a plan →
-                  </Link>
-                </>
-              ) : (
-                <div className="mt-3">
-                  <InlineGoalForm
-                    race={{
-                      athleteRaceId: signup!.id,
-                      name: race.name,
-                      raceDate: race.raceDate,
-                      distanceLabel: race.distanceLabel,
-                      distanceMeters: race.distanceMeters,
-                    }}
-                    goal={goal}
-                    onSaved={setGoal}
-                  />
-                </div>
-              )}
-            </section>
-          ) : null}
-
-          <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-gray-800 flex items-center gap-2">
-              <MessageCircle className="w-4 h-4 text-orange-600" />
-              Race chatter
-            </h2>
-            {chatterPreview === null ? (
-              <p className="mt-2 text-sm text-gray-500">Loading conversation…</p>
-            ) : chatterBlocked ? (
-              <p className="mt-2 text-sm text-gray-600">
-                {hubMemberCount != null && hubMemberCount > 0
-                  ? `${hubMemberCount} runner${hubMemberCount === 1 ? "" : "s"} in the hub — join the conversation.`
-                  : "See who else is running and swap tips in the race hub."}
-              </p>
-            ) : chatterPreview.length === 0 ? (
-              <p className="mt-2 text-sm text-gray-600">No messages yet — be the first to say hello.</p>
-            ) : (
-              <ul className="mt-3 space-y-2.5">
-                {chatterPreview.map((m) => (
-                  <li key={m.id} className="rounded-lg bg-gray-50 px-3 py-2.5 text-sm">
-                    <p className="font-semibold text-gray-900 text-xs">{displayName(m.athlete)}</p>
-                    <p className="text-gray-700 mt-0.5 line-clamp-2">{m.content}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <Link
-              href={`/race-hub/${race.id}`}
-              className="mt-4 inline-flex items-center justify-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-            >
-              Join the conversation →
-            </Link>
-          </section>
-
           {hasCourseSection ? (
             <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="text-sm font-bold uppercase tracking-wide text-gray-800 flex items-center gap-2">
                 <Route className="w-4 h-4 text-orange-600" />
-                Know the course
+                Course overview
               </h2>
               {raceExtras?.courseMapUrl ? (
                 <a
@@ -747,11 +556,109 @@ export default function MyRacePage() {
             </section>
           ) : null}
 
+          <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-900 flex items-center gap-2">
+              <Zap className="w-4 h-4" />
+              Plan for it
+            </h2>
+            {hasPlanForRace &&
+            activePlanSummary?.hasSchedule &&
+            activePlanSummary.weekNumber != null &&
+            activePlanSummary.totalWeeks != null ? (
+              <>
+                <p className="mt-2 text-base font-semibold text-gray-900">{activePlanSummary.name}</p>
+                <span className="mt-2 inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 px-3 py-1 text-xs font-bold">
+                  Week {activePlanSummary.weekNumber} of {activePlanSummary.totalWeeks}
+                </span>
+                {nextSession ? (
+                  <div className="mt-3 rounded-lg border border-emerald-100 bg-white/80 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase text-gray-500">Next session</p>
+                    <p className="mt-1 text-sm font-semibold text-gray-900">{nextSession.title}</p>
+                    <p className="text-xs text-gray-600 mt-0.5">{formatSessionWhen(nextSession.date)}</p>
+                  </div>
+                ) : null}
+                <Link
+                  href="/training"
+                  className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                >
+                  View training plan
+                </Link>
+              </>
+            ) : hasPlanForRace ? (
+              <>
+                <p className="mt-2 text-sm text-gray-800">
+                  You have a training plan for this race — finish setup or open your schedule.
+                </p>
+                <Link
+                  href={
+                    activePlanSummary?.hasSchedule
+                      ? "/training"
+                      : `/training-setup/${encodeURIComponent(trainingPlanId!)}`
+                  }
+                  className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                >
+                  {activePlanSummary?.hasSchedule ? "View training plan" : "Finish plan setup"}
+                </Link>
+              </>
+            ) : goalTimeDisplay ? (
+              <>
+                <p className="mt-2 text-sm text-gray-800">
+                  Goal <span className="font-bold tabular-nums">{goalTimeDisplay}</span> — add a plan to
+                  get race-ready.
+                </p>
+                <Link
+                  href={`/training-setup?athleteRaceId=${encodeURIComponent(signup!.id)}`}
+                  className="mt-4 inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+                >
+                  Add a plan
+                </Link>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-gray-700">
+                Set your finish goal below, then add a training plan for this race.
+              </p>
+            )}
+          </section>
+
+          {raceForGoal ? (
+            <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-white p-5 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-orange-900">Your goal</h2>
+              <p className="mt-1 text-sm text-gray-600">Finish time — updates your pace below.</p>
+              <div className="mt-3">
+                <InlineGoalForm
+                  race={raceForGoal}
+                  goal={goal}
+                  onSaved={setGoal}
+                  alwaysShowForm
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {raceForGoal ? (
+            <section
+              ref={paceSectionRef}
+              id="your-pace"
+              className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-5 shadow-sm scroll-mt-4"
+            >
+              <h2 className="text-sm font-bold uppercase tracking-wide text-violet-900">Your pace</h2>
+              <p className="mt-1 text-sm text-gray-600 mb-4">
+                Average pace and mile splits — edit pace or goal time; both stay in sync.
+              </p>
+              <RacePlanSection
+                race={raceForGoal}
+                goal={goal}
+                onGoalSaved={setGoal}
+                hideGoalForm
+                embedded
+              />
+            </section>
+          ) : null}
+
           {!isGoalRace ? (
             <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <p className="text-sm text-gray-700 mb-3">
-                Mark this as your Goal race so friends can cheer you on — with or without a GoFast
-                training plan.
+                Mark this as your Goal race so friends can cheer you on in the public race hub.
               </p>
               <button
                 type="button"
@@ -764,49 +671,7 @@ export default function MyRacePage() {
               </button>
               {makeGoalError ? <p className="mt-2 text-xs text-red-600">{makeGoalError}</p> : null}
             </section>
-          ) : (
-            <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white shadow-sm overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setGoalExpanded((v) => !v)}
-                className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-orange-50/50 transition-colors"
-              >
-                <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-wide text-orange-800">My goal</p>
-                  {goalTimeDisplay ? (
-                    <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                      <span className="text-xl font-bold text-gray-900 tabular-nums">{goalTimeDisplay}</span>
-                      {goalPaceDisplay !== "—" ? (
-                        <span className="text-sm text-gray-600">avg {goalPaceDisplay}</span>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-sm text-gray-700">Set your finish goal time</p>
-                  )}
-                </div>
-                {goalExpanded ? (
-                  <ChevronUp className="w-5 h-5 text-orange-600 shrink-0" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-orange-600 shrink-0" />
-                )}
-              </button>
-              {goalExpanded ? (
-                <div className="px-5 pb-5 border-t border-orange-100">
-                  <RacePlanSection
-                    race={{
-                      athleteRaceId: signup!.id,
-                      name: race.name,
-                      raceDate: race.raceDate,
-                      distanceLabel: race.distanceLabel,
-                      distanceMeters: race.distanceMeters,
-                    }}
-                    goal={goal}
-                    onGoalSaved={setGoal}
-                  />
-                </div>
-              ) : null}
-            </section>
-          )}
+          ) : null}
 
           {isGoalRace ? (
             <div className="pt-2 border-t border-gray-100">
@@ -853,6 +718,16 @@ export default function MyRacePage() {
               )}
             </div>
           ) : null}
+
+          <p className="text-center pt-2">
+            <Link
+              href={`/race-hub/${race.id}`}
+              className="text-sm font-medium text-gray-500 hover:text-orange-600 hover:underline"
+            >
+              Race hub
+            </Link>
+            <span className="text-gray-400 text-sm"> — public chatter &amp; crew</span>
+          </p>
         </>
       )}
     </div>

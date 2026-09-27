@@ -79,7 +79,12 @@ export async function loadPlannedWorkoutDetailForAthlete(params: {
 
   if (!planned) return null;
 
-  if (planned.segments.length === 0 && planned.planId && planned.date) {
+  if (
+    planned.segments.length === 0 &&
+    planned.planId &&
+    planned.date &&
+    planned.workoutType !== "Race"
+  ) {
     try {
       await materializeWorkoutForPlanDay({
         planId: planned.planId,

@@ -1073,13 +1073,7 @@ export default function AthleteHomePage() {
                       href={goalRacePlanHref}
                       className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
                     >
-                      Open race plan
-                    </Link>
-                    <Link
-                      href={`/race-hub/${primaryRaceRegistryId}`}
-                      className="inline-flex items-center justify-center rounded-xl border border-violet-200/80 bg-violet-500/20 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-500/30"
-                    >
-                      Race hub
+                      Plan my race
                     </Link>
                   </div>
                 </div>
@@ -1144,13 +1138,7 @@ export default function AthleteHomePage() {
                       )}
                       className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
                     >
-                      Open race plan
-                    </Link>
-                    <Link
-                      href={`/race-hub/${raceDaySignupForHome.race_registry.id}`}
-                      className="inline-flex items-center justify-center rounded-xl border border-violet-200/80 bg-violet-500/20 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-500/30"
-                    >
-                      Race hub
+                      Plan my race
                     </Link>
                   </div>
                 </div>
@@ -1253,13 +1241,7 @@ export default function AthleteHomePage() {
                       href={goalRacePlanHref}
                       className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
                     >
-                      Plan your race
-                    </Link>
-                    <Link
-                      href={`/race-hub/${primaryRaceRegistryId}`}
-                      className="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-white px-5 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-50"
-                    >
-                      Race hub
+                      Plan my race
                     </Link>
                   </div>
                 </div>
@@ -1611,7 +1593,7 @@ export default function AthleteHomePage() {
                           href={goalRacePlanHref}
                           className="inline-flex justify-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
                         >
-                          Plan your race →
+                          Plan my race →
                         </Link>
                       ) : null}
                       <Link

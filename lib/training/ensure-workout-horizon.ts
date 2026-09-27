@@ -52,6 +52,7 @@ export function isRunnablePlanDay(scheduled: {
 } | null): scheduled is { workoutType: string; title: string } {
   if (!scheduled) return false;
   if (scheduled.title === "Rest") return false;
+  if (scheduled.workoutType === "Race") return false;
   return true;
 }
 

@@ -43,11 +43,14 @@ export function InlineGoalForm({
   goal,
   onSaved,
   className = "",
+  alwaysShowForm = false,
 }: {
   race: RaceForGoal;
   goal: InlineGoalRow | null;
   onSaved: (updated: InlineGoalRow) => void;
   className?: string;
+  /** My Race Hub — keep finish time editable without collapsing to a chip. */
+  alwaysShowForm?: boolean;
 }) {
   const hasTime = Boolean(goal?.goalTime?.trim());
   const isLong = isLongRaceGoalTimeFormat(race.distanceLabel, race.distanceMeters ?? null);
@@ -122,7 +125,7 @@ export function InlineGoalForm({
 
   const helper = goalTimeHelperLine(race.distanceLabel, race.distanceMeters ?? null);
 
-  if (hasTime && !expanded) {
+  if (hasTime && !expanded && !alwaysShowForm) {
     const paceLabel =
       goal?.goalRacePace != null && goal.goalRacePace > 0
         ? formatSecPerMileForHub(goal.goalRacePace)
