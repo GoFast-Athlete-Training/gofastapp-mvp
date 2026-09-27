@@ -25,6 +25,8 @@ import RaceCompleteModal, {
 } from '@/components/athlete/RaceCompleteModal';
 import { PaceContextCard } from '@/components/athlete/PaceContextCard';
 import { SignupRaceDayBeforeBanner } from '@/components/races/RaceDayBanner';
+import { RaceDayGoalBanner } from '@/components/races/RaceDayGoalBanner';
+import { RacePrepForkActions } from '@/components/races/RacePrepForkActions';
 import RunClubLeaderHomeCard from '@/components/runclub/leader/RunClubLeaderHomeCard';
 import type { RaceCompleteAnalysis } from '@/components/athlete/RaceCompleteModal';
 import Image from 'next/image';
@@ -1019,142 +1021,45 @@ export default function AthleteHomePage() {
             goalPhase === 'race_day' &&
             primaryRaceRegistryId &&
             goalRace ? (
-              <div className="mb-4 rounded-2xl border-2 border-violet-400 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-lg">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex gap-4 min-w-0">
-                    <Trophy className="h-12 w-12 shrink-0 text-amber-200" aria-hidden />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-100">
-                        Today is race day
-                      </p>
-                      <h2 className="mt-2 text-2xl font-extrabold leading-tight">
-                        {goalRace.name}
-                      </h2>
-                      {goalRace.distanceLabel ? (
-                        <p className="mt-1 text-lg font-semibold text-violet-100">
-                          {goalRace.distanceLabel}
-                        </p>
-                      ) : null}
-                      <p className="mt-3 text-xl font-bold text-white">
-                        Go crush it
-                        {typeof athlete?.firstName === 'string' && athlete.firstName.trim()
-                          ? `, ${athlete.firstName.trim()}`
-                          : ''}
-                        !
-                      </p>
-                      {(() => {
-                        const city = goalRace.city;
-                        const st = goalRace.state;
-                        const loc =
-                          [city, st].filter((x) => x && String(x).trim()).join(', ') || null;
-                        const stTime = undefined;
-                        if (!loc && !stTime) return null;
-                        return (
-                          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-violet-100">
-                            {loc ? (
-                              <span className="inline-flex items-center gap-1.5">
-                                <MapPin className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                                {loc}
-                              </span>
-                            ) : null}
-                            {stTime ? (
-                              <span className="inline-flex items-center gap-1.5">
-                                <Timer className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                                {stTime}
-                              </span>
-                            ) : null}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-2 sm:items-stretch">
-                    <Link
-                      href={goalRacePlanHref}
-                      className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
-                    >
-                      Plan my race
-                    </Link>
-                    <Link
-                      href={`/race-hub/${primaryRaceRegistryId}`}
-                      className="inline-flex items-center justify-center rounded-xl border border-violet-200/80 bg-violet-500/20 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-500/30"
-                    >
-                      Race hub
-                    </Link>
-                  </div>
-                </div>
-              </div>
+              <RaceDayGoalBanner
+                raceName={goalRace.name}
+                distanceLabel={goalRace.distanceLabel}
+                plannerHref={goalRacePlanHref}
+                raceHubHref={`/race-hub/${primaryRaceRegistryId}`}
+                cheerName={
+                  typeof athlete?.firstName === 'string' ? athlete.firstName : null
+                }
+                locationLabel={
+                  [goalRace.city, goalRace.state]
+                    .filter((x) => x && String(x).trim())
+                    .join(', ') || null
+                }
+              />
             ) : !primaryGoal && raceDaySignupForHome ? (
-              <div className="mb-4 rounded-2xl border-2 border-violet-400 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-lg">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex gap-4 min-w-0">
-                    <Trophy className="h-12 w-12 shrink-0 text-amber-200" aria-hidden />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-100">
-                        Today is race day
-                      </p>
-                      <h2 className="mt-2 text-2xl font-extrabold leading-tight">
-                        {signupDisplayName(raceDaySignupForHome)}
-                      </h2>
-                      {(raceDaySignupForHome.distanceLabel ??
-                        raceDaySignupForHome.race_registry.distanceLabel) ? (
-                        <p className="mt-1 text-lg font-semibold text-violet-100">
-                          {raceDaySignupForHome.distanceLabel ??
-                            raceDaySignupForHome.race_registry.distanceLabel}
-                        </p>
-                      ) : null}
-                      <p className="mt-3 text-xl font-bold text-white">
-                        Go crush it
-                        {typeof athlete?.firstName === 'string' && athlete.firstName.trim()
-                          ? `, ${athlete.firstName.trim()}`
-                          : ''}
-                        !
-                      </p>
-                      {(() => {
-                        const city = raceDaySignupForHome.race_registry.city;
-                        const st = raceDaySignupForHome.race_registry.state;
-                        const loc =
-                          [city, st].filter((x) => x && String(x).trim()).join(', ') || null;
-                        const stTime = raceDaySignupForHome.race_registry.startTime?.trim();
-                        if (!loc && !stTime) return null;
-                        return (
-                          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-violet-100">
-                            {loc ? (
-                              <span className="inline-flex items-center gap-1.5">
-                                <MapPin className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                                {loc}
-                              </span>
-                            ) : null}
-                            {stTime ? (
-                              <span className="inline-flex items-center gap-1.5">
-                                <Timer className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                                {stTime}
-                              </span>
-                            ) : null}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-2 sm:items-stretch">
-                    <Link
-                      href={myRacePlannerHref(
-                        signupDisplaySlug(raceDaySignupForHome),
-                        raceDaySignupForHome.race_registry.id
-                      )}
-                      className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
-                    >
-                      Plan my race
-                    </Link>
-                    <Link
-                      href={`/race-hub/${raceDaySignupForHome.race_registry.id}`}
-                      className="inline-flex items-center justify-center rounded-xl border border-violet-200/80 bg-violet-500/20 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-500/30"
-                    >
-                      Race hub
-                    </Link>
-                  </div>
-                </div>
-              </div>
+              <RaceDayGoalBanner
+                raceName={signupDisplayName(raceDaySignupForHome)}
+                distanceLabel={
+                  raceDaySignupForHome.distanceLabel ??
+                  raceDaySignupForHome.race_registry.distanceLabel
+                }
+                plannerHref={myRacePlannerHref(
+                  signupDisplaySlug(raceDaySignupForHome),
+                  raceDaySignupForHome.race_registry.id
+                )}
+                raceHubHref={`/race-hub/${raceDaySignupForHome.race_registry.id}`}
+                cheerName={
+                  typeof athlete?.firstName === 'string' ? athlete.firstName : null
+                }
+                locationLabel={
+                  [
+                    raceDaySignupForHome.race_registry.city,
+                    raceDaySignupForHome.race_registry.state,
+                  ]
+                    .filter((x) => x && String(x).trim())
+                    .join(', ') || null
+                }
+                startTimeLabel={raceDaySignupForHome.race_registry.startTime}
+              />
             ) : showGoalDayBeforeBanner && goalRace && primaryRaceRegistryId ? (
               <SignupRaceDayBeforeBanner
                 raceRegistryId={primaryRaceRegistryId}
@@ -1248,20 +1153,12 @@ export default function AthleteHomePage() {
                       You&apos;ve put in the work. Race week is here.
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-                    <Link
-                      href={goalRacePlanHref}
-                      className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
-                    >
-                      Plan my race
-                    </Link>
-                    <Link
-                      href={`/race-hub/${primaryRaceRegistryId}`}
-                      className="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-white px-5 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-50"
-                    >
-                      Race hub
-                    </Link>
-                  </div>
+                  <RacePrepForkActions
+                    plannerHref={goalRacePlanHref}
+                    raceHubHref={`/race-hub/${primaryRaceRegistryId}`}
+                    variant="heroLight"
+                    layout="row"
+                  />
                 </div>
               </div>
             ) : showSignupDayBeforeBanner && upcomingRaceSignupForHome ? (

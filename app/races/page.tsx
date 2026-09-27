@@ -27,6 +27,7 @@ import {
   myRacePageHref,
   myRacePlannerHref,
 } from "@/lib/races/athlete-race-signup-display";
+import { RacePrepForkActions } from "@/components/races/RacePrepForkActions";
 
 type ApiAthleteRace = {
   id: string;
@@ -321,18 +322,12 @@ function AthleteRaceCard({
             Make this my Goal race
           </button>
         )}
-        <Link
-          href={plannerHref(row)}
-          className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
-        >
-          Plan my race →
-        </Link>
-        <Link
-          href={`/race-hub/${row.raceRegistryId}`}
-          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
-        >
-          Race hub
-        </Link>
+        <RacePrepForkActions
+          plannerHref={plannerHref(row)}
+          raceHubHref={`/race-hub/${row.raceRegistryId}`}
+          variant="compact"
+          layout="row"
+        />
         {(() => {
           const training = trainingPlanSecondaryCta(row);
           if (!training || !row.goalTime?.trim()) return null;
@@ -690,12 +685,12 @@ export default function MyRacesPage() {
                               Make this my Goal race
                             </button>
                           )}
-                          <Link
-                            href={primary.href}
-                            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-600 shadow-sm"
-                          >
-                            {primary.label}
-                          </Link>
+                          <RacePrepForkActions
+                            plannerHref={plannerHref(heroRace)}
+                            raceHubHref={`/race-hub/${heroRace.raceRegistryId}`}
+                            variant="compact"
+                            layout="row"
+                          />
                           {heroGoal?.goalTime?.trim() &&
                           training &&
                           !training.label.startsWith("Set") ? (
@@ -706,12 +701,6 @@ export default function MyRacesPage() {
                               {heroRace.trainingPlanId ? "Training plan →" : "Add training plan →"}
                             </Link>
                           ) : null}
-                          <Link
-                            href={`/race-hub/${heroRace.raceRegistryId}`}
-                            className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-                          >
-                            Race hub
-                          </Link>
                           <Link
                             href={personalRaceHref(heroRace)}
                             className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:underline"

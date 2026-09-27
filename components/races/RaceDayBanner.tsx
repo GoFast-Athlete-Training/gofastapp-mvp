@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { X, Flag } from "lucide-react";
+import { myRacePlannerHref } from "@/lib/races/athlete-race-signup-display";
+import { RacePrepForkActions } from "@/components/races/RacePrepForkActions";
 
 function dismissKey(raceRegistryId: string): string {
   return `gofast.dismissSignupRaceDayBefore.${raceRegistryId}`;
@@ -37,10 +38,8 @@ export function SignupRaceDayBeforeBanner({
 
   if (dismissed) return null;
 
-  const planHref =
-    slug && slug.trim()
-      ? `/myrace/${slug.trim()}?plan=1`
-      : `/race-hub/${raceRegistryId}`;
+  const plannerHref = myRacePlannerHref(slug, raceRegistryId);
+  const raceHubHref = `/race-hub/${raceRegistryId}`;
 
   const dismiss = () => {
     try {
@@ -71,12 +70,14 @@ export function SignupRaceDayBeforeBanner({
             <p className="mt-2 text-sm text-gray-800">
               Finalize your goal pace and set your pacing — then rest up tonight.
             </p>
-            <Link
-              href={planHref}
-              className="mt-3 inline-flex items-center justify-center rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
-            >
-              Plan my race
-            </Link>
+            <div className="mt-3">
+              <RacePrepForkActions
+                plannerHref={plannerHref}
+                raceHubHref={raceHubHref}
+                variant="compact"
+                layout="row"
+              />
+            </div>
           </div>
         </div>
         <button

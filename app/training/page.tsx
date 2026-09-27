@@ -54,6 +54,9 @@ import {
 } from "@/components/training/PlanLongRunTrajectorySection";
 import { RegeneratePlanScheduleButton } from "@/components/training/RegeneratePlanScheduleButton";
 import { myRacePlannerHref } from "@/lib/races/athlete-race-signup-display";
+import { RacePrepForkActions } from "@/components/races/RacePrepForkActions";
+import { SignupRaceDayBeforeBanner } from "@/components/races/RaceDayBanner";
+import { RaceDayGoalBanner } from "@/components/races/RaceDayGoalBanner";
 
 type PlanDetailHub = {
   id: string;
@@ -66,7 +69,16 @@ type PlanDetailHub = {
   currentFiveKPace?: string | null;
   _count?: { planned_workouts: number };
   raceId?: string | null;
-  race_registry: { id?: string; name: string; raceDate?: string } | null;
+  race_registry: {
+    id?: string;
+    name: string;
+    raceDate?: string;
+    slug?: string | null;
+    distanceLabel?: string | null;
+    city?: string | null;
+    state?: string | null;
+    startTime?: string | null;
+  } | null;
   training_plan_preset?: {
     minWeeklyMiles?: number | null;
     maxWeeklyMiles?: number | null;
@@ -192,11 +204,18 @@ export default function TrainingHubPage() {
   } | null>(null);
   const [scheduledRuns, setScheduledRuns] = useState<ScheduledRunJson[]>([]);
   const [planRacePlannerHref, setPlanRacePlannerHref] = useState<string | null>(null);
+  const [planRaceHubHref, setPlanRaceHubHref] = useState<string | null>(null);
 
   const pastRacePhase = useMemo(
     () => (pastRacePlan?.raceDate ? getRacePhaseLocal(pastRacePlan.raceDate) : null),
     [pastRacePlan?.raceDate]
   );
+
+  const activePlanRacePhase = useMemo(() => {
+    const d = planDetail?.race_registry?.raceDate;
+    if (d == null || d === "") return null;
+    return getRacePhaseLocal(d);
+  }, [planDetail?.race_registry?.raceDate]);
 
   const paceDisplay = useMemo(() => {
     if (!planDetail) return null;
@@ -239,6 +258,7 @@ export default function TrainingHubPage() {
     setWeekDays([]);
     setParkedPlans([]);
     setPlanRacePlannerHref(null);
+    setPlanRaceHubHref(null);
     try {
       const u = auth.currentUser;
       if (!u) return;
@@ -364,6 +384,11 @@ export default function TrainingHubPage() {
       }
 
       setPlanDetail(plan);
+      setPastRacePlan(null);
+      const planRaceRegistryId = plan.raceId ?? plan.race_registry?.id ?? null;
+      if (planRaceRegistryId) {
+        setPlanRaceHubHref(`/race-hub/${planRaceRegistryId}`);
+      }
       if (activePlan.athleteRaceId) {
         try {
           const arRes = await fetch(
@@ -377,11 +402,20 @@ export default function TrainingHubPage() {
             const ar = arData.athleteRace;
             if (ar?.raceRegistryId) {
               setPlanRacePlannerHref(myRacePlannerHref(ar.slug, ar.raceRegistryId));
+              setPlanRaceHubHref(`/race-hub/${ar.raceRegistryId}`);
             }
           }
         } catch {
-          /* non-critical */
+          if (planRaceRegistryId) {
+            setPlanRacePlannerHref(
+              myRacePlannerHref(plan.race_registry?.slug ?? null, planRaceRegistryId)
+            );
+          }
         }
+      } else if (planRaceRegistryId) {
+        setPlanRacePlannerHref(
+          myRacePlannerHref(plan.race_registry?.slug ?? null, planRaceRegistryId)
+        );
       }
       if (hasSchedule(plan)) {
         const wn = currentTrainingWeekNumber(
@@ -733,6 +767,36 @@ export default function TrainingHubPage() {
           </p>
         )}
 
+        {showTrainingHub &&
+        planDetail?.race_registry &&
+        activePlanRacePhase === "day_before" ? (
+          <SignupRaceDayBeforeBanner
+            raceRegistryId={
+              planDetail.raceId ?? planDetail.race_registry.id ?? ""
+            }
+            raceName={planRaceDisplayName(planDetail)}
+            distanceLabel={planDetail.race_registry.distanceLabel}
+            slug={planDetail.race_registry.slug}
+          />
+        ) : null}
+
+        {showTrainingHub &&
+        planDetail?.race_registry &&
+        activePlanRacePhase === "race_day" ? (
+          <RaceDayGoalBanner
+            raceName={planRaceDisplayName(planDetail)}
+            distanceLabel={planDetail.race_registry.distanceLabel}
+            plannerHref={planRacePlannerHref}
+            raceHubHref={planRaceHubHref}
+            locationLabel={
+              [planDetail.race_registry.city, planDetail.race_registry.state]
+                .filter((x) => x && String(x).trim())
+                .join(", ") || null
+            }
+            startTimeLabel={planDetail.race_registry.startTime}
+          />
+        ) : null}
+
         {authReady && !loading && legacyPlanReselect && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 shadow-sm mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Training setup changed</h2>
@@ -798,29 +862,6 @@ export default function TrainingHubPage() {
             >
               Go to My Races
             </Link>
-          </div>
-        )}
-
-        {authReady && !loading && pastRacePlan && pastRacePhase === "race_day" && (
-          <div className="rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-8 shadow-sm mb-8">
-            <p className="text-xs font-semibold uppercase tracking-wide text-violet-800 mb-1">
-              Today is race day
-            </p>
-            <h2 className="text-2xl font-bold text-gray-900 mb-1">Good luck!</h2>
-            {pastRacePlan.raceName && (
-              <p className="text-base text-gray-700 mb-4">{pastRacePlan.raceName}</p>
-            )}
-            <p className="text-sm text-gray-600 mb-5">
-              You&apos;ve put in the miles. Race hub has your crew — no need to log a result yet.
-            </p>
-            {pastRacePlan.raceId ? (
-              <Link
-                href={`/race-hub/${pastRacePlan.raceId}`}
-                className="inline-flex justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
-              >
-                Open race hub
-              </Link>
-            ) : null}
           </div>
         )}
 
@@ -1012,14 +1053,12 @@ export default function TrainingHubPage() {
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {planRacePlannerHref ? (
-                  <Link
-                    href={planRacePlannerHref}
-                    className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-                  >
-                    Plan my race
-                  </Link>
-                ) : null}
+                <RacePrepForkActions
+                  plannerHref={planRacePlannerHref}
+                  raceHubHref={planRaceHubHref}
+                  variant="compact"
+                  layout="row"
+                />
                 <div className="relative">
                   <button
                     type="button"
