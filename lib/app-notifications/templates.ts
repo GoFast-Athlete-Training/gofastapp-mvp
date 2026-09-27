@@ -145,17 +145,13 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
     },
   },
   'race.dayBefore': {
-    title: ({ title, raceName }) =>
-      typeof title === 'string' && title.trim()
-        ? title.trim()
-        : typeof raceName === 'string' && raceName.trim()
-          ? `${raceName.trim()} tomorrow`
-          : 'Race tomorrow',
+    title: ({ title }) =>
+      typeof title === 'string' && title.trim() ? title.trim() : 'Ready to go? You got this!',
     body: ({ body, raceName }) => {
       if (typeof body === 'string' && body.trim()) return body.trim();
       const name =
         typeof raceName === 'string' && raceName.trim() ? raceName.trim() : 'your race';
-      return `Set your race pace and splits for ${name} tonight, then rest up.`;
+      return `Finalize your goal pace and set your pacing for ${name}.`;
     },
   },
   'race.raceDay': {

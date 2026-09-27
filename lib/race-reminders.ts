@@ -3,7 +3,8 @@ import { sendAppNotification } from "@/lib/app-notifications/send";
 import type { NotificationTemplateKey } from "@/lib/app-notifications/types";
 import { publishProductEvent } from "@/lib/publish-product-event";
 import { myRacePlannerHref } from "@/lib/races/athlete-race-signup-display";
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import { calendarDayKeyInTimezone } from "@/lib/race-calendar-phase";
+import { addDaysUtc, utcDateOnly } from "@/lib/training/plan-utils";
 
 export type RaceReminderKind = "week_out" | "day_before" | "race_day";
 
@@ -57,8 +58,8 @@ function pushCopy(kind: RaceReminderKind, raceName: string) {
       };
     case "day_before":
       return {
-        title: "Race tomorrow",
-        body: `Set your race pace and splits for ${name} tonight, then rest up.`,
+        title: "Ready to go? You got this!",
+        body: `Finalize your goal pace and set your pacing for ${name}.`,
       };
     case "race_day":
       return {
@@ -70,13 +71,16 @@ function pushCopy(kind: RaceReminderKind, raceName: string) {
 
 export async function processRaceReminders(now = new Date()) {
   const today = utcDateOnly(now);
+  const todayKey = calendarDayKeyInTimezone(now);
+  const windowStart = addDaysUtc(today, -1);
+  const windowEnd = addDaysUtc(today, 1);
 
   const triggers = await prisma.race_triggers.findMany({
     where: {
       OR: [
-        { weekOutDate: today },
-        { reminderDate: today },
-        { raceDate: today },
+        { weekOutDate: { gte: windowStart, lte: windowEnd } },
+        { reminderDate: { gte: windowStart, lte: windowEnd } },
+        { raceDate: { gte: windowStart, lte: windowEnd } },
       ],
     },
     include: {
@@ -114,9 +118,9 @@ export async function processRaceReminders(now = new Date()) {
   for (const trigger of triggers) {
     const raceName = trigger.race_registry.name;
     let kind: RaceReminderKind | null = null;
-    if (trigger.weekOutDate.getTime() === today.getTime()) kind = "week_out";
-    else if (trigger.reminderDate.getTime() === today.getTime()) kind = "day_before";
-    else if (trigger.raceDate.getTime() === today.getTime()) kind = "race_day";
+    if (calendarDayKeyInTimezone(trigger.weekOutDate) === todayKey) kind = "week_out";
+    else if (calendarDayKeyInTimezone(trigger.reminderDate) === todayKey) kind = "day_before";
+    else if (calendarDayKeyInTimezone(trigger.raceDate) === todayKey) kind = "race_day";
     if (!kind) continue;
 
     const field = notifiedField(kind);
@@ -127,7 +131,8 @@ export async function processRaceReminders(now = new Date()) {
     for (const member of trigger.members) {
       const ar = member.athlete_race;
       if (!ar) continue;
-      if (ar[field]?.getTime() === today.getTime()) continue;
+      const notifiedAt = ar[field];
+      if (notifiedAt && calendarDayKeyInTimezone(notifiedAt) === todayKey) continue;
 
       candidates += 1;
       const deeplink = myRacePlannerHref(ar.slug, ar.raceRegistryId);

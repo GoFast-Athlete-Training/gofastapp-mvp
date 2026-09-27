@@ -1075,6 +1075,12 @@ export default function AthleteHomePage() {
                     >
                       Plan my race
                     </Link>
+                    <Link
+                      href={`/race-hub/${primaryRaceRegistryId}`}
+                      className="inline-flex items-center justify-center rounded-xl border border-violet-200/80 bg-violet-500/20 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-500/30"
+                    >
+                      Race hub
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -1139,6 +1145,12 @@ export default function AthleteHomePage() {
                       className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
                     >
                       Plan my race
+                    </Link>
+                    <Link
+                      href={`/race-hub/${raceDaySignupForHome.race_registry.id}`}
+                      className="inline-flex items-center justify-center rounded-xl border border-violet-200/80 bg-violet-500/20 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-500/30"
+                    >
+                      Race hub
                     </Link>
                   </div>
                 </div>
@@ -1242,6 +1254,12 @@ export default function AthleteHomePage() {
                       className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
                     >
                       Plan my race
+                    </Link>
+                    <Link
+                      href={`/race-hub/${primaryRaceRegistryId}`}
+                      className="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-white px-5 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-50"
+                    >
+                      Race hub
                     </Link>
                   </div>
                 </div>

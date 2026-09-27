@@ -618,7 +618,19 @@ export default function MyRacePage() {
                   <InlineGoalForm
                     race={raceForGoal}
                     goal={effectiveGoal}
-                    onSaved={setGoal}
+                    onSaved={(g) => {
+                      setGoal(g);
+                      setSignup((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              goalTime: g.goalTime ?? prev.goalTime,
+                              goalRacePace: g.goalRacePace ?? prev.goalRacePace,
+                              goalPace5K: g.goalPace5K ?? prev.goalPace5K,
+                            }
+                          : prev
+                      );
+                    }}
                     alwaysShowForm
                   />
                 </div>
@@ -636,7 +648,19 @@ export default function MyRacePage() {
                 <RacePlanSection
                   race={raceForGoal}
                   goal={effectiveGoal}
-                  onGoalSaved={setGoal}
+                  onGoalSaved={(g) => {
+                    setGoal(g);
+                    setSignup((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            goalTime: g.goalTime ?? prev.goalTime,
+                            goalRacePace: g.goalRacePace ?? prev.goalRacePace,
+                            goalPace5K: g.goalPace5K ?? prev.goalPace5K,
+                          }
+                        : prev
+                    );
+                  }}
                   hideGoalForm
                   embedded
                 />
