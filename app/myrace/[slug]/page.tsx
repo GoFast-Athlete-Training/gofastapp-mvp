@@ -618,11 +618,12 @@ export default function MyRacePage() {
                   raceForGoal={raceForGoal}
                   goal={effectiveGoal}
                   defaultTab="build"
-                  raceDayApply={
-                    trainingPlanId && raceForGoal?.raceDate
+                  racePlanContext={
+                    signup?.id && raceForGoal?.raceDate
                       ? {
+                          athleteRaceId: signup.id,
+                          raceDate: String(raceForGoal.raceDate).slice(0, 10),
                           planId: trainingPlanId,
-                          dateKey: String(raceForGoal.raceDate).slice(0, 10),
                           title: raceForGoal.name,
                         }
                       : undefined

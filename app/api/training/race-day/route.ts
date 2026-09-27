@@ -2,13 +2,16 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
+import { prisma } from "@/lib/prisma";
 import {
-  getRaceDayPlanState,
-  RaceDayPlanError,
-  upsertRaceDayPlannedWorkout,
-} from "@/lib/training/save-race-day-planned-workout";
+  getRacePlanForAthleteRace,
+  upsertRacePlan,
+  RacePlanError,
+} from "@/lib/training/race-plan-service";
+import { normalizeRacePlanDocument } from "@/lib/races/race-plan-builder";
+import { RaceDayPlanError } from "@/lib/training/save-race-day-planned-workout";
 
-/** GET — schedule slot + optional athlete-built race segments (no catalogue materialize). */
+/** GET — race plan for plan race day (resolves athleteRaceId from training plan). */
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAthleteFromBearer(request);
@@ -23,26 +26,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "planId and date are required" }, { status: 400 });
     }
 
-    const state = await getRaceDayPlanState({
+    const plan = await prisma.training_plans.findFirst({
+      where: { id: planId, athleteId: auth.athlete.id },
+      select: { athleteRaceId: true },
+    });
+    if (!plan?.athleteRaceId) {
+      return NextResponse.json({ error: "Plan has no linked athlete race" }, { status: 404 });
+    }
+
+    const state = await getRacePlanForAthleteRace({
       athleteId: auth.athlete.id,
-      planId,
-      dateParam: date,
+      athleteRaceId: plan.athleteRaceId,
     });
 
     return NextResponse.json({
-      scheduled: state.scheduled,
-      plannedWorkoutId: state.plannedWorkoutId,
-      segments: state.segments,
+      racePlanId: state.racePlanId,
+      planJson: state.planJson,
+      pushedAt: state.pushedAt?.toISOString() ?? null,
+      athleteRaceId: plan.athleteRaceId,
+      date,
     });
   } catch (e: unknown) {
-    const msg = e instanceof RaceDayPlanError ? e.message : e instanceof Error ? e.message : "Failed";
-    const status = msg.includes("not a race") || msg.includes("not found") ? 404 : 400;
+    const msg = e instanceof Error ? e.message : "Failed";
     console.error("GET /api/training/race-day", e);
-    return NextResponse.json({ error: msg }, { status });
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
 }
 
-/** POST — save athlete-built race segments on the plan day. */
+/** POST — save race plan (legacy path; prefer POST /api/races/race-plan). */
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAthleteFromBearer(request);
@@ -54,24 +65,44 @@ export async function POST(request: NextRequest) {
     const planId = typeof body.planId === "string" ? body.planId.trim() : "";
     const date = typeof body.date === "string" ? body.date.trim() : "";
     const title = typeof body.title === "string" ? body.title.trim() : "";
-    const segments = body.segments;
+    const planJson = body.planJson
+      ? normalizeRacePlanDocument(body.planJson)
+      : null;
 
     if (!planId || !date) {
       return NextResponse.json({ error: "planId and date are required" }, { status: 400 });
     }
 
-    const { plannedWorkoutId } = await upsertRaceDayPlannedWorkout({
+    const plan = await prisma.training_plans.findFirst({
+      where: { id: planId, athleteId: auth.athlete.id },
+      select: { athleteRaceId: true },
+    });
+    if (!plan?.athleteRaceId) {
+      throw new RaceDayPlanError("Plan has no linked athlete race");
+    }
+
+    if (!planJson) {
+      return NextResponse.json({ error: "planJson is required" }, { status: 400 });
+    }
+
+    const { racePlanId } = await upsertRacePlan({
       athleteId: auth.athlete.id,
+      athleteRaceId: plan.athleteRaceId,
       planId,
-      dateParam: date,
       title,
-      segments,
+      raceDate: date,
+      planJson,
     });
 
-    return NextResponse.json({ plannedWorkoutId, workoutId: plannedWorkoutId });
+    return NextResponse.json({ racePlanId, plannedWorkoutId: racePlanId, workoutId: racePlanId });
   } catch (e: unknown) {
-    const msg = e instanceof RaceDayPlanError ? e.message : e instanceof Error ? e.message : "Failed";
-    const status = msg.includes("not a race") || msg.includes("not found") ? 404 : 400;
+    const msg =
+      e instanceof RacePlanError || e instanceof RaceDayPlanError
+        ? e.message
+        : e instanceof Error
+          ? e.message
+          : "Failed";
+    const status = msg.includes("not found") || msg.includes("not a race") ? 404 : 400;
     console.error("POST /api/training/race-day", e);
     return NextResponse.json({ error: msg }, { status });
   }

@@ -6,110 +6,100 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { PaceMiSplitEditor } from "@/components/workout/PaceMiSplitEditor";
-import { formatSegmentDistance } from "@/lib/training/segment-summary";
-import {
-  formatStoredPaceAsMinPerMile,
-  secondsPerMileToSecondsPerKm,
-  storedPaceSecondsKmToSecondsPerMile,
-} from "@/lib/workout-generator/pace-calculator";
+import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { parseSplitPaceToSecPerMile, secPerMileToSplitStrings } from "@/lib/workout/pace-mi-split";
 import {
-  apiSegmentsToFlatWorkBlocks,
-  raceDaySegmentsToWorkBlocks,
-  racePaceWorkBlocksToRaceDaySegments,
-  tryParseTabularRacePacePaste,
-  type RacePaceWorkBlock,
-} from "@/lib/races/race-pace-target-paste";
+  EMPTY_RACE_PLAN,
+  formatBlockMileRange,
+  formatBlockPaceBand,
+  type RacePlanBlock,
+  type RacePlanDocument,
+} from "@/lib/races/race-plan-types";
 
-const PACE_SLOT_ENC = 2 as const;
-
-type RaceDayApply = {
-  planId: string;
-  dateKey: string;
+type RacePlanContext = {
+  athleteRaceId: string;
+  raceDate: string;
+  planId?: string | null;
   title?: string;
 };
 
 type Props = {
-  raceDayApply?: RaceDayApply;
+  racePlanContext: RacePlanContext;
   raceTitle: string;
 };
 
-function secPerKmToPaceDisplay(value: number): string {
-  return formatStoredPaceAsMinPerMile(value, PACE_SLOT_ENC);
+function newBlock(index: number, prevEnd = 0): RacePlanBlock {
+  return {
+    mileStart: prevEnd,
+    mileEnd: prevEnd + 3,
+    paceLow: "",
+    paceHigh: "",
+    effort: "",
+    instruction: "",
+    cue: `Block ${index + 1}`,
+  };
 }
 
-function blockOneLine(block: RacePaceWorkBlock): string {
-  const dist = block.miles > 0 ? formatSegmentDistance(block.miles) : "";
-  const low = block.paceValueLow != null ? secPerKmToPaceDisplay(block.paceValueLow) : "";
-  const high = block.paceValueHigh != null ? secPerKmToPaceDisplay(block.paceValueHigh) : "";
-  const pace = low && high ? (low === high ? `${low}/mi` : `${low}-${high}/mi`) : "";
-  return [block.name, dist, pace].filter(Boolean).join(" · ") || "—";
-}
-
-function blockToPaceSplitState(block: RacePaceWorkBlock | null) {
+function blockPaceSplitState(block: RacePlanBlock) {
   let lowMin = "";
   let lowSec = "";
   let highMin = "";
   let highSec = "";
-  if (block?.paceValueLow != null) {
-    const secMi = Math.round(
-      storedPaceSecondsKmToSecondsPerMile(block.paceValueLow, PACE_SLOT_ENC)
-    );
-    const lo = secPerMileToSplitStrings(secMi);
-    lowMin = lo.min;
-    lowSec = lo.sec;
+  if (block.paceLow) {
+    try {
+      const sec = parsePaceToSecondsPerMile(block.paceLow);
+      const lo = secPerMileToSplitStrings(sec);
+      lowMin = lo.min;
+      lowSec = lo.sec;
+    } catch {
+      /* keep */
+    }
   }
-  if (block?.paceValueHigh != null) {
-    const secMi = Math.round(
-      storedPaceSecondsKmToSecondsPerMile(block.paceValueHigh, PACE_SLOT_ENC)
-    );
-    const hi = secPerMileToSplitStrings(secMi);
-    highMin = hi.min;
-    highSec = hi.sec;
+  if (block.paceHigh) {
+    try {
+      const sec = parsePaceToSecondsPerMile(block.paceHigh);
+      const hi = secPerMileToSplitStrings(sec);
+      highMin = hi.min;
+      highSec = hi.sec;
+    } catch {
+      /* keep */
+    }
   }
   return { lowMin, lowSec, highMin, highSec };
 }
 
-function applyPaceEditsToBlock(
-  block: RacePaceWorkBlock,
-  lowMin: string,
-  lowSec: string,
-  highMin: string,
-  highSec: string
-): RacePaceWorkBlock {
-  const ctx = block.name.trim() || "Race block";
-  let paceValueLow = block.paceValueLow;
-  let paceValueHigh = block.paceValueHigh;
+function applyPaceEdits(block: RacePlanBlock, lowMin: string, lowSec: string, highMin: string, highSec: string): RacePlanBlock {
+  const ctx = block.cue.trim() || "Race block";
+  let paceLow = block.paceLow;
+  let paceHigh = block.paceHigh;
   if (!lowMin.trim() && !lowSec.trim()) {
-    paceValueLow = undefined;
+    paceLow = "";
   } else {
     try {
-      const secMiLow = parseSplitPaceToSecPerMile(lowMin, lowSec, ctx, "low");
-      if (Number.isFinite(secMiLow)) {
-        paceValueLow = secondsPerMileToSecondsPerKm(secMiLow);
-      }
+      const sec = parseSplitPaceToSecPerMile(lowMin, lowSec, ctx, "low");
+      const parts = secPerMileToSplitStrings(sec);
+      paceLow = `${parts.min}:${parts.sec.padStart(2, "0")}`;
     } catch {
       /* keep */
     }
   }
   if (!highMin.trim() && !highSec.trim()) {
-    paceValueHigh = undefined;
+    paceHigh = "";
   } else {
     try {
-      const secMiHigh = parseSplitPaceToSecPerMile(highMin, highSec, ctx, "high");
-      if (Number.isFinite(secMiHigh)) {
-        paceValueHigh = secondsPerMileToSecondsPerKm(secMiHigh);
-      }
+      const sec = parseSplitPaceToSecPerMile(highMin, highSec, ctx, "high");
+      const parts = secPerMileToSplitStrings(sec);
+      paceHigh = `${parts.min}:${parts.sec.padStart(2, "0")}`;
     } catch {
       /* keep */
     }
   }
-  return { ...block, paceValueLow, paceValueHigh };
+  return { ...block, paceLow, paceHigh };
 }
 
-export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
-  const [blocks, setBlocks] = useState<RacePaceWorkBlock[]>([]);
-  const [plannedWorkoutId, setPlannedWorkoutId] = useState<string | null>(null);
+export function RacePaceTargetsSection({ racePlanContext, raceTitle }: Props) {
+  const [plan, setPlan] = useState<RacePlanDocument>({ ...EMPTY_RACE_PLAN });
+  const [racePlanId, setRacePlanId] = useState<string | null>(null);
   const [loadingState, setLoadingState] = useState(false);
 
   const [sourceText, setSourceText] = useState("");
@@ -131,39 +121,31 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
   const [editingPaceHighMin, setEditingPaceHighMin] = useState("");
   const [editingPaceHighSec, setEditingPaceHighSec] = useState("");
 
-  const hasBlocks = blocks.some((b) => b.miles > 0);
+  const hasBlocks = plan.blocks.some((b) => b.mileEnd > b.mileStart);
 
-  const loadRaceDayState = useCallback(async () => {
-    if (!raceDayApply) return;
+  const loadRacePlan = useCallback(async () => {
     setLoadingState(true);
     try {
       const { data } = await api.get<{
-        plannedWorkoutId?: string | null;
-        segments?: Array<{
-          title: string;
-          durationType: string;
-          durationValue: number;
-          targets?: Array<{ type: string; valueLow?: number; valueHigh?: number }>;
-        }>;
+        racePlanId?: string | null;
+        planJson?: RacePlanDocument;
       }>(
-        `training/race-day?planId=${encodeURIComponent(raceDayApply.planId)}&date=${encodeURIComponent(raceDayApply.dateKey)}`
+        `/races/race-plan?athleteRaceId=${encodeURIComponent(racePlanContext.athleteRaceId)}`
       );
-      const wid = data.plannedWorkoutId?.trim() || null;
-      setPlannedWorkoutId(wid);
-      const segs = data.segments ?? [];
-      if (segs.length > 0) {
-        setBlocks(raceDaySegmentsToWorkBlocks(segs));
+      setRacePlanId(data.racePlanId?.trim() || null);
+      if (data.planJson?.blocks?.length) {
+        setPlan(data.planJson);
       }
     } catch {
       /* optional preload */
     } finally {
       setLoadingState(false);
     }
-  }, [raceDayApply]);
+  }, [racePlanContext.athleteRaceId]);
 
   useEffect(() => {
-    void loadRaceDayState();
-  }, [loadRaceDayState]);
+    void loadRacePlan();
+  }, [loadRacePlan]);
 
   useEffect(() => {
     const athleteId = LocalStorageAPI.getAthleteId();
@@ -189,126 +171,104 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
 
   useEffect(() => {
     if (editingIndex == null) return;
-    const block = blocks[editingIndex];
+    const block = plan.blocks[editingIndex];
     if (!block) return;
-    const sp = blockToPaceSplitState(block);
+    const sp = blockPaceSplitState(block);
     setEditingPaceLowMin(sp.lowMin);
     setEditingPaceLowSec(sp.lowSec);
     setEditingPaceHighMin(sp.highMin);
     setEditingPaceHighSec(sp.highSec);
-  }, [editingIndex, blocks]);
+  }, [editingIndex, plan.blocks]);
 
   useEffect(() => {
     if (editingIndex == null) return;
-    setBlocks((prev) => {
-      const block = prev[editingIndex];
+    setPlan((prev) => {
+      const block = prev.blocks[editingIndex];
       if (!block) return prev;
-      const next = applyPaceEditsToBlock(
+      const nextBlock = applyPaceEdits(
         block,
         editingPaceLowMin,
         editingPaceLowSec,
         editingPaceHighMin,
         editingPaceHighSec
       );
-      if (
-        next.paceValueLow === block.paceValueLow &&
-        next.paceValueHigh === block.paceValueHigh
-      ) {
-        return prev;
-      }
-      const copy = [...prev];
-      copy[editingIndex] = next;
-      return copy;
+      if (nextBlock === block) return prev;
+      const copy = [...prev.blocks];
+      copy[editingIndex] = nextBlock;
+      return { ...prev, blocks: copy };
     });
-  }, [
-    editingIndex,
-    editingPaceLowMin,
-    editingPaceLowSec,
-    editingPaceHighMin,
-    editingPaceHighSec,
-  ]);
+  }, [editingIndex, editingPaceLowMin, editingPaceLowSec, editingPaceHighMin, editingPaceHighSec]);
 
   const handleDerive = async () => {
     const text = sourceText.trim();
     if (!text) {
-      setDeriveError("Paste pacing notes or split lines first.");
+      setDeriveError("Paste your race plan first.");
       return;
     }
     setDeriveError(null);
     setDeriving(true);
     try {
-      const tabular = tryParseTabularRacePacePaste(text);
-      if (tabular) {
-        setBlocks(apiSegmentsToFlatWorkBlocks(tabular));
-        return;
-      }
-
-      const { data } = await api.post<{
-        segments: Array<{
-          stepOrder: number;
-          title: string;
-          durationType: string;
-          durationValue: number;
-          targets?: Array<{ type: string; valueLow?: number; valueHigh?: number }>;
-        }>;
-      }>("workouts/ai-generate", { workoutType: "Race", sourceText: text });
-      setBlocks(apiSegmentsToFlatWorkBlocks(data.segments ?? []));
+      const { data } = await api.post<{ planJson: RacePlanDocument }>("races/race-plan/parse", {
+        sourceText: text,
+      });
+      setPlan(data.planJson);
     } catch (err: unknown) {
-      setDeriveError(err instanceof Error ? err.message : "Could not parse paste.");
+      const ax = err as { response?: { data?: { error?: string } } };
+      setDeriveError(ax.response?.data?.error ?? "Could not parse race plan.");
     } finally {
       setDeriving(false);
     }
   };
 
   const handleSave = async () => {
-    if (!raceDayApply) return;
-    const segments = racePaceWorkBlocksToRaceDaySegments(blocks);
-    if (segments.length === 0) {
-      setSaveError("Add at least one block with miles.");
+    if (!hasBlocks) {
+      setSaveError("Add at least one block with a mile range.");
       return;
     }
     setSaving(true);
     setSaveError(null);
     setSaveMessage(null);
     try {
-      const { data } = await api.post<{ plannedWorkoutId?: string; workoutId?: string }>(
-        "training/race-day",
-        {
-          planId: raceDayApply.planId,
-          date: raceDayApply.dateKey,
-          title: raceDayApply.title?.trim() || raceTitle,
-          segments,
-        }
-      );
-      const wid = data.plannedWorkoutId ?? data.workoutId ?? null;
-      setPlannedWorkoutId(wid);
-      setSaveMessage("Race pace targets saved on your race-day plan.");
+      const { data } = await api.post<{ racePlanId?: string }>("races/race-plan", {
+        athleteRaceId: racePlanContext.athleteRaceId,
+        planId: racePlanContext.planId ?? null,
+        title: racePlanContext.title?.trim() || raceTitle,
+        raceDate: racePlanContext.raceDate,
+        planJson: plan,
+      });
+      const id = data.racePlanId?.trim() || null;
+      setRacePlanId(id);
+      setSaveMessage("Race plan saved.");
     } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : "Could not save.");
+      const ax = err as { response?: { data?: { error?: string } } };
+      setSaveError(ax.response?.data?.error ?? "Could not save.");
     } finally {
       setSaving(false);
     }
   };
 
   const handlePushGarmin = async () => {
-    if (!plannedWorkoutId || !raceDayApply) return;
     setPushingGarmin(true);
     setGarminError(null);
     setGarminMessage(null);
     try {
-      const segments = racePaceWorkBlocksToRaceDaySegments(blocks);
-      const { data } = await api.post<{ plannedWorkoutId?: string; workoutId?: string }>(
-        "training/race-day",
-        {
-          planId: raceDayApply.planId,
-          date: raceDayApply.dateKey,
-          title: raceDayApply.title?.trim() || raceTitle,
-          segments,
-        }
-      );
-      const wid = data.plannedWorkoutId ?? data.workoutId ?? plannedWorkoutId;
-      setPlannedWorkoutId(wid);
-      await api.post(`workouts/${encodeURIComponent(wid)}/push-to-garmin`);
+      let id = racePlanId;
+      if (!id) {
+        const { data } = await api.post<{ racePlanId?: string }>("races/race-plan", {
+          athleteRaceId: racePlanContext.athleteRaceId,
+          planId: racePlanContext.planId ?? null,
+          title: racePlanContext.title?.trim() || raceTitle,
+          raceDate: racePlanContext.raceDate,
+          planJson: plan,
+        });
+        id = data.racePlanId?.trim() || null;
+        setRacePlanId(id);
+      }
+      if (!id) {
+        setGarminError("Save your race plan first.");
+        return;
+      }
+      await api.post(`races/race-plan/${encodeURIComponent(id)}/push-to-garmin`);
       setGarminMessage("Sent to Garmin. Sync your watch.");
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
@@ -318,18 +278,7 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
     }
   };
 
-  const showGarminButton = useMemo(
-    () => Boolean(plannedWorkoutId && hasBlocks && raceDayApply),
-    [plannedWorkoutId, hasBlocks, raceDayApply]
-  );
-
-  if (!raceDayApply) {
-    return (
-      <p className="text-sm text-gray-600">
-        Link a training plan to save race pace targets and send them to Garmin.
-      </p>
-    );
-  }
+  const showGarminButton = useMemo(() => Boolean(hasBlocks), [hasBlocks]);
 
   return (
     <div className="space-y-4">
@@ -338,21 +287,20 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
           Create Race Pace Targets
         </h3>
         <p className="mt-1 text-sm text-gray-600">
-          Name each stretch of the course (all work — no warmup/cooldown slots). Paste coach notes or
-          one line per block:{" "}
-          <span className="font-mono text-gray-800">label | miles pace pace</span>.
+          Paste a full race plan with blocks (mile range, pace band, effort, instruction, cue). Each
+          block becomes a Garmin work step on race day.
         </p>
       </div>
 
       {!hasBlocks ? (
         <div className="rounded-lg border border-gray-200 bg-white/80 p-4">
-          <h4 className="text-sm font-semibold text-gray-900 mb-2">Paste pacing blocks</h4>
+          <h4 className="text-sm font-semibold text-gray-900 mb-2">Paste race plan</h4>
           <textarea
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-violet-500"
-            placeholder={"e.g. start out strong | 2 7:30 7:45\nOpen space for 5 | 5 7:00 7:15"}
+            rows={8}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 font-mono"
+            placeholder={"Goal: …\n\nBLOCK 1 — Miles 0.0 to 3.0\nTarget Pace: 7:03-7:07/mi\n…"}
           />
           {deriveError ? <p className="mt-1 text-sm text-red-600">{deriveError}</p> : null}
           <button
@@ -362,21 +310,42 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
             className="mt-2 inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
           >
             <FileText className="w-4 h-4" />
-            {deriving ? "Parsing…" : "Parse paste"}
+            {deriving ? "Parsing…" : "Parse race plan"}
           </button>
         </div>
       ) : null}
 
+      {plan.goal ? (
+        <div className="rounded-lg border border-violet-100 bg-violet-50/40 px-4 py-3">
+          <p className="text-xs font-semibold uppercase text-violet-800">Goal</p>
+          <p className="text-sm text-gray-800 mt-1">{plan.goal}</p>
+        </div>
+      ) : null}
+
       <div className="space-y-3">
-        {blocks.map((block, index) => {
+        {plan.blocks.map((block, index) => {
           const isEditing = editingIndex === index;
           return (
             <div
-              key={`${block.name}-${index}`}
+              key={`${block.cue}-${index}`}
               className="rounded-lg border border-violet-100 bg-white px-4 py-3 shadow-sm"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-gray-900">{blockOneLine(block)}</p>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-bold text-violet-900">{block.cue || `Block ${index + 1}`}</p>
+                  <p className="text-sm text-gray-700 mt-0.5">
+                    Miles {formatBlockMileRange(block)}
+                    {block.paceLow && block.paceHigh ? ` · ${formatBlockPaceBand(block)}` : ""}
+                  </p>
+                  {block.effort ? (
+                    <p className="text-xs text-gray-600 mt-1">
+                      <span className="font-semibold">Effort:</span> {block.effort}
+                    </p>
+                  ) : null}
+                  {block.instruction ? (
+                    <p className="text-sm text-gray-800 mt-2">{block.instruction}</p>
+                  ) : null}
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -389,7 +358,10 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
                   <button
                     type="button"
                     onClick={() => {
-                      setBlocks((prev) => prev.filter((_, i) => i !== index));
+                      setPlan((prev) => ({
+                        ...prev,
+                        blocks: prev.blocks.filter((_, i) => i !== index),
+                      }));
                       if (editingIndex === index) setEditingIndex(null);
                     }}
                     className="text-sm px-2 py-1 rounded-lg text-red-700 hover:bg-red-50 inline-flex items-center gap-1"
@@ -402,34 +374,82 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
               {isEditing ? (
                 <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Block name</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Cue</label>
                     <input
                       type="text"
-                      value={block.name}
+                      value={block.cue}
                       onChange={(e) => {
-                        const name = e.target.value;
-                        setBlocks((prev) => {
-                          const copy = [...prev];
-                          copy[index] = { ...copy[index], name };
-                          return copy;
+                        const cue = e.target.value;
+                        setPlan((prev) => {
+                          const copy = [...prev.blocks];
+                          copy[index] = { ...copy[index]!, cue };
+                          return { ...prev, blocks: copy };
                         });
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Miles</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Mile start</label>
                     <input
                       type="number"
                       step="0.1"
-                      min={0}
-                      value={block.miles || ""}
+                      value={block.mileStart}
                       onChange={(e) => {
-                        const miles = parseFloat(e.target.value) || 0;
-                        setBlocks((prev) => {
-                          const copy = [...prev];
-                          copy[index] = { ...copy[index], miles };
-                          return copy;
+                        const mileStart = parseFloat(e.target.value) || 0;
+                        setPlan((prev) => {
+                          const copy = [...prev.blocks];
+                          copy[index] = { ...copy[index]!, mileStart };
+                          return { ...prev, blocks: copy };
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Mile end</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={block.mileEnd}
+                      onChange={(e) => {
+                        const mileEnd = parseFloat(e.target.value) || 0;
+                        setPlan((prev) => {
+                          const copy = [...prev.blocks];
+                          copy[index] = { ...copy[index]!, mileEnd };
+                          return { ...prev, blocks: copy };
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Effort</label>
+                    <input
+                      type="text"
+                      value={block.effort}
+                      onChange={(e) => {
+                        const effort = e.target.value;
+                        setPlan((prev) => {
+                          const copy = [...prev.blocks];
+                          copy[index] = { ...copy[index]!, effort };
+                          return { ...prev, blocks: copy };
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Instruction</label>
+                    <textarea
+                      rows={2}
+                      value={block.instruction}
+                      onChange={(e) => {
+                        const instruction = e.target.value;
+                        setPlan((prev) => {
+                          const copy = [...prev.blocks];
+                          copy[index] = { ...copy[index]!, instruction };
+                          return { ...prev, blocks: copy };
                         });
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
@@ -462,14 +482,22 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
         })}
       </div>
 
+      {plan.primaryRule ? (
+        <div className="rounded-lg border border-amber-100 bg-amber-50/50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase text-amber-900">Primary rule</p>
+          <p className="text-sm text-gray-800 mt-1">{plan.primaryRule}</p>
+        </div>
+      ) : null}
+
       <button
         type="button"
         onClick={() => {
-          setBlocks((prev) => [
+          const prevEnd = plan.blocks.length ? plan.blocks[plan.blocks.length - 1]!.mileEnd : 0;
+          setPlan((prev) => ({
             ...prev,
-            { name: "Work", miles: 0 },
-          ]);
-          setEditingIndex(blocks.length);
+            blocks: [...prev.blocks, newBlock(prev.blocks.length, prevEnd)],
+          }));
+          setEditingIndex(plan.blocks.length);
         }}
         className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-violet-300 px-3 py-2 text-sm font-semibold text-violet-900 hover:bg-violet-50"
       >
@@ -481,7 +509,7 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
         <button
           type="button"
           onClick={() => {
-            setBlocks([]);
+            setPlan({ ...EMPTY_RACE_PLAN });
             setEditingIndex(null);
             setSourceText("");
           }}
@@ -498,7 +526,7 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
           onClick={() => void handleSave()}
           className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Save race pace targets"}
+          {saving ? "Saving…" : "Save race plan"}
         </button>
 
         {showGarminButton ? (

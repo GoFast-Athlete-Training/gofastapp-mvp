@@ -171,6 +171,7 @@ model Athlete {
   swim_workouts           swim_workout[]
   tri_workouts            tri_workout[]
   athlete_races           athlete_races[]
+  race_plans              race_plans[]
   race_trigger_athletes   race_trigger_athletes[]
   athlete_race_results    athlete_race_results[]
   race_memberships        race_memberships[]
@@ -897,6 +898,7 @@ model athlete_races {
   athlete_race_result       athlete_race_results?
   training_plans            training_plans[]            @relation("PlanAthleteRace")
   race_trigger_member       race_trigger_athletes?
+  race_plan                 race_plans?  @relation("RacePlanAthleteRace")
 
   @@unique([athleteId, raceRegistryId])
   @@index([athleteId])
@@ -904,6 +906,28 @@ model athlete_races {
   @@index([raceDate])
   @@index([athleteId, isPrimaryRace])
   @@map("athlete_races")
+}
+
+/// Athlete-authored race-day pacing — adjacent to workouts, not planned_workout_segments.
+model race_plans {
+  id              String         @id @default(cuid())
+  athleteId       String
+  athleteRaceId   String         @unique
+  planId          String?
+  raceDate        DateTime
+  title           String
+  planJson        Json
+  garminWorkoutId Int?
+  pushedAt        DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  Athlete         Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete_race    athlete_races  @relation("RacePlanAthleteRace", fields: [athleteRaceId], references: [id], onDelete: Cascade)
+  training_plans  training_plans? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([athleteId])
+  @@index([planId])
+  @@map("race_plans")
 }
 
 /// Prod date ledger for race-week / day-before / race-day push + email triggers.
@@ -2418,6 +2442,7 @@ model training_plans {
   updatedAt            DateTime
   workout_instances    workouts[]             @relation("TrainingPlanWorkoutInstances")
   planned_workouts     planned_workouts[]
+  race_plans           race_plans[]
   Athlete              Athlete                @relation(fields: [athleteId], references: [id])
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
   athlete_race         athlete_races?         @relation("PlanAthleteRace", fields: [athleteRaceId], references: [id], onDelete: SetNull)

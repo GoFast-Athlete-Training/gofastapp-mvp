@@ -5,16 +5,17 @@ import type { RaceForGoal, InlineGoalRow } from "@/components/races/InlineGoalFo
 import { RacePlanSection } from "@/components/races/RacePlanSection";
 import { RacePaceTargetsSection } from "@/components/races/RacePaceTargetsSection";
 
-type RaceDayApply = {
-  planId: string;
-  dateKey: string;
+type RacePlanContext = {
+  athleteRaceId: string;
+  raceDate: string;
+  planId?: string | null;
   title?: string;
 };
 
 type Props = {
   raceForGoal: RaceForGoal;
   goal: InlineGoalRow | null;
-  raceDayApply?: RaceDayApply;
+  racePlanContext?: RacePlanContext;
   /** Default tab when landing with ?plan=1 */
   defaultTab?: "build" | "outlook";
 };
@@ -22,7 +23,7 @@ type Props = {
 export function RacePaceHubTabs({
   raceForGoal,
   goal,
-  raceDayApply,
+  racePlanContext,
   defaultTab = "build",
 }: Props) {
   const [tab, setTab] = useState<"build" | "outlook">(defaultTab);
@@ -55,10 +56,16 @@ export function RacePaceHubTabs({
       </div>
 
       {tab === "build" ? (
-        <RacePaceTargetsSection
-          raceTitle={raceForGoal.name}
-          raceDayApply={raceDayApply}
-        />
+        racePlanContext ? (
+          <RacePaceTargetsSection
+            raceTitle={raceForGoal.name}
+            racePlanContext={racePlanContext}
+          />
+        ) : (
+          <p className="text-sm text-gray-600">
+            Sign up for this race on your account to build and save a race plan.
+          </p>
+        )
       ) : (
         <>
           <p className="text-sm text-gray-600">
