@@ -110,7 +110,6 @@ function applyPaceEditsToBlock(
 export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
   const [blocks, setBlocks] = useState<RacePaceWorkBlock[]>([]);
   const [plannedWorkoutId, setPlannedWorkoutId] = useState<string | null>(null);
-  const [workoutPushed, setWorkoutPushed] = useState(false);
   const [loadingState, setLoadingState] = useState(false);
 
   const [sourceText, setSourceText] = useState("");
@@ -154,14 +153,6 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
       const segs = data.segments ?? [];
       if (segs.length > 0) {
         setBlocks(raceDaySegmentsToWorkBlocks(segs));
-      }
-      if (wid) {
-        const wRes = await api.get<{ workout?: { workoutPushed?: boolean } }>(
-          `/training/workout/${encodeURIComponent(wid)}`
-        );
-        setWorkoutPushed(wRes.data?.workout?.workoutPushed === true);
-      } else {
-        setWorkoutPushed(false);
       }
     } catch {
       /* optional preload */
@@ -291,7 +282,6 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
       );
       const wid = data.plannedWorkoutId ?? data.workoutId ?? null;
       setPlannedWorkoutId(wid);
-      setWorkoutPushed(false);
       setSaveMessage("Race pace targets saved on your race-day plan.");
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : "Could not save.");
@@ -301,17 +291,28 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
   };
 
   const handlePushGarmin = async () => {
-    if (!plannedWorkoutId) return;
+    if (!plannedWorkoutId || !raceDayApply) return;
     setPushingGarmin(true);
     setGarminError(null);
     setGarminMessage(null);
     try {
-      await api.post(`workouts/${encodeURIComponent(plannedWorkoutId)}/push-to-garmin`);
-      setWorkoutPushed(true);
-      setGarminMessage("On Garmin Connect calendar — sync your watch.");
+      const segments = racePaceWorkBlocksToRaceDaySegments(blocks);
+      const { data } = await api.post<{ plannedWorkoutId?: string; workoutId?: string }>(
+        "training/race-day",
+        {
+          planId: raceDayApply.planId,
+          date: raceDayApply.dateKey,
+          title: raceDayApply.title?.trim() || raceTitle,
+          segments,
+        }
+      );
+      const wid = data.plannedWorkoutId ?? data.workoutId ?? plannedWorkoutId;
+      setPlannedWorkoutId(wid);
+      await api.post(`workouts/${encodeURIComponent(wid)}/push-to-garmin`);
+      setGarminMessage("Sent to Garmin. Sync your watch.");
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
-      setGarminError(ax.response?.data?.error ?? "Could not add to Garmin calendar.");
+      setGarminError(ax.response?.data?.error ?? "Could not send to Garmin.");
     } finally {
       setPushingGarmin(false);
     }
@@ -466,7 +467,7 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
         onClick={() => {
           setBlocks((prev) => [
             ...prev,
-            { name: `Block ${prev.length + 1}`, miles: 0 },
+            { name: "Work", miles: 0 },
           ]);
           setEditingIndex(blocks.length);
         }}
@@ -507,11 +508,7 @@ export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
             onClick={() => void handlePushGarmin()}
             className="rounded-lg border border-orange-300 bg-white px-4 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-50 disabled:opacity-50"
           >
-            {pushingGarmin
-              ? "Adding to calendar…"
-              : workoutPushed
-                ? "Re-send to Garmin calendar"
-                : "Add to Garmin calendar"}
+            {pushingGarmin ? "Sending…" : "Send to Garmin"}
           </button>
         ) : null}
       </div>

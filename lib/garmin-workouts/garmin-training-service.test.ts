@@ -90,6 +90,27 @@ test("assembleGarminWorkout maps Main Work and Work to ACTIVE for running", () =
   }
 });
 
+test("assembleGarminWorkout keeps Race and Work-prefixed steps ACTIVE", () => {
+  for (const title of ["Race", "Work — start out strong"]) {
+    const workout = assembleGarminWorkout({
+      id: "w1",
+      title: "Boulderthon",
+      workoutType: "Race",
+      segments: [
+        {
+          id: "s1",
+          workoutId: "w1",
+          stepOrder: 1,
+          title,
+          durationType: "DISTANCE",
+          durationValue: 3,
+        },
+      ],
+    });
+    assert.equal(workout.steps[0]!.intensity, GarminIntensity.ACTIVE);
+  }
+});
+
 test("assembleGarminWorkout heals corrupted durationValue 400 (meters stored as miles)", () => {
   const workout = assembleGarminWorkout({
     id: "w1",

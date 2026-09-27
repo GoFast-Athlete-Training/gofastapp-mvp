@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   apiSegmentsToFlatWorkBlocks,
+  racePaceWorkBlocksToRaceDaySegments,
   tryParseTabularRacePacePaste,
 } from "./race-pace-target-paste";
 
@@ -35,4 +36,19 @@ test("apiSegmentsToFlatWorkBlocks keeps warmup titles as work blocks", () => {
   assert.equal(blocks.length, 2);
   assert.equal(blocks[0].name, "Warmup mile");
   assert.equal(blocks[1].name, "up north for hills");
+});
+
+test("race day segments titled Race save as Work steps", () => {
+  const blocks = apiSegmentsToFlatWorkBlocks([
+    {
+      stepOrder: 1,
+      title: "Race",
+      durationType: "DISTANCE",
+      durationValue: 3,
+      targets: [{ type: "PACE", valueLow: 260, valueHigh: 263 }],
+    },
+  ]);
+  assert.equal(blocks[0]?.name, "Work");
+  const segs = racePaceWorkBlocksToRaceDaySegments(blocks);
+  assert.equal(segs[0]?.title, "Work");
 });

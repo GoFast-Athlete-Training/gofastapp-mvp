@@ -410,7 +410,11 @@ function mapWorkoutTypeToSport(workoutType: string): GarminSport {
  */
 function mapIntensityFromTitle(title: string): GarminIntensity {
   const lower = title.toLowerCase();
-  
+
+  if (/\bwork\b/.test(lower) || /\bmain\b/.test(lower)) {
+    return GarminIntensity.ACTIVE;
+  }
+
   if (lower.includes("warmup") || lower.includes("warm-up")) {
     return GarminIntensity.WARMUP;
   }
@@ -420,15 +424,11 @@ function mapIntensityFromTitle(title: string): GarminIntensity {
   if (lower.includes("recovery")) {
     return GarminIntensity.RECOVERY;
   }
-  if (lower.includes("rest")) {
+  if (/\brest\b/.test(lower)) {
     return GarminIntensity.REST;
   }
   if (lower.includes("interval") || lower.includes("repeat")) {
     return GarminIntensity.INTERVAL;
-  }
-  // Running workouts must not use MAIN (Garmin: swimming only). "Main Work" / "Work" → ACTIVE.
-  if (/\bwork\b/.test(lower) || /\bmain\b/.test(lower)) {
-    return GarminIntensity.ACTIVE;
   }
 
   return GarminIntensity.ACTIVE;

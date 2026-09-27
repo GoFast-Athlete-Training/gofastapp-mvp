@@ -128,6 +128,29 @@ function paceBandSecKmFromTarget(t: {
   return {};
 }
 
+/** Generic titles that should stay a Garmin work step, not a race/calendar label. */
+function isGenericWorkLabel(title: string): boolean {
+  const t = title.trim();
+  return !t || /^race$/i.test(t) || /^work$/i.test(t) || /^block\s+\d+$/i.test(t);
+}
+
+/** Athlete-facing block name. Stored "Race" steps load as Work. */
+export function athleteWorkBlockName(title: string): string {
+  const t = title.trim();
+  if (isGenericWorkLabel(t)) return "Work";
+  const prefixed = t.match(/^work\s*[—–-]\s*(.+)$/i);
+  if (prefixed?.[1]?.trim()) return prefixed[1].trim();
+  return t;
+}
+
+/** Garmin step title. Always includes "Work" so intensity maps to ACTIVE. */
+export function garminWorkStepTitle(name: string): string {
+  const t = name.trim();
+  if (isGenericWorkLabel(t)) return "Work";
+  if (/\bwork\b/i.test(t)) return t;
+  return `Work — ${t}`;
+}
+
 /** All segments become named work blocks — no warmup/cooldown routing. */
 export function apiSegmentsToFlatWorkBlocks(segments: RacePaceApiSegment[]): RacePaceWorkBlock[] {
   return segments.map((seg, i) => {
@@ -144,7 +167,7 @@ export function apiSegmentsToFlatWorkBlocks(segments: RacePaceApiSegment[]): Rac
     const miles =
       typeof seg.durationValue === "number" && seg.durationValue > 0 ? seg.durationValue : 0;
     return {
-      name: seg.title?.trim() || `Block ${i + 1}`,
+      name: athleteWorkBlockName(seg.title?.trim() || ""),
       miles,
       paceValueLow,
       paceValueHigh,
@@ -170,7 +193,7 @@ export function racePaceWorkBlocksToRaceDaySegments(blocks: RacePaceWorkBlock[])
           : [];
       return {
         stepOrder: i + 1,
-        title: b.name.trim() || `Block ${i + 1}`,
+        title: garminWorkStepTitle(b.name),
         durationType: "DISTANCE" as const,
         durationValue: b.miles,
         targets,
@@ -191,7 +214,7 @@ export function raceDaySegmentsToWorkBlocks(
     const lowKm = paceTarget?.valueLow;
     const highKm = paceTarget?.valueHigh ?? lowKm;
     return {
-      name: seg.title?.trim() || `Block ${i + 1}`,
+      name: athleteWorkBlockName(seg.title?.trim() || ""),
       miles: seg.durationType === "DISTANCE" ? seg.durationValue : 0,
       paceValueLow: lowKm,
       paceValueHigh: highKm,
