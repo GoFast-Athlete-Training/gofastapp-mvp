@@ -62,6 +62,40 @@ export default function CityRunDetailsSection({
         </div>
       ) : null}
 
+      {run.runStore || run.partnerBrand ? (
+        <div className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
+          {(run.runStore?.logoUrl ?? run.partnerBrand?.logoUrl) ? (
+            <img
+              src={(run.runStore?.logoUrl ?? run.partnerBrand?.logoUrl) as string}
+              alt=""
+              className="h-14 w-14 rounded-lg border border-gray-100 object-contain"
+            />
+          ) : null}
+          <div>
+            <div className="text-xs uppercase tracking-wide text-gray-400 mb-0.5">
+              {run.runStore ? "Run store" : "Brand partner"}
+            </div>
+            <div className="font-bold text-gray-900">
+              {run.runStore?.name ?? run.partnerBrand?.name}
+            </div>
+            {(run.runStore?.websiteUrl ?? run.partnerBrand?.websiteUrl) ? (
+              <a
+                href={
+                  (run.runStore?.websiteUrl ?? run.partnerBrand?.websiteUrl)?.startsWith("http")
+                    ? (run.runStore?.websiteUrl ?? run.partnerBrand?.websiteUrl)!
+                    : `https://${run.runStore?.websiteUrl ?? run.partnerBrand?.websiteUrl}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-sky-700 hover:underline"
+              >
+                Visit website
+              </a>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <div className={`bg-white rounded-xl shadow-sm ${compact ? 'p-4' : 'p-6'}`}>
         {run.runClub && !showHostCard ? (
           <div className="flex items-center gap-3 mb-4">

@@ -8,7 +8,10 @@ export type NotificationTemplateKey =
   | 'crew.announcement'
   | 'workout.complete'
   | 'activity.synced'
-  | 'sponsorship.received';
+  | 'sponsorship.received'
+  | 'race.weekOut'
+  | 'race.dayBefore'
+  | 'race.raceDay';
 
 export type AppNotificationObjectType =
   | 'workout'
@@ -17,7 +20,8 @@ export type AppNotificationObjectType =
   | 'run_club'
   | 'run_crew_announcement'
   | 'athlete_activity'
-  | 'sponsor_commitment';
+  | 'sponsor_commitment'
+  | 'athlete_race';
 
 export type TemplateFacts = Record<string, unknown>;
 
@@ -67,6 +71,12 @@ export function templateKeyToMobileType(templateKey: NotificationTemplateKey): s
       return 'activity_synced';
     case 'sponsorship.received':
       return 'sponsorship_received';
+    case 'race.weekOut':
+      return 'race_week_out';
+    case 'race.dayBefore':
+      return 'race_day_before';
+    case 'race.raceDay':
+      return 'race_race_day';
     default:
       return templateKey;
   }

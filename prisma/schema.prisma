@@ -171,6 +171,7 @@ model Athlete {
   swim_workouts           swim_workout[]
   tri_workouts            tri_workout[]
   athlete_races           athlete_races[]
+  race_trigger_athletes   race_trigger_athletes[]
   athlete_race_results    athlete_race_results[]
   race_memberships        race_memberships[]
   training_cohort_memberships training_cohort_memberships[]
@@ -822,6 +823,7 @@ model race_registry {
   race_events              race_events[]
   city_runs_tagged         city_runs[]               @relation("CityRunRaceRegistry")
   course_segments          race_registry_course_segments[]
+  race_triggers            race_triggers?
 
   @@index([city, state])
   @@index([isActive])
@@ -883,6 +885,10 @@ model athlete_races {
   isPrimaryRace    Boolean  @default(false)
   selfDeclaredAt   DateTime @default(now())
   notifyEnabled    Boolean  @default(true)
+  /// Cron dedupe — last UTC calendar day a race reminder push was sent.
+  raceWeekOutNotifiedAt    DateTime?
+  raceDayBeforeNotifiedAt  DateTime?
+  raceDayNotifiedAt        DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -890,6 +896,7 @@ model athlete_races {
   race_registry             race_registry               @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
   athlete_race_result       athlete_race_results?
   training_plans            training_plans[]            @relation("PlanAthleteRace")
+  race_trigger_member       race_trigger_athletes?
 
   @@unique([athleteId, raceRegistryId])
   @@index([athleteId])
@@ -897,6 +904,46 @@ model athlete_races {
   @@index([raceDate])
   @@index([athleteId, isPrimaryRace])
   @@map("athlete_races")
+}
+
+/// Prod date ledger for race-week / day-before / race-day push + email triggers.
+model race_triggers {
+  id                       String   @id @default(cuid())
+  raceRegistryId           String   @unique
+  raceDate                 DateTime
+  weekOutDate              DateTime
+  reminderDate             DateTime
+  weekOutProductEventSlug  String   @default("race.week_out")
+  reminderProductEventSlug String   @default("race.day_before")
+  raceDayProductEventSlug  String   @default("race.race_day")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  race_registry race_registry             @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
+  members       race_trigger_athletes[]
+
+  @@index([weekOutDate])
+  @@index([reminderDate])
+  @@index([raceDate])
+  @@map("race_triggers")
+}
+
+model race_trigger_athletes {
+  id            String   @id @default(cuid())
+  raceTriggerId String
+  athleteId     String
+  athleteRaceId String   @unique
+  notifyEnabled Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  race_trigger race_triggers @relation(fields: [raceTriggerId], references: [id], onDelete: Cascade)
+  Athlete      Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete_race athlete_races @relation(fields: [athleteRaceId], references: [id], onDelete: Cascade)
+
+  @@unique([raceTriggerId, athleteId])
+  @@index([athleteId])
+  @@map("race_trigger_athletes")
 }
 
 /// Persisted finish data for a race (manual or linked Garmin activity).
@@ -1088,9 +1135,28 @@ model brands {
   syncedAt        DateTime  @default(now())
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-  run_clubs       run_clubs[]
+  run_clubs              run_clubs[]
+  city_runs_partner_brand city_runs[] @relation("CityRunPartnerBrand")
 
   @@map("brands")
+}
+
+/// Physical run store — prodpush from Company acq_run_stores; id matches ACQ row id.
+model run_stores {
+  id               String      @id
+  slug             String      @unique
+  name             String
+  websiteUrl       String?
+  logoUrl          String?
+  city             String?
+  state            String?
+  formattedAddress String?
+  syncedAt         DateTime    @default(now())
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  city_runs        city_runs[]
+
+  @@map("run_stores")
 }
 
 model run_clubs {
@@ -1519,6 +1585,10 @@ model city_runs {
   runSeriesId         String?              // null = standalone; set = series occurrence (FK to run_series)
   /// Optional: tag this run to a race registry (training for X marathon, etc.).
   raceRegistryId      String?
+  /// Optional store partner (e.g. local Fleet Feet) — hydrates website/logo on the run.
+  runStoreId          String?
+  /// Optional brand partner (e.g. New Balance activation) — hydrates website/logo on the run.
+  partnerBrandId      String?
   /// Idempotent key for Company → prod shakeout sync (one row per race_run_event window). Null for normal city_runs.
   shakeoutDedupeKey   String?              @unique
   locationId          String?              // FK to run_locations (auto-seeded or manually linked)
@@ -1539,6 +1609,8 @@ model city_runs {
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   runSeries           run_series?          @relation(fields: [runSeriesId], references: [id], onDelete: SetNull)
   race_registry       race_registry?       @relation("CityRunRaceRegistry", fields: [raceRegistryId], references: [id], onDelete: SetNull)
+  runStore            run_stores?          @relation(fields: [runStoreId], references: [id], onDelete: SetNull)
+  partnerBrand        brands?              @relation("CityRunPartnerBrand", fields: [partnerBrandId], references: [id], onDelete: SetNull)
   location            run_locations?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
   route               routes?              @relation(fields: [routeId], references: [id], onDelete: SetNull)
   workout             workouts?            @relation(fields: [workoutId], references: [id], onDelete: SetNull)
@@ -1558,6 +1630,8 @@ model city_runs {
   @@index([staffGeneratedId])
   @@index([runSeriesId])
   @@index([raceRegistryId])
+  @@index([runStoreId])
+  @@index([partnerBrandId])
   @@index([locationId])
   @@index([routeId])
   @@index([workoutId])

@@ -38,7 +38,9 @@ export function SignupRaceDayBeforeBanner({
   if (dismissed) return null;
 
   const planHref =
-    slug && slug.trim() ? `/myrace/${slug.trim()}` : `/race-hub/${raceRegistryId}`;
+    slug && slug.trim()
+      ? `/myrace/${slug.trim()}?plan=1`
+      : `/race-hub/${raceRegistryId}`;
 
   const dismiss = () => {
     try {

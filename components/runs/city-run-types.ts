@@ -132,6 +132,18 @@ export interface CityRunDetails {
   } | null;
   workout?: CityRunWorkoutSummary | null;
   runClub?: RunClub | null;
+  runStore?: {
+    id: string;
+    name: string;
+    websiteUrl?: string | null;
+    logoUrl?: string | null;
+  } | null;
+  partnerBrand?: {
+    id: string;
+    name: string;
+    websiteUrl?: string | null;
+    logoUrl?: string | null;
+  } | null;
   runCrew?: RunCrew | null;
   rsvps?: CityRunRsvp[];
   currentRSVP?: string | null;

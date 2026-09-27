@@ -20,6 +20,10 @@ import {
 } from "@/lib/training/race-plan-calendar-service";
 import { cleanupPlanWorkoutsBeforeDelete } from "@/lib/training/plan-delete-cleanup";
 import { TrainingPlanLifecycle } from "@prisma/client";
+import {
+  removeRaceTriggerMember,
+  syncRaceTriggerMemberForAthleteRace,
+} from "@/lib/race-triggers-sync";
 
 export type AthleteRacePlanImpact = Awaited<ReturnType<typeof athleteRaceAffectsActivePlan>>;
 export type AthleteRaceImpactPreview = ReturnType<typeof previewPlanRaceCollision> | null;
@@ -51,6 +55,8 @@ export async function claimAthleteRaceWithSideEffects(params: {
   raceRegistryId: string;
 }): Promise<AthleteRaceClaimResult> {
   const athleteRace = await claimAthleteRace(params);
+
+  await syncRaceTriggerMemberForAthleteRace(athleteRace.id);
 
   await upsertRaceMembershipFromSignup(params.athleteId, params.raceRegistryId);
   await syncAthleteProfileSnapshot(params.athleteId);
@@ -132,6 +138,8 @@ export async function removeAthleteRaceWithSideEffects(params: {
     });
     await prisma.training_plans.delete({ where: { id: activePlan.id } });
   }
+
+  await removeRaceTriggerMember(existing.id);
 
   const deleted = await deleteAthleteRace(params);
   if (!deleted) return { ok: false, reason: "not_found" };

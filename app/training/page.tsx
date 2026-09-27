@@ -52,6 +52,7 @@ import {
   PlanLongRunTrajectorySection,
   trajectoryContextFromPlanDetail,
 } from "@/components/training/PlanLongRunTrajectorySection";
+import { myRacePlannerHref } from "@/lib/races/athlete-race-signup-display";
 
 type PlanDetailHub = {
   id: string;
@@ -189,6 +190,7 @@ export default function TrainingHubPage() {
     resultId: string | null;
   } | null>(null);
   const [scheduledRuns, setScheduledRuns] = useState<ScheduledRunJson[]>([]);
+  const [planRacePlannerHref, setPlanRacePlannerHref] = useState<string | null>(null);
 
   const pastRacePhase = useMemo(
     () => (pastRacePlan?.raceDate ? getRacePhase(pastRacePlan.raceDate) : null),
@@ -235,6 +237,7 @@ export default function TrainingHubPage() {
     setPastRaceResultStatus(null);
     setWeekDays([]);
     setParkedPlans([]);
+    setPlanRacePlannerHref(null);
     try {
       const u = auth.currentUser;
       if (!u) return;
@@ -360,6 +363,25 @@ export default function TrainingHubPage() {
       }
 
       setPlanDetail(plan);
+      if (activePlan.athleteRaceId) {
+        try {
+          const arRes = await fetch(
+            `/api/athlete-races/${encodeURIComponent(activePlan.athleteRaceId)}`,
+            { headers: athleteBearerFetchHeaders(token) }
+          );
+          if (arRes.ok) {
+            const arData = (await arRes.json()) as {
+              athleteRace?: { slug?: string | null; raceRegistryId?: string };
+            };
+            const ar = arData.athleteRace;
+            if (ar?.raceRegistryId) {
+              setPlanRacePlannerHref(myRacePlannerHref(ar.slug, ar.raceRegistryId));
+            }
+          }
+        } catch {
+          /* non-critical */
+        }
+      }
       if (hasSchedule(plan)) {
         const wn = currentTrainingWeekNumber(
           plan.startDate,
@@ -989,6 +1011,14 @@ export default function TrainingHubPage() {
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {planRacePlannerHref ? (
+                  <Link
+                    href={planRacePlannerHref}
+                    className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+                  >
+                    Plan your race
+                  </Link>
+                ) : null}
                 <div className="relative">
                   <button
                     type="button"

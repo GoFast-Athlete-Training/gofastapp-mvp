@@ -540,6 +540,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    const { syncRaceTriggerForRegistry } = await import("@/lib/race-triggers-sync");
+    await syncRaceTriggerForRegistry(row.id);
+
     const linkedPlans = await prisma.training_plans.findMany({
       where: { raceId: row.id },
       select: { id: true, name: true },

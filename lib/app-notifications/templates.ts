@@ -130,6 +130,44 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
       return `${brand} just activated a Brand Partnership on your GoFast profile.`;
     },
   },
+  'race.weekOut': {
+    title: ({ title, raceName }) =>
+      typeof title === 'string' && title.trim()
+        ? title.trim()
+        : typeof raceName === 'string' && raceName.trim()
+          ? `${raceName.trim()} — race week`
+          : 'Race week is here',
+    body: ({ body, raceName }) => {
+      if (typeof body === 'string' && body.trim()) return body.trim();
+      const name =
+        typeof raceName === 'string' && raceName.trim() ? raceName.trim() : 'Your race';
+      return `${name} is one week out — open your race plan for pace and splits.`;
+    },
+  },
+  'race.dayBefore': {
+    title: ({ title, raceName }) =>
+      typeof title === 'string' && title.trim()
+        ? title.trim()
+        : typeof raceName === 'string' && raceName.trim()
+          ? `${raceName.trim()} tomorrow`
+          : 'Race tomorrow',
+    body: ({ body, raceName }) => {
+      if (typeof body === 'string' && body.trim()) return body.trim();
+      const name =
+        typeof raceName === 'string' && raceName.trim() ? raceName.trim() : 'your race';
+      return `Set your race pace and splits for ${name} tonight, then rest up.`;
+    },
+  },
+  'race.raceDay': {
+    title: ({ title }) =>
+      typeof title === 'string' && title.trim() ? title.trim() : 'Race day',
+    body: ({ body, raceName }) => {
+      if (typeof body === 'string' && body.trim()) return body.trim();
+      const name =
+        typeof raceName === 'string' && raceName.trim() ? raceName.trim() : 'your race';
+      return `Go crush it at ${name}! Your race plan is one tap away.`;
+    },
+  },
 };
 
 function renderHardcoded(

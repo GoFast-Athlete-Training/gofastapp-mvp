@@ -80,17 +80,35 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
-    const title =
+    const seedFromRace = body.seedFromRace === true;
+
+    let title =
       typeof body.title === "string" && body.title.trim()
         ? body.title.trim().slice(0, 200)
         : "";
-    const meetUpPoint =
+    let meetUpPoint =
       typeof body.meetUpPoint === "string" && body.meetUpPoint.trim()
         ? body.meetUpPoint.trim().slice(0, 500)
         : "";
     const dateRaw = body.date;
-    const runAt =
+    let runAt =
       typeof dateRaw === "string" || dateRaw instanceof Date ? new Date(dateRaw) : null;
+
+    if (seedFromRace || !title || !meetUpPoint || !runAt || Number.isNaN(runAt?.getTime() ?? NaN)) {
+      if (!title) {
+        title = `${race.name.trim()} shakeout`.slice(0, 200);
+      }
+      if (!meetUpPoint) {
+        const cityState = [race.city, race.state].filter(Boolean).join(", ");
+        meetUpPoint = (cityState || "Meetup TBD").slice(0, 500);
+      }
+      if (!runAt || Number.isNaN(runAt.getTime())) {
+        const base = new Date(race.raceDate);
+        base.setUTCDate(base.getUTCDate() - 1);
+        base.setUTCHours(10, 0, 0, 0);
+        runAt = base;
+      }
+    }
 
     if (!title || !meetUpPoint || !runAt || Number.isNaN(runAt.getTime())) {
       return NextResponse.json(
@@ -141,7 +159,7 @@ export async function POST(
         raceRegistryId: race.id,
         staffGeneratedId,
         workflowStatus: "DEVELOP",
-        published: true,
+        published: body.published === true,
         cityRunType: resolveCityRunType({
           runClubId: null,
           shakeoutDedupeKey: null,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
@@ -154,7 +154,10 @@ function normalizePreviewMessage(raw: Record<string, unknown>): ChatterPreviewMe
 export default function MyRacePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const slug = typeof params.slug === "string" ? params.slug : "";
+  const expandPlanFromQuery =
+    searchParams.get("plan") === "1" || searchParams.get("plan") === "true";
 
   const [race, setRace] = useState<ResolvedRace | null>(null);
   const [raceExtras, setRaceExtras] = useState<RaceExtras | null>(null);
@@ -177,6 +180,18 @@ export default function MyRacePage() {
   const [hubMemberCount, setHubMemberCount] = useState<number | null>(null);
   const [addingToCalendar, setAddingToCalendar] = useState(false);
   const [addCalendarError, setAddCalendarError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (expandPlanFromQuery) {
+      setGoalExpanded(true);
+      return;
+    }
+    if (race?.raceDate) {
+      if (daysUntilRace(race.raceDate) === 1) {
+        setGoalExpanded(true);
+      }
+    }
+  }, [expandPlanFromQuery, race?.raceDate]);
 
   useEffect(() => {
     if (!slug.trim()) {

@@ -269,6 +269,12 @@ export async function GET(
             stravaUrl: true,
           },
         },
+        runStore: {
+          select: { id: true, name: true, websiteUrl: true, logoUrl: true },
+        },
+        partnerBrand: {
+          select: { id: true, name: true, websiteUrl: true, logoUrl: true },
+        },
         runSeries: {
           select: {
             id: true,
@@ -840,6 +846,18 @@ export async function PUT(
         body.runSeriesId === null || body.runSeriesId === ''
           ? null
           : String(body.runSeriesId).trim() || null;
+    }
+    if (body.runStoreId !== undefined) {
+      updateData.runStoreId =
+        body.runStoreId === null || body.runStoreId === ''
+          ? null
+          : String(body.runStoreId).trim() || null;
+    }
+    if (body.partnerBrandId !== undefined) {
+      updateData.partnerBrandId =
+        body.partnerBrandId === null || body.partnerBrandId === ''
+          ? null
+          : String(body.partnerBrandId).trim() || null;
     }
 
     const mergedRelationships = mergeRelationshipSnapshot(run, {

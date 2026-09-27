@@ -123,6 +123,22 @@ export async function GET(
               stravaUrl: true,
             },
           },
+          runStore: {
+            select: {
+              id: true,
+              name: true,
+              websiteUrl: true,
+              logoUrl: true,
+            },
+          },
+          partnerBrand: {
+            select: {
+              id: true,
+              name: true,
+              websiteUrl: true,
+              logoUrl: true,
+            },
+          },
           plannedWorkout: {
             select: {
               id: true,
@@ -358,6 +374,22 @@ export async function PATCH(
               websiteUrl: true,
               instagramUrl: true,
               stravaUrl: true,
+            },
+          },
+          runStore: {
+            select: {
+              id: true,
+              name: true,
+              websiteUrl: true,
+              logoUrl: true,
+            },
+          },
+          partnerBrand: {
+            select: {
+              id: true,
+              name: true,
+              websiteUrl: true,
+              logoUrl: true,
             },
           },
         },

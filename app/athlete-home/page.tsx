@@ -55,10 +55,19 @@ import {
   effectiveTrainingWeekCount,
   formatPlanDateDisplay,
   localTodayKey,
-  utcDateOnly,
   ymdFromDate,
 } from '@/lib/training/plan-utils';
-import { getRacePhase, raceCalendarDaysFromTodayUtc } from '@/lib/race-calendar-phase';
+import {
+  getRacePhaseLocal,
+  raceCalendarDaysFromTodayLocal,
+} from '@/lib/race-calendar-phase';
+import {
+  myRacePlannerHref,
+  signupClaimRaceDateIso,
+  signupDisplayName,
+  signupDisplaySlug,
+  signupRegistryId,
+} from '@/lib/races/athlete-race-signup-display';
 import { formatPlannedWorkoutTitle } from '@/lib/training/workout-display-title';
 import { normalizeDistanceForPace } from '@/lib/pace-utils';
 import { goalRaceFromGoal } from '@/lib/goal-race-display';
@@ -171,13 +180,19 @@ type GoingRunRow = {
 type RaceSignupWithRegistry = {
   id: string;
   raceRegistryId: string;
+  name?: string;
+  raceDate?: string;
+  slug?: string | null;
+  distanceLabel?: string | null;
+  city?: string | null;
+  state?: string | null;
   race_registry: {
     id: string;
     slug: string | null;
     name: string;
     distanceLabel: string | null;
     distanceMeters: number | null;
-    raceDate: string;
+    raceDate?: string;
     city: string | null;
     state: string | null;
     country: string | null;
@@ -706,8 +721,8 @@ export default function AthleteHomePage() {
         : '';
 
   const goalRaceIsoStr = raceDateToIsoString(goalRace?.raceDate);
-  const goalPhase = getRacePhase(goalRaceIsoStr);
-  const goalDaysUntil = raceCalendarDaysFromTodayUtc(goalRaceIsoStr);
+  const goalPhase = getRacePhaseLocal(goalRaceIsoStr);
+  const goalDaysUntil = raceCalendarDaysFromTodayLocal(goalRaceIsoStr);
 
   const nextTrainingIncomplete =
     upcomingSessions.find(
@@ -766,58 +781,52 @@ export default function AthleteHomePage() {
 
   const goalDistanceNorm = normalizeGoalDistanceLabel(primaryGoal?.distance);
 
-  const todayUtcForRace = utcDateOnly(new Date());
-  const raceDaySignupForHome = raceSignups.find((s) => {
-    const rd = utcDateOnly(new Date(s.race_registry.raceDate));
-    return rd.getTime() === todayUtcForRace.getTime();
-  });
+  const signupDaysUntil = (s: RaceSignupWithRegistry) =>
+    raceCalendarDaysFromTodayLocal(signupClaimRaceDateIso(s));
+
+  const raceDaySignupForHome = raceSignups.find((s) => signupDaysUntil(s) === 0);
   const upcomingRaceSignupForHome = !raceDaySignupForHome
     ? raceSignups
         .filter((s) => {
-          const rd = utcDateOnly(new Date(s.race_registry.raceDate));
-          const diff = rd.getTime() - todayUtcForRace.getTime();
-          return diff > 0 && diff <= 7 * 24 * 60 * 60 * 1000;
+          const d = signupDaysUntil(s);
+          return d != null && d >= 1 && d <= 7;
         })
-        .sort(
-          (a, b) =>
-            new Date(a.race_registry.raceDate).getTime() -
-            new Date(b.race_registry.raceDate).getTime()
-        )[0]
+        .sort((a, b) => (signupDaysUntil(a) ?? 99) - (signupDaysUntil(b) ?? 99))[0]
     : undefined;
   const daysUntilUpcomingRace =
-    upcomingRaceSignupForHome != null
-      ? Math.round(
-          (utcDateOnly(new Date(upcomingRaceSignupForHome.race_registry.raceDate)).getTime() -
-            todayUtcForRace.getTime()) /
-            (24 * 60 * 60 * 1000)
-        )
-      : null;
+    upcomingRaceSignupForHome != null ? signupDaysUntil(upcomingRaceSignupForHome) : null;
 
   const signupPostEarlyNoGoal =
     primaryGoal == null
       ? raceSignups
           .filter(
-            (s) => getRacePhase(raceDateToIsoString(s.race_registry.raceDate)) === 'post_early'
+            (s) => getRacePhaseLocal(signupClaimRaceDateIso(s)) === 'post_early'
           )
-          .sort(
-            (a, b) =>
-              new Date(b.race_registry.raceDate).getTime() -
-              new Date(a.race_registry.raceDate).getTime()
-          )[0]
+          .sort((a, b) => {
+            const ad = signupClaimRaceDateIso(a);
+            const bd = signupClaimRaceDateIso(b);
+            return new Date(bd ?? 0).getTime() - new Date(ad ?? 0).getTime();
+          })[0]
       : undefined;
+
+  const showGoalDayBeforeBanner =
+    Boolean(primaryGoal) &&
+    goalDaysUntil === 1 &&
+    primaryRaceRegistryId != null &&
+    goalRace != null;
 
   const showGoalRaceWeekBanner =
     Boolean(primaryGoal) &&
     goalPhase === 'pre' &&
     goalDaysUntil != null &&
-    goalDaysUntil >= 1 &&
+    goalDaysUntil >= 2 &&
     goalDaysUntil <= 7 &&
     primaryRaceRegistryId != null &&
     goalRace != null;
 
   const showSignupDayBeforeBanner =
     !raceDaySignupForHome &&
-    !showGoalRaceWeekBanner &&
+    !showGoalDayBeforeBanner &&
     upcomingRaceSignupForHome != null &&
     daysUntilUpcomingRace === 1;
 
@@ -947,16 +956,19 @@ export default function AthleteHomePage() {
       ? goalRace.slug.trim()
       : null;
   const goalRaceHref = goalRaceSlug ? `/myrace/${goalRaceSlug}` : '/races';
+  const goalRacePlanHref =
+    primaryRaceRegistryId != null
+      ? myRacePlannerHref(goalRaceSlug, primaryRaceRegistryId)
+      : goalRaceHref;
 
   // Primary upcoming signup (soonest future race) used when there's no goal yet
   const primaryUpcomingSignup = !primaryGoal
     ? raceSignups
-        .filter((s) => new Date(s.race_registry.raceDate).getTime() > Date.now())
-        .sort(
-          (a, b) =>
-            new Date(a.race_registry.raceDate).getTime() -
-            new Date(b.race_registry.raceDate).getTime()
-        )[0] ?? null
+        .filter((s) => {
+          const d = signupDaysUntil(s);
+          return d != null && d > 0;
+        })
+        .sort((a, b) => (signupDaysUntil(a) ?? 99) - (signupDaysUntil(b) ?? 99))[0] ?? null
     : null;
 
   let todayRunIcon = Footprints;
@@ -1056,12 +1068,20 @@ export default function AthleteHomePage() {
                       })()}
                     </div>
                   </div>
-                  <Link
-                    href={`/race-hub/${primaryRaceRegistryId}`}
-                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
-                  >
-                    Open race hub
-                  </Link>
+                  <div className="flex shrink-0 flex-col gap-2 sm:items-stretch">
+                    <Link
+                      href={goalRacePlanHref}
+                      className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
+                    >
+                      Open race plan
+                    </Link>
+                    <Link
+                      href={`/race-hub/${primaryRaceRegistryId}`}
+                      className="inline-flex items-center justify-center rounded-xl border border-violet-200/80 bg-violet-500/20 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-500/30"
+                    >
+                      Race hub
+                    </Link>
+                  </div>
                 </div>
               </div>
             ) : !primaryGoal && raceDaySignupForHome ? (
@@ -1074,11 +1094,13 @@ export default function AthleteHomePage() {
                         Today is race day
                       </p>
                       <h2 className="mt-2 text-2xl font-extrabold leading-tight">
-                        {raceDaySignupForHome.race_registry.name}
+                        {signupDisplayName(raceDaySignupForHome)}
                       </h2>
-                      {raceDaySignupForHome.race_registry.distanceLabel ? (
+                      {(raceDaySignupForHome.distanceLabel ??
+                        raceDaySignupForHome.race_registry.distanceLabel) ? (
                         <p className="mt-1 text-lg font-semibold text-violet-100">
-                          {raceDaySignupForHome.race_registry.distanceLabel}
+                          {raceDaySignupForHome.distanceLabel ??
+                            raceDaySignupForHome.race_registry.distanceLabel}
                         </p>
                       ) : null}
                       <p className="mt-3 text-xl font-bold text-white">
@@ -1114,14 +1136,32 @@ export default function AthleteHomePage() {
                       })()}
                     </div>
                   </div>
-                  <Link
-                    href={`/race-hub/${raceDaySignupForHome.race_registry.id}`}
-                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
-                  >
-                    Open race hub
-                  </Link>
+                  <div className="flex shrink-0 flex-col gap-2 sm:items-stretch">
+                    <Link
+                      href={myRacePlannerHref(
+                        signupDisplaySlug(raceDaySignupForHome),
+                        raceDaySignupForHome.race_registry.id
+                      )}
+                      className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-violet-700 shadow hover:bg-violet-50"
+                    >
+                      Open race plan
+                    </Link>
+                    <Link
+                      href={`/race-hub/${raceDaySignupForHome.race_registry.id}`}
+                      className="inline-flex items-center justify-center rounded-xl border border-violet-200/80 bg-violet-500/20 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-500/30"
+                    >
+                      Race hub
+                    </Link>
+                  </div>
                 </div>
               </div>
+            ) : showGoalDayBeforeBanner && goalRace && primaryRaceRegistryId ? (
+              <SignupRaceDayBeforeBanner
+                raceRegistryId={primaryRaceRegistryId}
+                raceName={goalRace.name}
+                distanceLabel={goalRace.distanceLabel}
+                slug={goalRace.slug}
+              />
             ) : primaryGoal &&
               goalPhase === 'post_early' &&
               primaryRaceRegistryId &&
@@ -1208,20 +1248,34 @@ export default function AthleteHomePage() {
                       You&apos;ve put in the work. Race week is here.
                     </p>
                   </div>
-                  <Link
-                    href={`/race-hub/${primaryRaceRegistryId}`}
-                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
-                  >
-                    Race hub
-                  </Link>
+                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+                    <Link
+                      href={goalRacePlanHref}
+                      className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+                    >
+                      Plan your race
+                    </Link>
+                    <Link
+                      href={`/race-hub/${primaryRaceRegistryId}`}
+                      className="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-white px-5 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-50"
+                    >
+                      Race hub
+                    </Link>
+                  </div>
                 </div>
               </div>
             ) : showSignupDayBeforeBanner && upcomingRaceSignupForHome ? (
               <SignupRaceDayBeforeBanner
-                raceRegistryId={upcomingRaceSignupForHome.race_registry.id}
-                raceName={upcomingRaceSignupForHome.race_registry.name}
-                distanceLabel={upcomingRaceSignupForHome.race_registry.distanceLabel}
-                slug={upcomingRaceSignupForHome.race_registry.slug}
+                raceRegistryId={
+                  signupRegistryId(upcomingRaceSignupForHome) ??
+                  upcomingRaceSignupForHome.race_registry.id
+                }
+                raceName={signupDisplayName(upcomingRaceSignupForHome)}
+                distanceLabel={
+                  upcomingRaceSignupForHome.distanceLabel ??
+                  upcomingRaceSignupForHome.race_registry.distanceLabel
+                }
+                slug={signupDisplaySlug(upcomingRaceSignupForHome)}
               />
             ) : null}
 
@@ -1551,12 +1605,22 @@ export default function AthleteHomePage() {
                         without a recent long run.
                       </p>
                     ) : null}
-                    <Link
-                      href={goalRaceHref}
-                      className="mt-3 text-sm font-semibold text-orange-600 hover:text-orange-700"
-                    >
-                      Open race page →
-                    </Link>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {primaryGoal.goalTime?.trim() ? (
+                        <Link
+                          href={goalRacePlanHref}
+                          className="inline-flex justify-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+                        >
+                          Plan your race →
+                        </Link>
+                      ) : null}
+                      <Link
+                        href={goalRaceHref}
+                        className="text-sm font-semibold text-orange-600 hover:text-orange-700 self-center"
+                      >
+                        Open race page →
+                      </Link>
+                    </div>
                   </div>
                 ) : primaryUpcomingSignup ? (
                   <div className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/60 p-4 h-full flex flex-col justify-between">
@@ -1573,10 +1637,16 @@ export default function AthleteHomePage() {
                         </p>
                       ) : null}
                       <p className="text-xs text-gray-500 mt-1">
-                        {new Date(primaryUpcomingSignup.race_registry.raceDate).toLocaleDateString(
-                          'en-US',
-                          { month: 'short', day: 'numeric', year: 'numeric' }
-                        )}
+                        {(() => {
+                          const iso = signupClaimRaceDateIso(primaryUpcomingSignup);
+                          return iso
+                            ? new Date(iso).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })
+                            : '—';
+                        })()}
                       </p>
                     </div>
                     <Link

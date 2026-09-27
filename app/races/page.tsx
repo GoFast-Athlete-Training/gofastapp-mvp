@@ -23,6 +23,10 @@ import {
 } from "@/components/races/AthleteRaceDistanceField";
 import { pickHeroAthleteRace } from "@/lib/races/my-races-hero";
 import { trainingPlanCtaForRace } from "@/lib/races/training-plan-cta";
+import {
+  myRacePageHref,
+  myRacePlannerHref,
+} from "@/lib/races/athlete-race-signup-display";
 
 type ApiAthleteRace = {
   id: string;
@@ -100,8 +104,11 @@ function normalizeAthleteRace(raw: ApiAthleteRace): AthleteRaceRow {
 }
 
 function personalRaceHref(row: AthleteRaceRow): string {
-  const s = row.slug?.trim();
-  return s ? `/myrace/${encodeURIComponent(s)}` : `/race-hub/${row.raceRegistryId}`;
+  return myRacePageHref(row.slug, row.raceRegistryId);
+}
+
+function plannerHref(row: AthleteRaceRow): string {
+  return myRacePlannerHref(row.slug, row.raceRegistryId);
 }
 
 function raceForGoal(row: AthleteRaceRow): RaceForGoal {
@@ -124,12 +131,19 @@ function countdownChipLabel(iso: string): string {
   return `${w} week${w === 1 ? "" : "s"} to go`;
 }
 
-function heroPrimaryCta(row: AthleteRaceRow, myRaceHref: string): { href: string; label: string } {
+function heroPrimaryCta(row: AthleteRaceRow): { href: string; label: string } {
+  if (row.goalTime?.trim()) {
+    return { href: plannerHref(row), label: "Plan your race →" };
+  }
+  return { href: personalRaceHref(row), label: "Set your goal →" };
+}
+
+function trainingPlanSecondaryCta(row: AthleteRaceRow): { href: string; label: string } | null {
   return trainingPlanCtaForRace({
     athleteRaceId: row.athleteRaceId,
     trainingPlanId: row.trainingPlanId,
     goalTime: row.goalTime,
-    myRaceHref,
+    myRaceHref: personalRaceHref(row),
   });
 }
 
@@ -310,26 +324,39 @@ function AthleteRaceCard({
             Make this my Goal race
           </button>
         )}
-        {row.goalTime?.trim() || row.trainingPlanId ? (
+        {row.goalTime?.trim() ? (
           <Link
-            href={
-              trainingPlanCtaForRace({
-                athleteRaceId: row.athleteRaceId,
-                trainingPlanId: row.trainingPlanId,
-                goalTime: row.goalTime,
-                myRaceHref: personalRaceHref(row),
-              }).href
-            }
-            className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
+            href={plannerHref(row)}
+            className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
           >
-            {row.trainingPlanId ? "View plan" : "Add a plan"}
+            Plan your race →
           </Link>
-        ) : null}
+        ) : (
+          <Link
+            href={personalRaceHref(row)}
+            className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
+          >
+            Set your goal →
+          </Link>
+        )}
+        {(() => {
+          const training = trainingPlanSecondaryCta(row);
+          if (!training || !row.goalTime?.trim()) return null;
+          if (training.label.startsWith("Set")) return null;
+          return (
+            <Link
+              href={training.href}
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
+            >
+              {row.trainingPlanId ? "Training plan" : "Add training plan"}
+            </Link>
+          );
+        })()}
         <Link
-          href={personalRaceHref(row)}
-          className="inline-flex items-center justify-center rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5"
+          href={`/race-hub/${row.raceRegistryId}`}
+          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
         >
-          Get Ready →
+          Race hub
         </Link>
         <button
           type="button"
@@ -541,7 +568,7 @@ export default function MyRacesPage() {
             <div className="min-w-0">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Races</h1>
               <p className="text-gray-600 text-sm mt-1 max-w-xl">
-                Your race schedule — tap any race for your personal dashboard.
+                Your race schedule — set a goal time, then plan your race pace and splits before race day.
               </p>
             </div>
             <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0 text-sm">
@@ -642,12 +669,18 @@ export default function MyRacesPage() {
                     </div>
                   )}
 
+                  {heroGoal?.goalTime?.trim() ? (
+                    <p className="mt-3 text-sm text-gray-700">
+                      Goal locked in — open your{" "}
+                      <span className="font-semibold text-gray-900">race plan</span> for pace and mile
+                      splits (even, negative, or positive).
+                    </p>
+                  ) : null}
+
                   <div className="mt-4 flex flex-wrap gap-2">
                     {(() => {
-                      const primary = heroPrimaryCta(
-                        heroRace,
-                        personalRaceHref(heroRace)
-                      );
+                      const primary = heroPrimaryCta(heroRace);
+                      const training = trainingPlanSecondaryCta(heroRace);
                       return (
                         <>
                           {heroRace.isPrimaryRace ? (
@@ -675,17 +708,27 @@ export default function MyRacesPage() {
                           >
                             {primary.label}
                           </Link>
+                          {heroGoal?.goalTime?.trim() &&
+                          training &&
+                          !training.label.startsWith("Set") ? (
+                            <Link
+                              href={training.href}
+                              className="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
+                            >
+                              {heroRace.trainingPlanId ? "Training plan →" : "Add training plan →"}
+                            </Link>
+                          ) : null}
                           <Link
                             href={`/race-hub/${heroRace.raceRegistryId}`}
                             className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
                           >
-                            Race hub →
+                            Race hub
                           </Link>
                           <Link
                             href={personalRaceHref(heroRace)}
                             className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:underline"
                           >
-                            Race prep
+                            Race page
                           </Link>
                           <button
                             type="button"
