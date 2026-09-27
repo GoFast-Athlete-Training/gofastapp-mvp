@@ -31,6 +31,16 @@ export async function POST(request: Request) {
       { status: 404 }
     );
   }
+  if (materialized.status === "race_day_skip") {
+    return NextResponse.json(
+      {
+        error:
+          "Race day uses your pace plan — build pace markers on the training hub instead of sending a catalogue workout to Garmin.",
+        code: "race_day",
+      },
+      { status: 400 }
+    );
+  }
   if (materialized.status === "error") {
     return NextResponse.json({ error: materialized.message }, { status: 400 });
   }

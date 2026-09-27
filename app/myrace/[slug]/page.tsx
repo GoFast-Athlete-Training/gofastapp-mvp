@@ -643,11 +643,20 @@ export default function MyRacePage() {
               >
                 <h3 className="text-xs font-bold uppercase tracking-wide text-violet-900">Your pace</h3>
                 <p className="mt-1 text-sm text-gray-600 mb-4">
-                  Average pace and mile splits — edit pace or goal time; both stay in sync.
+                  Coarse pacing blocks from your goal — edit pace or finish time; both stay in sync.
                 </p>
                 <RacePlanSection
                   race={raceForGoal}
                   goal={effectiveGoal}
+                  raceDayApply={
+                    trainingPlanId && raceForGoal?.raceDate
+                      ? {
+                          planId: trainingPlanId,
+                          dateKey: String(raceForGoal.raceDate).slice(0, 10),
+                          title: raceForGoal.name,
+                        }
+                      : undefined
+                  }
                   onGoalSaved={(g) => {
                     setGoal(g);
                     setSignup((prev) =>

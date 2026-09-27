@@ -13,6 +13,7 @@ import { materializeWorkoutForPlanDay } from "./workout-materializer";
 export type MaterializeTodayPlanResult =
   | { status: "materialized"; plannedWorkoutId: string; workoutId: string }
   | { status: "no_session_today" }
+  | { status: "race_day_skip" }
   | { status: "no_active_plan" }
   | { status: "error"; message: string };
 
@@ -74,6 +75,10 @@ export async function materializeTodayPlanWorkoutForAthlete(
 
   if (!scheduled) {
     return { status: "no_session_today" };
+  }
+
+  if (scheduled.workoutType === "Race") {
+    return { status: "race_day_skip" };
   }
 
   try {

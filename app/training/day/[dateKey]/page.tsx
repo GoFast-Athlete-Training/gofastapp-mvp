@@ -42,6 +42,7 @@ import {
 } from "@/lib/training/workout-preview-payload";
 import { stashWorkoutDayNav, TRAINING_HUB_BACK_PATH } from "@/lib/training/workout-day-nav";
 import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
+import { buildRaceDayBuilderHref } from "@/lib/training/race-day-builder-href";
 import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
 import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
 import WorkoutSkipActions from "@/components/training/WorkoutSkipActions";
@@ -262,13 +263,11 @@ export default function TrainingPlanDayPreviewPage() {
   const raceDayBuilderHref = useMemo(() => {
     if (!planDetail?.id || !dateKey) return null;
     const back = `/training/day/${dateKey}${querySuffix}`;
-    const params = new URLSearchParams({
-      raceDay: "1",
+    return buildRaceDayBuilderHref({
       planId: planDetail.id,
-      date: dateKey,
+      dateKey,
       back,
     });
-    return `/workouts/create?${params.toString()}`;
   }, [planDetail?.id, dateKey, querySuffix]);
 
   const load = useCallback(async () => {

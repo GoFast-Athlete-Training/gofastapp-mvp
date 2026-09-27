@@ -57,6 +57,9 @@ import { myRacePlannerHref } from "@/lib/races/athlete-race-signup-display";
 import { RacePrepForkActions } from "@/components/races/RacePrepForkActions";
 import { SignupRaceDayBeforeBanner } from "@/components/races/RaceDayBanner";
 import { RaceDayGoalBanner } from "@/components/races/RaceDayGoalBanner";
+import { AthleteRacePoint } from "@/components/races/AthleteRacePoint";
+import type { MyRacePointJson } from "@/lib/races/load-my-race";
+import { buildRaceDayBuilderHref } from "@/lib/training/race-day-builder-href";
 
 type PlanDetailHub = {
   id: string;
@@ -163,6 +166,7 @@ export default function TrainingHubPage() {
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [planDetail, setPlanDetail] = useState<PlanDetailHub | null>(null);
+  const [myRacePoint, setMyRacePoint] = useState<MyRacePointJson | null>(null);
   const [goalRacePaceResolved, setGoalRacePaceResolved] = useState<GoalRacePaceResolved | null>(null);
   const [raceReadiness, setRaceReadiness] = useState<RaceReadinessSummary | null>(null);
   const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
@@ -252,6 +256,7 @@ export default function TrainingHubPage() {
     setLegacyPlanReselect(null);
     setMyRacesForPick([]);
     setPlanDetail(null);
+    setMyRacePoint(null);
     setRaceReadiness(null);
     setPastRacePlan(null);
     setPastRaceResultStatus(null);
@@ -340,12 +345,18 @@ export default function TrainingHubPage() {
         return;
       }
       const planId = activePlan.id;
-      const { plan: raw, athleteFiveKPace: athPace, goalRacePaceResolved: resolvedPace, raceReadiness: readiness } =
-        await fetchTrainingPlanDetail(planId, token);
+      const {
+        plan: raw,
+        athleteFiveKPace: athPace,
+        goalRacePaceResolved: resolvedPace,
+        raceReadiness: readiness,
+        myRace,
+      } = await fetchTrainingPlanDetail(planId, token);
       const plan = raw as PlanDetailHub;
       setAthleteFiveKPace(athPace);
       setGoalRacePaceResolved(resolvedPace ?? null);
       setRaceReadiness(readiness ?? null);
+      setMyRacePoint(myRace ?? null);
 
       const planPhase = getRacePhaseLocal(plan.race_registry?.raceDate);
       if (planPhase === "post_early" || planPhase === "post_cooled") {
@@ -537,6 +548,10 @@ export default function TrainingHubPage() {
   }
 
   function handleOpenSession(day: PlanDayCard) {
+    if (day.workoutType === "Race") {
+      router.push(`/training/day/${day.dateKey}`);
+      return;
+    }
     const hydrated = hydratePlanButSwapIfExecuted(day);
     if (hydrated) {
       router.push(workoutDetailPathWithBackHref(detailIdForHydrated(hydrated), "/training"));
@@ -663,6 +678,15 @@ export default function TrainingHubPage() {
   const focusHydrated = focusPlanDay
     ? hydratePlanButSwapIfExecuted(focusPlanDay)
     : null;
+  const focusIsRaceDay = focusPlanDay?.workoutType === "Race";
+  const focusRaceDayBuilderHref = useMemo(() => {
+    if (!planDetail?.id || !focusPlanDay?.dateKey || !focusIsRaceDay) return null;
+    return buildRaceDayBuilderHref({
+      planId: planDetail.id,
+      dateKey: focusPlanDay.dateKey,
+      back: "/training",
+    });
+  }, [planDetail?.id, focusPlanDay?.dateKey, focusIsRaceDay]);
 
   const weekPlannedMiles = useMemo(() => {
     if (!weekDays.length) return null;
@@ -1315,12 +1339,18 @@ export default function TrainingHubPage() {
                   className={
                     focusPlanDay?.garminDetailActivityId
                       ? "rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm scroll-mt-24"
-                      : "rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm scroll-mt-24"
+                      : focusIsRaceDay
+                        ? "rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-white p-6 shadow-sm scroll-mt-24"
+                        : "rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm scroll-mt-24"
                   }
                 >
                   <p
                     className={`text-xs font-semibold uppercase tracking-wide ${
-                      focusPlanDay?.garminDetailActivityId ? "text-emerald-900" : "text-orange-900"
+                      focusPlanDay?.garminDetailActivityId
+                        ? "text-emerald-900"
+                        : focusIsRaceDay
+                          ? "text-violet-900"
+                          : "text-orange-900"
                     }`}
                   >
                     {focusIsToday ? "Today" : "Selected day"}
@@ -1365,6 +1395,43 @@ export default function TrainingHubPage() {
                             </Link>
                           ) : null}
                         </div>
+                      </>
+                    ) : focusIsRaceDay && myRacePoint ? (
+                      <>
+                        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-violet-800">
+                          Race day
+                        </p>
+                        <div className="mt-3">
+                          <AthleteRacePoint
+                            myRace={myRacePoint}
+                            raceDayBuilderHref={focusRaceDayBuilderHref}
+                            dayLabel={
+                              focusIsToday
+                                ? "Today"
+                                : formatPlanDateDisplay(focusPlanDay.dateKey, {
+                                    weekday: "long",
+                                    month: "short",
+                                    day: "numeric",
+                                  })
+                            }
+                          />
+                        </div>
+                      </>
+                    ) : focusIsRaceDay ? (
+                      <>
+                        <h2 className="mt-2 text-2xl font-bold text-gray-900">Race day</h2>
+                        <p className="mt-2 text-sm text-gray-700">
+                          Link an athlete race to this plan to see your event logo, start time, and
+                          pace builder.
+                        </p>
+                        {focusRaceDayBuilderHref ? (
+                          <Link
+                            href={focusRaceDayBuilderHref}
+                            className="mt-4 inline-flex justify-center rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white hover:bg-violet-700"
+                          >
+                            Build pace markers
+                          </Link>
+                        ) : null}
                       </>
                     ) : (
                       <>

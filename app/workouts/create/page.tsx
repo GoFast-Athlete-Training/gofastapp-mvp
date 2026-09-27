@@ -17,6 +17,10 @@ import {
 } from "@/lib/workout-generator/pace-calculator";
 import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
 import { formatSegmentDistance } from "@/lib/training/segment-summary";
+import {
+  suggestRaceBlocksFromGoal,
+  type PacingStrategy,
+} from "@/lib/races/race-pacing-blocks";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals", "Race"] as const;
 
@@ -291,6 +295,9 @@ function CreateWorkoutPageInner() {
   const [warmup, setWarmup] = useState<SlotData | null>(null);
   const [mainSegments, setMainSegments] = useState<SlotData[]>([]);
   const [cooldown, setCooldown] = useState<SlotData | null>(null);
+  const [raceGoalPaceSecPerMi, setRaceGoalPaceSecPerMi] = useState<number | null>(null);
+  const [raceTotalMiles, setRaceTotalMiles] = useState<number>(13.1);
+  const [raceSuggestStrategy, setRaceSuggestStrategy] = useState<PacingStrategy>("even");
 
   const [sourceText, setSourceText] = useState("");
   const [deriving, setDeriving] = useState(false);
@@ -389,6 +396,31 @@ function CreateWorkoutPageInner() {
       cancelled = true;
     };
   }, [raceDayMode, racePlanId, raceDateKey]);
+
+  useEffect(() => {
+    if (!raceDayMode || !racePlanId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get<{
+          goalRacePaceResolved?: {
+            goalPaceSecPerMile?: number | null;
+            raceDistanceMiles?: number | null;
+          };
+        }>(`training-plan/${encodeURIComponent(racePlanId)}`);
+        if (cancelled) return;
+        const pace = data.goalRacePaceResolved?.goalPaceSecPerMile;
+        if (pace != null && pace > 0) setRaceGoalPaceSecPerMi(pace);
+        const miles = data.goalRacePaceResolved?.raceDistanceMiles;
+        if (miles != null && miles > 0) setRaceTotalMiles(miles);
+      } catch {
+        /* optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [raceDayMode, racePlanId]);
 
   useEffect(() => {
     if (raceDayMode) return;
@@ -490,6 +522,29 @@ function CreateWorkoutPageInner() {
     mainSegments,
     cooldown,
   ]);
+
+  const applySuggestedRaceBlocks = () => {
+    const pace = raceGoalPaceSecPerMi ?? 480;
+    const blocks = suggestRaceBlocksFromGoal({
+      totalMiles: raceTotalMiles,
+      goalPaceSecPerMi: pace,
+      strategy: raceSuggestStrategy,
+    });
+    if (blocks.length === 0) return;
+    setWarmup(null);
+    setCooldown(null);
+    setMainSegments(
+      blocks.map((b) => ({
+        miles: b.miles,
+        segmentTitle: b.name,
+        paceValueLow: secondsPerMileToSecondsPerKm(b.paceSecPerMiLow),
+        paceValueHigh: secondsPerMileToSecondsPerKm(b.paceSecPerMiHigh),
+      }))
+    );
+    setName("Race — pacing blocks");
+    setDescription(`${blocks.length} blocks from goal (${raceSuggestStrategy} split).`);
+    setDeriveError(null);
+  };
 
   const clearSegmentsUsePasteInstead = () => {
     setWarmup(null);
@@ -813,14 +868,56 @@ function CreateWorkoutPageInner() {
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">
-            {raceDayMode ? "Plan your race" : "Create Workout"}
+            {raceDayMode ? "Plan pacing blocks" : "Create Workout"}
           </h1>
 
           {raceDayMode ? (
-            <p className="mb-6 text-sm text-gray-600">
-              Build mile splits and pace bands for race day. Saved on your plan as{" "}
-              <span className="font-semibold">Race</span> — no catalogue workout.
-            </p>
+            <>
+              <p className="mb-4 text-sm text-gray-600">
+                Name a few coarse blocks (start, settle, push, finish) with miles and pace bands — not
+                one row per mile. Paste coach prose or tabular lines (each line = one block). Saved on
+                your plan as <span className="font-semibold">Race</span> — no catalogue workout.
+              </p>
+              <div className="mb-6 rounded-lg border border-violet-100 bg-violet-50/60 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-violet-900 mb-2">
+                  Suggest blocks from goal
+                </p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {(
+                    [
+                      ["even", "Even"],
+                      ["negative", "Negative split"],
+                      ["positive", "Positive split"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setRaceSuggestStrategy(id)}
+                      className={`rounded-lg px-3 py-1.5 text-sm font-medium border ${
+                        raceSuggestStrategy === id
+                          ? "border-violet-600 bg-violet-600 text-white"
+                          : "border-gray-300 bg-white text-gray-800"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={applySuggestedRaceBlocks}
+                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+                >
+                  Suggest blocks from goal
+                </button>
+                {raceGoalPaceSecPerMi == null ? (
+                  <p className="mt-2 text-xs text-gray-600">
+                    No goal pace on file — using a default pace until you set a goal on My Race.
+                  </p>
+                ) : null}
+              </div>
+            </>
           ) : null}
 
           {!raceDayMode ? (
@@ -981,12 +1078,24 @@ function CreateWorkoutPageInner() {
 
           {!hasSlots && (
             <div className="mb-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Paste your workout</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                {raceDayMode ? "Paste pacing blocks" : "Paste your workout"}
+              </h2>
               <p className="text-sm text-gray-600 mb-3">
-                Paste prose from a coach, Runna, or Strava — or one line per split:{" "}
-                <span className="font-mono text-gray-800">miles pace pace</span> (e.g.{" "}
-                <span className="font-mono text-gray-800">5 7:00 7:20</span>) for a pace band per
-                segment.
+                {raceDayMode ? (
+                  <>
+                    Paste coach notes (AI turns them into blocks) or one line per block:{" "}
+                    <span className="font-mono text-gray-800">miles pace pace</span> (e.g.{" "}
+                    <span className="font-mono text-gray-800">8 7:05 7:25</span> = 8-mile block).
+                  </>
+                ) : (
+                  <>
+                    Paste prose from a coach, Runna, or Strava — or one line per split:{" "}
+                    <span className="font-mono text-gray-800">miles pace pace</span> (e.g.{" "}
+                    <span className="font-mono text-gray-800">5 7:00 7:20</span>) for a pace band per
+                    segment.
+                  </>
+                )}
               </p>
               <textarea
                 value={sourceText}

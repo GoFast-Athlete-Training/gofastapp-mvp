@@ -3,6 +3,7 @@
  */
 
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+import type { MyRacePointJson } from "@/lib/races/load-my-race";
 import type { WeekPerformanceSnapshot } from "@/lib/training/week-performance-types";
 
 export type { WeekPerformanceSnapshot };
@@ -54,6 +55,7 @@ export async function fetchTrainingPlanDetail(
   weeklyMileageTargetPreference: number | null;
   goalRacePaceResolved: GoalRacePaceResolved | null;
   raceReadiness: RaceReadinessSummary | null;
+  myRace: MyRacePointJson | null;
 }> {
   const res = await fetch(`/api/training-plan/${planId}`, {
     headers: athleteBearerFetchHeaders(bearerToken),
@@ -65,6 +67,7 @@ export async function fetchTrainingPlanDetail(
     weeklyMileageTargetPreference?: number | null;
     goalRacePaceResolved?: GoalRacePaceResolved | null;
     raceReadiness?: RaceReadinessSummary | null;
+    myRace?: MyRacePointJson | null;
   };
   if (!res.ok) {
     throw new Error(typeof data.error === "string" ? data.error : "Failed to load plan");
@@ -77,6 +80,7 @@ export async function fetchTrainingPlanDetail(
       typeof pref === "number" && Number.isFinite(pref) ? Math.round(pref) : null,
     goalRacePaceResolved: data.goalRacePaceResolved ?? null,
     raceReadiness: data.raceReadiness ?? null,
+    myRace: data.myRace ?? null,
   };
 }
 

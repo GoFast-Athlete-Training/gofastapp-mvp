@@ -12,8 +12,14 @@ import {
 } from "@/lib/workout-generator/pace-calculator";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { formatFinishClock } from "@/lib/training/race-projection";
+import {
+  raceBlocksToRaceDaySegments,
+  suggestRaceBlocksFromGoal,
+  type PacingStrategy,
+  type RacePacingBlock,
+} from "@/lib/races/race-pacing-blocks";
 
-export type PacingStrategy = "even" | "negative" | "positive";
+export type { PacingStrategy };
 
 function formatSecPerMile(sec: number): string {
   if (!Number.isFinite(sec) || sec <= 0) return "—";
@@ -29,41 +35,44 @@ function formatSplit(sec: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-type MileRow = { label: string; lengthMi: number; paceSecPerMi: number; splitSec: number };
+function formatPaceBand(low: number, high: number): string {
+  if (Math.abs(low - high) < 2) return formatSecPerMile(low);
+  return `${formatSecPerMile(low)} – ${formatSecPerMile(high)}`;
+}
 
-function buildMileRows(
-  totalMiles: number,
-  baseGoalPaceSecPerMi: number,
-  strategy: PacingStrategy
-): MileRow[] {
-  const rows: MileRow[] = [];
-  const eps = 1e-6;
-  let offset = 0;
+function blockSplitSec(b: RacePacingBlock): number {
+  const mid = (b.paceSecPerMiLow + b.paceSecPerMiHigh) / 2;
+  return mid * b.miles;
+}
 
-  const paceAtMidpoint = (midMi: number) => {
-    const half = totalMiles / 2;
-    if (strategy === "even") return baseGoalPaceSecPerMi;
-    if (strategy === "negative") {
-      return midMi < half - eps ? baseGoalPaceSecPerMi * 1.03 : baseGoalPaceSecPerMi * 0.97;
+function elapsedAtMile(blocks: RacePacingBlock[], atMi: number): number {
+  let cum = 0;
+  let sec = 0;
+  for (const b of blocks) {
+    if (cum + b.miles >= atMi - 1e-6) {
+      const slice = atMi - cum;
+      const mid = (b.paceSecPerMiLow + b.paceSecPerMiHigh) / 2;
+      return sec + mid * slice;
     }
-    return midMi < half - eps ? baseGoalPaceSecPerMi * 0.97 : baseGoalPaceSecPerMi * 1.03;
-  };
-
-  let full = 0;
-  while (offset + eps < totalMiles) {
-    const remaining = totalMiles - offset;
-    const len = remaining >= 1 ? 1 : remaining;
-    const mid = offset + len / 2;
-    const pace = paceAtMidpoint(mid);
-    const splitSec = pace * len;
-    full += 1;
-    const isLast = remaining <= 1 + eps;
-    const label = isLast && len < 1 - eps ? `Finish (${len.toFixed(2)} mi)` : `Mile ${full}`;
-    rows.push({ label, lengthMi: len, paceSecPerMi: pace, splitSec });
-    offset += len;
+    sec += blockSplitSec(b);
+    cum += b.miles;
   }
+  return sec;
+}
 
-  return rows;
+function checkpointLabels(totalMiles: number, blocks: RacePacingBlock[]) {
+  const targets: Array<{ label: string; atMi: number }> = [
+    { label: "5K", atMi: 3.1 },
+    { label: "10K", atMi: 6.2 },
+    { label: "Half", atMi: 13.1 },
+  ].filter((t) => t.atMi <= totalMiles + 0.05);
+  if (totalMiles > 13.5) {
+    targets.push({ label: "Finish", atMi: totalMiles });
+  }
+  return targets.map((t) => ({
+    ...t,
+    elapsedSec: elapsedAtMile(blocks, t.atMi),
+  }));
 }
 
 function PaceAdjustForm({
@@ -174,6 +183,8 @@ type Props = {
   hideGoalForm?: boolean;
   /** Render inside My Race Hub without duplicate page chrome. */
   embedded?: boolean;
+  /** When set, save coarse blocks to the plan race-day workout. */
+  raceDayApply?: { planId: string; dateKey: string; title?: string };
 };
 
 export function RacePlanSection({
@@ -182,8 +193,11 @@ export function RacePlanSection({
   onGoalSaved,
   hideGoalForm,
   embedded,
+  raceDayApply,
 }: Props) {
   const [strategy, setStrategy] = useState<PacingStrategy>("even");
+  const [applyingBlocks, setApplyingBlocks] = useState(false);
+  const [applyBlocksMessage, setApplyBlocksMessage] = useState<string | null>(null);
 
   const derived = useMemo(() => {
     const gTime = goal?.goalTime?.trim();
@@ -231,10 +245,19 @@ export function RacePlanSection({
     return m ?? RACE_DISTANCES_MILES["5k"];
   }, [race.distanceLabel, race.distanceMeters]);
 
-  const mileRows = useMemo(() => {
+  const pacingBlocks = useMemo(() => {
     if (goalRacePace == null || !Number.isFinite(totalMiles) || totalMiles <= 0) return [];
-    return buildMileRows(totalMiles, goalRacePace, strategy);
+    return suggestRaceBlocksFromGoal({
+      totalMiles,
+      goalPaceSecPerMi: goalRacePace,
+      strategy,
+    });
   }, [goalRacePace, totalMiles, strategy]);
+
+  const checkpoints = useMemo(
+    () => (pacingBlocks.length ? checkpointLabels(totalMiles, pacingBlocks) : []),
+    [pacingBlocks, totalMiles]
+  );
 
   const goalTimeDisplay = goal?.goalTime?.trim() ?? null;
   let goalFinishSec: number | null = null;
@@ -245,7 +268,27 @@ export function RacePlanSection({
       goalFinishSec = null;
     }
   }
-  const rowsSumSec = mileRows.reduce((a, r) => a + r.splitSec, 0);
+  const rowsSumSec = pacingBlocks.reduce((a, r) => a + blockSplitSec(r), 0);
+
+  async function handleApplyBlocksToRaceDay() {
+    if (!raceDayApply || pacingBlocks.length === 0) return;
+    setApplyingBlocks(true);
+    setApplyBlocksMessage(null);
+    try {
+      const segments = raceBlocksToRaceDaySegments(pacingBlocks);
+      await api.post("training/race-day", {
+        planId: raceDayApply.planId,
+        date: raceDayApply.dateKey,
+        title: raceDayApply.title?.trim() || race.name,
+        segments,
+      });
+      setApplyBlocksMessage("Pace blocks saved on your race-day plan.");
+    } catch (err: unknown) {
+      setApplyBlocksMessage(err instanceof Error ? err.message : "Could not save blocks.");
+    } finally {
+      setApplyingBlocks(false);
+    }
+  }
 
   const Wrapper = embedded ? "div" : "section";
   const wrapperClass = embedded
@@ -258,7 +301,7 @@ export function RacePlanSection({
         <>
           <h2 className="text-lg font-bold text-gray-900 mb-1">Plan your race</h2>
           <p className="text-sm text-gray-600 mb-4">
-            Lock in your goal time, pick a pacing style, and see target splits by mile.
+            Lock in your goal time, pick a pacing style, and review a few coarse pacing blocks.
           </p>
         </>
       ) : null}
@@ -281,11 +324,11 @@ export function RacePlanSection({
 
       {goalRacePace == null && !goalTimeDisplay ? (
         <p className="text-sm text-gray-600">
-          Add a goal finish time in Your goal to generate per-mile targets and adjust pace.
+          Add a goal finish time in Your goal to generate pacing blocks and adjust pace.
         </p>
       ) : goalRacePace == null ? (
         <p className="text-sm text-gray-600">
-          Save your goal finish time to calculate pace and mile splits for this distance.
+          Save your goal finish time to calculate pace and blocks for this distance.
         </p>
       ) : (
         <>
@@ -297,7 +340,7 @@ export function RacePlanSection({
               <span className="font-semibold">{formatSecPerMile(goalRacePace)}</span>
               {goalFinishSec != null && rowsSumSec > 0 ? (
                 <span className="text-gray-500 text-xs block mt-1">
-                  Split table sums to ~{formatSplit(rowsSumSec)} (vs goal {goalTimeDisplay})
+                  Blocks sum to ~{formatSplit(rowsSumSec)} (vs goal {goalTimeDisplay})
                 </span>
               ) : null}
             </p>
@@ -331,7 +374,7 @@ export function RacePlanSection({
             </div>
             {strategy === "negative" ? (
               <p className="mt-2 text-xs text-gray-600">
-                First half ~3% slower per mile, second half ~3% faster — steady finish.
+                First half of the race ~3% slower, second half ~3% faster — steady finish.
               </p>
             ) : null}
             {strategy === "positive" ? (
@@ -341,26 +384,65 @@ export function RacePlanSection({
             ) : null}
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 text-left text-gray-600">
-                  <th className="px-3 py-2 font-semibold">Segment</th>
-                  <th className="px-3 py-2 font-semibold">Target pace</th>
-                  <th className="px-3 py-2 font-semibold">Split</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mileRows.map((row) => (
-                  <tr key={row.label} className="border-b border-gray-100">
-                    <td className="px-3 py-2 text-gray-900">{row.label}</td>
-                    <td className="px-3 py-2 font-medium">{formatSecPerMile(row.paceSecPerMi)}</td>
-                    <td className="px-3 py-2 text-gray-700">{formatSplit(row.splitSec)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {pacingBlocks.map((block) => (
+              <div
+                key={block.name}
+                className="rounded-lg border border-violet-100 bg-white px-4 py-3 shadow-sm"
+              >
+                <p className="font-semibold text-gray-900">{block.name}</p>
+                <p className="mt-1 text-sm text-gray-700">
+                  {block.miles.toFixed(2)} mi · {formatPaceBand(block.paceSecPerMiLow, block.paceSecPerMiHigh)}
+                  <span className="text-gray-500">
+                    {" "}
+                    · ~{formatSplit(blockSplitSec(block))}
+                  </span>
+                </p>
+              </div>
+            ))}
           </div>
+
+          {checkpoints.length > 0 ? (
+            <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200 bg-white/80">
+              <p className="px-3 pt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Checkpoints (estimate)
+              </p>
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50 text-left text-gray-600">
+                    <th className="px-3 py-2 font-semibold">Mark</th>
+                    <th className="px-3 py-2 font-semibold">Miles</th>
+                    <th className="px-3 py-2 font-semibold">Est. elapsed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {checkpoints.map((cp) => (
+                    <tr key={cp.label} className="border-b border-gray-100">
+                      <td className="px-3 py-2 text-gray-900">{cp.label}</td>
+                      <td className="px-3 py-2 text-gray-700">{cp.atMi.toFixed(1)}</td>
+                      <td className="px-3 py-2 text-gray-700">{formatSplit(cp.elapsedSec)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {raceDayApply ? (
+            <div className="mt-4">
+              <button
+                type="button"
+                disabled={applyingBlocks || pacingBlocks.length === 0}
+                onClick={() => void handleApplyBlocksToRaceDay()}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {applyingBlocks ? "Saving…" : "Use these blocks in race plan"}
+              </button>
+              {applyBlocksMessage ? (
+                <p className="mt-2 text-sm text-gray-700">{applyBlocksMessage}</p>
+              ) : null}
+            </div>
+          ) : null}
         </>
       )}
 
