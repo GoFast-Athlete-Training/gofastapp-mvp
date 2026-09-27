@@ -81,8 +81,8 @@ export function AthleteRacePoint({
       </div>
 
       <p className="text-sm text-gray-700 leading-relaxed">
-        Race day is about your event and pacing blocks — not a catalogue workout or Garmin schedule
-        template. Build named pace segments (start, settle, push, finish) before you toe the line.
+        Build named pace targets for race day, save them on your plan, then send the workout to your
+        Garmin Connect calendar from Plan my race.
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">

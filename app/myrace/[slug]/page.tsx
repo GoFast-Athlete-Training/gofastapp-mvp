@@ -16,7 +16,8 @@ import {
   Route,
 } from "lucide-react";
 import { formatRaceListDate, daysUntilRace } from "@/lib/races-display";
-import { RacePlanSection } from "@/components/races/RacePlanSection";
+import { RacePaceTargetsSection } from "@/components/races/RacePaceTargetsSection";
+import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { InlineGoalForm } from "@/components/races/InlineGoalForm";
 import {
   getPublicCoursePageUrl,
@@ -406,6 +407,32 @@ export default function MyRacePage() {
         }
       : null;
 
+  const goalTimeDisplay =
+    goal?.goalTime?.trim() || signup?.goalTime?.trim() || null;
+
+  const racePaceTotalMiles = useMemo(() => {
+    const m = plannerDistance.distanceMeters;
+    if (m != null && m > 0) return m / 1609.344;
+    return 26.2;
+  }, [plannerDistance.distanceMeters]);
+
+  const raceGoalPaceSecPerMi = useMemo(() => {
+    if (!goalTimeDisplay) return null;
+    const resolved = resolveGoalRacePace({
+      goalTime: goalTimeDisplay,
+      dbGoalRacePaceSecPerMile: effectiveGoal?.goalRacePace ?? signup?.goalRacePace ?? null,
+      distanceMeters: plannerDistance.distanceMeters,
+      distanceLabel: plannerDistance.distanceLabel,
+    });
+    return resolved?.goalPaceSecPerMile ?? null;
+  }, [
+    goalTimeDisplay,
+    effectiveGoal?.goalRacePace,
+    signup?.goalRacePace,
+    plannerDistance.distanceMeters,
+    plannerDistance.distanceLabel,
+  ]);
+
   if (loadingRace) {
     return <p className="text-gray-500 text-sm">Loading race…</p>;
   }
@@ -425,8 +452,6 @@ export default function MyRacePage() {
   const isGoalRace = Boolean(signup?.isPrimaryRace);
   const hasPlanForRace = Boolean(trainingPlanId);
   const hasSignup = Boolean(signup);
-  const goalTimeDisplay =
-    goal?.goalTime?.trim() || signup?.goalTime?.trim() || null;
   const courseTipsUrl = getPublicCoursePageUrl(raceExtras?.courseSlug);
   const publicRaceUrl = getPublicRacePageUrl(race.slug);
   const hasCourseSection = Boolean(
@@ -641,13 +666,10 @@ export default function MyRacePage() {
                 id="your-pace"
                 className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-4 scroll-mt-4"
               >
-                <h3 className="text-xs font-bold uppercase tracking-wide text-violet-900">Your pace</h3>
-                <p className="mt-1 text-sm text-gray-600 mb-4">
-                  Coarse pacing blocks from your goal — edit pace or finish time; both stay in sync.
-                </p>
-                <RacePlanSection
-                  race={raceForGoal}
-                  goal={effectiveGoal}
+                <RacePaceTargetsSection
+                  raceTitle={raceForGoal.name}
+                  totalMiles={racePaceTotalMiles}
+                  goalPaceSecPerMi={raceGoalPaceSecPerMi}
                   raceDayApply={
                     trainingPlanId && raceForGoal?.raceDate
                       ? {
@@ -657,21 +679,6 @@ export default function MyRacePage() {
                         }
                       : undefined
                   }
-                  onGoalSaved={(g) => {
-                    setGoal(g);
-                    setSignup((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            goalTime: g.goalTime ?? prev.goalTime,
-                            goalRacePace: g.goalRacePace ?? prev.goalRacePace,
-                            goalPace5K: g.goalPace5K ?? prev.goalPace5K,
-                          }
-                        : prev
-                    );
-                  }}
-                  hideGoalForm
-                  embedded
                 />
               </div>
 
