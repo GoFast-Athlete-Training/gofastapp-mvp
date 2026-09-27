@@ -43,7 +43,7 @@ import {
   prescribeIdForHydrated,
 } from "@/lib/training/hydrate-plan-day";
 import { planScheduleLooksStructured } from "@/lib/training/plan-schedule-schema";
-import { getRacePhase } from "@/lib/race-calendar-phase";
+import { getRacePhaseLocal } from "@/lib/race-calendar-phase";
 import {
   planRaceDisplayName,
   planTitleRaceMismatch,
@@ -52,6 +52,7 @@ import {
   PlanLongRunTrajectorySection,
   trajectoryContextFromPlanDetail,
 } from "@/components/training/PlanLongRunTrajectorySection";
+import { RegeneratePlanScheduleButton } from "@/components/training/RegeneratePlanScheduleButton";
 import { myRacePlannerHref } from "@/lib/races/athlete-race-signup-display";
 
 type PlanDetailHub = {
@@ -193,7 +194,7 @@ export default function TrainingHubPage() {
   const [planRacePlannerHref, setPlanRacePlannerHref] = useState<string | null>(null);
 
   const pastRacePhase = useMemo(
-    () => (pastRacePlan?.raceDate ? getRacePhase(pastRacePlan.raceDate) : null),
+    () => (pastRacePlan?.raceDate ? getRacePhaseLocal(pastRacePlan.raceDate) : null),
     [pastRacePlan?.raceDate]
   );
 
@@ -326,8 +327,8 @@ export default function TrainingHubPage() {
       setGoalRacePaceResolved(resolvedPace ?? null);
       setRaceReadiness(readiness ?? null);
 
-      const planPhase = getRacePhase(plan.race_registry?.raceDate);
-      if (planPhase !== "pre") {
+      const planPhase = getRacePhaseLocal(plan.race_registry?.raceDate);
+      if (planPhase === "post_early" || planPhase === "post_cooled") {
         setPlanDetail(null);
         setPastRacePlan({
           id: plan.id,
@@ -1113,6 +1114,16 @@ export default function TrainingHubPage() {
               <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 w-full sm:w-auto">
                 Plan actions
               </span>
+              <RegeneratePlanScheduleButton
+                planId={planDetail.id}
+                getToken={getHubToken}
+                weeklyMileageTarget={savedWeeklyTarget ?? presetMinWeeklyMiles}
+                minWeeklyMiles={presetMinWeeklyMiles}
+                onSuccess={async () => {
+                  await loadHub();
+                  void fetchWeekDays(weekNumber);
+                }}
+              />
               <Link
                 href={`/training-setup/${planDetail.id}`}
                 className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"

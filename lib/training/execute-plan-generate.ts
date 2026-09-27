@@ -233,6 +233,10 @@ export async function executePlanGenerate(params: {
   const weeklyIntervalSessions =
     composition != null ? Math.max(0, Math.round(composition.intervals)) : undefined;
 
+  const hasPresetTaperOrRaceWeek =
+    (phasePreset?.taper?.weeks?.length ?? 0) > 0 ||
+    (phasePreset?.raceWeek?.weeks?.length ?? 0) > 0;
+
   const placement = assignWorkoutDays({
     planStartDate: plan.startDate,
     raceDate: race.raceDate,
@@ -254,6 +258,7 @@ export async function executePlanGenerate(params: {
     easyPositions,
     weeklyTempoSessions,
     weeklyIntervalSessions,
+    standardRaceWeek: !hasPresetTaperOrRaceWeek,
   });
 
   const schedule = placement.schedule;

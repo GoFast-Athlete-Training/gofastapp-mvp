@@ -67,3 +67,20 @@ export function getRacePhaseLocal(raceDateIso: string | null | undefined): RaceP
   if (diffDays >= -6) return "post_early";
   return "post_cooled";
 }
+
+/** Product default for server cron — calendar YMD in a US timezone (not UTC midnight flip). */
+export const RACE_CALENDAR_TIMEZONE = "America/Denver";
+
+export function calendarDayKeyInTimezone(
+  value: Date | string,
+  timeZone = RACE_CALENDAR_TIMEZONE
+): string {
+  const d = value instanceof Date ? value : new Date(value.includes("T") ? value : `${value}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}

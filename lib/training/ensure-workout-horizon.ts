@@ -7,7 +7,7 @@ import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { addDaysUtc, localTodayKey, utcDateOnly, ymdFromDate } from "./plan-utils";
 import { planScheduleDayForDateKey } from "./plan-schedule";
-import { metersToMiles } from "@/lib/pace-utils";
+import { planRaceScheduleContextFromPlan } from "./plan-race-schedule-context";
 import {
   MaterializeWorkoutError,
   materializeWorkoutForPlanDay,
@@ -78,6 +78,14 @@ export async function ensureWorkoutHorizonForAthlete(params: {
     },
     orderBy: { updatedAt: "desc" },
     include: {
+      athlete_race: {
+        select: {
+          raceDate: true,
+          name: true,
+          distanceMeters: true,
+          distanceLabel: true,
+        },
+      },
       race_registry: {
         select: {
           raceDate: true,
@@ -107,11 +115,7 @@ export async function ensureWorkoutHorizonForAthlete(params: {
     };
   }
 
-  const race = plan.race_registry;
-  const raceDistanceMiles =
-    race?.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
-      ? metersToMiles(Number(race.distanceMeters))
-      : null;
+  const raceCtx = planRaceScheduleContextFromPlan(plan);
 
   const days: HorizonDayResult[] = [];
   let alreadyReady = 0;
@@ -125,9 +129,9 @@ export async function ensureWorkoutHorizonForAthlete(params: {
     const scheduled = planScheduleDayForDateKey({
       planStartDate: plan.startDate,
       planSchedule: plan.planSchedule,
-      raceDate: race?.raceDate ?? null,
-      raceName: race?.name ?? null,
-      raceDistanceMiles,
+      raceDate: raceCtx.raceDate,
+      raceName: raceCtx.raceName,
+      raceDistanceMiles: raceCtx.raceDistanceMiles,
       dateKey,
       maxWeekNumber: plan.totalWeeks,
       catalogueTitleById: {},

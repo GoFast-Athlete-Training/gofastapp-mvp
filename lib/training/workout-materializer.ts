@@ -10,6 +10,7 @@ import {
   planScheduleDayForDateKey,
   type PlanScheduleDay,
 } from "./plan-schedule";
+import { planRaceScheduleContextFromPlan } from "./plan-race-schedule-context";
 import { type WorkoutStep } from "./prescription";
 import { metersToMiles } from "@/lib/pace-utils";
 import {
@@ -283,6 +284,10 @@ export async function materializeWorkoutForPlanDay(params: {
       include: {
         athlete_race: {
           select: {
+            raceDate: true,
+            name: true,
+            distanceMeters: true,
+            distanceLabel: true,
             goalTime: true,
             goalRacePace: true,
             goalDistance: true,
@@ -321,12 +326,7 @@ export async function materializeWorkoutForPlanDay(params: {
     throw new MaterializeWorkoutError("Plan not found");
   }
 
-  const race = plan.race_registry;
-
-  const raceDistanceMiles =
-    race?.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
-      ? metersToMiles(Number(race.distanceMeters))
-      : null;
+  const raceCtx = planRaceScheduleContextFromPlan(plan);
 
   const catalogueTitleById = await loadCatalogueTitleByIdFromPlanSchedule(
     plan.planSchedule
@@ -335,9 +335,9 @@ export async function materializeWorkoutForPlanDay(params: {
   const scheduled = planScheduleDayForDateKey({
     planStartDate: plan.startDate,
     planSchedule: plan.planSchedule,
-    raceDate: race?.raceDate ?? null,
-    raceName: race?.name ?? null,
-    raceDistanceMiles,
+    raceDate: raceCtx.raceDate,
+    raceName: raceCtx.raceName,
+    raceDistanceMiles: raceCtx.raceDistanceMiles,
     dateKey,
     maxWeekNumber: plan.totalWeeks,
     catalogueTitleById,

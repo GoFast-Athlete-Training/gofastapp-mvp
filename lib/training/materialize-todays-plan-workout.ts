@@ -6,7 +6,7 @@
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { planScheduleDayForDateKey } from "./plan-schedule";
-import { metersToMiles } from "@/lib/pace-utils";
+import { planRaceScheduleContextFromPlan } from "./plan-race-schedule-context";
 import { ymdFromDate } from "./plan-utils";
 import { materializeWorkoutForPlanDay } from "./workout-materializer";
 
@@ -32,6 +32,14 @@ export async function materializeTodayPlanWorkoutForAthlete(
     },
     orderBy: { updatedAt: "desc" },
     include: {
+      athlete_race: {
+        select: {
+          raceDate: true,
+          name: true,
+          distanceMeters: true,
+          distanceLabel: true,
+        },
+      },
       race_registry: {
         select: {
           raceDate: true,
@@ -51,18 +59,14 @@ export async function materializeTodayPlanWorkoutForAthlete(
     return { status: "no_active_plan" };
   }
 
-  const race = plan.race_registry;
-  const raceDistanceMiles =
-    race?.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
-      ? metersToMiles(Number(race.distanceMeters))
-      : null;
+  const raceCtx = planRaceScheduleContextFromPlan(plan);
 
   const scheduled = planScheduleDayForDateKey({
     planStartDate: plan.startDate,
     planSchedule: rawSchedule,
-    raceDate: race?.raceDate ?? null,
-    raceName: race?.name ?? null,
-    raceDistanceMiles,
+    raceDate: raceCtx.raceDate,
+    raceName: raceCtx.raceName,
+    raceDistanceMiles: raceCtx.raceDistanceMiles,
     dateKey: dateParam,
     maxWeekNumber: plan.totalWeeks,
     catalogueTitleById: {},

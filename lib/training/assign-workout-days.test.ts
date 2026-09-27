@@ -172,6 +172,36 @@ test("Saturday race: Thursday shakeout Friday rest", () => {
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Race");
 });
 
+test("standardRaceWeek: race-2 taper tempo, race-1 off, no long run in race week", () => {
+  const planStart = new Date("2026-09-21T00:00:00.000Z");
+  const raceDate = new Date("2026-10-25T00:00:00.000Z");
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    planStartDate: planStart,
+    raceDate,
+    totalWeeks: 5,
+    preferredDays: [1, 2, 3, 4, 5, 6],
+    standardRaceWeek: true,
+  });
+
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Tempo");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-24"), null);
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Race");
+
+  const lastWeek = schedule.find((w) => w.weekNumber === 5);
+  assert.ok(lastWeek);
+  assert.equal(
+    lastWeek!.days.some((d) => d.workoutType === "LongRun"),
+    false,
+    "race week must not include a long run"
+  );
+
+  const qualityBeforeRest = lastWeek!.days.filter(
+    (d) => d.workoutType === "Tempo" || d.workoutType === "Intervals" || d.workoutType === "Easy"
+  );
+  assert.ok(qualityBeforeRest.length >= 3, "race week keeps normal easy/tempo/interval pattern");
+});
+
 test("5-week Sunday race: last week is a normal training week, not race-only", () => {
   const planStart = new Date("2026-09-21T00:00:00.000Z");
   const raceDate = new Date("2026-10-25T00:00:00.000Z");

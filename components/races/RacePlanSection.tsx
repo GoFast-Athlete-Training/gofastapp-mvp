@@ -213,7 +213,9 @@ export function RacePlanSection({
     });
   }, [goal?.goalTime, goal?.goalRacePace, race.distanceLabel, race.distanceMeters]);
 
-  const goalRacePace = resolvedGoalRacePace?.goalPaceSecPerMile ?? null;
+  const goalRacePace =
+    resolvedGoalRacePace?.goalPaceSecPerMile ??
+    (goal?.goalRacePace != null && goal.goalRacePace > 0 ? goal.goalRacePace : null);
 
   const goalPace5K =
     goal?.goalPace5K != null && goal.goalPace5K > 0
@@ -267,7 +269,7 @@ export function RacePlanSection({
         </div>
       )}
 
-      {goalTimeDisplay && goalRacePace != null ? (
+      {goalRacePace != null ? (
         <PaceAdjustForm
           race={race}
           goal={goal}
@@ -277,9 +279,13 @@ export function RacePlanSection({
         />
       ) : null}
 
-      {!goalTimeDisplay || goalRacePace == null ? (
+      {goalRacePace == null && !goalTimeDisplay ? (
         <p className="text-sm text-gray-600">
           Add a goal finish time in Your goal to generate per-mile targets and adjust pace.
+        </p>
+      ) : goalRacePace == null ? (
+        <p className="text-sm text-gray-600">
+          Save your goal finish time to calculate pace and mile splits for this distance.
         </p>
       ) : (
         <>

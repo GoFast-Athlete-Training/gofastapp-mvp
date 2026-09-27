@@ -4,12 +4,12 @@
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { metersToMiles } from "@/lib/pace-utils";
 import { loadCatalogueTitleByIdFromPlanSchedule } from "@/lib/training/catalogue-title-map";
 import {
   planScheduleDayForDateKey,
   type PlanScheduleDay,
 } from "@/lib/training/plan-schedule";
+import { planRaceScheduleContextFromPlan } from "@/lib/training/plan-race-schedule-context";
 import { utcDateOnly } from "@/lib/training/plan-utils";
 import type { WorkoutStep } from "@/lib/training/prescription";
 import { ensurePlannedWorkoutPrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
@@ -88,6 +88,14 @@ async function loadScheduledRaceDay(params: {
   const plan = await prisma.training_plans.findFirst({
     where: { id: params.planId, athleteId: params.athleteId },
     include: {
+      athlete_race: {
+        select: {
+          raceDate: true,
+          name: true,
+          distanceMeters: true,
+          distanceLabel: true,
+        },
+      },
       race_registry: {
         select: {
           raceDate: true,
@@ -100,20 +108,16 @@ async function loadScheduledRaceDay(params: {
   });
   if (!plan) throw new RaceDayPlanError("Plan not found");
 
-  const race = plan.race_registry;
-  const raceDistanceMiles =
-    race?.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
-      ? metersToMiles(Number(race.distanceMeters))
-      : null;
+  const raceCtx = planRaceScheduleContextFromPlan(plan);
 
   const catalogueTitleById = await loadCatalogueTitleByIdFromPlanSchedule(plan.planSchedule);
 
   const scheduled = planScheduleDayForDateKey({
     planStartDate: plan.startDate,
     planSchedule: plan.planSchedule,
-    raceDate: race?.raceDate ?? null,
-    raceName: race?.name ?? null,
-    raceDistanceMiles,
+    raceDate: raceCtx.raceDate,
+    raceName: raceCtx.raceName,
+    raceDistanceMiles: raceCtx.raceDistanceMiles,
     dateKey,
     maxWeekNumber: plan.totalWeeks,
     catalogueTitleById,

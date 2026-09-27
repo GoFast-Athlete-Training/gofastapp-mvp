@@ -40,6 +40,8 @@ import {
   trajectoryContextFromPlanDetail,
 } from "@/components/training/PlanLongRunTrajectorySection";
 import { AddedRacePlanPrompt } from "@/components/training/AddedRacePlanPrompt";
+import { RegeneratePlanScheduleButton } from "@/components/training/RegeneratePlanScheduleButton";
+import { postRegenerateTrainingPlanSchedule } from "@/lib/training/regenerate-plan-schedule-client";
 import {
   isAddedRacePromptDismissed,
   type PlanRaceEventsPayload,
@@ -687,23 +689,15 @@ export default function TrainingSetupPlanPage({
   }
 
   async function generatePlanSchedule(token: string, targetMiles: number) {
-    const genRes = await fetch("/api/training/plan/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...athleteBearerFetchHeaders(token),
-      },
-      body: JSON.stringify({
-        trainingPlanId: planId,
-        weeklyMileageTarget: targetMiles,
-        minWeeklyMiles: presetMinWeeklyMiles,
-        includedSecondaryAthleteRaceIds: [...includedSecondaryAthleteRaceIds],
-        includedSecondarySignupIds: [...includedSecondaryAthleteRaceIds],
-      }),
+    const result = await postRegenerateTrainingPlanSchedule({
+      token,
+      trainingPlanId: planId,
+      weeklyMileageTarget: targetMiles,
+      minWeeklyMiles: presetMinWeeklyMiles,
+      includedSecondaryAthleteRaceIds: [...includedSecondaryAthleteRaceIds],
     });
-    const genData = await genRes.json();
-    if (!genRes.ok) {
-      setError(genData.error || "Generation failed");
+    if (!result.ok) {
+      setError(result.error);
       return false;
     }
     return true;
@@ -1065,16 +1059,36 @@ export default function TrainingSetupPlanPage({
                     </dd>
                   </div>
                 </dl>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRegenerationSuccess(false);
-                    setShowPreferencesEditor(true);
-                  }}
-                  className="mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700"
-                >
-                  Edit weekly miles & regenerate
-                </button>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <RegeneratePlanScheduleButton
+                    planId={planId}
+                    getToken={getToken}
+                    weeklyMileageTarget={
+                      plan.weeklyMileageTarget != null &&
+                      Number.isFinite(Number(plan.weeklyMileageTarget))
+                        ? Math.round(Number(plan.weeklyMileageTarget))
+                        : athleteWeeklyTargetPreference ?? presetMinWeeklyMiles
+                    }
+                    minWeeklyMiles={presetMinWeeklyMiles}
+                    includedSecondaryAthleteRaceIds={[...includedSecondaryAthleteRaceIds]}
+                    variant="primary"
+                    onRegenerateStart={beginRegeneration}
+                    onRegenerateEnd={() => setGenerating(false)}
+                    onSuccess={async () => {
+                      await finishGenerationSuccess();
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRegenerationSuccess(false);
+                      setShowPreferencesEditor(true);
+                    }}
+                    className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+                  >
+                    Edit weekly miles & regenerate
+                  </button>
+                </div>
               </div>
 
               <PlanWeekViewer

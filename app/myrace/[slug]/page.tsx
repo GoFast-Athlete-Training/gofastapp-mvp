@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/firebase";
@@ -22,6 +22,7 @@ import {
   getPublicCoursePageUrl,
   getPublicRacePageUrl,
 } from "@/lib/public-race-url";
+import { resolveMyRacePlannerDistance } from "@/lib/races/myrace-planner-distance";
 type ResolvedRace = {
   id: string;
   name: string;
@@ -48,6 +49,10 @@ type Signup = {
   isPrimaryRace?: boolean;
   trainingPlanId?: string | null;
   goalTime?: string | null;
+  goalRacePace?: number | null;
+  goalPace5K?: number | null;
+  distanceLabel?: string | null;
+  distanceMeters?: number | null;
 };
 
 type GoalRow = {
@@ -354,6 +359,53 @@ export default function MyRacePage() {
     }
   }
 
+  const plannerDistance = useMemo(
+    () =>
+      race
+        ? resolveMyRacePlannerDistance({
+            registryMeters: race.distanceMeters,
+            registryLabel: race.distanceLabel,
+            claimMeters: signup?.distanceMeters,
+            claimLabel: signup?.distanceLabel,
+            slug: race.slug ?? slug,
+            raceName: race.name,
+          })
+        : { distanceLabel: null as string | null, distanceMeters: null as number | null },
+    [
+      race,
+      signup?.distanceMeters,
+      signup?.distanceLabel,
+      slug,
+    ]
+  );
+
+  const effectiveGoal = useMemo((): GoalRow | null => {
+    if (!signup) return goal;
+    const gTime = goal?.goalTime?.trim() || signup.goalTime?.trim() || null;
+    const gPace = goal?.goalRacePace ?? signup.goalRacePace ?? null;
+    const g5k = goal?.goalPace5K ?? signup.goalPace5K ?? null;
+    if (!gTime && (gPace == null || gPace <= 0) && !goal) return null;
+    return {
+      id: goal?.id ?? signup.id,
+      goalTime: gTime,
+      goalRacePace: gPace,
+      goalPace5K: g5k,
+      athleteRaceId: signup.id,
+      raceRegistryId: signup.raceRegistryId,
+    };
+  }, [goal, signup]);
+
+  const raceForGoal =
+    race && signup
+      ? {
+          athleteRaceId: signup.id,
+          name: race.name,
+          raceDate: race.raceDate,
+          distanceLabel: plannerDistance.distanceLabel,
+          distanceMeters: plannerDistance.distanceMeters,
+        }
+      : null;
+
   if (loadingRace) {
     return <p className="text-gray-500 text-sm">Loading race…</p>;
   }
@@ -380,15 +432,6 @@ export default function MyRacePage() {
   const hasCourseSection = Boolean(
     courseTipsUrl || raceExtras?.courseMapUrl || race.registrationUrl || publicRaceUrl
   );
-  const raceForGoal = signup
-    ? {
-        athleteRaceId: signup.id,
-        name: race.name,
-        raceDate: race.raceDate,
-        distanceLabel: race.distanceLabel,
-        distanceMeters: race.distanceMeters,
-      }
-    : null;
 
   return (
     <div className="space-y-5">
@@ -556,102 +599,87 @@ export default function MyRacePage() {
             </section>
           ) : null}
 
-          <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-900 flex items-center gap-2">
-              <Zap className="w-4 h-4" />
-              Plan for it
-            </h2>
-            {hasPlanForRace &&
-            activePlanSummary?.hasSchedule &&
-            activePlanSummary.weekNumber != null &&
-            activePlanSummary.totalWeeks != null ? (
-              <>
-                <p className="mt-2 text-base font-semibold text-gray-900">{activePlanSummary.name}</p>
-                <span className="mt-2 inline-flex items-center rounded-full bg-emerald-100 text-emerald-900 px-3 py-1 text-xs font-bold">
-                  Week {activePlanSummary.weekNumber} of {activePlanSummary.totalWeeks}
-                </span>
-                {nextSession ? (
-                  <div className="mt-3 rounded-lg border border-emerald-100 bg-white/80 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase text-gray-500">Next session</p>
-                    <p className="mt-1 text-sm font-semibold text-gray-900">{nextSession.title}</p>
-                    <p className="text-xs text-gray-600 mt-0.5">{formatSessionWhen(nextSession.date)}</p>
-                  </div>
-                ) : null}
-                <Link
-                  href="/training"
-                  className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-                >
-                  View training plan
-                </Link>
-              </>
-            ) : hasPlanForRace ? (
-              <>
-                <p className="mt-2 text-sm text-gray-800">
-                  You have a training plan for this race — finish setup or open your schedule.
-                </p>
-                <Link
-                  href={
-                    activePlanSummary?.hasSchedule
-                      ? "/training"
-                      : `/training-setup/${encodeURIComponent(trainingPlanId!)}`
-                  }
-                  className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-                >
-                  {activePlanSummary?.hasSchedule ? "View training plan" : "Finish plan setup"}
-                </Link>
-              </>
-            ) : goalTimeDisplay ? (
-              <>
-                <p className="mt-2 text-sm text-gray-800">
-                  Goal <span className="font-bold tabular-nums">{goalTimeDisplay}</span> — add a plan to
-                  get race-ready.
-                </p>
-                <Link
-                  href={`/training-setup?athleteRaceId=${encodeURIComponent(signup!.id)}`}
-                  className="mt-4 inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
-                >
-                  Add a plan
-                </Link>
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-gray-700">
-                Set your finish goal below, then add a training plan for this race.
-              </p>
-            )}
-          </section>
-
           {raceForGoal ? (
-            <section className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-white p-5 shadow-sm">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-orange-900">Your goal</h2>
-              <p className="mt-1 text-sm text-gray-600">Finish time — updates your pace below.</p>
-              <div className="mt-3">
-                <InlineGoalForm
+            <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white p-5 shadow-sm space-y-5">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-900 flex items-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  Plan for it
+                </h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  Set your goal time and pacing here — no need to open training setup for race-week prep.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-white p-4">
+                <h3 className="text-xs font-bold uppercase tracking-wide text-orange-900">Your goal</h3>
+                <p className="mt-1 text-sm text-gray-600">Finish time — updates your pace below.</p>
+                <div className="mt-3">
+                  <InlineGoalForm
+                    race={raceForGoal}
+                    goal={effectiveGoal}
+                    onSaved={setGoal}
+                    alwaysShowForm
+                  />
+                </div>
+              </div>
+
+              <div
+                ref={paceSectionRef}
+                id="your-pace"
+                className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-4 scroll-mt-4"
+              >
+                <h3 className="text-xs font-bold uppercase tracking-wide text-violet-900">Your pace</h3>
+                <p className="mt-1 text-sm text-gray-600 mb-4">
+                  Average pace and mile splits — edit pace or goal time; both stay in sync.
+                </p>
+                <RacePlanSection
                   race={raceForGoal}
-                  goal={goal}
-                  onSaved={setGoal}
-                  alwaysShowForm
+                  goal={effectiveGoal}
+                  onGoalSaved={setGoal}
+                  hideGoalForm
+                  embedded
                 />
               </div>
-            </section>
-          ) : null}
 
-          {raceForGoal ? (
-            <section
-              ref={paceSectionRef}
-              id="your-pace"
-              className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-5 shadow-sm scroll-mt-4"
-            >
-              <h2 className="text-sm font-bold uppercase tracking-wide text-violet-900">Your pace</h2>
-              <p className="mt-1 text-sm text-gray-600 mb-4">
-                Average pace and mile splits — edit pace or goal time; both stay in sync.
-              </p>
-              <RacePlanSection
-                race={raceForGoal}
-                goal={goal}
-                onGoalSaved={setGoal}
-                hideGoalForm
-                embedded
-              />
+              {hasPlanForRace ? (
+                <div className="rounded-lg border border-emerald-100 bg-white/90 px-4 py-3">
+                  {activePlanSummary?.hasSchedule &&
+                  activePlanSummary.weekNumber != null &&
+                  activePlanSummary.totalWeeks != null ? (
+                    <>
+                      <p className="text-sm font-semibold text-gray-900">{activePlanSummary.name}</p>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        Week {activePlanSummary.weekNumber} of {activePlanSummary.totalWeeks}
+                        {nextSession ? ` · Next: ${nextSession.title}` : ""}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-700">Training plan linked — finish setup or open your schedule.</p>
+                  )}
+                  <Link
+                    href={
+                      activePlanSummary?.hasSchedule
+                        ? "/training"
+                        : `/training-setup/${encodeURIComponent(trainingPlanId!)}`
+                    }
+                    className="mt-3 inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
+                  >
+                    {activePlanSummary?.hasSchedule ? "View training plan" : "Finish plan setup"}
+                  </Link>
+                </div>
+              ) : goalTimeDisplay ? (
+                <p className="text-sm text-gray-600">
+                  Optional:{" "}
+                  <Link
+                    href={`/training-setup?athleteRaceId=${encodeURIComponent(signup!.id)}`}
+                    className="font-semibold text-emerald-800 hover:underline"
+                  >
+                    Add a training plan
+                  </Link>{" "}
+                  for this race.
+                </p>
+              ) : null}
             </section>
           ) : null}
 

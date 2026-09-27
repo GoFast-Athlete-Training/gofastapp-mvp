@@ -14,11 +14,18 @@ export function formatRaceListDate(iso: string): string {
 }
 
 export function daysUntilRace(iso: string): number {
-  const race = new Date(iso);
+  const s = iso.trim();
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
   const today = new Date();
-  const startRace = new Date(race.getFullYear(), race.getMonth(), race.getDate());
-  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.round((startRace.getTime() - startToday.getTime()) / (1000 * 60 * 60 * 24));
+  today.setHours(0, 0, 0, 0);
+  const startRace = ymd
+    ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))
+    : (() => {
+        const race = new Date(s.includes("T") ? s : s);
+        return new Date(race.getFullYear(), race.getMonth(), race.getDate());
+      })();
+  startRace.setHours(0, 0, 0, 0);
+  return Math.round((startRace.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export function countdownLabel(iso: string): string {
