@@ -16,8 +16,7 @@ import {
   Route,
 } from "lucide-react";
 import { formatRaceListDate, daysUntilRace } from "@/lib/races-display";
-import { RacePaceTargetsSection } from "@/components/races/RacePaceTargetsSection";
-import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
+import { RacePaceHubTabs } from "@/components/races/RacePaceHubTabs";
 import { InlineGoalForm } from "@/components/races/InlineGoalForm";
 import {
   getPublicCoursePageUrl,
@@ -75,32 +74,11 @@ type ActivePlanSummary = {
   totalWeeks: number | null;
 };
 
-type UpcomingSession = {
-  id: string;
-  title: string;
-  date: string;
-  workoutType?: string;
-};
-
 type TrainingPlanRow = {
   id: string;
   name: string;
   athleteRaceId: string | null;
 };
-
-function formatSessionWhen(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 function countdownChipLabel(iso: string): string {
   const d = daysUntilRace(iso);
@@ -132,7 +110,6 @@ export default function MyRacePage() {
   const paceSectionRef = useRef<HTMLDivElement | null>(null);
   const [activePlanSummary, setActivePlanSummary] = useState<ActivePlanSummary | null>(null);
   const [trainingPlanId, setTrainingPlanId] = useState<string | null>(null);
-  const [nextSession, setNextSession] = useState<UpcomingSession | null>(null);
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [removingGoal, setRemovingGoal] = useState(false);
   const [removeGoalError, setRemoveGoalError] = useState<string | null>(null);
@@ -216,10 +193,8 @@ export default function MyRacePage() {
             .get<{ plans?: TrainingPlanRow[] }>("/training-plan?status=active")
             .catch(() => ({ data: { plans: [] } })),
           api
-            .get<{ sessions?: UpcomingSession[]; activePlanSummary?: ActivePlanSummary | null }>(
-              "/training/upcoming?limit=1"
-            )
-            .catch(() => ({ data: { sessions: [], activePlanSummary: null } })),
+            .get<{ activePlanSummary?: ActivePlanSummary | null }>("/training/upcoming?limit=1")
+            .catch(() => ({ data: { activePlanSummary: null } })),
         ]);
         const su =
           (suRes.data.athleteRaces ?? suRes.data.signups ?? []).find(
@@ -245,13 +220,10 @@ export default function MyRacePage() {
         setTrainingPlanId(resolvedTrainingPlanId);
 
         const summary = upcomingRes.data.activePlanSummary ?? null;
-        const sessions = upcomingRes.data.sessions ?? [];
         if (resolvedTrainingPlanId && summary?.hasSchedule) {
           setActivePlanSummary(summary);
-          setNextSession(sessions[0] ?? null);
         } else {
           setActivePlanSummary(null);
-          setNextSession(null);
         }
 
         if (su) {
@@ -262,7 +234,6 @@ export default function MyRacePage() {
         setGoal(null);
         setTrainingPlanId(null);
         setActivePlanSummary(null);
-        setNextSession(null);
       } finally {
         setLoadingUser(false);
       }
@@ -409,29 +380,6 @@ export default function MyRacePage() {
 
   const goalTimeDisplay =
     goal?.goalTime?.trim() || signup?.goalTime?.trim() || null;
-
-  const racePaceTotalMiles = useMemo(() => {
-    const m = plannerDistance.distanceMeters;
-    if (m != null && m > 0) return m / 1609.344;
-    return 26.2;
-  }, [plannerDistance.distanceMeters]);
-
-  const raceGoalPaceSecPerMi = useMemo(() => {
-    if (!goalTimeDisplay) return null;
-    const resolved = resolveGoalRacePace({
-      goalTime: goalTimeDisplay,
-      dbGoalRacePaceSecPerMile: effectiveGoal?.goalRacePace ?? signup?.goalRacePace ?? null,
-      distanceMeters: plannerDistance.distanceMeters,
-      distanceLabel: plannerDistance.distanceLabel,
-    });
-    return resolved?.goalPaceSecPerMile ?? null;
-  }, [
-    goalTimeDisplay,
-    effectiveGoal?.goalRacePace,
-    signup?.goalRacePace,
-    plannerDistance.distanceMeters,
-    plannerDistance.distanceLabel,
-  ]);
 
   if (loadingRace) {
     return <p className="text-gray-500 text-sm">Loading race…</p>;
@@ -666,10 +614,10 @@ export default function MyRacePage() {
                 id="your-pace"
                 className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-4 scroll-mt-4"
               >
-                <RacePaceTargetsSection
-                  raceTitle={raceForGoal.name}
-                  totalMiles={racePaceTotalMiles}
-                  goalPaceSecPerMi={raceGoalPaceSecPerMi}
+                <RacePaceHubTabs
+                  raceForGoal={raceForGoal}
+                  goal={effectiveGoal}
+                  defaultTab="build"
                   raceDayApply={
                     trainingPlanId && raceForGoal?.raceDate
                       ? {
@@ -683,31 +631,19 @@ export default function MyRacePage() {
               </div>
 
               {hasPlanForRace ? (
-                <div className="rounded-lg border border-emerald-100 bg-white/90 px-4 py-3">
-                  {activePlanSummary?.hasSchedule &&
-                  activePlanSummary.weekNumber != null &&
-                  activePlanSummary.totalWeeks != null ? (
-                    <>
-                      <p className="text-sm font-semibold text-gray-900">{activePlanSummary.name}</p>
-                      <p className="text-xs text-gray-600 mt-0.5">
-                        Week {activePlanSummary.weekNumber} of {activePlanSummary.totalWeeks}
-                        {nextSession ? ` · Next: ${nextSession.title}` : ""}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-gray-700">Training plan linked — finish setup or open your schedule.</p>
-                  )}
+                <p className="text-sm text-gray-600">
+                  Training schedule:{" "}
                   <Link
                     href={
                       activePlanSummary?.hasSchedule
                         ? "/training"
                         : `/training-setup/${encodeURIComponent(trainingPlanId!)}`
                     }
-                    className="mt-3 inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
+                    className="font-semibold text-emerald-800 hover:underline"
                   >
-                    {activePlanSummary?.hasSchedule ? "View training plan" : "Finish plan setup"}
+                    {activePlanSummary?.hasSchedule ? "Open training hub" : "Finish plan setup"}
                   </Link>
-                </div>
+                </p>
               ) : goalTimeDisplay ? (
                 <p className="text-sm text-gray-600">
                   Optional:{" "}

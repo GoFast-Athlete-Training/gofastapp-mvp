@@ -14,10 +14,6 @@ import {
 } from "@/lib/workout-generator/pace-calculator";
 import { parseSplitPaceToSecPerMile, secPerMileToSplitStrings } from "@/lib/workout/pace-mi-split";
 import {
-  suggestRaceBlocksFromGoal,
-  type PacingStrategy,
-} from "@/lib/races/race-pacing-blocks";
-import {
   apiSegmentsToFlatWorkBlocks,
   raceDaySegmentsToWorkBlocks,
   racePaceWorkBlocksToRaceDaySegments,
@@ -36,8 +32,6 @@ type RaceDayApply = {
 type Props = {
   raceDayApply?: RaceDayApply;
   raceTitle: string;
-  totalMiles: number;
-  goalPaceSecPerMi: number | null;
 };
 
 function secPerKmToPaceDisplay(value: number): string {
@@ -83,29 +77,37 @@ function applyPaceEditsToBlock(
   highMin: string,
   highSec: string
 ): RacePaceWorkBlock {
+  const ctx = block.name.trim() || "Race block";
   let paceValueLow = block.paceValueLow;
   let paceValueHigh = block.paceValueHigh;
-  try {
-    const secMiLow = parseSplitPaceToSecPerMile(lowMin, lowSec);
-    paceValueLow = secondsPerMileToSecondsPerKm(secMiLow);
-  } catch {
-    /* keep */
+  if (!lowMin.trim() && !lowSec.trim()) {
+    paceValueLow = undefined;
+  } else {
+    try {
+      const secMiLow = parseSplitPaceToSecPerMile(lowMin, lowSec, ctx, "low");
+      if (Number.isFinite(secMiLow)) {
+        paceValueLow = secondsPerMileToSecondsPerKm(secMiLow);
+      }
+    } catch {
+      /* keep */
+    }
   }
-  try {
-    const secMiHigh = parseSplitPaceToSecPerMile(highMin, highSec);
-    paceValueHigh = secondsPerMileToSecondsPerKm(secMiHigh);
-  } catch {
-    /* keep */
+  if (!highMin.trim() && !highSec.trim()) {
+    paceValueHigh = undefined;
+  } else {
+    try {
+      const secMiHigh = parseSplitPaceToSecPerMile(highMin, highSec, ctx, "high");
+      if (Number.isFinite(secMiHigh)) {
+        paceValueHigh = secondsPerMileToSecondsPerKm(secMiHigh);
+      }
+    } catch {
+      /* keep */
+    }
   }
   return { ...block, paceValueLow, paceValueHigh };
 }
 
-export function RacePaceTargetsSection({
-  raceDayApply,
-  raceTitle,
-  totalMiles,
-  goalPaceSecPerMi,
-}: Props) {
+export function RacePaceTargetsSection({ raceDayApply, raceTitle }: Props) {
   const [blocks, setBlocks] = useState<RacePaceWorkBlock[]>([]);
   const [plannedWorkoutId, setPlannedWorkoutId] = useState<string | null>(null);
   const [workoutPushed, setWorkoutPushed] = useState(false);
@@ -115,7 +117,6 @@ export function RacePaceTargetsSection({
   const [deriveError, setDeriveError] = useState<string | null>(null);
   const [deriving, setDeriving] = useState(false);
 
-  const [raceSuggestStrategy, setRaceSuggestStrategy] = useState<PacingStrategy>("even");
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -235,25 +236,6 @@ export function RacePaceTargetsSection({
     editingPaceHighMin,
     editingPaceHighSec,
   ]);
-
-  const applySuggestedBlocks = () => {
-    const pace = goalPaceSecPerMi ?? 480;
-    const suggested = suggestRaceBlocksFromGoal({
-      totalMiles,
-      goalPaceSecPerMi: pace,
-      strategy: raceSuggestStrategy,
-    });
-    if (suggested.length === 0) return;
-    setBlocks(
-      suggested.map((b) => ({
-        name: b.name,
-        miles: b.miles,
-        paceValueLow: secondsPerMileToSecondsPerKm(b.paceSecPerMiLow),
-        paceValueHigh: secondsPerMileToSecondsPerKm(b.paceSecPerMiHigh),
-      }))
-    );
-    setDeriveError(null);
-  };
 
   const handleDerive = async () => {
     const text = sourceText.trim();
@@ -383,41 +365,6 @@ export function RacePaceTargetsSection({
           </button>
         </div>
       ) : null}
-
-      <div className="rounded-lg border border-violet-100 bg-violet-50/50 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-violet-900 mb-2">
-          Suggest from goal (optional)
-        </p>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {(
-            [
-              ["even", "Even"],
-              ["negative", "Negative split"],
-              ["positive", "Positive split"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setRaceSuggestStrategy(id)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium border ${
-                raceSuggestStrategy === id
-                  ? "border-violet-600 bg-violet-600 text-white"
-                  : "border-gray-300 bg-white text-gray-800"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={applySuggestedBlocks}
-          className="rounded-lg border border-violet-300 bg-white px-3 py-1.5 text-sm font-semibold text-violet-900 hover:bg-violet-50"
-        >
-          Fill blocks from goal pace
-        </button>
-      </div>
 
       <div className="space-y-3">
         {blocks.map((block, index) => {

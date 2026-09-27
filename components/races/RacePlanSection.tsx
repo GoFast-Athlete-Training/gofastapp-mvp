@@ -185,6 +185,8 @@ type Props = {
   embedded?: boolean;
   /** When set, save coarse blocks to the plan race-day workout. */
   raceDayApply?: { planId: string; dateKey: string; title?: string };
+  /** Read-only split preview — no save, no effort calculator. */
+  splitOutlookOnly?: boolean;
 };
 
 export function RacePlanSection({
@@ -194,6 +196,7 @@ export function RacePlanSection({
   hideGoalForm,
   embedded,
   raceDayApply,
+  splitOutlookOnly = false,
 }: Props) {
   const [strategy, setStrategy] = useState<PacingStrategy>("even");
   const [applyingBlocks, setApplyingBlocks] = useState(false);
@@ -312,7 +315,7 @@ export function RacePlanSection({
         </div>
       )}
 
-      {goalRacePace != null ? (
+      {!splitOutlookOnly && goalRacePace != null ? (
         <PaceAdjustForm
           race={race}
           goal={goal}
@@ -428,7 +431,7 @@ export function RacePlanSection({
             </div>
           ) : null}
 
-          {raceDayApply ? (
+          {!splitOutlookOnly && raceDayApply ? (
             <div className="mt-4">
               <button
                 type="button"
@@ -446,14 +449,16 @@ export function RacePlanSection({
         </>
       )}
 
-      <div className="mt-6">
-        <PaceContextCard
-          variant="standalone"
-          goalPace5KSecPerMile={goalPace5K}
-          goalTimeLabel={goalTimeDisplay}
-          title="Check a recent effort"
-        />
-      </div>
+      {!splitOutlookOnly ? (
+        <div className="mt-6">
+          <PaceContextCard
+            variant="standalone"
+            goalPace5KSecPerMile={goalPace5K}
+            goalTimeLabel={goalTimeDisplay}
+            title="Check a recent effort"
+          />
+        </div>
+      ) : null}
     </Wrapper>
   );
 }
