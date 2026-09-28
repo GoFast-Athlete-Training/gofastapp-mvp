@@ -18,6 +18,7 @@ import { stampPaceDeltasAfterSplits } from "./stamp-pace-deltas";
 import { requiresSegmentLevelPaceForPace } from "./workout-paced-segments";
 import { sendAppNotification } from "@/lib/app-notifications/send";
 import { stampWorkoutCompleteInbox } from "@/lib/app-notifications/stamp-workout-complete-inbox";
+import { tryPromoteRaceWorkoutAfterGarminStamp } from "@/lib/training/promote-matched-race-workout-result";
 import {
   clearPlannedWorkoutCompletion,
   stampPlannedWorkoutCompletion,
@@ -551,6 +552,12 @@ export async function applyActivityToWorkout(params: {
   }
 
   await stampPlannedWorkoutCompletion(workout.id);
+
+  try {
+    await tryPromoteRaceWorkoutAfterGarminStamp(activity.athleteId, workout.id);
+  } catch (promoteErr) {
+    console.warn("race result promote after garmin stamp:", promoteErr);
+  }
 
   return { workoutId: workout.id };
 }

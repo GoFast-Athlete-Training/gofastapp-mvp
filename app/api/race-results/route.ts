@@ -11,6 +11,7 @@ import {
   normalizeRacePhotoUrls,
   saveRaceResultExtended,
 } from "@/lib/race-result-service";
+import { promoteMatchedRaceWorkoutToResultIfNeeded } from "@/lib/training/promote-matched-race-workout-result";
 
 function pickOptionalString(
   body: Record<string, unknown>,
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
   try {
     if (goalId?.trim()) {
       const athleteRaceId = goalId.trim();
+      await promoteMatchedRaceWorkoutToResultIfNeeded(athlete.id, athleteRaceId);
       const result = await getRaceResultByGoalId(athlete.id, athleteRaceId);
       let analysis = null;
       if (result?.athleteRaceId) {
@@ -59,7 +61,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ result, analysis });
     }
     if (raceRegistryId?.trim()) {
-      const results = await listRaceResultsByRegistry(athlete.id, raceRegistryId.trim());
+      const registryId = raceRegistryId.trim();
+      const athleteRace = await prisma.athlete_races.findFirst({
+        where: { athleteId: athlete.id, raceRegistryId: registryId },
+        orderBy: { raceDate: "desc" },
+        select: { id: true },
+      });
+      if (athleteRace) {
+        await promoteMatchedRaceWorkoutToResultIfNeeded(athlete.id, athleteRace.id);
+      }
+      const results = await listRaceResultsByRegistry(athlete.id, registryId);
       return NextResponse.json({ results });
     }
     return NextResponse.json({ error: "goalId or raceRegistryId is required" }, { status: 400 });

@@ -5,6 +5,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { RUNNING_ACTIVITY_TYPES } from "@/lib/training/activity-type-sets";
+import { tryPromoteRaceWorkoutAfterGarminStamp } from "@/lib/training/promote-matched-race-workout-result";
 
 function speedMpsToSecPerMile(mps: number | null | undefined): number | null {
   if (mps == null || mps <= 0) return null;
@@ -72,6 +73,12 @@ export async function seedSpawnedWorkoutFromActivity(
     where: { id: athleteActivityId },
     data: { ingestionStatus: "MATCHED" },
   });
+
+  try {
+    await tryPromoteRaceWorkoutAfterGarminStamp(activity.athleteId, created.id);
+  } catch (promoteErr) {
+    console.warn("race result promote after spawn:", promoteErr);
+  }
 
   return { workoutId: created.id };
 }

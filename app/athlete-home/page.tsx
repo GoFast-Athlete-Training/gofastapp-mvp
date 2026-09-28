@@ -304,6 +304,7 @@ export default function AthleteHomePage() {
     goalAchieved?: boolean;
     analysis: RaceCompleteAnalysis | null;
   } | null>(null);
+  const [primaryRaceResultHydrated, setPrimaryRaceResultHydrated] = useState(false);
   const [logResultOpen, setLogResultOpen] = useState(false);
   const [raceCompleteModalOpen, setRaceCompleteModalOpen] = useState(false);
   const [myPastRuns, setMyPastRuns] = useState<GoingRunRow[]>([]);
@@ -520,8 +521,10 @@ export default function AthleteHomePage() {
   const refreshPrimaryRaceResult = useCallback(() => {
     if (!primaryGoal?.id) {
       setPrimaryRaceResult(null);
+      setPrimaryRaceResultHydrated(true);
       return;
     }
+    setPrimaryRaceResultHydrated(false);
     void api
       .get('/race-results', { params: { goalId: primaryGoal.id } })
       .then((r) => {
@@ -550,7 +553,8 @@ export default function AthleteHomePage() {
           setPrimaryRaceResult(null);
         }
       })
-      .catch(() => setPrimaryRaceResult(null));
+      .catch(() => setPrimaryRaceResult(null))
+      .finally(() => setPrimaryRaceResultHydrated(true));
   }, [primaryGoal]);
 
   useEffect(() => {
@@ -565,6 +569,7 @@ export default function AthleteHomePage() {
 
   useEffect(() => {
     if (loading) return;
+    if (!primaryRaceResultHydrated) return;
     if (!primaryGoal?.id) {
       setRaceCompleteModalOpen(false);
       return;
@@ -584,6 +589,7 @@ export default function AthleteHomePage() {
     setRaceCompleteModalOpen(true);
   }, [
     loading,
+    primaryRaceResultHydrated,
     primaryGoal?.id,
     goalIsCompleteForModal,
     primaryRaceResult?.officialFinishTime,
