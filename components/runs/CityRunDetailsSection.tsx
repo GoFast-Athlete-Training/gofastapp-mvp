@@ -62,28 +62,28 @@ export default function CityRunDetailsSection({
         </div>
       ) : null}
 
-      {run.runStore || run.partnerBrand ? (
+      {run.runStore || run.runBrand ? (
         <div className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
-          {(run.runStore?.logoUrl ?? run.partnerBrand?.logoUrl) ? (
+          {(run.runStore?.logoUrl ?? run.runBrand?.logoUrl) ? (
             <img
-              src={(run.runStore?.logoUrl ?? run.partnerBrand?.logoUrl) as string}
+              src={(run.runStore?.logoUrl ?? run.runBrand?.logoUrl) as string}
               alt=""
               className="h-14 w-14 rounded-lg border border-gray-100 object-contain"
             />
           ) : null}
           <div>
             <div className="text-xs uppercase tracking-wide text-gray-400 mb-0.5">
-              {run.runStore ? "Run store" : "Brand partner"}
+              {run.runStore ? "Run store" : "Brand"}
             </div>
             <div className="font-bold text-gray-900">
-              {run.runStore?.name ?? run.partnerBrand?.name}
+              {run.runStore?.name ?? run.runBrand?.name}
             </div>
-            {(run.runStore?.websiteUrl ?? run.partnerBrand?.websiteUrl) ? (
+            {(run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl) ? (
               <a
                 href={
-                  (run.runStore?.websiteUrl ?? run.partnerBrand?.websiteUrl)?.startsWith("http")
-                    ? (run.runStore?.websiteUrl ?? run.partnerBrand?.websiteUrl)!
-                    : `https://${run.runStore?.websiteUrl ?? run.partnerBrand?.websiteUrl}`
+                  (run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl)?.startsWith("http")
+                    ? (run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl)!
+                    : `https://${run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl}`
                 }
                 target="_blank"
                 rel="noopener noreferrer"

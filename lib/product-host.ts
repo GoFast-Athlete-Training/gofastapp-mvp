@@ -1,9 +1,12 @@
 /** Hostname → product surface helpers for multi-subdomain entry. */
 
-export type RootHostIntent = 'coach' | 'club-manager' | 'leader' | 'default';
+export type RootHostIntent = 'coach' | 'club-manager' | 'run-manager' | 'leader' | 'default';
 
 /** Dedicated Club Manager host: clubmanage.gofastcrushgoals.com */
 export const CLUB_MANAGER_FRONT_DOOR = '/welcome-clubmanager';
+
+/** Staff run authoring host: runmanage.gofastcrushgoals.com */
+export const RUN_MANAGER_FRONT_DOOR = '/runmanage';
 
 export function isCoachHostname(hostname: string): boolean {
   return hostname.toLowerCase().startsWith('coach.');
@@ -17,9 +20,14 @@ export function isClubManageHostname(hostname: string): boolean {
   return hostname.toLowerCase().startsWith('clubmanage.');
 }
 
+export function isRunManageHostname(hostname: string): boolean {
+  return hostname.toLowerCase().startsWith('runmanage.');
+}
+
 export function resolveRootHostIntent(hostname: string): RootHostIntent {
   if (isCoachHostname(hostname)) return 'coach';
   if (isClubManageHostname(hostname)) return 'club-manager';
+  if (isRunManageHostname(hostname)) return 'run-manager';
   if (isLeaderHostname(hostname)) return 'leader';
   return 'default';
 }
@@ -43,6 +51,10 @@ export function resolveRootEntryPath(opts: {
   // Dedicated Club Manager host: always the club-manager welcome/sign-back-in door.
   if (intent === 'club-manager') {
     return CLUB_MANAGER_FRONT_DOOR;
+  }
+
+  if (intent === 'run-manager') {
+    return RUN_MANAGER_FRONT_DOOR;
   }
 
   if (intent === 'coach') {

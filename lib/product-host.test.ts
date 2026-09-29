@@ -5,6 +5,8 @@ import {
   isClubManageHostname,
   isCoachHostname,
   isLeaderHostname,
+  isRunManageHostname,
+  RUN_MANAGER_FRONT_DOOR,
   resolveRootEntryPath,
   resolveRootHostIntent,
 } from './product-host';
@@ -16,6 +18,7 @@ describe('product-host', () => {
     assert.equal(isClubManageHostname('gofastcrushgoals.com'), false);
     assert.equal(isCoachHostname('coach.gofastcrushgoals.com'), true);
     assert.equal(isLeaderHostname('leader.gofastcrushgoals.com'), true);
+    assert.equal(isRunManageHostname('runmanage.gofastcrushgoals.com'), true);
   });
 
   it('resolves clubmanage ahead of default athlete intent', () => {
@@ -38,6 +41,17 @@ describe('product-host', () => {
         isAuthenticated: true,
       }),
       '/welcome-clubmanager'
+    );
+  });
+
+  it('sends runmanage root to run manage shell', () => {
+    assert.equal(RUN_MANAGER_FRONT_DOOR, '/runmanage');
+    assert.equal(
+      resolveRootEntryPath({
+        hostname: 'runmanage.gofastcrushgoals.com',
+        isAuthenticated: false,
+      }),
+      '/runmanage'
     );
   });
 

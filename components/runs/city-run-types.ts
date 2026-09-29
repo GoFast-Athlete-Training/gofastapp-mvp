@@ -138,7 +138,7 @@ export interface CityRunDetails {
     websiteUrl?: string | null;
     logoUrl?: string | null;
   } | null;
-  partnerBrand?: {
+  runBrand?: {
     id: string;
     name: string;
     websiteUrl?: string | null;

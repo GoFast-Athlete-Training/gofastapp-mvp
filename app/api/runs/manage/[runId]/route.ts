@@ -131,7 +131,7 @@ export async function GET(
               logoUrl: true,
             },
           },
-          partnerBrand: {
+          runBrand: {
             select: {
               id: true,
               name: true,
@@ -384,7 +384,7 @@ export async function PATCH(
               logoUrl: true,
             },
           },
-          partnerBrand: {
+          runBrand: {
             select: {
               id: true,
               name: true,

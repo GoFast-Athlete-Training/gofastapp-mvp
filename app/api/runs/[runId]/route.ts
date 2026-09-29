@@ -272,7 +272,7 @@ export async function GET(
         runStore: {
           select: { id: true, name: true, websiteUrl: true, logoUrl: true },
         },
-        partnerBrand: {
+        runBrand: {
           select: { id: true, name: true, websiteUrl: true, logoUrl: true },
         },
         runSeries: {
@@ -853,11 +853,13 @@ export async function PUT(
           ? null
           : String(body.runStoreId).trim() || null;
     }
-    if (body.partnerBrandId !== undefined) {
-      updateData.partnerBrandId =
-        body.partnerBrandId === null || body.partnerBrandId === ''
+    const runBrandRaw =
+      body.runBrandId !== undefined ? body.runBrandId : body.partnerBrandId;
+    if (runBrandRaw !== undefined) {
+      updateData.runBrandId =
+        runBrandRaw === null || runBrandRaw === ''
           ? null
-          : String(body.partnerBrandId).trim() || null;
+          : String(runBrandRaw).trim() || null;
     }
 
     const mergedRelationships = mergeRelationshipSnapshot(run, {
