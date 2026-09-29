@@ -71,7 +71,7 @@ function normalizeCitySlug(city: string | null, stateValue: string | null): stri
 const corsHeaders = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_COMPANY_APP_URL || 'https://gofasthq.gofastcrushgoals.com',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-gofast-staff-id',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -92,6 +92,13 @@ export async function OPTIONS() {
  */
 export async function POST(request: NextRequest) {
   try {
+    const staffHeader = request.headers.get("x-gofast-staff-id")?.trim();
+    if (staffHeader) {
+      const { assertStaffBearerAuth } = await import("@/lib/training/training-engine-auth");
+      const authErr = await assertStaffBearerAuth(request);
+      if (authErr) return authErr;
+    }
+
     const body = await request.json();
     const {
       citySlug, // City slug (e.g., "boston", "new-york") - extracted from Google Maps or user input

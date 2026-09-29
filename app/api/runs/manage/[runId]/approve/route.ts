@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { adminAuth } from '@/lib/firebaseAdmin';
+import { assertStaffBearerAuth } from '@/lib/training/training-engine-auth';
 import { fieldsWhenSettingWorkflowStatus } from '@/lib/runInstanceApprovalPublish';
 
 /**
@@ -10,20 +10,12 @@ import { fieldsWhenSettingWorkflowStatus } from '@/lib/runInstanceApprovalPublis
  * Set workflowStatus to APPROVED (submit-for-approval flow). City runs are single-occurrence rows.
  */
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    try {
-      await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
+    const authErr = await assertStaffBearerAuth(request);
+    if (authErr) return authErr;
 
     const { runId } = await params;
 

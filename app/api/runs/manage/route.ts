@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { adminAuth } from '@/lib/firebaseAdmin';
+import { assertStaffBearerAuth } from '@/lib/training/training-engine-auth';
 
 function isMissingPostRunActivityColumn(error: any) {
   return (
@@ -32,20 +32,10 @@ function getStartOfTodayUTC() {
   return d;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    let decodedToken;
-    try {
-      decodedToken = await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
+    const authErr = await assertStaffBearerAuth(request);
+    if (authErr) return authErr;
 
     const { searchParams } = new URL(request.url);
     const workflowStatus = searchParams.get('workflowStatus');

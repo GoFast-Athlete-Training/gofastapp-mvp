@@ -54,7 +54,7 @@ export function resolveRootEntryPath(opts: {
   }
 
   if (intent === 'run-manager') {
-    return RUN_MANAGER_FRONT_DOOR;
+    return opts.isAuthenticated ? '/runmanage/runs' : '/runmanage/signin';
   }
 
   if (intent === 'coach') {

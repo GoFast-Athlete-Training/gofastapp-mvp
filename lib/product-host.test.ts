@@ -44,14 +44,21 @@ describe('product-host', () => {
     );
   });
 
-  it('sends runmanage root to run manage shell', () => {
+  it('sends runmanage root to sign-in or runs queue', () => {
     assert.equal(RUN_MANAGER_FRONT_DOOR, '/runmanage');
     assert.equal(
       resolveRootEntryPath({
         hostname: 'runmanage.gofastcrushgoals.com',
         isAuthenticated: false,
       }),
-      '/runmanage'
+      '/runmanage/signin'
+    );
+    assert.equal(
+      resolveRootEntryPath({
+        hostname: 'runmanage.gofastcrushgoals.com',
+        isAuthenticated: true,
+      }),
+      '/runmanage/runs'
     );
   });
 
