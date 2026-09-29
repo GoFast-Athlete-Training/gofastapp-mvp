@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   const slug = b?.slug?.trim().toLowerCase();
   const name = b?.name?.trim();
 
-  if (!brandId || !slug || !name) {
+  if (!b || !brandId || !slug || !name) {
     return NextResponse.json(
       { success: false, error: "brand.brandId, brand.slug, and brand.name are required" },
       { status: 400 },
