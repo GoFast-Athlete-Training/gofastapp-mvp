@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  assertStaffBearerAuth,
-  getForwardedStaffId,
-} from "@/lib/training/training-engine-auth";
+import { assertRunManageAuth } from "@/lib/runmanage/require-run-manage-auth";
 import { normalizeInstagramUrl, normalizeStravaUrl, normalizeWebsiteUrl } from "@/lib/runclub-urls";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +13,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ clubId: string }> }
 ) {
-  const authErr = await assertStaffBearerAuth(request);
-  if (authErr) return authErr;
-  if (!getForwardedStaffId(request)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await assertRunManageAuth(request);
+  if (auth instanceof NextResponse) return auth;
 
   const { clubId } = await params;
   const club = await prisma.run_clubs.findUnique({
@@ -53,11 +47,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ clubId: string }> }
 ) {
-  const authErr = await assertStaffBearerAuth(request);
-  if (authErr) return authErr;
-  if (!getForwardedStaffId(request)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await assertRunManageAuth(request);
+  if (auth instanceof NextResponse) return auth;
 
   const { clubId } = await params;
   const body = await request.json().catch(() => ({}));

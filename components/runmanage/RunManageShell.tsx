@@ -7,9 +7,11 @@ import { useRunManageAuth } from "@/components/runmanage/RunManageProviders";
 
 export function RunManageShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { staff, signOutStaff } = useRunManageAuth();
+  const { user, session, signOutRunManage } = useRunManageAuth();
   const isAuthSurface =
-    pathname === "/runmanage/signin" || pathname === "/runmanage/no-access";
+    pathname === "/runmanage/signin" ||
+    pathname === "/runmanage/no-access" ||
+    pathname === "/welcome-runmanage";
 
   if (isAuthSurface) {
     return <div className="min-h-screen bg-gray-50">{children}</div>;
@@ -37,10 +39,13 @@ export function RunManageShell({ children }: { children: ReactNode }) {
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-600">
-            {staff?.email ? <span className="hidden sm:inline">{staff.email}</span> : null}
+            {user?.email ? <span className="hidden sm:inline">{user.email}</span> : null}
+            {session?.staffGeneratedId ? (
+              <span className="hidden md:inline text-xs text-gray-400">Staff {session.staffGeneratedId.slice(0, 8)}…</span>
+            ) : null}
             <button
               type="button"
-              onClick={() => void signOutStaff()}
+              onClick={() => void signOutRunManage()}
               className="rounded-md border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
             >
               Sign out

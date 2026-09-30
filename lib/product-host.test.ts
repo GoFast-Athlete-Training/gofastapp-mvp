@@ -6,7 +6,7 @@ import {
   isCoachHostname,
   isLeaderHostname,
   isRunManageHostname,
-  RUN_MANAGER_FRONT_DOOR,
+  RUN_MANAGER_WELCOME_PATH,
   resolveRootEntryPath,
   resolveRootHostIntent,
 } from './product-host';
@@ -44,21 +44,21 @@ describe('product-host', () => {
     );
   });
 
-  it('sends runmanage root to sign-in or runs queue', () => {
-    assert.equal(RUN_MANAGER_FRONT_DOOR, '/runmanage');
+  it('always sends runmanage root to the run-manage welcome door', () => {
+    assert.equal(RUN_MANAGER_WELCOME_PATH, '/welcome-runmanage');
     assert.equal(
       resolveRootEntryPath({
         hostname: 'runmanage.gofastcrushgoals.com',
         isAuthenticated: false,
       }),
-      '/runmanage/signin'
+      '/welcome-runmanage'
     );
     assert.equal(
       resolveRootEntryPath({
         hostname: 'runmanage.gofastcrushgoals.com',
         isAuthenticated: true,
       }),
-      '/runmanage/runs'
+      '/welcome-runmanage'
     );
   });
 

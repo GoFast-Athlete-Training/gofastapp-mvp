@@ -27,10 +27,15 @@ export async function GET(request: Request) {
   try {
     const athlete = await prisma.athlete.findUnique({
       where: { firebaseId: decoded.uid },
-      select: { id: true, lastSeenAt: true },
+      select: { id: true, lastSeenAt: true, email: true },
     });
     if (!athlete) {
       return NextResponse.json({ success: false, error: "Athlete not found" }, { status: 404 });
+    }
+
+    {
+      const { claimRunManagerGrantsForAthlete } = await import('@/lib/domain-run-manager-grant');
+      await claimRunManagerGrantsForAthlete(athlete.id, athlete.email);
     }
 
     await touchAthleteLastSeenIfStale(athlete.id, athlete.lastSeenAt);

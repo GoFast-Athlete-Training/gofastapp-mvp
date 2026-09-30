@@ -5,12 +5,12 @@ import {
   resolveGofastTenantCompanyId,
   searchSponsorManageBrands,
 } from "@/lib/sponsor-manage-brand-client";
-import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
+import { assertRunManageAuth } from "@/lib/runmanage/require-run-manage-auth";
 
 /** GET /api/runmanage/brands/search?q= — staff proxy to Sponsor Manage brand catalog */
 export async function GET(request: NextRequest) {
-  const authErr = await assertStaffBearerAuth(request);
-  if (authErr) return authErr;
+  const auth = await assertRunManageAuth(request);
+  if (auth instanceof NextResponse) return auth;
 
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (!q) {

@@ -7,6 +7,7 @@ export const RUNCREW_CREATE_INTENT_KEY = 'runCrewCreateIntent';
 /** Canonical Club Manager activation context keys */
 export const CLUB_MANAGER_MODE_KEY = 'clubManagerMode';
 export const CLUB_MANAGER_ACTIVATION_TOKEN_KEY = 'clubManagerActivationToken';
+export const RUN_MANAGE_MODE_KEY = 'runManageMode';
 
 /** @deprecated Legacy keys — read for compatibility, prefer CLUB_MANAGER_* setters */
 export const CLUB_OWNER_MODE_KEY = 'clubOwnerMode';
@@ -120,6 +121,29 @@ export const LocalStorageAPI = {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(CLUB_MANAGER_MODE_KEY);
       localStorage.removeItem(CLUB_OWNER_MODE_KEY);
+    }
+  },
+
+  setRunManageMode(enabled: boolean) {
+    if (typeof window !== 'undefined') {
+      if (enabled) {
+        localStorage.setItem(RUN_MANAGE_MODE_KEY, '1');
+      } else {
+        localStorage.removeItem(RUN_MANAGE_MODE_KEY);
+      }
+    }
+  },
+
+  getRunManageMode() {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(RUN_MANAGE_MODE_KEY) === '1';
+    }
+    return false;
+  },
+
+  clearRunManageMode() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(RUN_MANAGE_MODE_KEY);
     }
   },
 

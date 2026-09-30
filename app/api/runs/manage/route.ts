@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { assertStaffBearerAuth } from '@/lib/training/training-engine-auth';
+import { assertRunManageAuth } from '@/lib/runmanage/require-run-manage-auth';
 
 function isMissingPostRunActivityColumn(error: any) {
   return (
@@ -34,8 +34,8 @@ function getStartOfTodayUTC() {
 
 export async function GET(request: NextRequest) {
   try {
-    const authErr = await assertStaffBearerAuth(request);
-    if (authErr) return authErr;
+    const auth = await assertRunManageAuth(request);
+    if (auth instanceof NextResponse) return auth;
 
     const { searchParams } = new URL(request.url);
     const workflowStatus = searchParams.get('workflowStatus');

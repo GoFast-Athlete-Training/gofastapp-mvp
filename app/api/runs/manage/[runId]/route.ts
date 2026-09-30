@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { assertStaffBearerAuth } from '@/lib/training/training-engine-auth';
+import { assertRunManageAuth } from '@/lib/runmanage/require-run-manage-auth';
 import {
   fieldsWhenSettingWorkflowStatus,
   type RunWorkflowStatus,
@@ -71,8 +71,8 @@ export async function GET(
   { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const authErr = await assertStaffBearerAuth(request);
-    if (authErr) return authErr;
+    const auth = await assertRunManageAuth(request);
+    if (auth instanceof NextResponse) return auth;
 
     const { runId } = await params;
     console.log('[GET /api/runs/manage/[runId]] Runtime info', {
@@ -299,8 +299,8 @@ export async function PATCH(
   { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const authErr = await assertStaffBearerAuth(request);
-    if (authErr) return authErr;
+    const auth = await assertRunManageAuth(request);
+    if (auth instanceof NextResponse) return auth;
 
     const { runId } = await params;
     const body = await request.json();

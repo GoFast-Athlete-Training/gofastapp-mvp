@@ -1,8 +1,8 @@
 "use client";
 
 import { AlertCircle, CheckCircle, Circle } from "lucide-react";
-import type { WizardStepVisualStatus } from "@/lib/clubCompletionStatus";
-import { wizardStepStatusLabel } from "@/lib/clubCompletionStatus";
+import type { WizardStepVisualStatus } from "@/lib/runmanage/wizard-step-visual-status";
+import { wizardStepStatusLabel } from "@/lib/runmanage/wizard-step-visual-status";
 
 type Props = {
   status: WizardStepVisualStatus;

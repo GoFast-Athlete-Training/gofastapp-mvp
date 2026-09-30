@@ -279,6 +279,11 @@ export async function POST(request: Request) {
       console.log('✅ ATHLETE CREATE: Product role CLUB_LEADER upserted for athlete:', athlete.id);
     }
 
+    {
+      const { claimRunManagerGrantsForAthlete } = await import('@/lib/domain-run-manager-grant');
+      await claimRunManagerGrantsForAthlete(athlete.id, athlete.email);
+    }
+
     // New athlete only — fire product event to App Management (welcome + internal alerts)
     if (!existingAthlete) {
       const contactEmail = isExternallyContactableEmail(athlete.email) ? athlete.email : null;

@@ -12,21 +12,21 @@ import {
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { usePathname, useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
-import runmanageApi from "@/lib/runmanage/api-client";
-import {
-  clearStaffSession,
-  normalizeStaffSession,
-  readStaffSession,
-  writeStaffSession,
-  type RunManageStaffSession,
-} from "@/lib/runmanage/staff-session";
+import api from "@/lib/api";
+import { LocalStorageAPI } from "@/lib/localstorage";
+
+export type RunManageSession = {
+  athleteId: string;
+  staffGeneratedId: string | null;
+  hasAccess: boolean;
+};
 
 type RunManageAuth = {
   user: User | null;
-  staff: RunManageStaffSession | null;
+  session: RunManageSession | null;
   loading: boolean;
-  refreshStaff: () => Promise<void>;
-  signOutStaff: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+  signOutRunManage: () => Promise<void>;
 };
 
 const RunManageAuthContext = createContext<RunManageAuth | null>(null);
@@ -39,64 +39,74 @@ export function useRunManageAuth(): RunManageAuth {
   return ctx;
 }
 
-async function bootstrapStaff(user: User): Promise<RunManageStaffSession> {
-  const res = await runmanageApi.post("/api/runmanage/staff/bootstrap");
-  const staff = normalizeStaffSession(res.data?.staff);
-  if (!staff) {
-    throw new Error("Staff not found");
+async function hydrateAthleteId(user: User): Promise<string | null> {
+  let athleteId = LocalStorageAPI.getAthleteId();
+  if (athleteId) return athleteId;
+  const meRes = await api.get("/athlete/me");
+  if (meRes.data?.success && meRes.data?.athleteId) {
+    athleteId = meRes.data.athleteId as string;
+    LocalStorageAPI.setAthleteId(athleteId);
+    return athleteId;
   }
-  writeStaffSession(user.uid, staff);
-  return staff;
+  return null;
+}
+
+async function loadRunManageSession(_user: User): Promise<RunManageSession | null> {
+  const athleteId = await hydrateAthleteId(_user);
+  if (!athleteId) return null;
+
+  const accessRes = await api.get("/me/run-manage-access");
+  const hasAccess = Boolean(accessRes.data?.hasAccess);
+  return {
+    athleteId,
+    staffGeneratedId: (accessRes.data?.staffGeneratedId as string | null) ?? null,
+    hasAccess,
+  };
 }
 
 export function RunManageProviders({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
-  const [staff, setStaff] = useState<RunManageStaffSession | null>(null);
+  const [session, setSession] = useState<RunManageSession | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshStaff = useCallback(async () => {
+  const refreshSession = useCallback(async () => {
     const u = auth.currentUser;
     if (!u) {
-      setStaff(null);
+      setSession(null);
       return;
     }
-    const cached = readStaffSession();
-    if (cached && cached.firebaseId === u.uid) {
-      setStaff(cached);
-      return;
+    try {
+      const resolved = await loadRunManageSession(u);
+      setSession(resolved);
+    } catch {
+      setSession(null);
     }
-    const resolved = await bootstrapStaff(u);
-    setStaff(resolved);
   }, []);
 
-  const signOutStaff = useCallback(async () => {
-    clearStaffSession();
-    setStaff(null);
+  const signOutRunManage = useCallback(async () => {
+    LocalStorageAPI.clearRunManageMode();
+    setSession(null);
     await signOut(auth);
-    router.replace("/runmanage/signin");
+    router.replace("/welcome-runmanage");
   }, [router]);
 
   useEffect(() => {
+    LocalStorageAPI.setRunManageMode(true);
+
     const unsub = onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       if (!nextUser) {
-        setStaff(null);
+        setSession(null);
         setLoading(false);
         return;
       }
       try {
-        const cached = readStaffSession();
-        if (cached && cached.firebaseId === nextUser.uid) {
-          setStaff(cached);
-        } else {
-          const resolved = await bootstrapStaff(nextUser);
-          setStaff(resolved);
-        }
+        const resolved = await loadRunManageSession(nextUser);
+        setSession(resolved);
       } catch {
-        clearStaffSession();
-        setStaff(null);
+        setSession(null);
       } finally {
         setLoading(false);
       }
@@ -104,26 +114,28 @@ export function RunManageProviders({ children }: { children: ReactNode }) {
     return () => unsub();
   }, []);
 
+  const isPublic =
+    pathname === "/runmanage/no-access" ||
+    pathname === "/runmanage/signin" ||
+    pathname === "/welcome-runmanage";
+
   useEffect(() => {
     if (loading) return;
-    const isPublic =
-      pathname === "/runmanage/signin" || pathname === "/runmanage/no-access";
     if (!user && !isPublic) {
-      router.replace(`/runmanage/signin?next=${encodeURIComponent(pathname || "/runmanage/runs")}`);
+      router.replace(
+        `/signup?mode=run-manage&auth=signin&redirect=${encodeURIComponent(pathname || "/runmanage/runs")}`
+      );
       return;
     }
-    if (user && !staff && !isPublic) {
+    if (user && session && !session.hasAccess && !isPublic) {
       router.replace("/runmanage/no-access");
     }
-  }, [loading, user, staff, pathname, router]);
+  }, [loading, user, session, pathname, router, isPublic]);
 
   const value = useMemo(
-    () => ({ user, staff, loading, refreshStaff, signOutStaff }),
-    [user, staff, loading, refreshStaff, signOutStaff]
+    () => ({ user, session, loading, refreshSession, signOutRunManage }),
+    [user, session, loading, refreshSession, signOutRunManage]
   );
-
-  const isPublic =
-    pathname === "/runmanage/signin" || pathname === "/runmanage/no-access";
 
   if (loading) {
     return (
@@ -133,7 +145,7 @@ export function RunManageProviders({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isPublic && (!user || !staff)) {
+  if (!isPublic && (!user || !session?.hasAccess)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <p className="text-gray-500">Loading…</p>

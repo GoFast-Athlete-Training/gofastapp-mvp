@@ -33,7 +33,7 @@ import {
 } from "@/lib/runmanage/paths";
 import { getCompanyAppUrl } from "@/lib/app-urls";
 import type { WizardStep } from "@/components/runmanage/runInstanceWizard/shared";
-import { formatDayLabel } from "@/lib/acqRunSeriesDisplay";
+import { formatDayLabel } from "@/lib/runmanage/format-day-label";
 import {
   cityRunToWizardValues,
   serializeWizardSnapshot,
@@ -44,7 +44,7 @@ import {
   instanceStaffState,
   instanceStaffStateBadgeClasses,
   instanceStaffStateLabel,
-} from "@/lib/runClubBoardHelpers";
+} from "@/lib/runmanage/instance-staff-state";
 import CityRunPartnerPanel, { partnerFromRun } from "@/components/runmanage/CityRunPartnerPanel";
 
 export interface Athlete {

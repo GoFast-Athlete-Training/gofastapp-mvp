@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { patchSponsorManageBrand } from "@/lib/sponsor-manage-brand-client";
-import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
+import { assertRunManageAuth } from "@/lib/runmanage/require-run-manage-auth";
 
 type PatchBody = {
   name?: string;
@@ -18,8 +18,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ brandId: string }> },
 ) {
-  const authErr = await assertStaffBearerAuth(request);
-  if (authErr) return authErr;
+  const auth = await assertRunManageAuth(request);
+  if (auth instanceof NextResponse) return auth;
 
   const { brandId } = await params;
   if (!brandId?.trim()) {

@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { adminAuth } from '@/lib/firebaseAdmin';
+import { assertRunManageAuth } from '@/lib/runmanage/require-run-manage-auth';
 import {
   bulkDataWhenSettingWorkflowStatus,
   type RunWorkflowStatus,
@@ -16,18 +16,10 @@ const VALID_WORKFLOW_STATUSES = ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'] 
  * Bulk update workflow status for multiple runs.
  * Body: { runIds: string[], workflowStatus: "DEVELOP" | "PENDING" | "SUBMITTED" | "APPROVED" }
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    try {
-      await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
+    const auth = await assertRunManageAuth(request);
+    if (auth instanceof NextResponse) return auth;
 
     const body = await request.json();
     const { runIds, workflowStatus } = body;

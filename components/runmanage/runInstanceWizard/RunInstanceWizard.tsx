@@ -19,9 +19,9 @@ import runmanageApi from "@/lib/runmanage/api-client";
 import GooglePlacesAutocomplete from "@/components/runmanage/GooglePlacesAutocomplete";
 import { parseGoogleAddress } from "@/lib/utils/parseAddress";
 import { dateMatchesDayOfWeek } from "@/lib/calendarDay";
-import { formatDayLabel } from "@/lib/acqRunSeriesDisplay";
+import { formatDayLabel } from "@/lib/runmanage/format-day-label";
 import { composeInstanceDescriptionDraft } from "@/lib/runInstanceContent";
-import { hasRouteDetailsSource } from "@/lib/services/route-details-service";
+import { hasRouteDetailsSource } from "@/lib/services/route-details-source";
 import {
   DEFAULT_PACE_OPTION,
   isTrackRun,
@@ -45,7 +45,7 @@ import RunClubPublicSourcesCard, {
 import WizardInstanceToolbar from "./WizardInstanceToolbar";
 import type { AutoSaveStatus } from "@/components/runclub/edit/SaveStatusPill";
 import { wizardSidebarButtonClasses } from "@/components/club-manager/WizardStatusDot";
-import type { WizardStepVisualStatus } from "@/lib/clubCompletionStatus";
+import type { WizardStepVisualStatus } from "@/lib/runmanage/wizard-step-visual-status";
 import {
   WIZARD_STEPS,
   WIZARD_STEP_ORDER,

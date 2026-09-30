@@ -13,6 +13,7 @@ enum AthleteRole {
   USER          // Default - regular user
   CLUB_LEADER   // Club leader - can manage their RunClub's CityRuns
   AMBASSADOR    // Ambassador - can manage their RunClub's CityRuns (future)
+  RUN_MANAGER   // Run Manage host — staff-attributed run authoring (athlete session)
 }
 
 /// At most one ACTIVE training plan per athlete (enforced in application code).
@@ -151,6 +152,7 @@ model Athlete {
   run_crew_messages       run_crew_messages[]
   run_club_memberships    run_club_memberships[]
   run_club_leader_claims    run_club_leader_claims[]
+  run_manager_grants        run_manager_grants[]
   athlete_product_roles   athlete_product_roles[]
   run_club_announcements  run_club_announcements[]
   run_club_events         run_club_events[]
@@ -1293,6 +1295,25 @@ model run_club_leader_claims {
   @@index([email, status])
   @@index([runClubId])
   @@map("run_club_leader_claims")
+}
+
+/// Run Manage operator grant — `id` is Company `company_staff.id` (staffGeneratedId on runs).
+model run_manager_grants {
+  id                  String    @id
+  email               String
+  displayName         String?
+  status              String    @default("unclaimed") // unclaimed | active | revoked
+  athleteId           String?
+  managerAssignmentId String?
+  assignedByStaffId   String?
+  claimedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  Athlete             Athlete?  @relation(fields: [athleteId], references: [id], onDelete: SetNull)
+
+  @@index([email, status])
+  @@index([athleteId])
+  @@map("run_manager_grants")
 }
 
 /// Club broadcast content — announcements visible to members (and optionally public).

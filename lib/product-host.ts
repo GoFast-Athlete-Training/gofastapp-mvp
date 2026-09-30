@@ -5,7 +5,10 @@ export type RootHostIntent = 'coach' | 'club-manager' | 'run-manager' | 'leader'
 /** Dedicated Club Manager host: clubmanage.gofastcrushgoals.com */
 export const CLUB_MANAGER_FRONT_DOOR = '/welcome-clubmanager';
 
-/** Staff run authoring host: runmanage.gofastcrushgoals.com */
+/** Dedicated Run Manage host: runmanage.gofastcrushgoals.com */
+export const RUN_MANAGER_WELCOME_PATH = '/welcome-runmanage';
+
+/** @deprecated Use RUN_MANAGER_WELCOME_PATH — kept for tests referencing legacy door */
 export const RUN_MANAGER_FRONT_DOOR = '/runmanage';
 
 export function isCoachHostname(hostname: string): boolean {
@@ -54,7 +57,7 @@ export function resolveRootEntryPath(opts: {
   }
 
   if (intent === 'run-manager') {
-    return opts.isAuthenticated ? '/runmanage/runs' : '/runmanage/signin';
+    return RUN_MANAGER_WELCOME_PATH;
   }
 
   if (intent === 'coach') {

@@ -1,57 +1,29 @@
-"use client";
+'use client';
 
-import axios from "axios";
-import { auth } from "@/lib/firebase";
-import { STAFF_ID_KEY } from "@/lib/runmanage/staff-session";
-import { STAFF_ID_HEADER } from "@/lib/training/training-engine-auth";
+import api from '@/lib/api';
 
-const runmanageClient = axios.create({
-  baseURL: "",
-  headers: { "Content-Type": "application/json" },
-});
+function apiPath(url: string): string {
+  if (url.startsWith('/api/')) return url.slice(4);
+  if (url.startsWith('/api')) return url.slice(4) || '/';
+  return url;
+}
 
-runmanageClient.interceptors.request.use(
-  async (config) => {
-    try {
-      const user = auth.currentUser;
-      if (user) {
-        const token = await user.getIdToken(false).catch(async () => user.getIdToken(true));
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch {
-      // unauthenticated request
-    }
-    if (typeof window !== "undefined") {
-      const staffId = localStorage.getItem(STAFF_ID_KEY);
-      if (staffId) {
-        config.headers[STAFF_ID_HEADER] = staffId;
-      }
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
+/** Run Manage UI uses athlete session (Firebase + x-athlete-id) like the main app. */
 const runmanageApi = {
-  get: async (url: string) => {
-    const response = await runmanageClient.get(url);
-    return { data: response.data };
+  async get(url: string) {
+    return api.get(apiPath(url));
   },
-  post: async (url: string, data?: unknown) => {
-    const response = await runmanageClient.post(url, data ?? {});
-    return { data: response.data };
+  async post(url: string, data?: unknown) {
+    return api.post(apiPath(url), data ?? {});
   },
-  put: async (url: string, data?: unknown) => {
-    const response = await runmanageClient.put(url, data ?? {});
-    return { data: response.data };
+  async put(url: string, data?: unknown) {
+    return api.put(apiPath(url), data ?? {});
   },
-  patch: async (url: string, data?: unknown) => {
-    const response = await runmanageClient.patch(url, data ?? {});
-    return { data: response.data };
+  async patch(url: string, data?: unknown) {
+    return api.patch(apiPath(url), data ?? {});
   },
-  delete: async (url: string) => {
-    const response = await runmanageClient.delete(url);
-    return { data: response.data };
+  async delete(url: string) {
+    return api.delete(apiPath(url));
   },
 };
 

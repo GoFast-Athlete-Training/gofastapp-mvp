@@ -8,8 +8,8 @@ import {
   instanceStaffState,
   instanceStaffStateBadgeClasses,
   instanceStaffStateLabel,
-} from "@/lib/runClubBoardHelpers";
-import type { RunInstanceSummary } from "@/lib/runInstanceSummary";
+} from "@/lib/runmanage/instance-staff-state";
+import type { RunInstanceSummary } from "@/lib/runmanage/run-instance-summary";
 
 type Props = {
   autoSaveStatus: AutoSaveStatus;

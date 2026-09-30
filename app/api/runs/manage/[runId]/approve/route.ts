@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { assertStaffBearerAuth } from '@/lib/training/training-engine-auth';
+import { assertRunManageAuth } from '@/lib/runmanage/require-run-manage-auth';
 import { fieldsWhenSettingWorkflowStatus } from '@/lib/runInstanceApprovalPublish';
 
 /**
@@ -14,8 +14,8 @@ export async function POST(
   { params }: { params: Promise<{ runId: string }> }
 ) {
   try {
-    const authErr = await assertStaffBearerAuth(request);
-    if (authErr) return authErr;
+    const auth = await assertRunManageAuth(request);
+    if (auth instanceof NextResponse) return auth;
 
     const { runId } = await params;
 
