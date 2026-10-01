@@ -12,6 +12,91 @@ export function generateRunManagerAccessId(): string {
   return `rma_${random}`;
 }
 
+export async function findRunManagerAccessByEmail(email: string) {
+  const normalized = normalizeRunManagerEmail(email);
+  if (!normalized) return null;
+  return prisma.run_manager_access.findFirst({
+    where: { email: normalized, status: { not: 'revoked' } },
+    orderBy: { updatedAt: 'desc' },
+  });
+}
+
+/** Admin assign: one write per email, with or without a prod athlete. */
+export async function upsertRunManagerAccessForEmail(input: {
+  email: string;
+  athleteId?: string | null;
+  displayName?: string | null;
+  managerAssignmentId?: string | null;
+  assignedByStaffId?: string | null;
+}) {
+  const email = normalizeRunManagerEmail(input.email);
+  if (!email) {
+    throw new Error('email is invalid');
+  }
+
+  const existing = await findRunManagerAccessByEmail(email);
+  const alreadyAssigned = Boolean(existing);
+  const accessId = existing?.id ?? generateRunManagerAccessId();
+  const athleteId = input.athleteId?.trim() || null;
+  const displayName = input.displayName?.trim() || existing?.displayName || null;
+
+  if (athleteId) {
+    await prisma.run_manager_access.upsert({
+      where: { id: accessId },
+      create: {
+        id: accessId,
+        email,
+        displayName,
+        athleteId,
+        status: 'active',
+        managerAssignmentId: input.managerAssignmentId ?? null,
+        assignedByStaffId: input.assignedByStaffId ?? null,
+        claimedAt: new Date(),
+      },
+      update: {
+        email,
+        displayName: displayName ?? undefined,
+        athleteId,
+        status: 'active',
+        managerAssignmentId: input.managerAssignmentId ?? undefined,
+        assignedByStaffId: input.assignedByStaffId ?? undefined,
+        claimedAt: new Date(),
+      },
+    });
+  } else {
+    const preserveLinkedAthlete =
+      existing?.status === 'active' && Boolean(existing.athleteId?.trim());
+
+    await prisma.run_manager_access.upsert({
+      where: { id: accessId },
+      create: {
+        id: accessId,
+        email,
+        displayName,
+        status: 'unclaimed',
+        managerAssignmentId: input.managerAssignmentId ?? null,
+        assignedByStaffId: input.assignedByStaffId ?? null,
+      },
+      update: {
+        email,
+        displayName: displayName ?? undefined,
+        managerAssignmentId: input.managerAssignmentId ?? undefined,
+        assignedByStaffId: input.assignedByStaffId ?? undefined,
+        ...(preserveLinkedAthlete
+          ? {}
+          : { status: 'unclaimed', athleteId: null, claimedAt: null }),
+      },
+    });
+  }
+
+  const access = await prisma.run_manager_access.findUnique({ where: { id: accessId } });
+  if (!access) {
+    throw new Error('Failed to load run manager access row');
+  }
+
+  return { access, alreadyAssigned };
+}
+
 export async function assignRunManagerAccess(input: {
   accessId: string;
   athleteId: string;

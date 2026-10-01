@@ -3,16 +3,14 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { lookupAthletesByEmail } from '@/lib/domain-club-manager-staff-assign';
 import {
-  assignRunManagerAccess,
-  generateRunManagerAccessId,
   normalizeRunManagerEmail,
   revokeRunManagerAccess,
-  seedRunManagerAccessStub,
+  upsertRunManagerAccessForEmail,
 } from '@/lib/domain-run-manager-access';
 import { assertStaffBearerAuth, getForwardedStaffId } from '@/lib/training/training-engine-auth';
 
 type AssignBody = {
-  action?: 'assign' | 'invite' | 'revoke';
+  action?: 'assign' | 'revoke';
   /** Legacy name — same as accessId */
   staffId?: string;
   accessId?: string;
@@ -35,7 +33,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as AssignBody;
     const action = body.action ?? 'assign';
-    let accessId = (body.accessId ?? body.staffId)?.trim();
+    const accessId = (body.accessId ?? body.staffId)?.trim();
 
     if (action === 'revoke') {
       if (!accessId) {
@@ -54,33 +52,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'email is invalid' }, { status: 400 });
     }
 
-    if (!accessId) {
-      accessId = generateRunManagerAccessId();
-    }
-
-    if (action === 'invite') {
-      const access = await seedRunManagerAccessStub({
-        accessId,
-        email,
-        displayName: body.displayName,
-        managerAssignmentId: body.managerAssignmentId ?? null,
-        assignedByStaffId,
-      });
-      return NextResponse.json({
-        success: true,
-        action: 'invite',
-        access,
-        grant: access,
-        welcomeUrl: '/welcome-runmanage',
-      });
-    }
-
-    let athleteId = body.athleteId?.trim();
+    let athleteId = body.athleteId?.trim() || null;
     if (!athleteId) {
       const matches = await lookupAthletesByEmail(email);
-      if (matches.length === 0) {
-        return NextResponse.json({ success: false, error: 'No athlete found for email' }, { status: 404 });
-      }
       if (matches.length > 1) {
         return NextResponse.json(
           {
@@ -91,13 +65,14 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-      athleteId = matches[0]!.athleteId;
+      if (matches.length === 1) {
+        athleteId = matches[0]!.athleteId;
+      }
     }
 
-    const access = await assignRunManagerAccess({
-      accessId,
-      athleteId,
+    const { access, alreadyAssigned } = await upsertRunManagerAccessForEmail({
       email,
+      athleteId,
       displayName: body.displayName,
       managerAssignmentId: body.managerAssignmentId ?? null,
       assignedByStaffId,
@@ -108,7 +83,8 @@ export async function POST(request: NextRequest) {
       action: 'assign',
       access,
       grant: access,
-      athleteId,
+      athleteId: access.athleteId,
+      alreadyAssigned,
       welcomeUrl: '/welcome-runmanage',
     });
   } catch (err: unknown) {
