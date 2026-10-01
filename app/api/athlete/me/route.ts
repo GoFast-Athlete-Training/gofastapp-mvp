@@ -34,8 +34,8 @@ export async function GET(request: Request) {
     }
 
     {
-      const { claimRunManagerGrantsForAthlete } = await import('@/lib/domain-run-manager-grant');
-      await claimRunManagerGrantsForAthlete(athlete.id, athlete.email);
+      const { claimRunManagerAccessForAthlete } = await import('@/lib/domain-run-manager-access');
+      await claimRunManagerAccessForAthlete(athlete.id, athlete.email);
     }
 
     await touchAthleteLastSeenIfStale(athlete.id, athlete.lastSeenAt);

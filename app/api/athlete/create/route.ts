@@ -280,8 +280,8 @@ export async function POST(request: Request) {
     }
 
     {
-      const { claimRunManagerGrantsForAthlete } = await import('@/lib/domain-run-manager-grant');
-      await claimRunManagerGrantsForAthlete(athlete.id, athlete.email);
+      const { claimRunManagerAccessForAthlete } = await import('@/lib/domain-run-manager-access');
+      await claimRunManagerAccessForAthlete(athlete.id, athlete.email);
     }
 
     // New athlete only — fire product event to App Management (welcome + internal alerts)

@@ -66,6 +66,10 @@ export default function WelcomeRunManagePage() {
             /* profile optional */
           }
         }
+        if (hasAccess) {
+          router.replace('/runmanage/runs');
+          return;
+        }
         setView({
           kind: 'ready',
           hasAccess,

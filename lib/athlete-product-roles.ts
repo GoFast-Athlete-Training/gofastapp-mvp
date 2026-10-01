@@ -3,7 +3,7 @@ import type { AthleteRole } from '@prisma/client';
 import { isClubManagerWriteRole } from '@/lib/club-manager-membership-roles';
 import { listLeaderMemberships } from '@/lib/run-club-leader-auth';
 
-const PRODUCT_ROLES: AthleteRole[] = ['CLUB_LEADER', 'AMBASSADOR', 'RUN_MANAGER'];
+const PRODUCT_ROLES: AthleteRole[] = ['CLUB_LEADER', 'AMBASSADOR'];
 
 export function isAthleteProductRole(role: string): role is AthleteRole {
   return PRODUCT_ROLES.includes(role as AthleteRole);

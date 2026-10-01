@@ -4,14 +4,18 @@ import {
   getForwardedStaffId,
 } from '@/lib/training/training-engine-auth';
 import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
-import { athleteHasProductRole } from '@/lib/athlete-product-roles';
+import {
+  athleteHasRunManagerAccess,
+  getRunManagerAccessForAthlete,
+  staffGeneratedIdFromAccessRow,
+} from '@/lib/domain-run-manager-access';
 
 export type RunManageAuthContext =
   | { mode: 'staff'; staffId: string }
   | { mode: 'athlete'; athleteId: string; staffGeneratedId: string | null };
 
 /**
- * HQ staff proxy lane OR runmanage athlete with RUN_MANAGER product role.
+ * HQ staff proxy lane OR runmanage athlete with active run_manager_access.
  */
 export async function assertRunManageAuth(
   request: NextRequest
@@ -34,29 +38,21 @@ export async function assertRunManageAuth(
   }
 
   const athleteId = athleteResult.athlete.id;
-  const hasRole = await athleteHasProductRole(athleteId, 'RUN_MANAGER');
-  if (!hasRole) {
+  const hasAccess = await athleteHasRunManagerAccess(athleteId);
+  if (!hasAccess) {
     return NextResponse.json(
       { success: false, error: 'Run Manage access required' },
       { status: 403 }
     );
   }
 
-  const grant = await prismaRunManagerGrantByAthlete(athleteId);
+  const access = await getRunManagerAccessForAthlete(athleteId);
 
   return {
     mode: 'athlete',
     athleteId,
-    staffGeneratedId: grant?.id ?? null,
+    staffGeneratedId: access ? staffGeneratedIdFromAccessRow(access) : null,
   };
-}
-
-async function prismaRunManagerGrantByAthlete(athleteId: string) {
-  const { prisma } = await import('@/lib/prisma');
-  return prisma.run_manager_grants.findFirst({
-    where: { athleteId, status: 'active' },
-    select: { id: true },
-  });
 }
 
 export function staffGeneratedIdFromAuth(ctx: RunManageAuthContext): string | null {

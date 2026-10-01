@@ -152,7 +152,7 @@ model Athlete {
   run_crew_messages       run_crew_messages[]
   run_club_memberships    run_club_memberships[]
   run_club_leader_claims    run_club_leader_claims[]
-  run_manager_grants        run_manager_grants[]
+  run_manager_access        run_manager_access[]
   athlete_product_roles   athlete_product_roles[]
   run_club_announcements  run_club_announcements[]
   run_club_events         run_club_events[]
@@ -1297,8 +1297,8 @@ model run_club_leader_claims {
   @@map("run_club_leader_claims")
 }
 
-/// Run Manage operator grant — `id` is Company `company_staff.id` (staffGeneratedId on runs).
-model run_manager_grants {
+/// Run Manage operator access — may use Company staff id or generated id; athleteId when active.
+model run_manager_access {
   id                  String    @id
   email               String
   displayName         String?
@@ -1313,7 +1313,7 @@ model run_manager_grants {
 
   @@index([email, status])
   @@index([athleteId])
-  @@map("run_manager_grants")
+  @@map("run_manager_access")
 }
 
 /// Club broadcast content — announcements visible to members (and optionally public).
