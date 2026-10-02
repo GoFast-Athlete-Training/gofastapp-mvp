@@ -1643,6 +1643,8 @@ model city_runs {
   plannedWorkoutId    String?              @unique
   /// Product behavior unlock: CLUB enables check-in, look-back, reminders.
   cityRunType         CityRunType          @default(OTHER)
+  /// Extra partners beyond single runClubId / runBrandId / runStoreId (snapped refs).
+  partnerExtras       Json?
   city_run_rsvps      city_run_rsvps[]
   city_run_messages   city_run_messages[]
   city_run_checkins   city_run_checkins[]
@@ -3174,6 +3176,8 @@ enum CityRunType {
   INDIVIDUAL
   RACE_SHAKEOUT
   RUN_CREW
+  RUN_STORE
+  SPECIAL
   OTHER
 }
 

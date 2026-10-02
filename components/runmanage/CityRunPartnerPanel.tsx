@@ -109,9 +109,25 @@ export default function CityRunPartnerPanel({
           })),
         );
       } else {
-        const res = await runmanageApi.get(`/api/acq/entity-search?${new URLSearchParams({ q }).toString()}`);
-        const rows = (res.data?.results ?? []) as EntityHit[];
-        setHits(Array.isArray(rows) ? rows.filter((r) => r.type === "RUN_STORE") : []);
+        const res = await runmanageApi.get(
+          `/api/runmanage/run-stores/search?${new URLSearchParams({ q }).toString()}`,
+        );
+        const stores = (res.data?.stores ?? []) as Array<{
+          id: string;
+          name: string;
+          slug?: string | null;
+          logoUrl?: string | null;
+          city?: string | null;
+        }>;
+        setHits(
+          stores.map((s) => ({
+            type: "RUN_STORE",
+            id: s.id,
+            name: s.name,
+            secondary: s.city ?? s.slug ?? null,
+            logoUrl: s.logoUrl ?? null,
+          })),
+        );
       }
     } catch {
       setError("Search failed");

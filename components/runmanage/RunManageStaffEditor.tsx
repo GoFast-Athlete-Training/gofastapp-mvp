@@ -45,7 +45,7 @@ import {
   instanceStaffStateBadgeClasses,
   instanceStaffStateLabel,
 } from "@/lib/runmanage/instance-staff-state";
-import CityRunPartnerPanel, { partnerFromRun } from "@/components/runmanage/CityRunPartnerPanel";
+import { RunManageRunAffiliationsEditor } from "@/components/runmanage/RunManageRunAffiliationsEditor";
 
 export interface Athlete {
   id: string;
@@ -102,6 +102,13 @@ export interface CityRunData {
   dayOfWeek: string | null;
   runSeriesId?: string | null;
   runClub: RunClub | null;
+  runClubId?: string | null;
+  runBrandId?: string | null;
+  runStoreId?: string | null;
+  cityRunType?: string | null;
+  raceRegistryId?: string | null;
+  partnerExtras?: unknown;
+  athleteGeneratedId?: string | null;
   runStore?: {
     id: string;
     name: string;
@@ -830,11 +837,10 @@ export default function RunManageStaffEditor({
             </div>
           )}
 
-          {run ? (
-            <CityRunPartnerPanel
-              runId={run.id}
-              partner={partnerFromRun(run)}
-              onUpdated={() => fetchRun({ silent: true })}
+          {run && staffMode === "edit" ? (
+            <RunManageRunAffiliationsEditor
+              run={run}
+              onSaved={() => fetchRun({ silent: true })}
             />
           ) : null}
         </div>

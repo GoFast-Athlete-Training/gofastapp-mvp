@@ -15,18 +15,29 @@ import { nullRouteFieldsForTrackRun } from "@/lib/runTypes";
 import { normalizeRunType } from "@/lib/runTypes";
 import runmanageApi from "@/lib/runmanage/api-client";
 import { runInstanceEditPath, RUN_MANAGE_DASHBOARD_PATH } from "@/lib/runmanage/paths";
+import {
+  RunManageRunAffiliations,
+  affiliationsToPayload,
+  emptyAffiliationDraft,
+  type RunAffiliationDraft,
+} from "@/components/runmanage/RunManageRunAffiliations";
+import { useRunManageAuth } from "@/components/runmanage/RunManageProviders";
 
 export default function RunManageCreateRunPage() {
   const router = useRouter();
+  const { session } = useRunManageAuth();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
 
+  const [phase, setPhase] = useState<"scope" | "details">("scope");
+  const [affiliations, setAffiliations] = useState<RunAffiliationDraft>(() =>
+    emptyAffiliationDraft("SPECIAL")
+  );
   const [wizardValues, setWizardValues] = useState<RunInstanceWizardValues>(() =>
     emptyWizardValues(localCalendarYmd(tomorrow))
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [runClubId, setRunClubId] = useState("");
 
   const handleCreate = async () => {
     setSaving(true);
@@ -45,6 +56,7 @@ export default function RunManageCreateRunPage() {
       const isTrack = wizardValues.runType?.toLowerCase() === "track";
 
       const payload: Record<string, unknown> = {
+        ...affiliationsToPayload(affiliations, session?.athleteId),
         citySlug: finalCitySlug,
         title: wizardValues.title.trim(),
         dayOfWeek: wizardValues.dayOfWeek?.trim() || null,
@@ -96,10 +108,6 @@ export default function RunManageCreateRunPage() {
         published: false,
       };
 
-      if (runClubId.trim()) {
-        payload.runClubId = runClubId.trim();
-      }
-
       const res = await runmanageApi.post("/api/runs/create", payload);
       const runId = res.data?.run?.id ?? res.data?.cityRunId ?? res.data?.runId;
       if (!runId) {
@@ -126,44 +134,54 @@ export default function RunManageCreateRunPage() {
       <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Run builder</p>
       <h1 className="text-2xl font-bold text-gray-900">Create run</h1>
       <p className="mt-1 text-sm text-gray-600">
-        One-off or club run — after save, attach a brand partner (e.g. ASICS) on the edit screen.
+        Choose the run type and host, then add date, meet-up, and copy.
       </p>
 
-      <label className="mt-4 block max-w-md text-sm">
-        <span className="font-medium text-gray-700">Run club id (optional)</span>
-        <input
-          type="text"
-          value={runClubId}
-          onChange={(e) => setRunClubId(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-        />
-      </label>
-
-      <div className="mt-6">
-        {saving ? (
-          <div className="flex items-center gap-2 text-gray-500">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Creating…
-          </div>
-        ) : (
-          <RunInstanceWizard
-            values={wizardValues}
-            onChange={setWizardValues}
-            context={{
-              variant: "create-scratch",
-              isSeriesInstance: false,
-              clubName: runClubId.trim() ? "Selected club" : null,
-              clubId: runClubId.trim() || null,
-            }}
-            onSave={() => void handleCreate()}
-            saving={saving}
-            error={error}
-            onErrorChange={setError}
-            saveLabel="Create draft run"
-            publicSources={null}
-          />
-        )}
-      </div>
+      {phase === "scope" ? (
+        <div className="mt-6 max-w-3xl space-y-4 rounded-xl border border-gray-200 bg-gray-50/80 p-5">
+          <RunManageRunAffiliations draft={affiliations} onChange={setAffiliations} />
+          <button
+            type="button"
+            onClick={() => setPhase("details")}
+            className="rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+          >
+            Continue to details
+          </button>
+        </div>
+      ) : (
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => setPhase("scope")}
+            className="mb-4 text-sm font-medium text-sky-700 hover:underline"
+          >
+            ← Edit type and affiliations
+          </button>
+          {saving ? (
+            <div className="flex items-center gap-2 text-gray-500">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Creating…
+            </div>
+          ) : (
+            <RunInstanceWizard
+              values={wizardValues}
+              onChange={setWizardValues}
+              context={{
+                variant: "create-scratch",
+                isSeriesInstance: false,
+                clubName: affiliations.runClubLabel,
+                clubId: affiliations.runClubId,
+              }}
+              onSave={() => void handleCreate()}
+              saving={saving}
+              error={error}
+              onErrorChange={setError}
+              saveLabel="Create draft run"
+              publicSources={null}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

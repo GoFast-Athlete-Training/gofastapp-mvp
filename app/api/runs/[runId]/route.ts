@@ -14,9 +14,11 @@ import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 import {
   cityRunTypeFromSnapshot,
+  isCityRunTypeValue,
   mergeRelationshipSnapshot,
   relationshipPatchFromBody,
 } from '@/lib/city-run-type';
+import { partnerExtrasForWrite } from '@/lib/runmanage/partner-extras';
 import { syncCityRunRouteFromFields } from '@/lib/city-run/ensure-city-run-route';
 
 const RUNTIME_COMMIT_SHA =
@@ -158,6 +160,11 @@ export async function GET(
           dayOfWeek: true,
           date: true,
           runClubId: true,
+          runBrandId: true,
+          runStoreId: true,
+          raceRegistryId: true,
+          partnerExtras: true,
+          athleteGeneratedId: true,
           cityRunType: true,
           runCrewId: true,
           meetUpPoint: true,
@@ -309,6 +316,11 @@ export async function GET(
           dayOfWeek: true,
           date: true,
           runClubId: true,
+          runBrandId: true,
+          runStoreId: true,
+          raceRegistryId: true,
+          partnerExtras: true,
+          athleteGeneratedId: true,
           cityRunType: true,
           runCrewId: true,
           meetUpPoint: true,
@@ -887,9 +899,21 @@ export async function PUT(
           ? relationshipPatch.raceRegistryId
           : (updateData.raceRegistryId as string | null | undefined) ?? run.raceRegistryId,
     });
-    updateData.cityRunType = mergedRelationships.runClubId
-      ? 'CLUB'
-      : cityRunTypeFromSnapshot(mergedRelationships);
+    if (body.cityRunType !== undefined) {
+      if (body.cityRunType === null || body.cityRunType === '') {
+        updateData.cityRunType = cityRunTypeFromSnapshot({
+          ...mergedRelationships,
+          runStoreId:
+            (updateData.runStoreId as string | null | undefined) ?? run.runStoreId ?? null,
+        });
+      } else if (isCityRunTypeValue(body.cityRunType)) {
+        updateData.cityRunType = body.cityRunType;
+      }
+    }
+    if (body.partnerExtras !== undefined) {
+      const extras = partnerExtrasForWrite(body.partnerExtras);
+      updateData.partnerExtras = extras ? extras : Prisma.JsonNull;
+    }
 
     const runClubUpdateData: Record<string, string | null> = {};
     if (body.runClubWebsiteUrl !== undefined) {

@@ -1,0 +1,6 @@
+-- AlterEnum
+ALTER TYPE "CityRunType" ADD VALUE IF NOT EXISTS 'RUN_STORE';
+ALTER TYPE "CityRunType" ADD VALUE IF NOT EXISTS 'SPECIAL';
+
+-- AlterTable
+ALTER TABLE "city_runs" ADD COLUMN IF NOT EXISTS "partnerExtras" JSONB;

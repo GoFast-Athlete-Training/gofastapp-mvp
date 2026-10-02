@@ -3,6 +3,8 @@ export const CITY_RUN_TYPES = [
   'INDIVIDUAL',
   'RACE_SHAKEOUT',
   'RUN_CREW',
+  'RUN_STORE',
+  'SPECIAL',
   'OTHER',
 ] as const;
 
@@ -14,14 +16,29 @@ export type CityRunRelationshipSnapshot = {
   athleteGeneratedId?: string | null;
   shakeoutDedupeKey?: string | null;
   raceRegistryId?: string | null;
+  runStoreId?: string | null;
 };
 
+export function isCityRunTypeValue(v: unknown): v is CityRunTypeValue {
+  return typeof v === 'string' && (CITY_RUN_TYPES as readonly string[]).includes(v);
+}
+
+/** Infer type when staff did not send cityRunType (legacy / machine paths). Shakeout before club. */
 export function resolveCityRunType(opts: CityRunRelationshipSnapshot): CityRunTypeValue {
-  if (opts.runClubId) return 'CLUB';
   if (opts.shakeoutDedupeKey || opts.raceRegistryId) return 'RACE_SHAKEOUT';
+  if (opts.runStoreId) return 'RUN_STORE';
+  if (opts.runClubId) return 'CLUB';
   if (opts.runCrewId) return 'RUN_CREW';
   if (opts.athleteGeneratedId) return 'INDIVIDUAL';
   return 'OTHER';
+}
+
+export function cityRunTypeForWrite(
+  explicit: unknown,
+  snapshot: CityRunRelationshipSnapshot
+): CityRunTypeValue {
+  if (isCityRunTypeValue(explicit)) return explicit;
+  return resolveCityRunType(snapshot);
 }
 
 /** Merge existing relationship FKs with optional PATCH body fields. */
@@ -106,7 +123,12 @@ export function hasSocialRunLifecycle(run: {
   athleteGeneratedId?: string | null;
 }): boolean {
   if (run.cityRunType) {
-    return run.cityRunType === 'CLUB' || run.cityRunType === 'INDIVIDUAL' || run.cityRunType === 'RUN_CREW';
+    return (
+      run.cityRunType === 'CLUB' ||
+      run.cityRunType === 'INDIVIDUAL' ||
+      run.cityRunType === 'RUN_CREW' ||
+      run.cityRunType === 'RUN_STORE'
+    );
   }
   return (
     isClubRun(run) || isIndividualHostedRun(run) || Boolean(run.runCrewId)

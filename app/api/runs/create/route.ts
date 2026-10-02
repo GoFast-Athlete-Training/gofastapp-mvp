@@ -13,6 +13,8 @@ import { autoRsvpHostRole } from "@/lib/host-run-rsvp";
 import { stampPlannedWorkoutCityRun } from "@/lib/city-run/stamp-planned-city-run";
 import { resolveWorkoutTargetForAthlete } from "@/lib/training/workout-or-planned-resolve";
 import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
+import { cityRunTypeForWrite } from "@/lib/city-run-type";
+import { partnerExtrasForWrite } from "@/lib/runmanage/partner-extras";
 
 export const dynamic = "force-dynamic";
 
@@ -180,6 +182,11 @@ export async function POST(request: NextRequest) {
       /** Link instance to run_series (e.g. Company build-instance) */
       runSeriesId: bodyRunSeriesId,
       published: bodyPublished,
+      cityRunType: bodyCityRunType,
+      runBrandId: bodyRunBrandId,
+      runStoreId: bodyRunStoreId,
+      raceRegistryId: bodyRaceRegistryId,
+      partnerExtras: bodyPartnerExtras,
     } = body;
 
     const staffGeneratedId =
@@ -614,10 +621,36 @@ export async function POST(request: NextRequest) {
       igPostGraphic: igPostGraphic?.trim() || null,
       routeId: resolvedRouteId,
       workoutId: isAthleteJoinMyWorkoutShare ? null : resolvedWorkoutId,
-      cityRunType: finalRunClubId ? 'CLUB' : resolveCityRunType({
+      runBrandId:
+        bodyRunBrandId === null || bodyRunBrandId === ""
+          ? null
+          : typeof bodyRunBrandId === "string"
+            ? bodyRunBrandId.trim() || null
+            : null,
+      runStoreId:
+        bodyRunStoreId === null || bodyRunStoreId === ""
+          ? null
+          : typeof bodyRunStoreId === "string"
+            ? bodyRunStoreId.trim() || null
+            : null,
+      raceRegistryId:
+        bodyRaceRegistryId === null || bodyRaceRegistryId === ""
+          ? null
+          : typeof bodyRaceRegistryId === "string"
+            ? bodyRaceRegistryId.trim() || null
+            : null,
+      partnerExtras: (() => {
+        const extras = partnerExtrasForWrite(bodyPartnerExtras);
+        return extras ? extras : Prisma.JsonNull;
+      })(),
+      cityRunType: cityRunTypeForWrite(bodyCityRunType, {
         runClubId: finalRunClubId,
         runCrewId: runCrewId?.trim() || null,
         athleteGeneratedId: athleteGeneratedId?.trim() || null,
+        raceRegistryId:
+          typeof bodyRaceRegistryId === "string" ? bodyRaceRegistryId.trim() || null : null,
+        runStoreId:
+          typeof bodyRunStoreId === "string" ? bodyRunStoreId.trim() || null : null,
       }),
       updatedAt: new Date(),
     };
