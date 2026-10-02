@@ -29,20 +29,27 @@ export function RunManageShell({ children }: { children: ReactNode }) {
               <Link
                 href="/runmanage/runs"
                 className={
-                  pathname?.startsWith("/runmanage/runs")
+                  pathname === "/runmanage/runs" || pathname === "/runmanage/runs/"
                     ? "font-medium text-sky-700"
                     : "text-gray-600 hover:text-gray-900"
                 }
               >
-                Runs
+                Dashboard
+              </Link>
+              <Link
+                href="/runmanage/runs/new"
+                className={
+                  pathname?.startsWith("/runmanage/runs/new")
+                    ? "font-medium text-sky-700"
+                    : "text-gray-600 hover:text-gray-900"
+                }
+              >
+                Create run
               </Link>
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-600">
             {user?.email ? <span className="hidden sm:inline">{user.email}</span> : null}
-            {session?.staffGeneratedId ? (
-              <span className="hidden md:inline text-xs text-gray-400">Staff {session.staffGeneratedId.slice(0, 8)}…</span>
-            ) : null}
             <button
               type="button"
               onClick={() => void signOutRunManage()}

@@ -100,6 +100,30 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    let runManageStaffId: string | null = null;
+    let runManageAthleteId: string | null = null;
+    if (!staffHeader) {
+      const { assertRunManageAuth, staffGeneratedIdFromAuth } = await import(
+        "@/lib/runmanage/require-run-manage-auth"
+      );
+      const runManageAuth = await assertRunManageAuth(request);
+      if (runManageAuth instanceof NextResponse) {
+        const hasBodyActor =
+          typeof body.staffGeneratedId === "string" ||
+          typeof body.staffId === "string" ||
+          typeof body.athleteGeneratedId === "string";
+        if (!hasBodyActor) {
+          return runManageAuth;
+        }
+      } else {
+        runManageStaffId = staffGeneratedIdFromAuth(runManageAuth);
+        if (runManageAuth.mode === "athlete" && !runManageStaffId) {
+          runManageAthleteId = runManageAuth.athleteId;
+        }
+      }
+    }
+
     const {
       citySlug, // City slug (e.g., "boston", "new-york") - extracted from Google Maps or user input
       cityName, // Optional: City name for slug generation if slug not provided
@@ -107,8 +131,8 @@ export async function POST(request: NextRequest) {
       runCrewId,
       runClubSlug, // @deprecated: Use runClub object instead
       runClub, // Full RunClub object from GoFastCompany (id, name, logoUrl, city, slug)
-      staffGeneratedId,
-      athleteGeneratedId,
+      staffGeneratedId: bodyStaffGeneratedId,
+      athleteGeneratedId: bodyAthleteGeneratedId,
       title,
       dayOfWeek,
       date,
@@ -157,6 +181,15 @@ export async function POST(request: NextRequest) {
       runSeriesId: bodyRunSeriesId,
       published: bodyPublished,
     } = body;
+
+    const staffGeneratedId =
+      (typeof bodyStaffGeneratedId === "string" ? bodyStaffGeneratedId.trim() : "") ||
+      runManageStaffId ||
+      null;
+    const athleteGeneratedId =
+      (typeof bodyAthleteGeneratedId === "string" ? bodyAthleteGeneratedId.trim() : "") ||
+      runManageAthleteId ||
+      null;
 
     const stravaEventUrl =
       bodyStravaEventUrl !== undefined && bodyStravaEventUrl !== null

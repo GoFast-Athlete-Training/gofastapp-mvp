@@ -9,6 +9,8 @@ import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import { clubManagerHubPath } from '@/lib/club-manager-paths';
 import { athleteHasManagerMemberships } from '@/lib/club-manager-home-route';
+import { runManageSignInPath, runManageWelcomePath } from '@/lib/runmanage/door';
+import { signOutProductDoor } from '@/lib/auth/product-door-sign-out';
 import type { LeaderContextClub } from '@/lib/run-club-leader-context';
 
 const SESSION_GATE_KEY = 'gofast_uid_resolved';
@@ -16,7 +18,7 @@ const SESSION_GATE_KEY = 'gofast_uid_resolved';
 type WelcomeStep = 'loading-local' | 'resolving-profile' | 'dashboard' | 'finish-profile';
 type SecondaryCta = {
   label: string;
-  action: 'dashboard' | 'profile' | 'club-manager';
+  action: 'dashboard' | 'profile' | 'club-manager' | 'run-manage';
 };
 
 type StoredSessionGate = {
@@ -109,6 +111,8 @@ export default function WelcomePage() {
   const [step, setStep] = useState<WelcomeStep>('loading-local');
   const [hasProfileHandle, setHasProfileHandle] = useState<boolean | null>(null);
   const [isClubManager, setIsClubManager] = useState(false);
+  const [hasRunManageAccess, setHasRunManageAccess] = useState(false);
+  const [signedInEmail, setSignedInEmail] = useState<string | null>(null);
   const [secondaryCta, setSecondaryCta] = useState<SecondaryCta | null>(null);
 
   useEffect(() => {
@@ -122,6 +126,11 @@ export default function WelcomePage() {
       return;
     }
 
+    if (hasRunManageAccess) {
+      setSecondaryCta({ label: 'Open Run Manage', action: 'run-manage' });
+      return;
+    }
+
     // Athlete door stays athlete — manager membership only surfaces a secondary entry.
     if (isClubManager) {
       setSecondaryCta({ label: 'Open Club Manager', action: 'club-manager' });
@@ -129,7 +138,7 @@ export default function WelcomePage() {
     }
 
     setSecondaryCta(null);
-  }, [hasProfileHandle, isClubManager]);
+  }, [hasProfileHandle, isClubManager, hasRunManageAccess]);
 
   useEffect(() => {
     if (hasProcessedRef.current) {
@@ -155,6 +164,7 @@ export default function WelcomePage() {
       setResolving(true);
       setError(null);
       setHasProfileHandle(null);
+      setSignedInEmail(firebaseUser.email ?? null);
 
       try {
         setRunnerName(
@@ -184,6 +194,12 @@ export default function WelcomePage() {
             setIsClubManager(athleteHasManagerMemberships(clubs));
           } catch {
             setIsClubManager(false);
+          }
+          try {
+            const accessRes = await api.get('/me/run-manage-access');
+            setHasRunManageAccess(Boolean(accessRes.data?.hasAccess));
+          } catch {
+            setHasRunManageAccess(false);
           }
           setResolving(false);
           return;
@@ -250,6 +266,12 @@ export default function WelcomePage() {
         setRunnerName(runnerNameFromSession(athlete, firebaseUser));
         setHasProfileHandle(hasHandle);
         setIsClubManager(hasManager);
+        try {
+          const accessRes = await api.get('/me/run-manage-access');
+          setHasRunManageAccess(Boolean(accessRes.data?.hasAccess));
+        } catch {
+          setHasRunManageAccess(false);
+        }
         setStep(hasHandle ? 'dashboard' : 'finish-profile');
         setSessionGate({
           uid: firebaseUser.uid,
@@ -272,11 +294,12 @@ export default function WelcomePage() {
     return () => unsubscribe();
   }, [router]);
 
-  async function handleBackToSignIn() {
-    await signOut(auth);
-    clearSessionGate();
-    LocalStorageAPI.clearAll();
-    router.replace('/signup');
+  async function handleSwitchAccount() {
+    const returnPath = LocalStorageAPI.getRunManageMode()
+      ? runManageSignInPath()
+      : '/signup?auth=signin';
+    const path = await signOutProductDoor(returnPath);
+    router.replace(path);
   }
 
   function goToDashboard() {
@@ -285,6 +308,10 @@ export default function WelcomePage() {
 
   function goToClubManagerSurface() {
     router.replace(clubManagerHubPath());
+  }
+
+  function goToRunManageSurface() {
+    router.replace(runManageWelcomePath());
   }
 
   function goToProfile() {
@@ -310,13 +337,16 @@ export default function WelcomePage() {
         {!error && !resolving && readySubtitle(step, isClubManager) ? (
           <p className="mt-2 text-sm text-white/80">{readySubtitle(step, isClubManager)}</p>
         ) : null}
+        {!error && !resolving && signedInEmail ? (
+          <p className="mt-1 text-sm text-white/70">{signedInEmail}</p>
+        ) : null}
 
         {error ? (
           <div className="mt-8 w-full rounded-2xl border border-red-400/50 bg-red-500/20 p-4">
             <p className="text-center text-sm text-red-100">{error}</p>
             <button
               type="button"
-              onClick={() => void handleBackToSignIn()}
+              onClick={() => void handleSwitchAccount()}
               className="mt-4 w-full rounded-xl bg-white px-5 py-3 font-bold text-sky-600"
             >
               Back to sign in
@@ -346,13 +376,22 @@ export default function WelcomePage() {
                     ? goToDashboard
                     : secondaryCta.action === 'club-manager'
                       ? goToClubManagerSurface
-                      : goToProfile
+                      : secondaryCta.action === 'run-manage'
+                        ? goToRunManageSurface
+                        : goToProfile
                 }
                 className="w-full rounded-xl border border-white/40 px-5 py-4 text-base font-semibold text-white"
               >
                 {secondaryCta.label}
               </button>
             ) : null}
+            <button
+              type="button"
+              onClick={() => void handleSwitchAccount()}
+              className="text-sm font-medium text-white/90 underline hover:text-white"
+            >
+              Use a different account
+            </button>
           </div>
         )}
       </div>

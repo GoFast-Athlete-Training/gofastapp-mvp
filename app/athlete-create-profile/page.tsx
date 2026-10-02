@@ -8,6 +8,7 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import { clubManagerActivatePath, clubManagerHubPath } from '@/lib/club-manager-paths';
+import { isRunManageRedirectPath, runManageWelcomePath } from '@/lib/runmanage/door';
 
 type ProfileStep = 'intro' | 'form' | 'success';
 
@@ -35,6 +36,14 @@ function AthleteCreateProfileInner() {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) return;
+
+      if (
+        LocalStorageAPI.getRunManageMode() ||
+        isRunManageRedirectPath(redirectParam)
+      ) {
+        router.replace(runManageWelcomePath());
+        return;
+      }
 
       const displayName = firebaseUser.displayName || '';
       const firstNameFromFirebase = displayName.split(' ')[0] || '';
