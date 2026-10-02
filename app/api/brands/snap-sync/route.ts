@@ -1,15 +1,15 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyInternalApiKey } from "@/lib/internal-api-auth";
 import { upsertProdBrandSnap } from "@/lib/prod-brand-snap";
+import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 
 /**
- * POST /api/internal/brands/snap-sync
- * Machine lane only. HQ staff sends use POST /api/brands/snap-sync.
+ * POST /api/brands/snap-sync
+ * Human lane: Company staff Bearer + x-gofast-staff-id writes the prod brand row (same id as Sponsor Manage).
  */
 export async function POST(request: NextRequest) {
-  const authError = verifyInternalApiKey(request);
+  const authError = await assertStaffBearerAuth(request);
   if (authError) return authError;
 
   let body: { brand?: Parameters<typeof upsertProdBrandSnap>[0] };
