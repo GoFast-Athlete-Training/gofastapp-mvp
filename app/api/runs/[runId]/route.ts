@@ -644,6 +644,7 @@ export async function PUT(
         id: true,
         runClubId: true,
         runCrewId: true,
+        runStoreId: true,
         athleteGeneratedId: true,
         shakeoutDedupeKey: true,
         raceRegistryId: true,
