@@ -64,3 +64,34 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
 
   return { ok: true as const, brand };
 }
+
+const prodBrandReadSelect = {
+  id: true,
+  slug: true,
+  name: true,
+  brandType: true,
+  description: true,
+  websiteUrl: true,
+  instagramHandle: true,
+  logoUrl: true,
+  syncedAt: true,
+  updatedAt: true,
+} as const;
+
+export async function getProdBrandSnapById(brandId: string) {
+  const id = brandId.trim();
+  if (!id) {
+    return { ok: false as const, status: 400, error: "brandId required" };
+  }
+
+  const brand = await prisma.brands.findUnique({
+    where: { id },
+    select: prodBrandReadSelect,
+  });
+
+  if (!brand) {
+    return { ok: false as const, status: 404, error: "Brand not found on prod" };
+  }
+
+  return { ok: true as const, brand };
+}
