@@ -136,36 +136,20 @@ function buildCoursePacket(
 }
 
 function buildTrainingTipsPacket(
-  race: RaceInfoPacketRaceInput,
-  athlete: RaceInfoPacketAthleteContext,
+  _race: RaceInfoPacketRaceInput,
+  _athlete: RaceInfoPacketAthleteContext,
   phase: RaceInfoPacketPhase,
-  daysUntil: number
+  _daysUntil: number
 ): RaceInfoPacket {
-  const tipSegments = (race.courseSegments ?? []).filter((s) => trim(s.runTip));
-  const items: RaceInfoPacket["items"] = [];
-
-  for (const seg of tipSegments.slice(0, 5)) {
-    items.push({
-      label: seg.name,
-      value: trim(seg.runTip)!,
-    });
-  }
-
-  const hasData = tipSegments.length > 0;
-  const visible = athlete.isSignedUp && hasData && daysUntil >= 0;
-
   return {
     kind: "trainingTips",
     title: phase === "raceWeek" ? "Race-week prep" : "Training tips",
-    summary:
-      phase === "raceWeek"
-        ? "Stay on plan and review course notes."
-        : "Build toward race day with your plan and course tips.",
+    summary: "Review the course guide on the full course page.",
     priority: phase === "raceWeek" ? 25 : 20,
-    visible,
-    emphasized: visible && phase === "preRace",
-    items,
-    sourceCompleteness: completenessFromFields(items.length, Math.max(items.length, 1)),
+    visible: false,
+    emphasized: false,
+    items: [],
+    sourceCompleteness: 0,
   };
 }
 

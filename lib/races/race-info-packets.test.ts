@@ -97,12 +97,17 @@ test("race day guide is primary during race week for signed-up athletes", () => 
   assert.ok(guide!.items.some((i) => i.label === "Start time"));
 });
 
-test("course packet includes segments with run tips", () => {
+test("course packet includes segment descriptions", () => {
   const race = baseRace({
     courseSlug: "demo-marathon",
     courseMapUrl: "https://example.com/map.png",
     courseSegments: [
-      { order: 1, name: "Mile 1", mileMarker: "1", runTip: "Stay calm on the downhill." },
+      {
+        order: 1,
+        name: "Mile 1",
+        mileMarker: "1",
+        description: "Flat opening mile through downtown.",
+      },
     ],
   });
 
@@ -111,9 +116,10 @@ test("course packet includes segments with run tips", () => {
   assert.ok(course);
   assert.equal(course!.courseSlug, "demo-marathon");
   assert.equal(course!.segments?.length, 1);
+  assert.equal(course!.segments![0]!.description, "Flat opening mile through downtown.");
 });
 
-test("training tips packet requires signup and plan or segment tips", () => {
+test("training tips packet is retired (never visible)", () => {
   const race = baseRace({
     courseSegments: [{ order: 1, name: "Mile 20", runTip: "Break up the wall." }],
   });
@@ -127,19 +133,24 @@ test("training tips packet requires signup and plan or segment tips", () => {
       training: { hasActivePlan: true, planName: "Marathon Build", weekNumber: 12, totalWeeks: 16 },
     })
   );
-  const tips = signed.packets.find((p) => p.kind === "trainingTips");
-  assert.ok(tips);
-  assert.ok(tips!.items.some((i) => i.label === "Training plan"));
+  assert.ok(!signed.packets.some((p) => p.kind === "trainingTips"));
 });
 
-test("training tips are primary before race week even when logistics exist", () => {
+test("course guide is primary before race week when segments exist", () => {
   const raceDate = new Date();
   raceDate.setDate(raceDate.getDate() + 10);
   const race = baseRace({
     raceDate,
     logisticsInfo: "Metro recommended.",
     packetPickupLocation: "Convention Center",
-    courseSegments: [{ order: 1, name: "Mile 20", runTip: "Fuel before the climb." }],
+    courseSegments: [
+      {
+        order: 1,
+        name: "Summit Avenue",
+        mileMarker: "Miles 21–25",
+        description: "Gradual climb along Summit Avenue toward the Cathedral.",
+      },
+    ],
   });
 
   const result = buildRaceInfoPackets(
@@ -150,8 +161,9 @@ test("training tips are primary before race week even when logistics exist", () 
   );
 
   assert.equal(result.phase, "preRace");
-  assert.equal(result.primaryPacketKind, "trainingTips");
-  assert.ok(result.packets.some((p) => p.kind === "trainingTips"));
+  assert.equal(result.primaryPacketKind, "course");
+  assert.ok(result.packets.some((p) => p.kind === "course"));
+  assert.ok(!result.packets.some((p) => p.kind === "trainingTips"));
   assert.ok(!result.packets.some((p) => p.kind === "arrival"));
   assert.ok(!result.packets.some((p) => p.kind === "packetPickup"));
 });
