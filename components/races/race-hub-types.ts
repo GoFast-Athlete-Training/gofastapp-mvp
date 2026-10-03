@@ -81,6 +81,7 @@ export type MyRaceResultRow = {
 export type HubGateResult = {
   canAccessHub: boolean;
   loadedRace: RaceSummary | null;
+  staffPreview?: boolean;
 };
 
 export function distanceSnapToChips(snap: string | null | undefined): string[] {

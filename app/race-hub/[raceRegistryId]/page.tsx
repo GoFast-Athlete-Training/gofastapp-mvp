@@ -73,9 +73,10 @@ function RaceHubPageInner() {
   const [hubGoalId, setHubGoalId] = useState<string | null>(null);
   const [hubSignupId, setHubSignupId] = useState<string | null>(null);
   const [logSheetOpen, setLogSheetOpen] = useState(false);
+  const [staffPreview, setStaffPreview] = useState(false);
 
   const athleteId = LocalStorageAPI.getAthleteId();
-  const isAdmin = myMembership?.role === "ADMIN";
+  const isAdmin = !staffPreview && myMembership?.role === "ADMIN";
 
   const loadHubData = useCallback(async (): Promise<HubGateResult> => {
     const id = resolvedRegistryId?.trim();
@@ -101,14 +102,66 @@ function RaceHubPageInner() {
       return { canAccessHub: false, loadedRace: null };
     }
 
+    const loadStaffPreview = async (): Promise<HubGateResult | null> => {
+      try {
+        const staffRes = await api.get("/race-hub/staff/preview-access");
+        const staffId = staffRes.data?.staff?.id as string | undefined;
+        if (staffRes.data?.success && staffId) {
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("gofast_staff_preview_id", staffId);
+          }
+          setStaffPreview(true);
+          setMemberships([]);
+          setMyMembership(null);
+          const [aRes, eRes, shRes] = await Promise.all([
+            api.get(`/race-hub/${encodeURIComponent(id)}/announcements`),
+            api.get(`/race-hub/${encodeURIComponent(id)}/events`),
+            api.get(`/race-hub/${encodeURIComponent(id)}/shakeouts`),
+          ]);
+          setAnnouncements((aRes.data?.announcements as AnnouncementRow[]) || []);
+          setEvents((eRes.data?.events as RaceEventRow[]) || []);
+          setShakeouts((shRes.data?.shakeouts as ShakeoutRunRow[]) || []);
+          setMyRaceResult(null);
+          setHubGoalId(null);
+          setHubSignupId(null);
+          return { canAccessHub: true, loadedRace, staffPreview: true };
+        }
+      } catch {
+        /* not staff */
+      }
+      return null;
+    };
+
+    if (!me) {
+      const staffGate = await loadStaffPreview();
+      if (staffGate) return staffGate;
+      setStaffPreview(false);
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("gofast_staff_preview_id");
+      }
+      setAnnouncements([]);
+      setEvents([]);
+      setShakeouts([]);
+      setMyRaceResult(null);
+      setHubGoalId(null);
+      setHubSignupId(null);
+      return { canAccessHub: false, loadedRace };
+    }
+
     try {
       const membersRes = await api.get(`/race-hub/${encodeURIComponent(id)}/members`);
       const list = (membersRes.data?.memberships || []) as MembershipRow[];
       setMemberships(list);
-      const mine = me ? list.find((m) => m.athleteId === me) || null : null;
+      const mine = list.find((m) => m.athleteId === me) || null;
       setMyMembership(mine);
 
       if (!mine) {
+        const staffGate = await loadStaffPreview();
+        if (staffGate) return staffGate;
+        setStaffPreview(false);
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("gofast_staff_preview_id");
+        }
         setAnnouncements([]);
         setEvents([]);
         setShakeouts([]);
@@ -116,6 +169,11 @@ function RaceHubPageInner() {
         setHubGoalId(null);
         setHubSignupId(null);
         return { canAccessHub: false, loadedRace };
+      }
+
+      setStaffPreview(false);
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("gofast_staff_preview_id");
       }
 
       const signupsRes = await api.get("/race-signups");
@@ -263,7 +321,7 @@ function RaceHubPageInner() {
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (cancelled) return;
-      if (!user || !LocalStorageAPI.getAthleteId()) {
+      if (!user) {
         setLoading(false);
         setError("unauthorized");
         return;
@@ -497,6 +555,11 @@ function RaceHubPageInner() {
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <TopNav showBack backUrl={hubBackUrl} backLabel="My race" />
+      {staffPreview ? (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950">
+          Staff preview — read-only. Athletes still join through the commitment flow.
+        </div>
+      ) : null}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-start justify-between gap-3 sm:gap-4">

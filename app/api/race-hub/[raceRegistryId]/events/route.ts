@@ -4,8 +4,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAthleteFromBearer } from "@/lib/race-container-auth";
 import { requireRaceMembership } from "@/lib/race-container-membership";
+import { assertRaceHubReadAccess } from "@/lib/race-hub/hub-read-access";
 
-/** GET — members only */
+/** GET — race members or Company staff preview */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ raceRegistryId: string }> }
@@ -16,11 +17,6 @@ export async function GET(
       return NextResponse.json({ error: "raceRegistryId required" }, { status: 400 });
     }
 
-    const auth = await getAthleteFromBearer(request);
-    if ("error" in auth) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
-    }
-
     const race = await prisma.race_registry.findFirst({
       where: { id: raceRegistryId.trim(), isActive: true },
     });
@@ -28,10 +24,12 @@ export async function GET(
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
 
-    const membership = await requireRaceMembership(auth.athlete.id, race.id);
-    if (!membership) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const access = await assertRaceHubReadAccess(request, race.id);
+    if ("error" in access) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
     }
+
+    const athleteIdForRsvp = access.mode === "member" ? access.athleteId : "__none__";
 
     const events = await prisma.race_events.findMany({
       where: { raceId: race.id },
@@ -41,7 +39,7 @@ export async function GET(
           select: { id: true, firstName: true, lastName: true, photoURL: true },
         },
         race_event_rsvps: {
-          where: { athleteId: auth.athlete.id },
+          where: { athleteId: athleteIdForRsvp },
           take: 1,
         },
       },

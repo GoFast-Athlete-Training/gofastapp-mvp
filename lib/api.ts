@@ -5,6 +5,9 @@ import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { LocalStorageAPI } from './localstorage';
 import { ATHLETE_ID_HEADER } from './gofast-request-headers';
+import { STAFF_ID_HEADER } from './staff-forward-auth';
+
+const STAFF_PREVIEW_STORAGE_KEY = 'gofast_staff_preview_id';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || '/api',
@@ -62,6 +65,13 @@ api.interceptors.request.use(async (config) => {
       config.headers['Authorization'] = `Bearer ${token}`;
     } catch (err) {
       console.error('❌ API: Failed to get Firebase token:', err);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    const staffPreviewId = sessionStorage.getItem(STAFF_PREVIEW_STORAGE_KEY);
+    if (staffPreviewId && config.headers[STAFF_ID_HEADER] == null) {
+      config.headers[STAFF_ID_HEADER] = staffPreviewId;
     }
   }
 
