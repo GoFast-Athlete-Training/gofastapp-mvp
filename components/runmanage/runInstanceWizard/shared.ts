@@ -1,7 +1,14 @@
 import type { RunInstanceContext, RunSeriesContext } from "@/lib/runInstanceContent";
 import type { GroupWorkoutSegment } from "@/lib/group-workout-segment-editor";
 
-export type WizardStep = "sources" | "core" | "description" | "route" | "workout";
+export type WizardStep =
+  | "intake"
+  | "host"
+  | "sources"
+  | "core"
+  | "description"
+  | "route"
+  | "workout";
 
 export type CoreEditKey =
   | "title"
@@ -16,7 +23,34 @@ export type CoreEditKey =
 
 export const WIZARD_STEP_ORDER: WizardStep[] = ["sources", "core", "description", "route", "workout"];
 
+/** Create-from-scratch: intake → host → open core → sources → description → route (always) → workout */
+export const CREATE_SCRATCH_WIZARD_STEP_ORDER: WizardStep[] = [
+  "intake",
+  "host",
+  "core",
+  "sources",
+  "description",
+  "route",
+  "workout",
+];
+
+export function wizardStepOrderForVariant(
+  variant: RunInstanceWizardContext["variant"]
+): WizardStep[] {
+  return variant === "create-scratch" ? CREATE_SCRATCH_WIZARD_STEP_ORDER : WIZARD_STEP_ORDER;
+}
+
 export const WIZARD_STEPS: { id: WizardStep; title: string; description: string }[] = [
+  {
+    id: "intake",
+    title: "Intake",
+    description: "Manual entry, AI paste, or CSV",
+  },
+  {
+    id: "host",
+    title: "Host",
+    description: "Who is hosting this run",
+  },
   {
     id: "sources",
     title: "Source info",

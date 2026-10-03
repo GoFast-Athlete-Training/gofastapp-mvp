@@ -16,7 +16,6 @@ import { normalizeRunType } from "@/lib/runTypes";
 import runmanageApi from "@/lib/runmanage/api-client";
 import { runInstanceEditPath, RUN_MANAGE_DASHBOARD_PATH } from "@/lib/runmanage/paths";
 import {
-  RunManageRunAffiliations,
   affiliationsToPayload,
   emptyAffiliationDraft,
   type RunAffiliationDraft,
@@ -29,9 +28,8 @@ export default function RunManageCreateRunPage() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const [phase, setPhase] = useState<"scope" | "details">("scope");
   const [affiliations, setAffiliations] = useState<RunAffiliationDraft>(() =>
-    emptyAffiliationDraft("SPECIAL")
+    emptyAffiliationDraft("INDIVIDUAL")
   );
   const [wizardValues, setWizardValues] = useState<RunInstanceWizardValues>(() =>
     emptyWizardValues(localCalendarYmd(tomorrow))
@@ -132,56 +130,48 @@ export default function RunManageCreateRunPage() {
         Back to dashboard
       </Link>
       <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Run builder</p>
-      <h1 className="text-2xl font-bold text-gray-900">Create run</h1>
-      <p className="mt-1 text-sm text-gray-600">
-        Choose the run type and host, then add date, meet-up, and copy.
+      <label className="mt-2 block">
+        <span className="sr-only">Run title</span>
+        <input
+          type="text"
+          value={wizardValues.title}
+          onChange={(e) => setWizardValues((v) => ({ ...v, title: e.target.value }))}
+          placeholder="Run title"
+          className="w-full max-w-2xl border-0 border-b-2 border-gray-200 bg-transparent pb-1 text-2xl font-bold text-gray-900 placeholder:text-gray-400 focus:border-sky-600 focus:outline-none focus:ring-0"
+        />
+      </label>
+      <p className="mt-2 text-sm text-gray-600">
+        Intake, host, meet-up, route, and copy — all in one wizard.
       </p>
 
-      {phase === "scope" ? (
-        <div className="mt-6 max-w-3xl space-y-4 rounded-xl border border-gray-200 bg-gray-50/80 p-5">
-          <RunManageRunAffiliations draft={affiliations} onChange={setAffiliations} />
-          <button
-            type="button"
-            onClick={() => setPhase("details")}
-            className="rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
-          >
-            Continue to details
-          </button>
-        </div>
-      ) : (
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={() => setPhase("scope")}
-            className="mb-4 text-sm font-medium text-sky-700 hover:underline"
-          >
-            ← Edit type and affiliations
-          </button>
-          {saving ? (
-            <div className="flex items-center gap-2 text-gray-500">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Creating…
-            </div>
-          ) : (
-            <RunInstanceWizard
-              values={wizardValues}
-              onChange={setWizardValues}
-              context={{
-                variant: "create-scratch",
-                isSeriesInstance: false,
-                clubName: affiliations.runClubLabel,
-                clubId: affiliations.runClubId,
-              }}
-              onSave={() => void handleCreate()}
-              saving={saving}
-              error={error}
-              onErrorChange={setError}
-              saveLabel="Create draft run"
-              publicSources={null}
-            />
-          )}
-        </div>
-      )}
+      <div className="mt-6">
+        {saving ? (
+          <div className="flex items-center gap-2 text-gray-500">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Creating…
+          </div>
+        ) : (
+          <RunInstanceWizard
+            values={wizardValues}
+            onChange={setWizardValues}
+            context={{
+              variant: "create-scratch",
+              isSeriesInstance: false,
+              clubName: affiliations.runClubLabel,
+              clubId: affiliations.runClubId,
+            }}
+            affiliations={affiliations}
+            onAffiliationsChange={setAffiliations}
+            titleInPageHeading
+            onSave={() => void handleCreate()}
+            saving={saving}
+            error={error}
+            onErrorChange={setError}
+            saveLabel="Create draft run"
+            publicSources={null}
+          />
+        )}
+      </div>
     </div>
   );
 }

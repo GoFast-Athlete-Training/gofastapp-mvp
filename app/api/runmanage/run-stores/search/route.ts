@@ -22,7 +22,15 @@ export async function GET(request: NextRequest) {
         { city: { contains: q, mode: "insensitive" } },
       ],
     },
-    select: { id: true, name: true, slug: true, logoUrl: true, city: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logoUrl: true,
+      city: true,
+      state: true,
+      websiteUrl: true,
+    },
     take: 20,
     orderBy: { name: "asc" },
   });

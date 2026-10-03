@@ -13,6 +13,8 @@ import {
   Route,
   Sparkles,
   Activity,
+  Users,
+  ClipboardList,
   X,
 } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
@@ -48,7 +50,7 @@ import { wizardSidebarButtonClasses } from "@/components/club-manager/WizardStat
 import type { WizardStepVisualStatus } from "@/lib/runmanage/wizard-step-visual-status";
 import {
   WIZARD_STEPS,
-  WIZARD_STEP_ORDER,
+  wizardStepOrderForVariant,
   buildInstanceContextFromValues,
   fieldChanged,
   formatInstanceDateLabel,
@@ -58,6 +60,14 @@ import {
   type RunInstanceWizardValues,
   type WizardStep,
 } from "./shared";
+import type { IntakeMode } from "@/components/runmanage/intake/IntakeModePicker";
+import RunManageScratchIntakeStep from "./RunManageScratchIntakeStep";
+import RunManageRunHostStep, {
+  validateHostStep,
+  type HostScope,
+} from "./RunManageRunHostStep";
+import RunManageOpenCorePanel from "./RunManageOpenCorePanel";
+import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
 
 export type RunInstanceWizardProps = {
   values: RunInstanceWizardValues;
@@ -89,6 +99,11 @@ export type RunInstanceWizardProps = {
   };
   /** Open directly on a wizard step (e.g. workout from Active Schedule). */
   initialWizardStep?: WizardStep;
+  /** Create-from-scratch: host + optional partners */
+  affiliations?: RunAffiliationDraft;
+  onAffiliationsChange?: (draft: RunAffiliationDraft) => void;
+  /** Title is edited in the page heading — core step skips title checklist */
+  titleInPageHeading?: boolean;
 };
 
 function renderCoreStatusBadge(opts: {
@@ -142,10 +157,19 @@ export default function RunInstanceWizard({
   headerSlot,
   publicSources,
   instanceToolbar,
-  initialWizardStep = "sources",
+  initialWizardStep,
+  affiliations,
+  onAffiliationsChange,
+  titleInPageHeading = false,
 }: RunInstanceWizardProps) {
-  const [wizardStep, setWizardStep] = useState<WizardStep>(initialWizardStep);
+  const isCreateScratch = context.variant === "create-scratch";
+  const resolvedInitialStep: WizardStep =
+    initialWizardStep ?? (isCreateScratch ? "intake" : "sources");
+  const [wizardStep, setWizardStep] = useState<WizardStep>(resolvedInitialStep);
   const [coreEditKey, setCoreEditKey] = useState<CoreEditKey>(null);
+  const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
+  const [intakeApplied, setIntakeApplied] = useState(false);
+  const [hostScope, setHostScope] = useState<HostScope | null>(null);
   const [generatingDescription, setGeneratingDescription] = useState(false);
   const [generatingRouteDetails, setGeneratingRouteDetails] = useState(false);
   const [uploadingMapImage, setUploadingMapImage] = useState(false);
@@ -181,7 +205,7 @@ export default function RunInstanceWizard({
     values.date.trim() &&
       !weekdayMismatch &&
       values.meetUpPoint.trim() &&
-      values.title.trim()
+      (titleInPageHeading || values.title.trim())
   );
 
   const routeStepComplete = Boolean(
@@ -198,10 +222,15 @@ export default function RunInstanceWizard({
 
   const descriptionStepComplete = Boolean(values.description.trim());
 
-  const visibleWizardSteps = useMemo(
-    () => (isTrack ? WIZARD_STEP_ORDER.filter((s) => s !== "route") : WIZARD_STEP_ORDER),
-    [isTrack]
+  const stepOrder = useMemo(
+    () => wizardStepOrderForVariant(context.variant),
+    [context.variant]
   );
+
+  const visibleWizardSteps = useMemo(() => {
+    if (isCreateScratch) return stepOrder;
+    return isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
+  }, [isCreateScratch, isTrack, stepOrder]);
 
   const lastWizardStep = visibleWizardSteps[visibleWizardSteps.length - 1] ?? "workout";
 
@@ -224,39 +253,67 @@ export default function RunInstanceWizard({
       onErrorChange?.("Meet-up is required.");
       return false;
     }
-    if (!values.title.trim()) {
+    if (!titleInPageHeading && !values.title.trim()) {
       onErrorChange?.("Title is required.");
+      return false;
+    }
+    if (titleInPageHeading && !values.title.trim()) {
+      onErrorChange?.("Add a run title in the heading above.");
       return false;
     }
     onErrorChange?.(null);
     return true;
   };
 
+  const stepIndex = (step: WizardStep) => visibleWizardSteps.indexOf(step);
+
   const handleWizardNext = () => {
-    if (wizardStep === "sources") {
+    const idx = stepIndex(wizardStep);
+    const next = visibleWizardSteps[idx + 1];
+    if (!next) return;
+
+    if (wizardStep === "intake") {
+      if (!intakeMode) {
+        onErrorChange?.("Choose manual, AI parse, or CSV.");
+        return;
+      }
+      if (intakeMode !== "manual" && !intakeApplied) {
+        onErrorChange?.("Parse or import your row before continuing.");
+        return;
+      }
+      onErrorChange?.(null);
+      goToWizardStep(next);
+      return;
+    }
+    if (wizardStep === "host") {
+      const hostErr = affiliations ? validateHostStep(hostScope, affiliations) : "Host setup missing.";
+      if (hostErr) {
+        onErrorChange?.(hostErr);
+        return;
+      }
+      onErrorChange?.(null);
+      goToWizardStep(next);
+      return;
+    }
+    if (wizardStep === "sources" && !isCreateScratch) {
       goToWizardStep("core");
       return;
     }
     if (wizardStep === "core") {
       if (!validateCoreStep()) return;
-      goToWizardStep("description");
+      goToWizardStep(next);
       return;
     }
-    if (wizardStep === "description") {
-      goToWizardStep(isTrack ? "workout" : "route");
-      return;
-    }
-    if (wizardStep === "route") {
-      goToWizardStep("workout");
-    }
+    goToWizardStep(next);
   };
 
   const handleWizardBack = () => {
-    if (wizardStep === "workout") goToWizardStep(isTrack ? "description" : "route");
-    else if (wizardStep === "route") goToWizardStep("description");
-    else if (wizardStep === "description") goToWizardStep("core");
-    else if (wizardStep === "core") goToWizardStep("sources");
+    const idx = stepIndex(wizardStep);
+    const prev = visibleWizardSteps[idx - 1];
+    if (prev) goToWizardStep(prev);
   };
+
+  const firstWizardStep = visibleWizardSteps[0] ?? "sources";
 
   const handleWizardStepClick = (step: WizardStep) => {
     goToWizardStep(step);
@@ -324,6 +381,8 @@ export default function RunInstanceWizard({
   };
 
   const wizardStepIcon = (step: WizardStep) => {
+    if (step === "intake") return <ClipboardList className="h-4 w-4" />;
+    if (step === "host") return <Users className="h-4 w-4" />;
     if (step === "sources") return <Link2 className="h-4 w-4" />;
     if (step === "core") return <MapPin className="h-4 w-4" />;
     if (step === "route") return <Route className="h-4 w-4" />;
@@ -332,6 +391,17 @@ export default function RunInstanceWizard({
   };
 
   const wizardStepStatus = (step: WizardStep): "complete" | "partial" | "idle" => {
+    if (step === "intake") {
+      if (intakeMode === "manual") return "complete";
+      if (intakeApplied) return "complete";
+      if (intakeMode) return "partial";
+      return "idle";
+    }
+    if (step === "host") {
+      if (affiliations && !validateHostStep(hostScope, affiliations)) return "complete";
+      if (hostScope) return "partial";
+      return "idle";
+    }
     if (step === "sources") {
       if (sourcesStepComplete) return "complete";
       return "idle";
@@ -539,6 +609,28 @@ export default function RunInstanceWizard({
         </aside>
 
         <div className="min-w-0 space-y-4">
+          {wizardStep === "intake" && isCreateScratch ? (
+            <RunManageScratchIntakeStep
+              values={values}
+              mode={intakeMode}
+              onModeChange={setIntakeMode}
+              onIntakeApplied={() => setIntakeApplied(true)}
+              onApply={(next) => {
+                onChange(next);
+                setIntakeApplied(true);
+              }}
+              onError={(msg) => onErrorChange?.(msg)}
+            />
+          ) : null}
+
+          {wizardStep === "host" && isCreateScratch && affiliations && onAffiliationsChange ? (
+            <RunManageRunHostStep
+              draft={affiliations}
+              onChange={onAffiliationsChange}
+              onScopeChange={setHostScope}
+            />
+          ) : null}
+
           {wizardStep === "sources" && (
             <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
               <div>
@@ -552,7 +644,18 @@ export default function RunInstanceWizard({
             </div>
           )}
 
-          {wizardStep === "core" && (
+          {wizardStep === "core" && isCreateScratch ? (
+            <RunManageOpenCorePanel
+              values={values}
+              onChange={onChange}
+              patch={patch}
+              context={context}
+              weekdayMismatch={weekdayMismatch}
+              onErrorChange={onErrorChange}
+            />
+          ) : null}
+
+          {wizardStep === "core" && !isCreateScratch && (
             <div className="rounded-lg border border-gray-200 bg-white">
               <div className="border-b border-gray-100 px-4 py-3">
                 <h3 className="text-sm font-semibold text-gray-900">Core details</h3>
@@ -864,7 +967,7 @@ export default function RunInstanceWizard({
             </div>
           )}
 
-          {wizardStep === "route" && !isTrack && (
+          {wizardStep === "route" && (!isTrack || isCreateScratch) && (
             <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Route</h3>
@@ -1165,7 +1268,7 @@ export default function RunInstanceWizard({
 
       {!hideFooter && (
         <div className="flex flex-wrap gap-2 border-t border-gray-200 pt-4">
-          {wizardStep !== "sources" ? (
+          {wizardStep !== firstWizardStep ? (
             <button
               type="button"
               onClick={handleWizardBack}

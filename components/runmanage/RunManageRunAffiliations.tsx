@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
 import {
   type PartnerExtra,
@@ -16,16 +16,31 @@ export type AffiliationPick = {
   name: string;
   logoUrl?: string | null;
   secondary?: string | null;
+  slug?: string | null;
+  city?: string | null;
+  state?: string | null;
+  websiteUrl?: string | null;
+  kindLabel?: string | null;
 };
+
+function metaLine(hit: AffiliationPick): string {
+  const place = [hit.city, hit.state].filter(Boolean).join(", ");
+  return [place || null, hit.slug ? `/${hit.slug}` : null, hit.websiteUrl || null]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 export type RunAffiliationDraft = {
   cityRunType: StaffCreateRunType;
   runClubId: string | null;
   runClubLabel: string | null;
+  runClubPick: AffiliationPick | null;
   runBrandId: string | null;
   runBrandLabel: string | null;
+  runBrandPick: AffiliationPick | null;
   runStoreId: string | null;
   runStoreLabel: string | null;
+  runStorePick: AffiliationPick | null;
   raceRegistryId: string | null;
   partnerExtras: PartnerExtra[];
 };
@@ -58,7 +73,73 @@ function apiErrorMessage(err: unknown): string {
   return e.response?.data?.error || e.message || "Search failed";
 }
 
-function EntitySearch({
+function HitCard({
+  hit,
+  actionLabel,
+  onAction,
+}: {
+  hit: AffiliationPick;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  const line = metaLine(hit);
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+      {hit.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={hit.logoUrl} alt="" className="h-9 w-9 shrink-0 rounded object-contain" />
+      ) : (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-gray-100 text-xs font-semibold text-gray-500">
+          {hit.name.slice(0, 1)}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-gray-900">{hit.name}</p>
+        {hit.kindLabel ? <p className="text-[11px] uppercase tracking-wide text-gray-500">{hit.kindLabel}</p> : null}
+        {line ? <p className="truncate text-xs text-gray-600">{line}</p> : (
+          <p className="text-xs text-gray-400">No city, slug, or site on this record</p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onAction}
+        className="shrink-0 rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700"
+      >
+        {actionLabel}
+      </button>
+    </div>
+  );
+}
+
+function AttachedCard({ hit, onClear }: { hit: AffiliationPick; onClear: () => void }) {
+  const line = metaLine(hit);
+  return (
+    <div className="mt-2 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+      {hit.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={hit.logoUrl} alt="" className="h-9 w-9 shrink-0 rounded object-contain" />
+      ) : (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-white text-xs font-semibold text-emerald-800">
+          {hit.name.slice(0, 1)}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">Attached</p>
+        <p className="truncate text-sm font-semibold text-gray-900">{hit.name}</p>
+        {line ? <p className="truncate text-xs text-gray-600">{line}</p> : null}
+      </div>
+      <button
+        type="button"
+        onClick={onClear}
+        className="shrink-0 text-xs font-medium text-gray-600 hover:text-gray-900"
+      >
+        Detach
+      </button>
+    </div>
+  );
+}
+
+export function EntitySearch({
   label,
   placeholder,
   selected,
@@ -93,12 +174,22 @@ function EntitySearch({
           setStatus({ kind: "error", message: res.data?.error ?? "Brand search failed" });
           return;
         }
-        const brands = (res.data?.brands ?? []) as AffiliationPick[];
+        const brands = (res.data?.brands ?? []) as Array<{
+          id: string;
+          name: string;
+          logoUrl?: string | null;
+          slug?: string | null;
+          websiteUrl?: string | null;
+          brandType?: string | null;
+        }>;
         const mapped = brands.map((b) => ({
           id: b.id,
           name: b.name,
           logoUrl: b.logoUrl,
-          secondary: null as string | null,
+          slug: b.slug,
+          websiteUrl: b.websiteUrl,
+          kindLabel: b.brandType,
+          secondary: b.brandType,
         }));
         setHits(mapped);
         setStatus(mapped.length === 0 ? { kind: "empty", q } : null);
@@ -114,12 +205,19 @@ function EntitySearch({
           id: string;
           name: string;
           logoUrl?: string | null;
+          slug?: string | null;
           city?: string | null;
+          state?: string | null;
+          websiteUrl?: string | null;
         }>;
         const mapped = clubs.map((c) => ({
           id: c.id,
           name: c.name,
           logoUrl: c.logoUrl,
+          slug: c.slug,
+          city: c.city,
+          state: c.state,
+          websiteUrl: c.websiteUrl,
           secondary: c.city,
         }));
         setHits(mapped);
@@ -136,12 +234,19 @@ function EntitySearch({
           id: string;
           name: string;
           logoUrl?: string | null;
+          slug?: string | null;
           city?: string | null;
+          state?: string | null;
+          websiteUrl?: string | null;
         }>;
         const mapped = stores.map((s) => ({
           id: s.id,
           name: s.name,
           logoUrl: s.logoUrl,
+          slug: s.slug,
+          city: s.city,
+          state: s.state,
+          websiteUrl: s.websiteUrl,
           secondary: s.city,
         }));
         setHits(mapped);
@@ -157,16 +262,9 @@ function EntitySearch({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3">
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-medium text-gray-800">{label}</span>
-        {selected ? (
-          <button type="button" onClick={onClear} className="text-xs text-gray-500 hover:text-gray-800">
-            Clear
-          </button>
-        ) : null}
-      </div>
+      <p className="text-sm font-medium text-gray-800">{label}</p>
       {selected ? (
-        <p className="mt-2 text-sm font-semibold text-gray-900">{selected.name}</p>
+        <AttachedCard hit={selected} onClear={onClear} />
       ) : (
         <>
           <div className="mt-2 flex gap-2">
@@ -197,31 +295,30 @@ function EntitySearch({
             </button>
           </div>
           {status?.kind === "searching" ? (
-            <p className="mt-2 text-sm text-gray-600">Searching…</p>
+            <p className="mt-2 text-sm text-gray-600">Searching the catalog…</p>
           ) : status?.kind === "empty" ? (
             <p className="mt-2 text-sm text-gray-600">No matches for &ldquo;{status.q}&rdquo;.</p>
           ) : status?.kind === "error" ? (
             <p className="mt-2 text-sm text-red-600">{status.message}</p>
+          ) : hits.length === 0 ? (
+            <p className="mt-2 text-xs text-gray-500">
+              Search lists matches. Nothing is linked until you press Attach.
+            </p>
           ) : null}
           {hits.length > 0 ? (
-            <ul className="mt-2 max-h-40 overflow-y-auto divide-y divide-gray-100 rounded border border-gray-100">
+            <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
               {hits.map((h) => (
                 <li key={h.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
+                  <HitCard
+                    hit={h}
+                    actionLabel="Attach"
+                    onAction={() => {
                       onSelect(h);
                       setHits([]);
                       setQuery("");
                       setStatus(null);
                     }}
-                    className="w-full px-2 py-2 text-left text-sm hover:bg-sky-50"
-                  >
-                    <span className="font-medium">{h.name}</span>
-                    {h.secondary ? (
-                      <span className="ml-1 text-xs text-gray-500">{h.secondary}</span>
-                    ) : null}
-                  </button>
+                  />
                 </li>
               ))}
             </ul>
@@ -239,10 +336,13 @@ export function emptyAffiliationDraft(
     cityRunType,
     runClubId: null,
     runClubLabel: null,
+    runClubPick: null,
     runBrandId: null,
     runBrandLabel: null,
+    runBrandPick: null,
     runStoreId: null,
     runStoreLabel: null,
+    runStorePick: null,
     raceRegistryId: null,
     partnerExtras: [],
   };
@@ -317,19 +417,18 @@ export function RunManageRunAffiliations({
           label="Club"
           placeholder="Search clubs…"
           kind="club"
-          selected={
-            draft.runClubId && draft.runClubLabel
-              ? { id: draft.runClubId, name: draft.runClubLabel }
-              : null
-          }
+          selected={draft.runClubPick}
           onSelect={(h) =>
             onChange({
               ...draft,
               runClubId: h.id,
               runClubLabel: h.name,
+              runClubPick: h,
             })
           }
-          onClear={() => onChange({ ...draft, runClubId: null, runClubLabel: null })}
+          onClear={() =>
+            onChange({ ...draft, runClubId: null, runClubLabel: null, runClubPick: null })
+          }
         />
       ) : null}
 
@@ -338,19 +437,18 @@ export function RunManageRunAffiliations({
           label="Run store"
           placeholder="Search stores…"
           kind="store"
-          selected={
-            draft.runStoreId && draft.runStoreLabel
-              ? { id: draft.runStoreId, name: draft.runStoreLabel }
-              : null
-          }
+          selected={draft.runStorePick}
           onSelect={(h) =>
             onChange({
               ...draft,
               runStoreId: h.id,
               runStoreLabel: h.name,
+              runStorePick: h,
             })
           }
-          onClear={() => onChange({ ...draft, runStoreId: null, runStoreLabel: null })}
+          onClear={() =>
+            onChange({ ...draft, runStoreId: null, runStoreLabel: null, runStorePick: null })
+          }
         />
       ) : null}
 
@@ -360,43 +458,52 @@ export function RunManageRunAffiliations({
             label="Brand (optional)"
             placeholder="Search brands…"
             kind="brand"
-            selected={
-              draft.runBrandId && draft.runBrandLabel
-                ? { id: draft.runBrandId, name: draft.runBrandLabel }
-                : null
-            }
+            selected={draft.runBrandPick}
             onSelect={(h) =>
-              onChange({ ...draft, runBrandId: h.id, runBrandLabel: h.name })
+              onChange({
+                ...draft,
+                runBrandId: h.id,
+                runBrandLabel: h.name,
+                runBrandPick: h,
+              })
             }
-            onClear={() => onChange({ ...draft, runBrandId: null, runBrandLabel: null })}
+            onClear={() =>
+              onChange({ ...draft, runBrandId: null, runBrandLabel: null, runBrandPick: null })
+            }
           />
           <EntitySearch
             label="Store (optional)"
             placeholder="Search stores…"
             kind="store"
-            selected={
-              draft.runStoreId && draft.runStoreLabel
-                ? { id: draft.runStoreId, name: draft.runStoreLabel }
-                : null
-            }
+            selected={draft.runStorePick}
             onSelect={(h) =>
-              onChange({ ...draft, runStoreId: h.id, runStoreLabel: h.name })
+              onChange({
+                ...draft,
+                runStoreId: h.id,
+                runStoreLabel: h.name,
+                runStorePick: h,
+              })
             }
-            onClear={() => onChange({ ...draft, runStoreId: null, runStoreLabel: null })}
+            onClear={() =>
+              onChange({ ...draft, runStoreId: null, runStoreLabel: null, runStorePick: null })
+            }
           />
           <EntitySearch
             label="Club (optional)"
             placeholder="Search clubs…"
             kind="club"
-            selected={
-              draft.runClubId && draft.runClubLabel
-                ? { id: draft.runClubId, name: draft.runClubLabel }
-                : null
-            }
+            selected={draft.runClubPick}
             onSelect={(h) =>
-              onChange({ ...draft, runClubId: h.id, runClubLabel: h.name })
+              onChange({
+                ...draft,
+                runClubId: h.id,
+                runClubLabel: h.name,
+                runClubPick: h,
+              })
             }
-            onClear={() => onChange({ ...draft, runClubId: null, runClubLabel: null })}
+            onClear={() =>
+              onChange({ ...draft, runClubId: null, runClubLabel: null, runClubPick: null })
+            }
           />
         </div>
       ) : null}
@@ -460,8 +567,25 @@ function ExtraClubAdd({ onAdd }: { onAdd: (hit: AffiliationPick) => void }) {
         setStatus({ kind: "error", message: res.data?.error ?? "Club search failed" });
         return;
       }
-      const clubs = (res.data?.clubs ?? []) as Array<{ id: string; name: string; city?: string | null }>;
-      const mapped = clubs.map((c) => ({ id: c.id, name: c.name, secondary: c.city }));
+      const clubs = (res.data?.clubs ?? []) as Array<{
+        id: string;
+        name: string;
+        logoUrl?: string | null;
+        slug?: string | null;
+        city?: string | null;
+        state?: string | null;
+        websiteUrl?: string | null;
+      }>;
+      const mapped = clubs.map((c) => ({
+        id: c.id,
+        name: c.name,
+        logoUrl: c.logoUrl,
+        slug: c.slug,
+        city: c.city,
+        state: c.state,
+        websiteUrl: c.websiteUrl,
+        secondary: c.city,
+      }));
       setHits(mapped);
       setStatus(mapped.length === 0 ? { kind: "empty", q } : null);
     } catch (err) {
@@ -502,42 +626,69 @@ function ExtraClubAdd({ onAdd }: { onAdd: (hit: AffiliationPick) => void }) {
         </button>
       </div>
       {status?.kind === "searching" ? (
-        <p className="text-sm text-gray-600">Searching…</p>
+        <p className="text-sm text-gray-600">Searching the catalog…</p>
       ) : status?.kind === "empty" ? (
         <p className="text-sm text-gray-600">No matches for &ldquo;{status.q}&rdquo;.</p>
       ) : status?.kind === "error" ? (
         <p className="text-sm text-red-600">{status.message}</p>
+      ) : hits.length === 0 ? (
+        <p className="text-xs text-gray-500">Search, then Attach. That adds the club to this run.</p>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      <div className="space-y-2">
         {hits.map((h) => (
-          <button
+          <HitCard
             key={h.id}
-            type="button"
-            onClick={() => {
+            hit={h}
+            actionLabel="Attach"
+            onAction={() => {
               onAdd(h);
               setHits([]);
               setQuery("");
               setStatus(null);
             }}
-            className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-1 text-xs font-medium text-sky-800"
-          >
-            <Plus className="h-3 w-3" />
-            {h.name}
-          </button>
+          />
         ))}
       </div>
     </div>
   );
 }
 
+type RelationSnap = {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  slug?: string | null;
+  city?: string | null;
+  state?: string | null;
+  websiteUrl?: string | null;
+  brandType?: string | null;
+};
+
+function pickFromRelation(rel: RelationSnap | null | undefined, fallbackId?: string | null): AffiliationPick | null {
+  if (rel) {
+    return {
+      id: rel.id,
+      name: rel.name,
+      logoUrl: rel.logoUrl,
+      slug: rel.slug,
+      city: rel.city,
+      state: rel.state,
+      websiteUrl: rel.websiteUrl,
+      kindLabel: rel.brandType,
+    };
+  }
+  if (fallbackId) return { id: fallbackId, name: "Attached" };
+  return null;
+}
+
 export function draftFromRun(run: {
   cityRunType?: string | null;
   runClubId?: string | null;
-  runClub?: { id: string; name: string } | null;
+  runClub?: RelationSnap | null;
   runBrandId?: string | null;
-  runBrand?: { id: string; name: string } | null;
+  runBrand?: RelationSnap | null;
   runStoreId?: string | null;
-  runStore?: { id: string; name: string } | null;
+  runStore?: RelationSnap | null;
   raceRegistryId?: string | null;
   partnerExtras?: unknown;
 }): RunAffiliationDraft {
@@ -546,14 +697,20 @@ export function draftFromRun(run: {
     typeof t === "string" && STAFF_CREATE_RUN_TYPES.includes(t as StaffCreateRunType)
       ? (t as StaffCreateRunType)
       : "SPECIAL";
+  const runClubPick = pickFromRelation(run.runClub, run.runClubId);
+  const runBrandPick = pickFromRelation(run.runBrand, run.runBrandId);
+  const runStorePick = pickFromRelation(run.runStore, run.runStoreId);
   return {
     cityRunType,
-    runClubId: run.runClubId ?? run.runClub?.id ?? null,
+    runClubId: runClubPick?.id ?? null,
     runClubLabel: run.runClub?.name ?? null,
-    runBrandId: run.runBrandId ?? run.runBrand?.id ?? null,
+    runClubPick,
+    runBrandId: runBrandPick?.id ?? null,
     runBrandLabel: run.runBrand?.name ?? null,
-    runStoreId: run.runStoreId ?? run.runStore?.id ?? null,
+    runBrandPick,
+    runStoreId: runStorePick?.id ?? null,
     runStoreLabel: run.runStore?.name ?? null,
+    runStorePick,
     raceRegistryId: run.raceRegistryId ?? null,
     partnerExtras: parsePartnerExtras(run.partnerExtras),
   };
