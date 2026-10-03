@@ -27,6 +27,11 @@ export function isRunManageHostname(hostname: string): boolean {
   return hostname.toLowerCase().startsWith('runmanage.');
 }
 
+/** Staff read-only race hub: racehubstaff.gofastcrushgoals.com */
+export function isRaceHubStaffHostname(hostname: string): boolean {
+  return hostname.toLowerCase().startsWith('racehubstaff.');
+}
+
 export function resolveRootHostIntent(hostname: string): RootHostIntent {
   if (isCoachHostname(hostname)) return 'coach';
   if (isClubManageHostname(hostname)) return 'club-manager';

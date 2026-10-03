@@ -7,11 +7,13 @@ import type { RaceEventRow, ShakeoutRunRow } from "@/components/races/race-hub-t
 type RaceHubShakeoutsSectionProps = {
   shakeouts: ShakeoutRunRow[];
   onSetShakeoutRunRsvp: (runId: string, status: "going" | "not-going") => void;
+  readOnly?: boolean;
 };
 
 export function RaceHubShakeoutsSection({
   shakeouts,
   onSetShakeoutRunRsvp,
+  readOnly = false,
 }: RaceHubShakeoutsSectionProps) {
   return (
     <section className="space-y-4">
@@ -105,36 +107,49 @@ export function RaceHubShakeoutsSection({
                     <p className="mt-1.5 text-xs text-gray-500 italic">After: {sh.postRunActivity}</p>
                   ) : null}
 
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void onSetShakeoutRunRsvp(sh.id, "going")}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                        isGoing
-                          ? "bg-green-600 text-white"
-                          : "bg-orange-500 hover:bg-orange-600 text-white"
-                      }`}
-                    >
-                      {isGoing ? "✓ I'm in" : "I'm in"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void onSetShakeoutRunRsvp(sh.id, "not-going")}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                        isCantGo
-                          ? "bg-gray-600 text-white"
-                          : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                      }`}
-                    >
-                      Can&apos;t make it
-                    </button>
-                    <Link
-                      href={sh.gorunPath}
-                      className="ml-auto text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
-                    >
-                      Run details
-                    </Link>
-                  </div>
+                  {readOnly ? (
+                    sh.gorunPath ? (
+                      <div className="mt-4">
+                        <Link
+                          href={sh.gorunPath}
+                          className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
+                        >
+                          Run details
+                        </Link>
+                      </div>
+                    ) : null
+                  ) : (
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void onSetShakeoutRunRsvp(sh.id, "going")}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                          isGoing
+                            ? "bg-green-600 text-white"
+                            : "bg-orange-500 hover:bg-orange-600 text-white"
+                        }`}
+                      >
+                        {isGoing ? "✓ I'm in" : "I'm in"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void onSetShakeoutRunRsvp(sh.id, "not-going")}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                          isCantGo
+                            ? "bg-gray-600 text-white"
+                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        Can&apos;t make it
+                      </button>
+                      <Link
+                        href={sh.gorunPath}
+                        className="ml-auto text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
+                      >
+                        Run details
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </li>
             );
@@ -148,9 +163,14 @@ export function RaceHubShakeoutsSection({
 type RaceHubEventsSectionProps = {
   events: RaceEventRow[];
   onSetRsvp: (eventId: string, status: "going" | "not-going" | "maybe") => void;
+  readOnly?: boolean;
 };
 
-export function RaceHubEventsSection({ events, onSetRsvp }: RaceHubEventsSectionProps) {
+export function RaceHubEventsSection({
+  events,
+  onSetRsvp,
+  readOnly = false,
+}: RaceHubEventsSectionProps) {
   return (
     <section className="space-y-4">
       <div>
@@ -176,26 +196,28 @@ export function RaceHubEventsSection({ events, onSetRsvp }: RaceHubEventsSection
                 {ev.description ? (
                   <p className="text-sm text-gray-700 mt-2 whitespace-pre-line">{ev.description}</p>
                 ) : null}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {(["going", "maybe", "not-going"] as const).map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => void onSetRsvp(ev.id, status)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                        myStatus === status
-                          ? status === "going"
-                            ? "bg-green-600 text-white"
-                            : status === "maybe"
-                              ? "bg-amber-500 text-white"
-                              : "bg-gray-600 text-white"
-                          : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                      }`}
-                    >
-                      {status === "going" ? "Going" : status === "maybe" ? "Maybe" : "Can't go"}
-                    </button>
-                  ))}
-                </div>
+                {readOnly ? null : (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(["going", "maybe", "not-going"] as const).map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => void onSetRsvp(ev.id, status)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                          myStatus === status
+                            ? status === "going"
+                              ? "bg-green-600 text-white"
+                              : status === "maybe"
+                                ? "bg-amber-500 text-white"
+                                : "bg-gray-600 text-white"
+                            : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                        }`}
+                      >
+                        {status === "going" ? "Going" : status === "maybe" ? "Maybe" : "Can't go"}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </li>
             );
           })}

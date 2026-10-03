@@ -21,6 +21,8 @@ import type {
   RaceEventRow,
   ShakeoutRunRow,
 } from "@/components/races/race-hub-types";
+import type { RaceInfoPacket } from "@/lib/races/race-info-packet-types";
+import RaceHubStaffInfoPacketsSection from "@/components/races/RaceHubStaffInfoPacketsSection";
 
 type RaceHubMobileTabsProps = {
   raceRegistryId: string;
@@ -51,6 +53,8 @@ type RaceHubMobileTabsProps = {
   showPostRaceResultCard: boolean;
   myRaceResult: MyRaceResultRow | null;
   onOpenLogSheet: () => void;
+  readOnly?: boolean;
+  infoPackets?: RaceInfoPacket[];
 };
 
 const TABS = [
@@ -76,6 +80,7 @@ export default function RaceHubMobileTabs(props: RaceHubMobileTabsProps) {
           latestAnnouncement={latestAnnouncement}
           announcementCount={props.announcements.length}
           onViewAllAnnouncements={() => setActiveTab("info")}
+          readOnly={props.readOnly}
         />
       ) : null}
 
@@ -98,8 +103,8 @@ export default function RaceHubMobileTabs(props: RaceHubMobileTabsProps) {
           />
           <RaceHubAnnouncementsSection
             announcements={props.announcements}
-            isAdmin={props.isAdmin}
-            showAnnounceForm={props.showAnnounceForm}
+            isAdmin={props.readOnly ? false : props.isAdmin}
+            showAnnounceForm={props.readOnly ? false : props.showAnnounceForm}
             onToggleAnnounceForm={props.onToggleAnnounceForm}
             announceTitle={props.announceTitle}
             announceBody={props.announceBody}
@@ -110,6 +115,9 @@ export default function RaceHubMobileTabs(props: RaceHubMobileTabsProps) {
             postingAnnounce={props.postingAnnounce}
             compact
           />
+          {props.infoPackets && props.infoPackets.length > 0 ? (
+            <RaceHubStaffInfoPacketsSection packets={props.infoPackets} />
+          ) : null}
         </div>
       ) : null}
 
@@ -118,8 +126,13 @@ export default function RaceHubMobileTabs(props: RaceHubMobileTabsProps) {
           <RaceHubShakeoutsSection
             shakeouts={props.shakeouts}
             onSetShakeoutRunRsvp={props.onSetShakeoutRunRsvp}
+            readOnly={props.readOnly}
           />
-          <RaceHubEventsSection events={props.events} onSetRsvp={props.onSetRsvp} />
+          <RaceHubEventsSection
+            events={props.events}
+            onSetRsvp={props.onSetRsvp}
+            readOnly={props.readOnly}
+          />
         </div>
       ) : null}
 

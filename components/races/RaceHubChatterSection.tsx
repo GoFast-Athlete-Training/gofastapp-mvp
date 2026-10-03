@@ -12,6 +12,7 @@ type RaceHubChatterSectionProps = {
   variant?: "default" | "mobile-hub";
   showHeading?: boolean;
   messageListClassName?: string;
+  readOnly?: boolean;
 };
 
 export default function RaceHubChatterSection({
@@ -22,6 +23,7 @@ export default function RaceHubChatterSection({
   variant = "default",
   showHeading = true,
   messageListClassName,
+  readOnly = false,
 }: RaceHubChatterSectionProps) {
   const isMobileHub = variant === "mobile-hub";
 
@@ -57,6 +59,7 @@ export default function RaceHubChatterSection({
         raceRegistryId={raceRegistryId}
         topics={[...RACE_HUB_DEFAULT_TOPICS]}
         variant={variant}
+        readOnly={readOnly}
         messageListClassName={
           messageListClassName ??
           (isMobileHub

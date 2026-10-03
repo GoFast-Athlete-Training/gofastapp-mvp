@@ -5,6 +5,7 @@ import {
   assertStaffBearerAuth,
   getForwardedStaffId,
 } from "@/lib/training/training-engine-auth";
+import { isRaceHubStaffHostRequest } from "@/lib/race-hub-staff-host";
 
 export type HubReadAccess =
   | { mode: "staff"; staffId: string }
@@ -14,6 +15,10 @@ export async function assertRaceHubReadAccess(
   request: Request,
   raceRegistryId: string,
 ): Promise<HubReadAccess | { error: string; status: number }> {
+  if (isRaceHubStaffHostRequest(request)) {
+    return { mode: "staff", staffId: "racehubstaff-host" };
+  }
+
   const staffBlock = await assertStaffBearerAuth(request as NextRequest);
   if (!staffBlock) {
     const staffId = getForwardedStaffId(request as NextRequest);

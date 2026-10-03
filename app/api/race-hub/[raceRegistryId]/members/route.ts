@@ -2,8 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAthleteFromBearer } from "@/lib/race-container-auth";
-import { requireRaceMembership } from "@/lib/race-container-membership";
+import { assertRaceHubReadAccess } from "@/lib/race-hub/hub-read-access";
 
 /** GET /api/race-hub/[raceRegistryId]/members — hub members only */
 export async function GET(
@@ -16,11 +15,6 @@ export async function GET(
       return NextResponse.json({ error: "raceRegistryId required" }, { status: 400 });
     }
 
-    const auth = await getAthleteFromBearer(request);
-    if ("error" in auth) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
-    }
-
     const race = await prisma.race_registry.findFirst({
       where: { id: raceRegistryId.trim(), isActive: true },
     });
@@ -28,12 +22,9 @@ export async function GET(
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
 
-    const membership = await requireRaceMembership(auth.athlete.id, race.id);
-    if (!membership) {
-      return NextResponse.json(
-        { error: "Join this race hub to view members", code: "MEMBERSHIP_REQUIRED" },
-        { status: 403 }
-      );
+    const access = await assertRaceHubReadAccess(request, race.id);
+    if ("error" in access) {
+      return NextResponse.json({ error: access.error, code: "MEMBERSHIP_REQUIRED" }, { status: access.status });
     }
 
     const memberships = await prisma.race_memberships.findMany({

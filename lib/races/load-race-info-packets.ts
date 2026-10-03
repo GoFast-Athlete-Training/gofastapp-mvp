@@ -108,3 +108,65 @@ export async function loadRaceInfoPacketsForAthlete(
 
   return buildRaceInfoPackets(raceInput, athleteContext);
 }
+
+/** Staff hub host — race packets only (no athlete training / signup context). */
+export async function loadRaceInfoPacketsForStaffView(
+  raceRegistryId: string
+): Promise<RaceInfoPacketsResponse | null> {
+  const race = await prisma.race_registry.findFirst({
+    where: { id: raceRegistryId, isActive: true },
+    include: {
+      course_segments: {
+        orderBy: { order: "asc" },
+        select: {
+          order: true,
+          name: true,
+          mileMarker: true,
+          description: true,
+          runTip: true,
+        },
+      },
+    },
+  });
+
+  if (!race) return null;
+
+  const raceInput: RaceInfoPacketRaceInput = {
+    id: race.id,
+    name: race.name,
+    slug: race.slug,
+    raceDate: race.raceDate,
+    startTime: race.startTime,
+    distanceLabel: race.distanceLabel,
+    summaryPhrase: race.summaryPhrase,
+    description: race.description,
+    registrationUrl: race.registrationUrl,
+    registrationOpenNow: race.registrationOpenNow,
+    registrationOpenDate: race.registrationOpenDate,
+    registrationCloseDate: race.registrationCloseDate,
+    registrationFee: race.registrationFee,
+    courseSlug: race.courseSlug,
+    courseMapUrl: race.courseMapUrl,
+    packetPickupLocation: race.packetPickupLocation,
+    packetPickupDate: race.packetPickupDate,
+    packetPickupTime: race.packetPickupTime,
+    packetPickupDescription: race.packetPickupDescription,
+    spectatorInfo: race.spectatorInfo,
+    logisticsInfo: race.logisticsInfo,
+    gearDropInstructions: race.gearDropInstructions,
+    courseSegments: race.course_segments,
+  };
+
+  const athleteContext: RaceInfoPacketAthleteContext = {
+    isSignedUp: false,
+    training: {
+      hasActivePlan: false,
+      planName: null,
+      weekNumber: null,
+      totalWeeks: null,
+      goalTime: null,
+    },
+  };
+
+  return buildRaceInfoPackets(raceInput, athleteContext);
+}
