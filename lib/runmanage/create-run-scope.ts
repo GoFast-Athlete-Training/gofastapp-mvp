@@ -1,13 +1,8 @@
 import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
-import type { StaffCreateRunType } from "@/lib/runmanage/partner-extras";
+import type { SpecialEventDraft } from "@/lib/runmanage/special-event-draft";
 
-/** Staff Run Manage create — athlete INDIVIDUAL runs are athlete-scoped, not staff input. */
-export const RUN_MANAGE_STAFF_CREATE_RUN_TYPES = [
-  "CLUB",
-  "RUN_STORE",
-  "SPECIAL",
-  "RACE_SHAKEOUT",
-] as const;
+/** Staff Run Manage create — club lookup + special event parent only. */
+export const RUN_MANAGE_STAFF_CREATE_RUN_TYPES = ["CLUB", "SPECIAL"] as const;
 
 export type RunManageStaffCreateRunType = (typeof RUN_MANAGE_STAFF_CREATE_RUN_TYPES)[number];
 
@@ -17,21 +12,19 @@ export function isRunManageStaffCreateRunType(v: string): v is RunManageStaffCre
 
 export type ClubBoltMode = "one_off" | "series";
 
-export type SpecialLeadMode = "floating" | "brand_popup";
-
 export type CreateRunScopeFork = {
   clubBoltMode: ClubBoltMode | null;
-  specialLeadMode: SpecialLeadMode | null;
 };
 
 export function defaultCreateRunScopeFork(): CreateRunScopeFork {
-  return { clubBoltMode: null, specialLeadMode: null };
+  return { clubBoltMode: null };
 }
 
 export function validateCreateRunScope(
   title: string,
   draft: RunAffiliationDraft,
-  fork: CreateRunScopeFork
+  fork: CreateRunScopeFork,
+  specialEvent?: SpecialEventDraft | null
 ): string | null {
   if (!title.trim()) {
     return "Add a run title.";
@@ -52,21 +45,14 @@ export function validateCreateRunScope(
     return null;
   }
 
-  if (type === "RUN_STORE") {
-    if (!draft.runStoreId) return "Attach the hosting run store.";
-    return null;
-  }
-
-  if (type === "RACE_SHAKEOUT") {
-    if (!draft.raceRegistryId?.trim()) return "Enter the race registry id for this shakeout.";
-    return null;
+  if (type === "RUN_STORE" || type === "RACE_SHAKEOUT") {
+    return "This run type is not created in Run Manage — use club or special event.";
   }
 
   if (type === "SPECIAL") {
-    if (!fork.specialLeadMode) return "Choose floating event or brand-led pop-up.";
-    if (fork.specialLeadMode === "brand_popup" && !draft.runBrandId) {
-      return "Attach the brand hosting this pop-up.";
-    }
+    const ev = specialEvent ?? null;
+    if (!ev?.name.trim()) return "Add the special event name.";
+    if (!ev.brandId) return "Attach the brand lead for this event.";
     return null;
   }
 
@@ -76,9 +62,10 @@ export function validateCreateRunScope(
 export function isCreateScopeComplete(
   title: string,
   draft: RunAffiliationDraft,
-  fork: CreateRunScopeFork
+  fork: CreateRunScopeFork,
+  specialEvent?: SpecialEventDraft | null
 ): boolean {
-  return validateCreateRunScope(title, draft, fork) === null;
+  return validateCreateRunScope(title, draft, fork, specialEvent) === null;
 }
 
 /** @alias validateCreateRunScope */
@@ -86,19 +73,21 @@ export const validateAffiliationDraft = validateCreateRunScope;
 
 export type RunContainerIdentity =
   | { kind: "club"; logoUrl: string | null; name: string; city: string; state: string; tagline: string }
-  | { kind: "store"; logoUrl: string | null; name: string; city: string; state: string }
-  | { kind: "race"; registryId: string; label: string }
-  | { kind: "brand_popup"; logoUrl: string | null; name: string; tagline: string }
-  | { kind: "floating_event"; title: string }
+  | { kind: "special_event"; eventName: string; eventTitle: string; logoUrl: string | null; leadName: string; eventDate: string; url: string }
   | { kind: "none" };
 
 export function containerIdentityFromScope(
   title: string,
   draft: RunAffiliationDraft,
   fork: CreateRunScopeFork,
-  clubHydrate?: { description?: string | null } | null
+  opts?: {
+    clubHydrate?: { description?: string | null } | null;
+    specialEvent?: SpecialEventDraft | null;
+  }
 ): RunContainerIdentity {
   const type = draft.cityRunType;
+  const clubHydrate = opts?.clubHydrate;
+  const specialEvent = opts?.specialEvent;
 
   if (type === "CLUB" && draft.runClubPick) {
     const tagline =
@@ -113,38 +102,16 @@ export function containerIdentityFromScope(
     };
   }
 
-  if (type === "RUN_STORE" && draft.runStorePick) {
+  if (type === "SPECIAL" && specialEvent?.brandPick) {
     return {
-      kind: "store",
-      logoUrl: draft.runStorePick.logoUrl ?? null,
-      name: draft.runStorePick.name,
-      city: draft.runStorePick.city ?? "",
-      state: draft.runStorePick.state ?? "",
+      kind: "special_event",
+      eventName: specialEvent.name.trim() || title.trim() || "Special event",
+      eventTitle: specialEvent.eventTitle.trim(),
+      logoUrl: specialEvent.brandPick.logoUrl ?? null,
+      leadName: specialEvent.brandPick.name,
+      eventDate: specialEvent.eventDate.trim(),
+      url: specialEvent.url.trim(),
     };
-  }
-
-  if (type === "RACE_SHAKEOUT" && draft.raceRegistryId?.trim()) {
-    return {
-      kind: "race",
-      registryId: draft.raceRegistryId.trim(),
-      label: draft.runBrandPick
-        ? `Race shakeout · ${draft.runBrandPick.name} (sponsor stamp)`
-        : "Race shakeout",
-    };
-  }
-
-  if (type === "SPECIAL") {
-    if (fork.specialLeadMode === "brand_popup" && draft.runBrandPick) {
-      return {
-        kind: "brand_popup",
-        logoUrl: draft.runBrandPick.logoUrl ?? null,
-        name: draft.runBrandPick.name,
-        tagline: draft.runBrandPick.secondary?.trim() || "Brand-led pop-up run event",
-      };
-    }
-    if (fork.specialLeadMode === "floating") {
-      return { kind: "floating_event", title: title.trim() || "Floating run event" };
-    }
   }
 
   return { kind: "none" };

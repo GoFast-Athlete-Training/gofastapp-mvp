@@ -30,6 +30,11 @@ import {
   validateCreateRunScope,
   type CreateRunScopeFork,
 } from "@/lib/runmanage/create-run-scope";
+import {
+  emptySpecialEventDraft,
+  specialEventApiBodyFromDraft,
+  type SpecialEventDraft,
+} from "@/lib/runmanage/special-event-draft";
 
 export default function RunManageCreateRunPage() {
   const router = useRouter();
@@ -41,6 +46,7 @@ export default function RunManageCreateRunPage() {
     emptyAffiliationDraft("CLUB")
   );
   const [scopeFork, setScopeFork] = useState<CreateRunScopeFork>(() => defaultCreateRunScopeFork());
+  const [specialEvent, setSpecialEvent] = useState<SpecialEventDraft>(() => emptySpecialEventDraft());
   const [clubDescription, setClubDescription] = useState<string | null>(null);
   const [wizardValues, setWizardValues] = useState<RunInstanceWizardValues>(() =>
     emptyWizardValues(localCalendarYmd(tomorrow))
@@ -48,7 +54,12 @@ export default function RunManageCreateRunPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const scopeComplete = isCreateScopeComplete(wizardValues.title, affiliations, scopeFork);
+  const scopeComplete = isCreateScopeComplete(
+    wizardValues.title,
+    affiliations,
+    scopeFork,
+    specialEvent
+  );
 
   useEffect(() => {
     const clubId = affiliations.runClubId;
@@ -73,14 +84,20 @@ export default function RunManageCreateRunPage() {
     () =>
       scopeComplete
         ? containerIdentityFromScope(wizardValues.title, affiliations, scopeFork, {
-            description: clubDescription,
+            clubHydrate: { description: clubDescription },
+            specialEvent,
           })
         : null,
-    [scopeComplete, wizardValues.title, affiliations, scopeFork, clubDescription]
+    [scopeComplete, wizardValues.title, affiliations, scopeFork, clubDescription, specialEvent]
   );
 
   const handleCreate = async () => {
-    const scopeErr = validateCreateRunScope(wizardValues.title, affiliations, scopeFork);
+    const scopeErr = validateCreateRunScope(
+      wizardValues.title,
+      affiliations,
+      scopeFork,
+      specialEvent
+    );
     if (scopeErr) {
       setError(scopeErr);
       return;
@@ -89,6 +106,19 @@ export default function RunManageCreateRunPage() {
     setSaving(true);
     setError(null);
     try {
+      let specialEventId: string | null = specialEvent.id;
+      if (affiliations.cityRunType === "SPECIAL") {
+        const evRes = await runmanageApi.post(
+          "/api/runmanage/special-events",
+          specialEventApiBodyFromDraft(specialEvent)
+        );
+        const evId = evRes.data?.specialEvent?.id;
+        if (!evId) {
+          throw new Error(evRes.data?.error || "Failed to create special event parent.");
+        }
+        specialEventId = String(evId);
+        setSpecialEvent((prev) => ({ ...prev, id: specialEventId }));
+      }
       const finalCitySlug = generateCitySlugFromParts(
         wizardValues.meetUpCity,
         wizardValues.meetUpState
@@ -102,7 +132,7 @@ export default function RunManageCreateRunPage() {
       const isTrack = wizardValues.runType?.toLowerCase() === "track";
 
       const payload: Record<string, unknown> = {
-        ...affiliationsToPayload(affiliations, session?.athleteId),
+        ...affiliationsToPayload(affiliations, session?.athleteId, { specialEventId }),
         citySlug: finalCitySlug,
         title: wizardValues.title.trim(),
         dayOfWeek: wizardValues.dayOfWeek?.trim() || null,
@@ -197,8 +227,10 @@ export default function RunManageCreateRunPage() {
           title={wizardValues.title}
           draft={affiliations}
           fork={scopeFork}
+          specialEvent={specialEvent}
           onDraftChange={setAffiliations}
           onForkChange={setScopeFork}
+          onSpecialEventChange={setSpecialEvent}
         />
       </div>
 

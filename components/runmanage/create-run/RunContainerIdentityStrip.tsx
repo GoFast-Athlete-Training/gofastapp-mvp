@@ -39,38 +39,7 @@ export default function RunContainerIdentityStrip({
     );
   }
 
-  if (identity.kind === "store") {
-    const place = [identity.city, identity.state].filter(Boolean).join(", ");
-    return (
-      <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-        {identity.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={identity.logoUrl} alt="" className="h-12 w-12 rounded object-contain" />
-        ) : (
-          <span className="flex h-12 w-12 items-center justify-center rounded bg-white text-sm font-bold text-gray-700">
-            {identity.name.slice(0, 1)}
-          </span>
-        )}
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Store container</p>
-          <p className="truncate text-sm font-semibold text-gray-900">{identity.name}</p>
-          {place ? <p className="text-xs text-gray-600">{place}</p> : null}
-        </div>
-      </div>
-    );
-  }
-
-  if (identity.kind === "race") {
-    return (
-      <div className="rounded-lg border border-violet-200 bg-violet-50/60 px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-800">Race container</p>
-        <p className="text-sm font-semibold text-gray-900">{identity.label}</p>
-        <p className="mt-1 font-mono text-xs text-gray-600">Registry: {identity.registryId}</p>
-      </div>
-    );
-  }
-
-  if (identity.kind === "brand_popup") {
+  if (identity.kind === "special_event") {
     return (
       <div className="flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50/60 px-4 py-3">
         {identity.logoUrl ? (
@@ -78,24 +47,25 @@ export default function RunContainerIdentityStrip({
           <img src={identity.logoUrl} alt="" className="h-12 w-12 rounded object-contain" />
         ) : (
           <span className="flex h-12 w-12 items-center justify-center rounded bg-white text-sm font-bold text-orange-800">
-            {identity.name.slice(0, 1)}
+            {identity.leadName.slice(0, 1)}
           </span>
         )}
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-800">Pop-up container</p>
-          <p className="truncate text-sm font-semibold text-gray-900">{identity.name}</p>
-          <p className="text-xs text-gray-600">{truncate(identity.tagline)}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-800">
+            Special event parent
+          </p>
+          <p className="truncate text-sm font-semibold text-gray-900">{identity.eventName}</p>
+          {identity.eventTitle ? (
+            <p className="text-xs text-gray-600">{identity.eventTitle}</p>
+          ) : null}
+          <p className="text-xs text-gray-600">Lead: {identity.leadName}</p>
+          {identity.eventDate ? (
+            <p className="text-xs text-gray-500">Event date: {identity.eventDate}</p>
+          ) : null}
+          {identity.url ? (
+            <p className="truncate text-xs text-sky-700">{identity.url}</p>
+          ) : null}
         </div>
-      </div>
-    );
-  }
-
-  if (identity.kind === "floating_event") {
-    return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Run event</p>
-        <p className="text-sm font-semibold text-gray-900">{identity.title}</p>
-        <p className="mt-1 text-xs text-gray-600">Floating special — RSVP lives on this run.</p>
       </div>
     );
   }

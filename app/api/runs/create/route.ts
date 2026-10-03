@@ -186,6 +186,7 @@ export async function POST(request: NextRequest) {
       runBrandId: bodyRunBrandId,
       runStoreId: bodyRunStoreId,
       raceRegistryId: bodyRaceRegistryId,
+      specialEventId: bodySpecialEventId,
       partnerExtras: bodyPartnerExtras,
     } = body;
 
@@ -416,6 +417,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const resolvedSpecialEventId =
+      bodySpecialEventId === null || bodySpecialEventId === ""
+        ? null
+        : typeof bodySpecialEventId === "string"
+          ? bodySpecialEventId.trim() || null
+          : null;
+
+    if (bodyCityRunType === "SPECIAL") {
+      if (!resolvedSpecialEventId) {
+        return NextResponse.json(
+          { success: false, error: "specialEventId is required for SPECIAL runs" },
+          { status: 400 }
+        );
+      }
+      const parent = await prisma.special_events.findUnique({
+        where: { id: resolvedSpecialEventId },
+        select: { id: true },
+      });
+      if (!parent) {
+        return NextResponse.json(
+          { success: false, error: "Special event not found" },
+          { status: 400 }
+        );
+      }
+    }
+
     // Parse date (date-only inputs anchor at UTC noon)
     let runDateObj: Date;
     try {
@@ -639,6 +666,12 @@ export async function POST(request: NextRequest) {
           : typeof bodyRaceRegistryId === "string"
             ? bodyRaceRegistryId.trim() || null
             : null,
+      specialEventId:
+        bodySpecialEventId === null || bodySpecialEventId === ""
+          ? null
+          : typeof bodySpecialEventId === "string"
+            ? bodySpecialEventId.trim() || null
+            : null,
       partnerExtras: (() => {
         const extras = partnerExtrasForWrite(bodyPartnerExtras);
         return extras ? extras : Prisma.JsonNull;
@@ -651,6 +684,8 @@ export async function POST(request: NextRequest) {
           typeof bodyRaceRegistryId === "string" ? bodyRaceRegistryId.trim() || null : null,
         runStoreId:
           typeof bodyRunStoreId === "string" ? bodyRunStoreId.trim() || null : null,
+        specialEventId:
+          typeof bodySpecialEventId === "string" ? bodySpecialEventId.trim() || null : null,
       }),
       updatedAt: new Date(),
     };

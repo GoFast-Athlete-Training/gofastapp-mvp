@@ -1163,8 +1163,30 @@ model brands {
   updatedAt       DateTime  @updatedAt
   run_clubs              run_clubs[]
   city_runs_run_brand city_runs[] @relation("CityRunRunBrand")
+  special_events         special_events[]
 
   @@map("brands")
+}
+
+/// Parent container for staff special-event runs (brand lead + optional club affiliates).
+model special_events {
+  id               String      @id
+  name             String
+  title            String?
+  description      String?
+  eventDate        DateTime?
+  url              String?
+  brandId          String?
+  partnerExtras    Json?
+  staffGeneratedId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime
+  brand            brands?     @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  city_runs        city_runs[]
+
+  @@index([brandId])
+  @@index([eventDate])
+  @@map("special_events")
 }
 
 /// Physical run store — prodpush from Company acq_run_stores; id matches ACQ row id.
@@ -1634,6 +1656,8 @@ model city_runs {
   runStoreId          String?
   /// Brand on this run (Sponsor Manage brandId → prod brands snap).
   runBrandId          String?
+  /// Staff special-event parent (brand lead lives on special_events).
+  specialEventId      String?
   /// Idempotent key for Company → prod shakeout sync (one row per race_run_event window). Null for normal city_runs.
   shakeoutDedupeKey   String?              @unique
   locationId          String?              // FK to run_locations (auto-seeded or manually linked)
@@ -1658,6 +1682,7 @@ model city_runs {
   race_registry       race_registry?       @relation("CityRunRaceRegistry", fields: [raceRegistryId], references: [id], onDelete: SetNull)
   runStore            run_stores?          @relation(fields: [runStoreId], references: [id], onDelete: SetNull)
   runBrand            brands?              @relation("CityRunRunBrand", fields: [runBrandId], references: [id], onDelete: SetNull)
+  specialEvent        special_events?      @relation(fields: [specialEventId], references: [id], onDelete: SetNull)
   location            run_locations?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
   route               routes?              @relation(fields: [routeId], references: [id], onDelete: SetNull)
   workout             workouts?            @relation(fields: [workoutId], references: [id], onDelete: SetNull)
@@ -1679,6 +1704,7 @@ model city_runs {
   @@index([raceRegistryId])
   @@index([runStoreId])
   @@index([runBrandId])
+  @@index([specialEventId])
   @@index([locationId])
   @@index([routeId])
   @@index([workoutId])

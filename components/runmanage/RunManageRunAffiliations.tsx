@@ -69,16 +69,12 @@ const TYPE_HINTS = STAFF_RUN_TYPE_HINTS;
 
 export const RUN_MANAGE_TYPE_LABELS: Record<RunManageStaffCreateRunType, string> = {
   CLUB: STAFF_RUN_TYPE_LABELS.CLUB,
-  RUN_STORE: STAFF_RUN_TYPE_LABELS.RUN_STORE,
-  SPECIAL: STAFF_RUN_TYPE_LABELS.SPECIAL,
-  RACE_SHAKEOUT: STAFF_RUN_TYPE_LABELS.RACE_SHAKEOUT,
+  SPECIAL: "Special event",
 };
 
 export const RUN_MANAGE_TYPE_HINTS: Record<RunManageStaffCreateRunType, string> = {
-  CLUB: STAFF_RUN_TYPE_HINTS.CLUB,
-  RUN_STORE: STAFF_RUN_TYPE_HINTS.RUN_STORE,
-  SPECIAL: STAFF_RUN_TYPE_HINTS.SPECIAL,
-  RACE_SHAKEOUT: STAFF_RUN_TYPE_HINTS.RACE_SHAKEOUT,
+  CLUB: "Search a club — lookup success sets runClubId.",
+  SPECIAL: "Write the event parent, attach brand lead, then bolt the run.",
 };
 
 type SearchKind = "club" | "brand" | "store";
@@ -784,14 +780,21 @@ export function draftFromRun(run: {
   };
 }
 
-export function affiliationsToPayload(draft: RunAffiliationDraft, athleteId?: string | null) {
+export function affiliationsToPayload(
+  draft: RunAffiliationDraft,
+  athleteId?: string | null,
+  opts?: { specialEventId?: string | null }
+) {
+  const isSpecial = draft.cityRunType === "SPECIAL";
   return {
     cityRunType: draft.cityRunType,
-    runClubId: draft.runClubId,
-    runBrandId: draft.runBrandId,
-    runStoreId: draft.runStoreId,
-    raceRegistryId: draft.raceRegistryId,
-    partnerExtras: draft.partnerExtras.length > 0 ? draft.partnerExtras : null,
+    runClubId: isSpecial ? null : draft.runClubId,
+    runBrandId: isSpecial ? null : draft.runBrandId,
+    runStoreId: isSpecial ? null : draft.runStoreId,
+    raceRegistryId: isSpecial ? null : draft.raceRegistryId,
+    specialEventId: isSpecial ? opts?.specialEventId ?? null : null,
+    partnerExtras:
+      !isSpecial && draft.partnerExtras.length > 0 ? draft.partnerExtras : null,
     athleteGeneratedId: draft.cityRunType === "INDIVIDUAL" ? athleteId ?? null : null,
   };
 }

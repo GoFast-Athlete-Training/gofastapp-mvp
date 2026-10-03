@@ -17,6 +17,7 @@ export type CityRunRelationshipSnapshot = {
   shakeoutDedupeKey?: string | null;
   raceRegistryId?: string | null;
   runStoreId?: string | null;
+  specialEventId?: string | null;
 };
 
 export function isCityRunTypeValue(v: unknown): v is CityRunTypeValue {
@@ -26,6 +27,7 @@ export function isCityRunTypeValue(v: unknown): v is CityRunTypeValue {
 /** Infer type when staff did not send cityRunType (legacy / machine paths). Shakeout before club. */
 export function resolveCityRunType(opts: CityRunRelationshipSnapshot): CityRunTypeValue {
   if (opts.shakeoutDedupeKey || opts.raceRegistryId) return 'RACE_SHAKEOUT';
+  if (opts.specialEventId) return 'SPECIAL';
   if (opts.runStoreId) return 'RUN_STORE';
   if (opts.runClubId) return 'CLUB';
   if (opts.runCrewId) return 'RUN_CREW';
@@ -59,6 +61,10 @@ export function mergeRelationshipSnapshot(
         : existing.shakeoutDedupeKey,
     raceRegistryId:
       patch.raceRegistryId !== undefined ? patch.raceRegistryId : existing.raceRegistryId,
+    runStoreId:
+      patch.runStoreId !== undefined ? patch.runStoreId : existing.runStoreId,
+    specialEventId:
+      patch.specialEventId !== undefined ? patch.specialEventId : existing.specialEventId,
   };
 }
 
@@ -73,6 +79,8 @@ const RELATIONSHIP_KEYS: (keyof CityRunRelationshipSnapshot)[] = [
   'athleteGeneratedId',
   'shakeoutDedupeKey',
   'raceRegistryId',
+  'runStoreId',
+  'specialEventId',
 ];
 
 export function relationshipPatchFromBody(
