@@ -2,12 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import {
-  loadRaceInfoPacketsForAthlete,
-  loadRaceInfoPacketsForStaffView,
-} from "@/lib/races/load-race-info-packets";
-import { isRaceHubStaffHostRequest } from "@/lib/race-hub-staff-host";
-
+import { loadRaceInfoPacketsForAthlete } from "@/lib/races/load-race-info-packets";
 /** GET /api/race-registry/[id]/info-packets — time-aware race info slices for any client. */
 export async function GET(
   request: NextRequest,
@@ -20,14 +15,6 @@ export async function GET(
     }
 
     const raceId = id.trim();
-
-    if (isRaceHubStaffHostRequest(request)) {
-      const result = await loadRaceInfoPacketsForStaffView(raceId);
-      if (!result) {
-        return NextResponse.json({ error: "Race not found" }, { status: 404 });
-      }
-      return NextResponse.json({ success: true, ...result });
-    }
 
     const auth = await requireAthleteFromBearer(request);
     if ("error" in auth) {

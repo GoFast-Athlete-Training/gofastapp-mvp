@@ -39,7 +39,18 @@ export async function GET(
       where: { raceRegistryId: race.id },
       orderBy: { date: "asc" },
       include: {
-        city_run_rsvps: true,
+        city_run_rsvps: {
+          include: {
+            Athlete: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                gofastHandle: true,
+              },
+            },
+          },
+        },
         runClub: { select: { id: true, name: true, slug: true } },
       },
     });

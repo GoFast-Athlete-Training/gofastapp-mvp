@@ -23,13 +23,42 @@ export function citySlugFromRegistry(city: string | null | undefined, slug: stri
   return "unknown";
 }
 
+type ShakeoutRsvpRow = {
+  athleteId: string;
+  status: string;
+  Athlete?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    gofastHandle: string | null;
+  } | null;
+};
+
 type RunWithClub = city_runs & {
   runClub?: Pick<run_clubs, "id" | "name" | "slug"> | null;
-  city_run_rsvps?: { athleteId: string; status: string }[];
+  city_run_rsvps?: ShakeoutRsvpRow[];
 };
+
+function goingAttendeesFromRsvps(rsvps: ShakeoutRsvpRow[]) {
+  const rows = rsvps
+    .filter((rv) => rv.status === "going")
+    .map((rv) => {
+      const a = rv.Athlete;
+      if (!a?.id) return null;
+      return {
+        id: a.id,
+        firstName: a.firstName,
+        lastName: a.lastName,
+        gofastHandle: a.gofastHandle,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row != null);
+  return rows.length > 0 ? rows : undefined;
+}
 
 export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string) {
   const rsvps = run.city_run_rsvps ?? [];
+  const goingAttendees = goingAttendeesFromRsvps(rsvps);
   return {
     id: run.id,
     title: run.title,
@@ -51,6 +80,7 @@ export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string)
     gorunPath: `/gorun/${run.id}`,
     runClub: run.runClub ?? null,
     rsvpCount: rsvps.filter((rv) => rv.status === "going").length,
+    ...(goingAttendees ? { goingAttendees } : {}),
     myRsvp: viewerAthleteId
       ? (rsvps.find((rv) => rv.athleteId === viewerAthleteId) ?? null)
       : null,
