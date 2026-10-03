@@ -149,7 +149,7 @@ function buildTrainingTipsPacket(
     visible: false,
     emphasized: false,
     items: [],
-    sourceCompleteness: 0,
+    sourceCompleteness: "empty",
   };
 }
 
