@@ -48,6 +48,16 @@ const TYPE_HINTS: Record<StaffCreateRunType, string> = {
 
 type SearchKind = "club" | "brand" | "store";
 
+type SearchStatus =
+  | { kind: "searching" }
+  | { kind: "empty"; q: string }
+  | { kind: "error"; message: string };
+
+function apiErrorMessage(err: unknown): string {
+  const e = err as { response?: { data?: { error?: string } }; message?: string };
+  return e.response?.data?.error || e.message || "Search failed";
+}
+
 function EntitySearch({
   label,
   placeholder,
@@ -66,57 +76,80 @@ function EntitySearch({
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<AffiliationPick[]>([]);
   const [searching, setSearching] = useState(false);
+  const [status, setStatus] = useState<SearchStatus | null>(null);
 
   const search = useCallback(async () => {
     const q = query.trim();
     if (q.length < 2) return;
     setSearching(true);
+    setStatus({ kind: "searching" });
+    setHits([]);
     try {
       if (kind === "brand") {
         const res = await runmanageApi.get(
           `/api/runmanage/brands/search?${new URLSearchParams({ q }).toString()}`
         );
+        if (!res.data?.success) {
+          setStatus({ kind: "error", message: res.data?.error ?? "Brand search failed" });
+          return;
+        }
         const brands = (res.data?.brands ?? []) as AffiliationPick[];
-        setHits(brands.map((b) => ({ id: b.id, name: b.name, logoUrl: b.logoUrl, secondary: null })));
+        const mapped = brands.map((b) => ({
+          id: b.id,
+          name: b.name,
+          logoUrl: b.logoUrl,
+          secondary: null as string | null,
+        }));
+        setHits(mapped);
+        setStatus(mapped.length === 0 ? { kind: "empty", q } : null);
       } else if (kind === "club") {
         const res = await runmanageApi.get(
           `/api/runmanage/run-clubs/search?${new URLSearchParams({ q }).toString()}`
         );
+        if (!res.data?.success) {
+          setStatus({ kind: "error", message: res.data?.error ?? "Club search failed" });
+          return;
+        }
         const clubs = (res.data?.clubs ?? []) as Array<{
           id: string;
           name: string;
           logoUrl?: string | null;
           city?: string | null;
         }>;
-        setHits(
-          clubs.map((c) => ({
-            id: c.id,
-            name: c.name,
-            logoUrl: c.logoUrl,
-            secondary: c.city,
-          }))
-        );
+        const mapped = clubs.map((c) => ({
+          id: c.id,
+          name: c.name,
+          logoUrl: c.logoUrl,
+          secondary: c.city,
+        }));
+        setHits(mapped);
+        setStatus(mapped.length === 0 ? { kind: "empty", q } : null);
       } else {
         const res = await runmanageApi.get(
           `/api/runmanage/run-stores/search?${new URLSearchParams({ q }).toString()}`
         );
+        if (!res.data?.success) {
+          setStatus({ kind: "error", message: res.data?.error ?? "Store search failed" });
+          return;
+        }
         const stores = (res.data?.stores ?? []) as Array<{
           id: string;
           name: string;
           logoUrl?: string | null;
           city?: string | null;
         }>;
-        setHits(
-          stores.map((s) => ({
-            id: s.id,
-            name: s.name,
-            logoUrl: s.logoUrl,
-            secondary: s.city,
-          }))
-        );
+        const mapped = stores.map((s) => ({
+          id: s.id,
+          name: s.name,
+          logoUrl: s.logoUrl,
+          secondary: s.city,
+        }));
+        setHits(mapped);
+        setStatus(mapped.length === 0 ? { kind: "empty", q } : null);
       }
-    } catch {
+    } catch (err) {
       setHits([]);
+      setStatus({ kind: "error", message: apiErrorMessage(err) });
     } finally {
       setSearching(false);
     }
@@ -140,7 +173,17 @@ function EntitySearch({
             <input
               type="search"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setStatus(null);
+                setHits([]);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void search();
+                }
+              }}
               placeholder={placeholder}
               className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
             />
@@ -153,6 +196,13 @@ function EntitySearch({
               {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
             </button>
           </div>
+          {status?.kind === "searching" ? (
+            <p className="mt-2 text-sm text-gray-600">Searching…</p>
+          ) : status?.kind === "empty" ? (
+            <p className="mt-2 text-sm text-gray-600">No matches for &ldquo;{status.q}&rdquo;.</p>
+          ) : status?.kind === "error" ? (
+            <p className="mt-2 text-sm text-red-600">{status.message}</p>
+          ) : null}
           {hits.length > 0 ? (
             <ul className="mt-2 max-h-40 overflow-y-auto divide-y divide-gray-100 rounded border border-gray-100">
               {hits.map((h) => (
@@ -163,6 +213,7 @@ function EntitySearch({
                       onSelect(h);
                       setHits([]);
                       setQuery("");
+                      setStatus(null);
                     }}
                     className="w-full px-2 py-2 text-left text-sm hover:bg-sky-50"
                   >
@@ -393,54 +444,88 @@ function ExtraClubAdd({ onAdd }: { onAdd: (hit: AffiliationPick) => void }) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<AffiliationPick[]>([]);
   const [searching, setSearching] = useState(false);
+  const [status, setStatus] = useState<SearchStatus | null>(null);
 
   const search = async () => {
     const q = query.trim();
     if (q.length < 2) return;
     setSearching(true);
+    setStatus({ kind: "searching" });
+    setHits([]);
     try {
       const res = await runmanageApi.get(
         `/api/runmanage/run-clubs/search?${new URLSearchParams({ q }).toString()}`
       );
+      if (!res.data?.success) {
+        setStatus({ kind: "error", message: res.data?.error ?? "Club search failed" });
+        return;
+      }
       const clubs = (res.data?.clubs ?? []) as Array<{ id: string; name: string; city?: string | null }>;
-      setHits(clubs.map((c) => ({ id: c.id, name: c.name, secondary: c.city })));
+      const mapped = clubs.map((c) => ({ id: c.id, name: c.name, secondary: c.city }));
+      setHits(mapped);
+      setStatus(mapped.length === 0 ? { kind: "empty", q } : null);
+    } catch (err) {
+      setHits([]);
+      setStatus({ kind: "error", message: apiErrorMessage(err) });
     } finally {
       setSearching(false);
     }
   };
 
   return (
-    <div className="mt-2 flex flex-wrap items-end gap-2">
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search another club…"
-        className="min-w-[12rem] flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-      />
-      <button
-        type="button"
-        disabled={searching}
-        onClick={() => void search()}
-        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-      >
-        Search
-      </button>
-      {hits.map((h) => (
-        <button
-          key={h.id}
-          type="button"
-          onClick={() => {
-            onAdd(h);
+    <div className="mt-2 space-y-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setStatus(null);
             setHits([]);
-            setQuery("");
           }}
-          className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-1 text-xs font-medium text-sky-800"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void search();
+            }
+          }}
+          placeholder="Search another club…"
+          className="min-w-[12rem] flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+        />
+        <button
+          type="button"
+          disabled={searching || query.trim().length < 2}
+          onClick={() => void search()}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-50"
         >
-          <Plus className="h-3 w-3" />
-          {h.name}
+          {searching ? "Searching…" : "Search"}
         </button>
-      ))}
+      </div>
+      {status?.kind === "searching" ? (
+        <p className="text-sm text-gray-600">Searching…</p>
+      ) : status?.kind === "empty" ? (
+        <p className="text-sm text-gray-600">No matches for &ldquo;{status.q}&rdquo;.</p>
+      ) : status?.kind === "error" ? (
+        <p className="text-sm text-red-600">{status.message}</p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {hits.map((h) => (
+          <button
+            key={h.id}
+            type="button"
+            onClick={() => {
+              onAdd(h);
+              setHits([]);
+              setQuery("");
+              setStatus(null);
+            }}
+            className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-1 text-xs font-medium text-sky-800"
+          >
+            <Plus className="h-3 w-3" />
+            {h.name}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
