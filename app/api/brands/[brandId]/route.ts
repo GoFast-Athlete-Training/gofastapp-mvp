@@ -24,5 +24,9 @@ export async function GET(
     );
   }
 
+  if (!result.exists) {
+    return NextResponse.json({ success: true, exists: false, brand: null });
+  }
+
   return NextResponse.json({ success: true, exists: true, brand: result.brand });
 }

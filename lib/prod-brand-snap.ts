@@ -90,8 +90,8 @@ export async function getProdBrandSnapById(brandId: string) {
   });
 
   if (!brand) {
-    return { ok: false as const, status: 404, error: "Brand not found on prod" };
+    return { ok: true as const, exists: false as const, brand: null };
   }
 
-  return { ok: true as const, brand };
+  return { ok: true as const, exists: true as const, brand };
 }
