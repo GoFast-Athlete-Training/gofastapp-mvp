@@ -13,7 +13,6 @@ import {
   Route,
   Sparkles,
   Activity,
-  Users,
   ClipboardList,
   X,
 } from "lucide-react";
@@ -62,12 +61,7 @@ import {
 } from "./shared";
 import type { IntakeMode } from "@/components/runmanage/intake/IntakeModePicker";
 import RunManageScratchIntakeStep from "./RunManageScratchIntakeStep";
-import RunManageRunHostStep, {
-  validateHostStep,
-  type HostScope,
-} from "./RunManageRunHostStep";
 import RunManageOpenCorePanel from "./RunManageOpenCorePanel";
-import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
 
 export type RunInstanceWizardProps = {
   values: RunInstanceWizardValues;
@@ -99,9 +93,6 @@ export type RunInstanceWizardProps = {
   };
   /** Open directly on a wizard step (e.g. workout from Active Schedule). */
   initialWizardStep?: WizardStep;
-  /** Create-from-scratch: host + optional partners */
-  affiliations?: RunAffiliationDraft;
-  onAffiliationsChange?: (draft: RunAffiliationDraft) => void;
   /** Title is edited in the page heading — core step skips title checklist */
   titleInPageHeading?: boolean;
 };
@@ -158,8 +149,6 @@ export default function RunInstanceWizard({
   publicSources,
   instanceToolbar,
   initialWizardStep,
-  affiliations,
-  onAffiliationsChange,
   titleInPageHeading = false,
 }: RunInstanceWizardProps) {
   const isCreateScratch = context.variant === "create-scratch";
@@ -169,7 +158,6 @@ export default function RunInstanceWizard({
   const [coreEditKey, setCoreEditKey] = useState<CoreEditKey>(null);
   const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
   const [intakeApplied, setIntakeApplied] = useState(false);
-  const [hostScope, setHostScope] = useState<HostScope | null>(null);
   const [generatingDescription, setGeneratingDescription] = useState(false);
   const [generatingRouteDetails, setGeneratingRouteDetails] = useState(false);
   const [uploadingMapImage, setUploadingMapImage] = useState(false);
@@ -285,16 +273,6 @@ export default function RunInstanceWizard({
       goToWizardStep(next);
       return;
     }
-    if (wizardStep === "host") {
-      const hostErr = affiliations ? validateHostStep(hostScope, affiliations) : "Host setup missing.";
-      if (hostErr) {
-        onErrorChange?.(hostErr);
-        return;
-      }
-      onErrorChange?.(null);
-      goToWizardStep(next);
-      return;
-    }
     if (wizardStep === "sources" && !isCreateScratch) {
       goToWizardStep("core");
       return;
@@ -382,7 +360,6 @@ export default function RunInstanceWizard({
 
   const wizardStepIcon = (step: WizardStep) => {
     if (step === "intake") return <ClipboardList className="h-4 w-4" />;
-    if (step === "host") return <Users className="h-4 w-4" />;
     if (step === "sources") return <Link2 className="h-4 w-4" />;
     if (step === "core") return <MapPin className="h-4 w-4" />;
     if (step === "route") return <Route className="h-4 w-4" />;
@@ -395,11 +372,6 @@ export default function RunInstanceWizard({
       if (intakeMode === "manual") return "complete";
       if (intakeApplied) return "complete";
       if (intakeMode) return "partial";
-      return "idle";
-    }
-    if (step === "host") {
-      if (affiliations && !validateHostStep(hostScope, affiliations)) return "complete";
-      if (hostScope) return "partial";
       return "idle";
     }
     if (step === "sources") {
@@ -620,14 +592,6 @@ export default function RunInstanceWizard({
                 setIntakeApplied(true);
               }}
               onError={(msg) => onErrorChange?.(msg)}
-            />
-          ) : null}
-
-          {wizardStep === "host" && isCreateScratch && affiliations && onAffiliationsChange ? (
-            <RunManageRunHostStep
-              draft={affiliations}
-              onChange={onAffiliationsChange}
-              onScopeChange={setHostScope}
             />
           ) : null}
 

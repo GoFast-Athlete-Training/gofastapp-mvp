@@ -23,10 +23,9 @@ export type CoreEditKey =
 
 export const WIZARD_STEP_ORDER: WizardStep[] = ["sources", "core", "description", "route", "workout"];
 
-/** Create-from-scratch: intake → host → open core → sources → description → route (always) → workout */
+/** Create-from-scratch: scope on page → intake → open core → sources → description → route (always) → workout */
 export const CREATE_SCRATCH_WIZARD_STEP_ORDER: WizardStep[] = [
   "intake",
-  "host",
   "core",
   "sources",
   "description",

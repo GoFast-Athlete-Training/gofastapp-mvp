@@ -10,6 +10,7 @@ import {
   runTypeHasOpenAffiliations,
   parsePartnerExtras,
 } from "@/lib/runmanage/partner-extras";
+import type { RunManageStaffCreateRunType } from "@/lib/runmanage/create-run-scope";
 
 export type AffiliationPick = {
   id: string;
@@ -45,20 +46,39 @@ export type RunAffiliationDraft = {
   partnerExtras: PartnerExtra[];
 };
 
-const TYPE_LABELS: Record<StaffCreateRunType, string> = {
+export const STAFF_RUN_TYPE_LABELS: Record<StaffCreateRunType, string> = {
   CLUB: "Club run",
   INDIVIDUAL: "Individual",
   RUN_STORE: "Run store",
-  SPECIAL: "Special",
-  RACE_SHAKEOUT: "Shakeout",
+  SPECIAL: "Special event",
+  RACE_SHAKEOUT: "Race shakeout",
 };
 
-const TYPE_HINTS: Record<StaffCreateRunType, string> = {
-  CLUB: "Pick the hosting club.",
-  INDIVIDUAL: "Athlete-hosted run.",
-  RUN_STORE: "Store-hosted (e.g. Fleet Feet Tuesday run).",
-  SPECIAL: "Brand, store, and club are all optional.",
-  RACE_SHAKEOUT: "Race shakeout — brand, store, and club are all optional.",
+export const STAFF_RUN_TYPE_HINTS: Record<StaffCreateRunType, string> = {
+  CLUB: "Bolt to a club container — pick the hosting club.",
+  INDIVIDUAL: "Athlete-hosted — not staff create.",
+  RUN_STORE: "Bolt to a store container.",
+  SPECIAL: "Pop-up run event — floating or brand-led.",
+  RACE_SHAKEOUT: "Bolt to a race container; brand is an optional stamp.",
+};
+
+/** @deprecated use STAFF_RUN_TYPE_LABELS */
+const TYPE_LABELS = STAFF_RUN_TYPE_LABELS;
+/** @deprecated use STAFF_RUN_TYPE_HINTS */
+const TYPE_HINTS = STAFF_RUN_TYPE_HINTS;
+
+export const RUN_MANAGE_TYPE_LABELS: Record<RunManageStaffCreateRunType, string> = {
+  CLUB: STAFF_RUN_TYPE_LABELS.CLUB,
+  RUN_STORE: STAFF_RUN_TYPE_LABELS.RUN_STORE,
+  SPECIAL: STAFF_RUN_TYPE_LABELS.SPECIAL,
+  RACE_SHAKEOUT: STAFF_RUN_TYPE_LABELS.RACE_SHAKEOUT,
+};
+
+export const RUN_MANAGE_TYPE_HINTS: Record<RunManageStaffCreateRunType, string> = {
+  CLUB: STAFF_RUN_TYPE_HINTS.CLUB,
+  RUN_STORE: STAFF_RUN_TYPE_HINTS.RUN_STORE,
+  SPECIAL: STAFF_RUN_TYPE_HINTS.SPECIAL,
+  RACE_SHAKEOUT: STAFF_RUN_TYPE_HINTS.RACE_SHAKEOUT,
 };
 
 type SearchKind = "club" | "brand" | "store";
@@ -181,6 +201,7 @@ export function EntitySearch({
           slug?: string | null;
           websiteUrl?: string | null;
           brandType?: string | null;
+          description?: string | null;
         }>;
         const mapped = brands.map((b) => ({
           id: b.id,
@@ -189,7 +210,8 @@ export function EntitySearch({
           slug: b.slug,
           websiteUrl: b.websiteUrl,
           kindLabel: b.brandType,
-          secondary: b.brandType,
+          secondary:
+            (typeof b.description === "string" && b.description.trim()) || b.brandType || null,
         }));
         setHits(mapped);
         setStatus(mapped.length === 0 ? { kind: "empty", q } : null);
@@ -352,12 +374,16 @@ export function RunManageRunAffiliations({
   draft,
   onChange,
   showTypePicker = true,
+  scopeMode = "default",
 }: {
   draft: RunAffiliationDraft;
   onChange: (next: RunAffiliationDraft) => void;
   showTypePicker?: boolean;
+  /** SPECIAL create: optional partner grid only (no primary type blocks). */
+  scopeMode?: "default" | "special_partners_only";
 }) {
   const open = runTypeHasOpenAffiliations(draft.cityRunType);
+  const partnersOnly = scopeMode === "special_partners_only";
 
   const setType = (cityRunType: StaffCreateRunType) => {
     onChange({ ...emptyAffiliationDraft(cityRunType), cityRunType });
@@ -412,7 +438,7 @@ export function RunManageRunAffiliations({
         </div>
       ) : null}
 
-      {draft.cityRunType === "CLUB" ? (
+      {!partnersOnly && draft.cityRunType === "CLUB" ? (
         <EntitySearch
           label="Club"
           placeholder="Search clubs…"
@@ -432,7 +458,7 @@ export function RunManageRunAffiliations({
         />
       ) : null}
 
-      {draft.cityRunType === "RUN_STORE" ? (
+      {!partnersOnly && draft.cityRunType === "RUN_STORE" ? (
         <EntitySearch
           label="Run store"
           placeholder="Search stores…"
@@ -452,7 +478,49 @@ export function RunManageRunAffiliations({
         />
       ) : null}
 
-      {open ? (
+      {open && partnersOnly ? (
+        <div>
+          <p className="text-sm font-medium text-gray-800">Optional partner stamps</p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <EntitySearch
+              label="Store (optional)"
+              placeholder="Search stores…"
+              kind="store"
+              selected={draft.runStorePick}
+              onSelect={(h) =>
+                onChange({
+                  ...draft,
+                  runStoreId: h.id,
+                  runStoreLabel: h.name,
+                  runStorePick: h,
+                })
+              }
+              onClear={() =>
+                onChange({ ...draft, runStoreId: null, runStoreLabel: null, runStorePick: null })
+              }
+            />
+            <EntitySearch
+              label="Club (optional)"
+              placeholder="Search clubs…"
+              kind="club"
+              selected={draft.runClubPick}
+              onSelect={(h) =>
+                onChange({
+                  ...draft,
+                  runClubId: h.id,
+                  runClubLabel: h.name,
+                  runClubPick: h,
+                })
+              }
+              onClear={() =>
+                onChange({ ...draft, runClubId: null, runClubLabel: null, runClubPick: null })
+              }
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {open && !partnersOnly ? (
         <div className="grid gap-3 sm:grid-cols-3">
           <EntitySearch
             label="Brand (optional)"
@@ -530,7 +598,7 @@ export function RunManageRunAffiliations({
         </div>
       ) : null}
 
-      {draft.cityRunType === "RACE_SHAKEOUT" ? (
+      {!partnersOnly && draft.cityRunType === "RACE_SHAKEOUT" ? (
         <label className="block text-sm">
           <span className="font-medium text-gray-700">Race registry id (optional)</span>
           <input

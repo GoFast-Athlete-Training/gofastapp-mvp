@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -21,6 +21,15 @@ import {
   type RunAffiliationDraft,
 } from "@/components/runmanage/RunManageRunAffiliations";
 import { useRunManageAuth } from "@/components/runmanage/RunManageProviders";
+import RunManageCreateRunScope from "@/components/runmanage/create-run/RunManageCreateRunScope";
+import RunContainerIdentityStrip from "@/components/runmanage/create-run/RunContainerIdentityStrip";
+import {
+  containerIdentityFromScope,
+  defaultCreateRunScopeFork,
+  isCreateScopeComplete,
+  validateCreateRunScope,
+  type CreateRunScopeFork,
+} from "@/lib/runmanage/create-run-scope";
 
 export default function RunManageCreateRunPage() {
   const router = useRouter();
@@ -29,15 +38,54 @@ export default function RunManageCreateRunPage() {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   const [affiliations, setAffiliations] = useState<RunAffiliationDraft>(() =>
-    emptyAffiliationDraft("INDIVIDUAL")
+    emptyAffiliationDraft("CLUB")
   );
+  const [scopeFork, setScopeFork] = useState<CreateRunScopeFork>(() => defaultCreateRunScopeFork());
+  const [clubDescription, setClubDescription] = useState<string | null>(null);
   const [wizardValues, setWizardValues] = useState<RunInstanceWizardValues>(() =>
     emptyWizardValues(localCalendarYmd(tomorrow))
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const scopeComplete = isCreateScopeComplete(wizardValues.title, affiliations, scopeFork);
+
+  useEffect(() => {
+    const clubId = affiliations.runClubId;
+    if (!clubId || affiliations.cityRunType !== "CLUB") {
+      setClubDescription(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await runmanageApi.get(`/api/runmanage/run-clubs/${clubId}`);
+        if (res.data?.success && res.data.runClub) {
+          const desc = (res.data.runClub as { description?: string }).description;
+          setClubDescription(typeof desc === "string" ? desc : null);
+        }
+      } catch {
+        setClubDescription(null);
+      }
+    })();
+  }, [affiliations.runClubId, affiliations.cityRunType]);
+
+  const containerIdentity = useMemo(
+    () =>
+      scopeComplete
+        ? containerIdentityFromScope(wizardValues.title, affiliations, scopeFork, {
+            description: clubDescription,
+          })
+        : null,
+    [scopeComplete, wizardValues.title, affiliations, scopeFork, clubDescription]
+  );
+
   const handleCreate = async () => {
+    const scopeErr = validateCreateRunScope(wizardValues.title, affiliations, scopeFork);
+    if (scopeErr) {
+      setError(scopeErr);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -141,37 +189,61 @@ export default function RunManageCreateRunPage() {
         />
       </label>
       <p className="mt-2 text-sm text-gray-600">
-        Intake, host, meet-up, route, and copy — all in one wizard.
+        Set title, run type, and container attach — then meet-up, miles, pace, and route in the wizard.
       </p>
 
       <div className="mt-6">
-        {saving ? (
-          <div className="flex items-center gap-2 text-gray-500">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Creating…
-          </div>
-        ) : (
-          <RunInstanceWizard
-            values={wizardValues}
-            onChange={setWizardValues}
-            context={{
-              variant: "create-scratch",
-              isSeriesInstance: false,
-              clubName: affiliations.runClubLabel,
-              clubId: affiliations.runClubId,
-            }}
-            affiliations={affiliations}
-            onAffiliationsChange={setAffiliations}
-            titleInPageHeading
-            onSave={() => void handleCreate()}
-            saving={saving}
-            error={error}
-            onErrorChange={setError}
-            saveLabel="Create draft run"
-            publicSources={null}
-          />
-        )}
+        <RunManageCreateRunScope
+          title={wizardValues.title}
+          draft={affiliations}
+          fork={scopeFork}
+          onDraftChange={setAffiliations}
+          onForkChange={setScopeFork}
+        />
       </div>
+
+      {!scopeComplete ? (
+        <p className="mt-4 text-sm text-gray-500">
+          Complete scope above to open the run builder. Individual runs are athlete-scoped and not
+          created here.
+        </p>
+      ) : null}
+
+      {scopeComplete && containerIdentity ? (
+        <div className="mt-4 max-w-3xl">
+          <RunContainerIdentityStrip identity={containerIdentity} />
+        </div>
+      ) : null}
+
+      {scopeComplete ? (
+        <div className="mt-6">
+          {saving ? (
+            <div className="flex items-center gap-2 text-gray-500">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Creating…
+            </div>
+          ) : (
+            <RunInstanceWizard
+              values={wizardValues}
+              onChange={setWizardValues}
+              context={{
+                variant: "create-scratch",
+                isSeriesInstance: false,
+                clubName: affiliations.runClubLabel,
+                clubId: affiliations.runClubId,
+              }}
+              titleInPageHeading
+              onSave={() => void handleCreate()}
+              saving={saving}
+              error={error}
+              onErrorChange={setError}
+              saveLabel="Create draft run"
+              publicSources={null}
+              headerSlot={null}
+            />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

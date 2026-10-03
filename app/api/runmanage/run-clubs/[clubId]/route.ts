@@ -25,6 +25,8 @@ export async function GET(
       name: true,
       logoUrl: true,
       city: true,
+      state: true,
+      description: true,
       websiteUrl: true,
       instagramUrl: true,
       stravaUrl: true,
