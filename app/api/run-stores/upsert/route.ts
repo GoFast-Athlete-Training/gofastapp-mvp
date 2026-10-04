@@ -65,12 +65,15 @@ export async function POST(request: NextRequest) {
       s.formattedAddress != null && String(s.formattedAddress).trim()
         ? String(s.formattedAddress).trim()
         : null;
+    const brandId =
+      s.brandId != null && String(s.brandId).trim() ? String(s.brandId).trim() : null;
 
     const now = new Date();
     const store = await prisma.run_stores.upsert({
       where: { id },
       create: {
         id,
+        brandId,
         slug,
         name,
         websiteUrl,
@@ -82,6 +85,7 @@ export async function POST(request: NextRequest) {
         updatedAt: now,
       },
       update: {
+        brandId,
         slug,
         name,
         websiteUrl,

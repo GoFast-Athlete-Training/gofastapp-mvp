@@ -1,6 +1,14 @@
 import { prisma } from "@/lib/prisma";
 
-const BRAND_TYPES = ["SHOE", "APPAREL", "RUN_STORE_CHAIN", "GEAR", "OTHER"] as const;
+const BRAND_TYPES = [
+  "SHOE",
+  "APPAREL",
+  "NUTRITION",
+  "PERFORMANCE",
+  "RUN_STORE_CHAIN",
+  "GEAR",
+  "OTHER",
+] as const;
 
 function parseBrandType(v: unknown): (typeof BRAND_TYPES)[number] {
   if (typeof v === "string" && BRAND_TYPES.includes(v as (typeof BRAND_TYPES)[number])) {
@@ -20,6 +28,10 @@ export type ProdBrandSnapInput = {
   instagramHandle?: string | null;
   city?: string | null;
   state?: string | null;
+  yearFounded?: number | null;
+  otherLocations?: unknown;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
 };
 
 export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
@@ -39,6 +51,11 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
   const instagramHandle = b.instagramHandle?.trim().replace(/^@+/, "") || null;
   const city = b.city?.trim() || null;
   const state = b.state?.trim() || null;
+  const yearFounded =
+    typeof b.yearFounded === "number" && Number.isInteger(b.yearFounded) ? b.yearFounded : null;
+  const contactEmail = b.contactEmail?.trim() || null;
+  const contactPhone = b.contactPhone?.trim() || null;
+  const otherLocations = Array.isArray(b.otherLocations) ? b.otherLocations : [];
 
   const slugTaken = await prisma.brands.findUnique({ where: { slug } });
   const slugUpdate = !slugTaken || slugTaken.id === brandId ? slug : undefined;
@@ -56,6 +73,10 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
       logoUrl,
       city,
       state,
+      yearFounded,
+      otherLocations,
+      contactEmail,
+      contactPhone,
       syncedAt: now,
       updatedAt: now,
     },
@@ -68,6 +89,10 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
       logoUrl,
       city,
       state,
+      yearFounded,
+      otherLocations,
+      contactEmail,
+      contactPhone,
       syncedAt: now,
       updatedAt: now,
       ...(slugUpdate ? { slug: slugUpdate } : {}),

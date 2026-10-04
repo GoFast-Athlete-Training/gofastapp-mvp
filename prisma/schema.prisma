@@ -1160,12 +1160,17 @@ model brands {
   logoUrl         String?
   city            String?
   state           String?
+  yearFounded     Int?
+  otherLocations  Json      @default("[]")
+  contactEmail    String?
+  contactPhone    String?
   syncedAt        DateTime  @default(now())
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   run_clubs              run_clubs[]
   city_runs_run_brand city_runs[] @relation("CityRunRunBrand")
   special_events         special_events[]
+  run_stores             run_stores[]
 
   @@map("brands")
 }
@@ -1194,6 +1199,7 @@ model special_events {
 /// Physical run store — prodpush from Company acq_run_stores; id matches ACQ row id.
 model run_stores {
   id               String      @id
+  brandId          String?
   slug             String      @unique
   name             String
   websiteUrl       String?
@@ -1204,8 +1210,10 @@ model run_stores {
   syncedAt         DateTime    @default(now())
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
+  brand            brands?     @relation(fields: [brandId], references: [id], onDelete: SetNull)
   city_runs        city_runs[]
 
+  @@index([brandId])
   @@map("run_stores")
 }
 
@@ -3213,6 +3221,8 @@ enum CityRunType {
 enum BrandType {
   SHOE
   APPAREL
+  NUTRITION
+  PERFORMANCE
   RUN_STORE_CHAIN
   GEAR
   OTHER

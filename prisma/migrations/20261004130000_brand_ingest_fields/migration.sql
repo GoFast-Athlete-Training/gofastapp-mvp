@@ -1,0 +1,17 @@
+ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "yearFounded" INTEGER;
+ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "otherLocations" JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "contactEmail" TEXT;
+ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "contactPhone" TEXT;
+
+ALTER TYPE "BrandType" ADD VALUE IF NOT EXISTS 'NUTRITION';
+ALTER TYPE "BrandType" ADD VALUE IF NOT EXISTS 'PERFORMANCE';
+
+ALTER TABLE "run_stores" ADD COLUMN IF NOT EXISTS "brandId" TEXT;
+CREATE INDEX IF NOT EXISTS "run_stores_brandId_idx" ON "run_stores"("brandId");
+
+DO $$ BEGIN
+  ALTER TABLE "run_stores" ADD CONSTRAINT "run_stores_brandId_fkey"
+    FOREIGN KEY ("brandId") REFERENCES "brands"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
