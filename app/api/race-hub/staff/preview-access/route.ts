@@ -11,9 +11,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const res = await forwardToCompany(request, "/api/staff/find-or-create", {
-      method: "POST",
-      body: "{}",
+    const res = await forwardToCompany(request, "/api/staff/person", {
+      method: "GET",
     });
     const data = (await res.json().catch(() => ({}))) as {
       success?: boolean;

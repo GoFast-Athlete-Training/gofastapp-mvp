@@ -12,7 +12,7 @@ export interface RunManageStaffSession {
   email?: string | null;
 }
 
-/** Normalize Company find-or-create / staff payload for client storage. */
+/** Normalize Company staff/person payload for client storage. */
 export function normalizeStaffSession(raw: unknown): RunManageStaffSession | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;

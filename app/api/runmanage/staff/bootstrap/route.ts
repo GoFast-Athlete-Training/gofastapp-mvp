@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/runmanage/staff/bootstrap
- * Invite-only staff resolution via Company find-or-create (Firebase Bearer only).
+ * Invite-only staff resolution via Company GET /api/staff/person (Firebase Bearer only).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -14,9 +14,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const res = await forwardToCompany(request, "/api/staff/find-or-create", {
-      method: "POST",
-      body: "{}",
+    const res = await forwardToCompany(request, "/api/staff/person", {
+      method: "GET",
     });
     const data = await res.json().catch(() => ({}));
 
