@@ -92,6 +92,24 @@ export interface CityRunWorkoutSummary {
   segments?: CityRunWorkoutSegment[];
 }
 
+/** One container or partner on a run, resolved server-side by the association canon. */
+export interface CityRunAffiliationEntity {
+  id: string | null;
+  kind: string;
+  label: string;
+  name: string | null;
+  subtitle: string | null;
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  href: string | null;
+}
+
+export interface CityRunAffiliations {
+  cityRunType: string;
+  container: CityRunAffiliationEntity | null;
+  partners: (CityRunAffiliationEntity & { slot: 'lead' | 'extra' })[];
+}
+
 export interface CityRunDetails {
   id: string;
   slug?: string | null;
@@ -145,6 +163,9 @@ export interface CityRunDetails {
     logoUrl?: string | null;
   } | null;
   runCrew?: RunCrew | null;
+  raceRegistryId?: string | null;
+  specialEventId?: string | null;
+  affiliations?: CityRunAffiliations | null;
   rsvps?: CityRunRsvp[];
   currentRSVP?: string | null;
   currentRSVPRole?: string | null;

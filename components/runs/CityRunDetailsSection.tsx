@@ -10,6 +10,111 @@ import {
   type RunSeries,
 } from '@/components/runs/city-run-types';
 import { buildClubPastCheckinCopy, resolveRunRsvpCopy, resolveRunPastCheckinCopy } from '@/lib/city-run-copy';
+import type { CityRunAffiliationEntity } from '@/components/runs/city-run-types';
+
+/** Eyebrow copy per container kind — the race reads as the run's reason, not its owner. */
+const CONTAINER_EYEBROW: Record<string, string> = {
+  RACE: 'Shakeout for',
+  SPECIAL_EVENT: 'Special event',
+  RUN_STORE: 'Hosted by',
+  RUN_CREW: 'Hosted by',
+  ATHLETE: 'Hosted by',
+};
+
+function externalHref(url: string | null | undefined): string | null {
+  const trimmed = url?.trim();
+  if (!trimmed) return null;
+  return trimmed.startsWith('http://') || trimmed.startsWith('https://')
+    ? trimmed
+    : `https://${trimmed}`;
+}
+
+function CityRunContainerCard({ container }: { container: CityRunAffiliationEntity }) {
+  const eyebrow = CONTAINER_EYEBROW[container.kind] ?? container.label;
+  const website = externalHref(container.websiteUrl);
+  const name = container.name?.trim();
+  if (!name) return null;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
+      {container.logoUrl ? (
+        <img
+          src={container.logoUrl}
+          alt=""
+          className="h-14 w-14 rounded-lg border border-gray-100 object-contain"
+        />
+      ) : null}
+      <div className="min-w-0">
+        <div className="text-xs uppercase tracking-wide text-gray-400 mb-0.5">{eyebrow}</div>
+        {container.href ? (
+          <a href={container.href} className="font-bold text-gray-900 hover:text-orange-500">
+            {name}
+          </a>
+        ) : (
+          <div className="font-bold text-gray-900">{name}</div>
+        )}
+        {container.subtitle ? (
+          <div className="text-sm text-gray-500">{container.subtitle}</div>
+        ) : null}
+        {website ? (
+          <a
+            href={website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-sky-700 hover:underline"
+          >
+            Visit website
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CityRunPartnerStrip({ partners }: { partners: CityRunAffiliationEntity[] }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5">
+      <div className="text-xs uppercase tracking-wide text-gray-400 mb-3">
+        {partners.length === 1 ? 'Partner' : 'Partners'}
+      </div>
+      <ul className="flex flex-wrap gap-3">
+        {partners.map((partner) => {
+          const website = externalHref(partner.websiteUrl);
+          return (
+            <li
+              key={`${partner.kind}-${partner.id}`}
+              className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2"
+            >
+              {partner.logoUrl ? (
+                <img
+                  src={partner.logoUrl}
+                  alt=""
+                  className="h-9 w-9 rounded object-contain"
+                />
+              ) : null}
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-wide text-gray-400">
+                  {partner.label}
+                </div>
+                {partner.href ?? website ? (
+                  <a
+                    href={(partner.href ?? website) as string}
+                    {...(partner.href ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+                    className="text-sm font-semibold text-gray-900 hover:text-orange-500"
+                  >
+                    {partner.name}
+                  </a>
+                ) : (
+                  <div className="text-sm font-semibold text-gray-900">{partner.name}</div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 type CityRunDetailsSectionProps = {
   run: CityRunDetails;
@@ -32,6 +137,10 @@ export default function CityRunDetailsSection({
 }: CityRunDetailsSectionProps) {
   const timeLabel = formatRunTime(run.startTimeHour, run.startTimeMinute, run.startTimePeriod);
   const dateLabel = formatRunDate(run.date, includeYear);
+  // Container and partners are resolved server-side; a club container keeps the
+  // existing "Hosted by" card below so it is never shown twice.
+  const container = run.affiliations?.container ?? null;
+  const partners = (run.affiliations?.partners ?? []).filter((p) => p.name?.trim());
 
   return (
     <div className="space-y-4">
@@ -62,39 +171,11 @@ export default function CityRunDetailsSection({
         </div>
       ) : null}
 
-      {run.runStore || run.runBrand ? (
-        <div className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
-          {(run.runStore?.logoUrl ?? run.runBrand?.logoUrl) ? (
-            <img
-              src={(run.runStore?.logoUrl ?? run.runBrand?.logoUrl) as string}
-              alt=""
-              className="h-14 w-14 rounded-lg border border-gray-100 object-contain"
-            />
-          ) : null}
-          <div>
-            <div className="text-xs uppercase tracking-wide text-gray-400 mb-0.5">
-              {run.runStore ? "Run store" : "Brand"}
-            </div>
-            <div className="font-bold text-gray-900">
-              {run.runStore?.name ?? run.runBrand?.name}
-            </div>
-            {(run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl) ? (
-              <a
-                href={
-                  (run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl)?.startsWith("http")
-                    ? (run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl)!
-                    : `https://${run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-sky-700 hover:underline"
-              >
-                Visit website
-              </a>
-            ) : null}
-          </div>
-        </div>
+      {container && container.kind !== 'RUN_CLUB' ? (
+        <CityRunContainerCard container={container} />
       ) : null}
+
+      {partners.length > 0 ? <CityRunPartnerStrip partners={partners} /> : null}
 
       <div className={`bg-white rounded-xl shadow-sm ${compact ? 'p-4' : 'p-6'}`}>
         {run.runClub && !showHostCard ? (

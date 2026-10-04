@@ -8,6 +8,10 @@ import {
   type RunWorkflowStatus,
 } from '@/lib/runInstanceApprovalPublish';
 import { ensureCityRunRoute } from '@/lib/city-run/ensure-city-run-route';
+import {
+  CITY_RUN_AFFILIATION_INCLUDE,
+  serializeCityRunAffiliations,
+} from '@/lib/city-run/run-affiliations';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -86,6 +90,7 @@ export async function GET(
       run = await prisma.city_runs.findUnique({
         where: { id: runId },
         include: {
+          ...CITY_RUN_AFFILIATION_INCLUDE,
           route: {
             select: {
               id: true,
@@ -107,26 +112,11 @@ export async function GET(
               name: true,
               logoUrl: true,
               city: true,
+              state: true,
               description: true,
               websiteUrl: true,
               instagramUrl: true,
               stravaUrl: true,
-            },
-          },
-          runStore: {
-            select: {
-              id: true,
-              name: true,
-              websiteUrl: true,
-              logoUrl: true,
-            },
-          },
-          runBrand: {
-            select: {
-              id: true,
-              name: true,
-              websiteUrl: true,
-              logoUrl: true,
             },
           },
           plannedWorkout: {
@@ -274,6 +264,7 @@ export async function GET(
         ...run,
         routePhotos: Array.isArray(run.routePhotos) ? run.routePhotos : null,
         rsvps: run.city_run_rsvps,
+        affiliations: serializeCityRunAffiliations(run),
       },
     });
   } catch (error: any) {
