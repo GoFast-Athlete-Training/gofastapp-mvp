@@ -1,4 +1,8 @@
 import type { city_runs, run_clubs } from "@prisma/client";
+import {
+  serializeCityRunAffiliations,
+  type CityRunAffiliationRow,
+} from "@/lib/city-run/run-affiliations";
 
 export function generateCityRunId(): string {
   const timestamp = Date.now().toString(36);
@@ -34,10 +38,11 @@ type ShakeoutRsvpRow = {
   } | null;
 };
 
-type RunWithClub = city_runs & {
-  runClub?: Pick<run_clubs, "id" | "name" | "slug"> | null;
-  city_run_rsvps?: ShakeoutRsvpRow[];
-};
+type RunWithClub = city_runs &
+  CityRunAffiliationRow & {
+    runClub?: Pick<run_clubs, "id" | "name" | "slug"> | null;
+    city_run_rsvps?: ShakeoutRsvpRow[];
+  };
 
 function goingAttendeesFromRsvps(rsvps: ShakeoutRsvpRow[]) {
   const rows = rsvps
@@ -79,6 +84,9 @@ export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string)
     shakeoutDedupeKey: run.shakeoutDedupeKey,
     gorunPath: `/gorun/${run.id}`,
     runClub: run.runClub ?? null,
+    // A shakeout can be led by a club or a brand, so the hub lists every stamp
+    // rather than only the club.
+    affiliations: serializeCityRunAffiliations(run),
     rsvpCount: rsvps.filter((rv) => rv.status === "going").length,
     ...(goingAttendees ? { goingAttendees } : {}),
     myRsvp: viewerAthleteId

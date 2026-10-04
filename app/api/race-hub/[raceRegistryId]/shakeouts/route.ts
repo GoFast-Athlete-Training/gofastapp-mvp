@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertRaceHubReadAccess } from "@/lib/race-hub/hub-read-access";
 import { serializeHubShakeout } from "@/lib/race-hub-shakeout-utils";
+import { CITY_RUN_AFFILIATION_INCLUDE } from "@/lib/city-run/run-affiliations";
 
 /** GET — race hub members; lists synced shakeout `city_runs` for this registry. */
 export async function GET(
@@ -33,7 +34,7 @@ export async function GET(
       orderBy: { date: "asc" },
       include: {
         city_run_rsvps: true,
-        runClub: { select: { id: true, name: true, slug: true } },
+        ...CITY_RUN_AFFILIATION_INCLUDE,
       },
     });
 

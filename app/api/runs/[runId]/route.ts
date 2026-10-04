@@ -19,6 +19,14 @@ import {
   relationshipPatchFromBody,
 } from '@/lib/city-run-type';
 import { partnerExtrasForWrite } from '@/lib/runmanage/partner-extras';
+import {
+  CITY_RUN_AFFILIATION_ID_FIELDS,
+  CITY_RUN_AFFILIATION_SELECT,
+  serializeCityRunAffiliations,
+  validateCityRunAffiliationShape,
+  type CityRunAffiliationRefs,
+} from '@/lib/city-run/run-affiliations';
+import { validateCityRunAffiliationRefs } from '@/lib/city-run/validate-run-affiliations';
 import { syncCityRunRouteFromFields } from '@/lib/city-run/ensure-city-run-route';
 
 const RUNTIME_COMMIT_SHA =
@@ -153,20 +161,13 @@ export async function GET(
       run = await prisma.city_runs.findUnique({
         where: { id: resolvedId },
         select: {
+          ...CITY_RUN_AFFILIATION_SELECT,
           id: true,
           slug: true,
           title: true,
           citySlug: true,
           dayOfWeek: true,
           date: true,
-          runClubId: true,
-          runBrandId: true,
-          runStoreId: true,
-          raceRegistryId: true,
-          partnerExtras: true,
-          athleteGeneratedId: true,
-          cityRunType: true,
-          runCrewId: true,
           meetUpPoint: true,
           meetUpStreetAddress: true,
           meetUpCity: true,
@@ -270,17 +271,12 @@ export async function GET(
             name: true,
             logoUrl: true,
             city: true,
+            state: true,
             description: true,
             websiteUrl: true,
             instagramUrl: true,
             stravaUrl: true,
           },
-        },
-        runStore: {
-          select: { id: true, name: true, websiteUrl: true, logoUrl: true },
-        },
-        runBrand: {
-          select: { id: true, name: true, websiteUrl: true, logoUrl: true },
         },
         runSeries: {
           select: {
@@ -512,6 +508,10 @@ export async function GET(
       };
     }
     
+    // Container + partner stamps, resolved from the association canon so the run
+    // page, race hub, and Run Manage all describe the same run the same way.
+    const affiliations = serializeCityRunAffiliations({ ...run, runClub });
+
     // Format response (exclude sensitive fields)
     return NextResponse.json({
       success: true,
@@ -585,6 +585,13 @@ export async function GET(
         runClub,
         runCrew,
         clubMembership,
+        runStoreId: run.runStoreId ?? null,
+        runStore: run.runStore ?? null,
+        runBrandId: run.runBrandId ?? null,
+        runBrand: run.runBrand ?? null,
+        raceRegistryId: run.raceRegistryId ?? null,
+        specialEventId: run.specialEventId ?? null,
+        affiliations,
         rsvps: run.city_run_rsvps.map((rsvp: any) => ({
           id: rsvp.id,
           status: rsvp.status,
@@ -645,6 +652,7 @@ export async function PUT(
         runClubId: true,
         runCrewId: true,
         runStoreId: true,
+        specialEventId: true,
         athleteGeneratedId: true,
         shakeoutDedupeKey: true,
         raceRegistryId: true,
@@ -854,6 +862,9 @@ export async function PUT(
     if (relationshipPatch.raceRegistryId !== undefined) {
       updateData.raceRegistryId = relationshipPatch.raceRegistryId;
     }
+    if (relationshipPatch.specialEventId !== undefined) {
+      updateData.specialEventId = relationshipPatch.specialEventId;
+    }
     if (body.runSeriesId !== undefined) {
       updateData.runSeriesId =
         body.runSeriesId === null || body.runSeriesId === ''
@@ -899,21 +910,50 @@ export async function PUT(
         relationshipPatch.raceRegistryId !== undefined
           ? relationshipPatch.raceRegistryId
           : (updateData.raceRegistryId as string | null | undefined) ?? run.raceRegistryId,
+      runStoreId:
+        relationshipPatch.runStoreId !== undefined
+          ? relationshipPatch.runStoreId
+          : (updateData.runStoreId as string | null | undefined) ?? run.runStoreId,
+      specialEventId:
+        relationshipPatch.specialEventId !== undefined
+          ? relationshipPatch.specialEventId
+          : (updateData.specialEventId as string | null | undefined) ?? run.specialEventId,
     });
-    if (body.cityRunType !== undefined) {
-      if (body.cityRunType === null || body.cityRunType === '') {
-        updateData.cityRunType = cityRunTypeFromSnapshot({
-          ...mergedRelationships,
-          runStoreId:
-            (updateData.runStoreId as string | null | undefined) ?? run.runStoreId ?? null,
-        });
-      } else if (isCityRunTypeValue(body.cityRunType)) {
-        updateData.cityRunType = body.cityRunType;
-      }
-    }
     if (body.partnerExtras !== undefined) {
       const extras = partnerExtrasForWrite(body.partnerExtras);
       updateData.partnerExtras = extras ? extras : Prisma.JsonNull;
+    }
+
+    // Only the references this request touches are checked, so a stale id left
+    // on the row cannot block an unrelated edit.
+    const patchedRefs: CityRunAffiliationRefs = {};
+    for (const key of CITY_RUN_AFFILIATION_ID_FIELDS) {
+      if (updateData[key] !== undefined) {
+        patchedRefs[key] = updateData[key] as string | null;
+      }
+    }
+    if (updateData.partnerExtras !== undefined) {
+      patchedRefs.partnerExtras =
+        updateData.partnerExtras === Prisma.JsonNull ? null : updateData.partnerExtras;
+    }
+    const patchedRefsError = await validateCityRunAffiliationRefs(patchedRefs);
+    if (patchedRefsError) {
+      return NextResponse.json({ error: patchedRefsError }, { status: 400 });
+    }
+
+    if (body.cityRunType !== undefined) {
+      if (body.cityRunType === null || body.cityRunType === '') {
+        updateData.cityRunType = cityRunTypeFromSnapshot(mergedRelationships);
+      } else if (isCityRunTypeValue(body.cityRunType)) {
+        const shapeError = validateCityRunAffiliationShape(
+          { ...mergedRelationships, ...patchedRefs },
+          body.cityRunType
+        );
+        if (shapeError) {
+          return NextResponse.json({ error: shapeError }, { status: 400 });
+        }
+        updateData.cityRunType = body.cityRunType;
+      }
     }
 
     const runClubUpdateData: Record<string, string | null> = {};
