@@ -93,6 +93,22 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const seedFromRace = body.seedFromRace === true;
 
+    const runClubId =
+      typeof body.runClubId === "string" && body.runClubId.trim()
+        ? body.runClubId.trim()
+        : null;
+    const runBrandId =
+      typeof body.runBrandId === "string" && body.runBrandId.trim()
+        ? body.runBrandId.trim()
+        : null;
+
+    if (!seedFromRace && !runClubId && !runBrandId) {
+      return NextResponse.json(
+        { error: "Attach a club or brand lead, or use seedFromRace for legacy stub create" },
+        { status: 400 },
+      );
+    }
+
     let title =
       typeof body.title === "string" && body.title.trim()
         ? body.title.trim().slice(0, 200)
@@ -171,8 +187,10 @@ export async function POST(
         staffGeneratedId,
         workflowStatus: "DEVELOP",
         published: body.published === true,
+        runClubId,
+        runBrandId,
         cityRunType: resolveCityRunType({
-          runClubId: null,
+          runClubId,
           shakeoutDedupeKey: null,
           raceRegistryId: race.id,
         }),
