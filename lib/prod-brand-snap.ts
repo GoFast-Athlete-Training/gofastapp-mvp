@@ -17,6 +17,9 @@ export type ProdBrandSnapInput = {
   websiteUrl?: string | null;
   description?: string | null;
   brandType?: string | null;
+  instagramHandle?: string | null;
+  city?: string | null;
+  state?: string | null;
 };
 
 export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
@@ -33,6 +36,9 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
   const description = b.description?.trim() || null;
   const websiteUrl = b.websiteUrl?.trim() || null;
   const logoUrl = b.logoUrl?.trim() || null;
+  const instagramHandle = b.instagramHandle?.trim().replace(/^@+/, "") || null;
+  const city = b.city?.trim() || null;
+  const state = b.state?.trim() || null;
 
   const slugTaken = await prisma.brands.findUnique({ where: { slug } });
   const slugUpdate = !slugTaken || slugTaken.id === brandId ? slug : undefined;
@@ -46,7 +52,10 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
       brandType,
       description,
       websiteUrl,
+      instagramHandle,
       logoUrl,
+      city,
+      state,
       syncedAt: now,
       updatedAt: now,
     },
@@ -55,7 +64,10 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
       brandType,
       description,
       websiteUrl,
+      instagramHandle,
       logoUrl,
+      city,
+      state,
       syncedAt: now,
       updatedAt: now,
       ...(slugUpdate ? { slug: slugUpdate } : {}),
