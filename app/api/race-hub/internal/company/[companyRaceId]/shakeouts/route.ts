@@ -1,9 +1,13 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resolveActiveRaceByCompanyRaceId } from "@/lib/race-hub-internal-company";
 import { resolveCityRunType } from "@/lib/city-run-type";
+import { partnerExtrasForWrite } from "@/lib/runmanage/partner-extras";
+import { validateCityRunAffiliationRefs } from "@/lib/city-run/validate-run-affiliations";
+import { CITY_RUN_AFFILIATION_INCLUDE } from "@/lib/city-run/run-affiliations";
 import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
 import {
   assertStaffBearerAuth,
@@ -51,7 +55,7 @@ export async function GET(
             },
           },
         },
-        runClub: { select: { id: true, name: true, slug: true } },
+        ...CITY_RUN_AFFILIATION_INCLUDE,
       },
     });
 
@@ -101,20 +105,23 @@ export async function POST(
       typeof body.runBrandId === "string" && body.runBrandId.trim()
         ? body.runBrandId.trim()
         : null;
-    const partnerExtrasRaw = body.partnerExtras;
-    const partnerExtras =
-      partnerExtrasRaw !== null &&
-      partnerExtrasRaw !== undefined &&
-      typeof partnerExtrasRaw === "object" &&
-      !Array.isArray(partnerExtrasRaw)
-        ? partnerExtrasRaw
-        : null;
+    const partnerExtras = partnerExtrasForWrite(body.partnerExtras);
 
     if (!seedFromRace && !runClubId && !runBrandId) {
       return NextResponse.json(
         { error: "Attach a club or brand lead, or use seedFromRace for legacy stub create" },
         { status: 400 },
       );
+    }
+
+    const affiliationError = await validateCityRunAffiliationRefs({
+      raceRegistryId: race.id,
+      runClubId,
+      runBrandId,
+      partnerExtras,
+    });
+    if (affiliationError) {
+      return NextResponse.json({ error: affiliationError }, { status: 400 });
     }
 
     let title =
@@ -197,7 +204,7 @@ export async function POST(
         published: body.published === true,
         runClubId,
         runBrandId,
-        partnerExtras,
+        partnerExtras: partnerExtras ?? Prisma.JsonNull,
         cityRunType: resolveCityRunType({
           runClubId,
           shakeoutDedupeKey: null,
@@ -207,7 +214,7 @@ export async function POST(
       },
       include: {
         city_run_rsvps: true,
-        runClub: { select: { id: true, name: true, slug: true } },
+        ...CITY_RUN_AFFILIATION_INCLUDE,
       },
     });
 

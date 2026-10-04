@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { isRaceRegistryUuid } from "@/lib/race-hub-urls";
 import { serializeHubShakeout } from "@/lib/race-hub-shakeout-utils";
+import { CITY_RUN_AFFILIATION_INCLUDE } from "@/lib/city-run/run-affiliations";
 import { loadRaceInfoPacketsForStaffView } from "@/lib/races/load-race-info-packets";
 
 const raceSelect = {
@@ -114,7 +115,7 @@ export async function loadRaceHubStaffSnapshotBySlug(
             },
           },
         },
-        runClub: { select: { id: true, name: true, slug: true } },
+        ...CITY_RUN_AFFILIATION_INCLUDE,
       },
     }),
     prisma.race_memberships.findMany({

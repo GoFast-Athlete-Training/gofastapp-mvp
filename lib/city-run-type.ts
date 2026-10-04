@@ -1,3 +1,8 @@
+import {
+  CITY_RUN_TYPE_BY_CONTAINER,
+  resolveCityRunContainer,
+} from '@/lib/city-run/run-affiliations';
+
 export const CITY_RUN_TYPES = [
   'CLUB',
   'INDIVIDUAL',
@@ -24,15 +29,14 @@ export function isCityRunTypeValue(v: unknown): v is CityRunTypeValue {
   return typeof v === 'string' && (CITY_RUN_TYPES as readonly string[]).includes(v);
 }
 
-/** Infer type when staff did not send cityRunType (legacy / machine paths). Shakeout before club. */
+/**
+ * Infer type when staff did not send cityRunType (legacy / machine paths).
+ * Precedence lives in the association canon so reads and writes cannot diverge.
+ *
+ * @see lib/city-run/run-affiliations.ts
+ */
 export function resolveCityRunType(opts: CityRunRelationshipSnapshot): CityRunTypeValue {
-  if (opts.shakeoutDedupeKey || opts.raceRegistryId) return 'RACE_SHAKEOUT';
-  if (opts.specialEventId) return 'SPECIAL';
-  if (opts.runStoreId) return 'RUN_STORE';
-  if (opts.runClubId) return 'CLUB';
-  if (opts.runCrewId) return 'RUN_CREW';
-  if (opts.athleteGeneratedId) return 'INDIVIDUAL';
-  return 'OTHER';
+  return CITY_RUN_TYPE_BY_CONTAINER[resolveCityRunContainer(opts).kind];
 }
 
 export function cityRunTypeForWrite(
