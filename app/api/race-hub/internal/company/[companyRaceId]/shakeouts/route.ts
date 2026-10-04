@@ -101,6 +101,14 @@ export async function POST(
       typeof body.runBrandId === "string" && body.runBrandId.trim()
         ? body.runBrandId.trim()
         : null;
+    const partnerExtrasRaw = body.partnerExtras;
+    const partnerExtras =
+      partnerExtrasRaw !== null &&
+      partnerExtrasRaw !== undefined &&
+      typeof partnerExtrasRaw === "object" &&
+      !Array.isArray(partnerExtrasRaw)
+        ? partnerExtrasRaw
+        : null;
 
     if (!seedFromRace && !runClubId && !runBrandId) {
       return NextResponse.json(
@@ -189,6 +197,7 @@ export async function POST(
         published: body.published === true,
         runClubId,
         runBrandId,
+        partnerExtras,
         cityRunType: resolveCityRunType({
           runClubId,
           shakeoutDedupeKey: null,

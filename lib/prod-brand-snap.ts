@@ -111,9 +111,23 @@ const prodBrandReadSelect = {
   websiteUrl: true,
   instagramHandle: true,
   logoUrl: true,
+  city: true,
+  state: true,
+  yearFounded: true,
+  otherLocations: true,
+  contactEmail: true,
+  contactPhone: true,
   syncedAt: true,
   updatedAt: true,
 } as const;
+
+export async function listProdBrandsForReconcile(since?: Date) {
+  return prisma.brands.findMany({
+    where: since ? { updatedAt: { gte: since } } : undefined,
+    select: prodBrandReadSelect,
+    orderBy: { updatedAt: "desc" },
+  });
+}
 
 export async function getProdBrandSnapById(brandId: string) {
   const id = brandId.trim();
