@@ -5,7 +5,8 @@ alwaysApply: true
 
 # Cross-app auth (gofastapp-mvp)
 
-- **Human:** staff Bearer + `x-gofast-staff-id`, athlete Bearer + `x-athlete-id`, brand flows via advertising platform.
+- **Human:** Firebase Bearer; staff identity is resolved server-side from the token + local seat (satellites) or `company_staff` (Company). `x-gofast-staff-id` is stamped **outbound only** on Company→Prod/satellite proxy hops — browsers do not send it.
+- **Athlete:** Bearer + `x-athlete-id`. **Brand:** advertising platform headers.
 - **Machine:** `internalApiHeaders()` from [`lib/internal-api-auth.ts`](lib/internal-api-auth.ts) for Prod → Company notification triggers.
 
 Set `GOFAST_INTERNAL_API_KEY` in Vercel (same value as go-fast-company).
