@@ -1,10 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  resolveGofastTenantCompanyId,
-  upsertSponsorManageBrand,
-} from "@/lib/sponsor-manage-brand-client";
+import { upsertSponsorManageBrand } from "@/lib/sponsor-manage-brand-client";
 import { assertRunManageAuth } from "@/lib/runmanage/require-run-manage-auth";
 
 type CreateBody = {
@@ -21,11 +18,10 @@ export async function POST(request: NextRequest) {
   const auth = await assertRunManageAuth(request);
   if (auth instanceof NextResponse) return auth;
 
-  const gofastCompanyId = resolveGofastTenantCompanyId();
-  if (!gofastCompanyId) {
+  if (auth.mode !== "staff") {
     return NextResponse.json(
-      { success: false, error: "GOFAST_GO_FAST_COMPANY_ID is not configured" },
-      { status: 503 },
+      { success: false, error: "Staff session required to create brands" },
+      { status: 403 },
     );
   }
 
@@ -41,8 +37,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "name is required" }, { status: 400 });
   }
 
-  const result = await upsertSponsorManageBrand({
-    gofastCompanyId,
+  const result = await upsertSponsorManageBrand(request, auth.staffId, {
     name,
     slug: body.slug ?? null,
     websiteUrl: body.websiteUrl ?? null,
@@ -55,5 +50,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: result.error }, { status: 502 });
   }
 
-  return NextResponse.json({ success: true, brand: result.company, brandId: result.company.id });
+  return NextResponse.json({ success: true, brand: result.brand, brandId: result.brand.id });
 }

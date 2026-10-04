@@ -1,15 +1,18 @@
-import { internalApiHeaders } from "@/lib/internal-api-auth";
+import type { NextRequest } from "next/server";
 
 export type SponsorManageBrandRow = {
   id: string;
-  kind: string;
   name: string;
   slug: string | null;
   websiteUrl: string | null;
   logoUrl: string | null;
   brandType: string | null;
   description: string | null;
+  city?: string | null;
+  state?: string | null;
 };
+
+const STAFF_ID_HEADER = "x-gofast-staff-id";
 
 function sponsorManageBaseUrl(): string | null {
   const base =
@@ -26,87 +29,90 @@ export function resolveGofastTenantCompanyId(): string | null {
   );
 }
 
-export async function searchSponsorManageBrands(opts: {
-  q: string;
-  gofastCompanyId?: string | null;
-  limit?: number;
-}): Promise<{ ok: true; companies: SponsorManageBrandRow[] } | { ok: false; error: string }> {
+function staffForwardHeaders(request: NextRequest, staffId: string): HeadersInit {
+  const authorization = request.headers.get("authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    throw new Error("Missing Bearer token");
+  }
+  return {
+    Authorization: authorization,
+    [STAFF_ID_HEADER]: staffId,
+    Accept: "application/json",
+  };
+}
+
+export async function searchSponsorManageBrands(
+  request: NextRequest,
+  staffId: string,
+  opts: { q: string },
+): Promise<{ ok: true; brands: SponsorManageBrandRow[] } | { ok: false; error: string }> {
   const base = sponsorManageBaseUrl();
   if (!base) {
     return { ok: false, error: "GOFAST_SPONSOR_MANAGE_URL is not configured" };
   }
 
-  const params = new URLSearchParams({
-    kind: "BRAND",
-    q: opts.q.trim(),
-    limit: String(opts.limit ?? 20),
-  });
-  if (opts.gofastCompanyId?.trim()) {
-    params.set("gofastCompanyId", opts.gofastCompanyId.trim());
-  }
+  const params = new URLSearchParams({ search: opts.q.trim() });
 
   try {
-    const res = await fetch(`${base}/api/internal/companies/search?${params}`, {
+    const res = await fetch(`${base}/api/brands?${params}`, {
       method: "GET",
-      headers: internalApiHeaders(),
+      headers: staffForwardHeaders(request, staffId),
       cache: "no-store",
     });
     const json = (await res.json().catch(() => ({}))) as {
       success?: boolean;
-      companies?: SponsorManageBrandRow[];
+      brands?: SponsorManageBrandRow[];
       error?: string;
     };
     if (!res.ok || !json.success) {
       return { ok: false, error: json.error ?? "Brand search failed" };
     }
-    return { ok: true, companies: json.companies ?? [] };
+    return { ok: true, brands: json.brands ?? [] };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Brand search failed";
     return { ok: false, error: msg };
   }
 }
 
-export async function upsertSponsorManageBrand(input: {
-  id?: string;
-  gofastCompanyId: string;
-  name: string;
-  slug?: string | null;
-  websiteUrl?: string | null;
-  logoUrl?: string | null;
-  description?: string | null;
-  brandType?: string | null;
-}): Promise<{ ok: true; company: SponsorManageBrandRow } | { ok: false; error: string }> {
+export async function upsertSponsorManageBrand(
+  request: NextRequest,
+  staffId: string,
+  input: {
+    name: string;
+    slug?: string | null;
+    websiteUrl?: string | null;
+    logoUrl?: string | null;
+    description?: string | null;
+    brandType?: string | null;
+    city?: string | null;
+    state?: string | null;
+    instagramHandle?: string | null;
+  },
+): Promise<{ ok: true; brand: SponsorManageBrandRow } | { ok: false; error: string }> {
   const base = sponsorManageBaseUrl();
   if (!base) {
     return { ok: false, error: "GOFAST_SPONSOR_MANAGE_URL is not configured" };
   }
 
   try {
-    const res = await fetch(`${base}/api/internal/companies/upsert`, {
+    const res = await fetch(`${base}/api/brands`, {
       method: "POST",
-      headers: internalApiHeaders(),
-      body: JSON.stringify({
-        id: input.id,
-        gofastCompanyId: input.gofastCompanyId,
-        kind: "BRAND",
-        name: input.name,
-        slug: input.slug ?? null,
-        websiteUrl: input.websiteUrl ?? null,
-        logoUrl: input.logoUrl ?? null,
-        description: input.description ?? null,
-        brandType: input.brandType ?? null,
-      }),
+      headers: {
+        ...staffForwardHeaders(request, staffId),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
       cache: "no-store",
     });
     const json = (await res.json().catch(() => ({}))) as {
       success?: boolean;
-      company?: SponsorManageBrandRow;
+      brand?: SponsorManageBrandRow;
       error?: string;
     };
-    if (!res.ok || !json.success || !json.company) {
+    if (!res.ok || !json.success || !json.brand) {
       return { ok: false, error: json.error ?? "Brand upsert failed" };
     }
-    return { ok: true, company: json.company };
+    return { ok: true, brand: json.brand };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Brand upsert failed";
     return { ok: false, error: msg };
@@ -114,6 +120,8 @@ export async function upsertSponsorManageBrand(input: {
 }
 
 export async function patchSponsorManageBrand(
+  request: NextRequest,
+  staffId: string,
   brandId: string,
   patch: {
     name?: string;
@@ -122,29 +130,34 @@ export async function patchSponsorManageBrand(
     logoUrl?: string | null;
     description?: string | null;
     brandType?: string | null;
+    city?: string | null;
+    state?: string | null;
   },
-): Promise<{ ok: true; company: SponsorManageBrandRow } | { ok: false; error: string }> {
+): Promise<{ ok: true; brand: SponsorManageBrandRow } | { ok: false; error: string }> {
   const base = sponsorManageBaseUrl();
   if (!base) {
     return { ok: false, error: "GOFAST_SPONSOR_MANAGE_URL is not configured" };
   }
 
   try {
-    const res = await fetch(`${base}/api/internal/companies/${encodeURIComponent(brandId)}`, {
+    const res = await fetch(`${base}/api/brands/${encodeURIComponent(brandId)}`, {
       method: "PATCH",
-      headers: internalApiHeaders(),
+      headers: {
+        ...staffForwardHeaders(request, staffId),
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(patch),
       cache: "no-store",
     });
     const json = (await res.json().catch(() => ({}))) as {
       success?: boolean;
-      company?: SponsorManageBrandRow;
+      brand?: SponsorManageBrandRow;
       error?: string;
     };
-    if (!res.ok || !json.success || !json.company) {
+    if (!res.ok || !json.success || !json.brand) {
       return { ok: false, error: json.error ?? "Brand update failed" };
     }
-    return { ok: true, company: json.company };
+    return { ok: true, brand: json.brand };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Brand update failed";
     return { ok: false, error: msg };

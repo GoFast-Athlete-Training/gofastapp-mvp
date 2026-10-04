@@ -33,10 +33,17 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const result = await patchSponsorManageBrand(brandId.trim(), body);
+  if (auth.mode !== "staff") {
+    return NextResponse.json(
+      { success: false, error: "Staff session required to edit brands" },
+      { status: 403 },
+    );
+  }
+
+  const result = await patchSponsorManageBrand(request, auth.staffId, brandId.trim(), body);
   if (!result.ok) {
     return NextResponse.json({ success: false, error: result.error }, { status: 502 });
   }
 
-  return NextResponse.json({ success: true, brand: result.company, brandId: result.company.id });
+  return NextResponse.json({ success: true, brand: result.brand, brandId: result.brand.id });
 }
