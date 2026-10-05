@@ -129,9 +129,13 @@ export function RunManageDashboardHome() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [fullListOpen, setFullListOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  const [selectedCityKey, setSelectedCityKey] = useState<string>("");
+  const [selectedRunClubId, setSelectedRunClubId] = useState<string>("");
 
-  const loadRuns = async () => {
-    const response = await runmanageApi.get("/api/runs/manage?upcomingOnly=false");
+  const loadRuns = async (runClubId?: string) => {
+    const params = new URLSearchParams({ upcomingOnly: "false" });
+    if (runClubId?.trim()) params.set("runClubId", runClubId.trim());
+    const response = await runmanageApi.get(`/api/runs/manage?${params.toString()}`);
     if (response.data.success) {
       setRuns(response.data.runs || []);
     }
@@ -141,14 +145,48 @@ export function RunManageDashboardHome() {
     void (async () => {
       try {
         setLoading(true);
-        await loadRuns();
+        await loadRuns(selectedRunClubId || undefined);
       } catch (error) {
         console.error("Error fetching runs:", error);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [selectedRunClubId]);
+
+  const cityOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of runs) {
+      const key = (r.citySlug || r.meetUpCity || "").trim().toLowerCase();
+      if (!key) continue;
+      const label = r.meetUpCity?.trim() || r.citySlug?.trim() || key;
+      map.set(key, label);
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [runs]);
+
+  const clubOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of runs) {
+      const club = r.runClub;
+      const id = r.runClubId || club?.id;
+      if (!id || !club?.name) continue;
+      map.set(id, club.name);
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [runs]);
+
+  const scopedRuns = useMemo(() => {
+    let list = runs;
+    if (selectedCityKey) {
+      list = list.filter((r) => {
+        const slug = (r.citySlug || "").trim().toLowerCase();
+        const city = (r.meetUpCity || "").trim().toLowerCase();
+        return slug === selectedCityKey || city === selectedCityKey;
+      });
+    }
+    return list;
+  }, [runs, selectedCityKey]);
 
   const weekStart = useMemo(() => {
     const base = startOfWeekMonday(new Date());
@@ -163,12 +201,12 @@ export function RunManageDashboardHome() {
   }, [weekStart]);
 
   const runsInWeek = useMemo(() => {
-    return runs.filter((r) => {
+    return scopedRuns.filter((r) => {
       if (!r.date) return false;
       const d = new Date(r.date);
       return d >= weekStart && d < weekEndExclusive;
     });
-  }, [runs, weekStart, weekEndExclusive]);
+  }, [scopedRuns, weekStart, weekEndExclusive]);
 
   const runsByDayInWeek = useMemo(() => {
     const map = new Map<string, number>();
@@ -194,14 +232,14 @@ export function RunManageDashboardHome() {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
-    for (const r of runs) {
+    for (const r of scopedRuns) {
       const bucket = cockpitBucketForRun(r);
       if (!bucket) continue;
       stats[bucket].count++;
     }
 
     for (const bucket of COCKPIT_BUCKET_ORDER) {
-      const inBucket = runs
+      const inBucket = scopedRuns
         .filter((r) => cockpitBucketForRun(r) === bucket && r.date)
         .filter((r) => new Date(r.date) >= startOfToday)
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -209,10 +247,10 @@ export function RunManageDashboardHome() {
     }
 
     return stats;
-  }, [runs]);
+  }, [scopedRuns]);
 
   const cockpitGridRuns = useMemo(() => {
-    let list = runs;
+    let list = scopedRuns;
     if (selectedBucket) {
       list = list.filter((r) => cockpitBucketForRun(r) === selectedBucket);
     }
@@ -226,13 +264,13 @@ export function RunManageDashboardHome() {
       });
     }
     return [...list].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [runs, selectedBucket, selectedDayYmd, weekStart, weekEndExclusive]);
+  }, [scopedRuns, selectedBucket, selectedDayYmd, weekStart, weekEndExclusive]);
 
   const filteredRuns = useMemo(() => {
-    if (filter === "all") return runs;
+    if (filter === "all") return scopedRuns;
     const target = filter.toUpperCase();
-    return runs.filter((r) => (r.workflowStatus || "DEVELOP").toUpperCase() === target);
-  }, [runs, filter]);
+    return scopedRuns.filter((r) => (r.workflowStatus || "DEVELOP").toUpperCase() === target);
+  }, [scopedRuns, filter]);
 
   const handleApprove = async (runId: string) => {
     if (!confirm("Approve this run? It will be marked approved in the editorial workflow.")) {
@@ -241,7 +279,7 @@ export function RunManageDashboardHome() {
     try {
       const response = await runmanageApi.post(`/api/runs/manage/${runId}/approve`, {});
       if (response.data.success) {
-        await loadRuns();
+        await loadRuns(selectedRunClubId || undefined);
       }
     } catch {
       alert("Failed to approve run. Please try again.");
@@ -256,7 +294,9 @@ export function RunManageDashboardHome() {
     ? `Runs on ${formatRunDate(selectedDayYmd + "T12:00:00")}`
     : selectedBucket
       ? COCKPIT_BUCKET_META[selectedBucket].label
-      : "This week on the calendar";
+      : selectedCityKey || selectedRunClubId
+        ? "Filtered week on the calendar"
+        : "This week on the calendar";
 
   return (
     <div className="space-y-8">
@@ -274,6 +314,58 @@ export function RunManageDashboardHome() {
           <Plus className="h-4 w-4" />
           Create run
         </Link>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-4 rounded-xl border border-gray-200 bg-white p-4">
+        <label className="block min-w-[10rem] flex-1 text-sm">
+          <span className="mb-1 block font-medium text-gray-700">City</span>
+          <select
+            value={selectedCityKey}
+            onChange={(e) => {
+              setSelectedCityKey(e.target.value);
+              setSelectedDayYmd(null);
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">All cities</option>
+            {cityOptions.map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block min-w-[12rem] flex-1 text-sm">
+          <span className="mb-1 block font-medium text-gray-700">Run club</span>
+          <select
+            value={selectedRunClubId}
+            onChange={(e) => {
+              setSelectedRunClubId(e.target.value);
+              setSelectedDayYmd(null);
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">All clubs</option>
+            {clubOptions.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {(selectedCityKey || selectedRunClubId) && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCityKey("");
+              setSelectedRunClubId("");
+              setSelectedDayYmd(null);
+            }}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">

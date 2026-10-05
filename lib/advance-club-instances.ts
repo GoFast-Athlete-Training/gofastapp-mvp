@@ -17,6 +17,11 @@ export type RunInstanceSummary = {
   workflowStatus: string;
   runSeriesId: string;
   runClubId: string | null;
+  meetUpPoint?: string | null;
+  citySlug?: string | null;
+  slug?: string | null;
+  stravaMapUrl?: string | null;
+  mapImageUrl?: string | null;
 };
 
 export type InstanceLane = {
@@ -79,6 +84,11 @@ function mapRunSummary(run: {
   workflowStatus: string;
   runSeriesId: string | null;
   runClubId: string | null;
+  meetUpPoint?: string | null;
+  citySlug?: string | null;
+  slug?: string | null;
+  stravaMapUrl?: string | null;
+  mapImageUrl?: string | null;
 }): RunInstanceSummary | null {
   if (!run.runSeriesId) return null;
   return {
@@ -89,6 +99,11 @@ function mapRunSummary(run: {
     workflowStatus: run.workflowStatus,
     runSeriesId: run.runSeriesId,
     runClubId: run.runClubId,
+    meetUpPoint: run.meetUpPoint ?? null,
+    citySlug: run.citySlug ?? null,
+    slug: run.slug ?? null,
+    stravaMapUrl: run.stravaMapUrl ?? null,
+    mapImageUrl: run.mapImageUrl ?? null,
   };
 }
 

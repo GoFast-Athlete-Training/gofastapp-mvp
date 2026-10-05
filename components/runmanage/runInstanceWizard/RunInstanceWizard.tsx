@@ -40,7 +40,6 @@ import {
   pickRoutePhotoFiles,
   uploadImageFiles,
 } from "@/lib/client/uploadImages";
-import CoreChecklistRow from "./CoreChecklistRow";
 import RunInstanceSourcesPanel, { hasRunInstanceSources } from "./RunInstanceSourcesPanel";
 import TrackWorkoutBuilder from "./TrackWorkoutBuilder";
 import RunClubPublicSourcesCard, {
@@ -57,7 +56,6 @@ import {
   fieldChanged,
   formatInstanceDateLabel,
   formatStartTimeLabel,
-  type CoreEditKey,
   type RunInstanceWizardContext,
   type RunInstanceWizardValues,
   type WizardStep,
@@ -107,44 +105,6 @@ export type RunInstanceWizardProps = {
   associateMessage?: string | null;
 };
 
-function renderCoreStatusBadge(opts: {
-  changed?: boolean;
-  missing?: boolean;
-  instanceOnly?: boolean;
-  series?: boolean;
-}) {
-  if (opts.missing) {
-    return (
-      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
-        Missing
-      </span>
-    );
-  }
-  if (opts.changed) {
-    return (
-      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-900">
-        Changed
-      </span>
-    );
-  }
-  if (opts.instanceOnly) {
-    return (
-      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700">
-        This instance
-      </span>
-    );
-  }
-  if (opts.series) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-        Series
-      </span>
-    );
-  }
-  return null;
-}
-
 export default function RunInstanceWizard({
   values,
   onChange,
@@ -169,9 +129,8 @@ export default function RunInstanceWizard({
 }: RunInstanceWizardProps) {
   const isCreateScratch = context.variant === "create-scratch";
   const resolvedInitialStep: WizardStep =
-    initialWizardStep ?? (isCreateScratch ? "intake" : "sources");
+    initialWizardStep ?? (isCreateScratch ? "intake" : "core");
   const [wizardStep, setWizardStep] = useState<WizardStep>(resolvedInitialStep);
-  const [coreEditKey, setCoreEditKey] = useState<CoreEditKey>(null);
   const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
   const [intakeApplied, setIntakeApplied] = useState(false);
   const [generatingDescription, setGeneratingDescription] = useState(false);
@@ -245,7 +204,6 @@ export default function RunInstanceWizard({
 
   const goToWizardStep = (step: WizardStep) => {
     setWizardStep(step);
-    setCoreEditKey(null);
     onErrorChange?.(null);
   };
 
@@ -312,10 +270,6 @@ export default function RunInstanceWizard({
 
   const handleWizardStepClick = (step: WizardStep) => {
     goToWizardStep(step);
-  };
-
-  const toggleCoreEdit = (key: CoreEditKey) => {
-    setCoreEditKey((prev) => (prev === key ? null : key));
   };
 
   const handleRunTypeChange = (nextRunType: string) => {

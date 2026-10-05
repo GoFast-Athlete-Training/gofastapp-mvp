@@ -18,6 +18,7 @@ import runmanageApi from "@/lib/runmanage/api-client";
 import RunContentPreviewFrame from "@/components/runmanage/RunContentPreviewFrame";
 import RunInstanceRsvpPanel from "@/components/runmanage/RunInstanceRsvpPanel";
 import RunInstanceWizard from "@/components/runmanage/runInstanceWizard/RunInstanceWizard";
+import RunPublicDescriptionField from "@/components/runmanage/RunPublicDescriptionField";
 import type { AutoSaveStatus } from "@/components/runclub/edit/SaveStatusPill";
 import type { RunInstanceWizardValues } from "@/components/runmanage/runInstanceWizard/shared";
 import { normalizeGroupWorkoutSegment } from "@/lib/group-workout-segment-editor";
@@ -919,7 +920,21 @@ export default function RunManageStaffEditor({
             error={wizardError}
             onErrorChange={setWizardError}
             saveLabel="Save & Preview"
-            initialWizardStep={initialWizardStep}
+            initialWizardStep={initialWizardStep ?? "core"}
+            headerSlot={
+              <div className="mb-4 space-y-3 border-b border-gray-100 pb-4">
+                <RunPublicDescriptionField
+                  values={wizardValues}
+                  onDescriptionChange={(description) =>
+                    setWizardValues((v) => (v ? { ...v, description } : v))
+                  }
+                  cityRunType={run.cityRunType}
+                  clubName={run.runClub?.name}
+                  onError={setWizardError}
+                  compact
+                />
+              </div>
+            }
             publicSources={publicSources}
             associateDraft={useAssociateTab ? associateDraft ?? undefined : undefined}
             onAssociateChange={useAssociateTab ? setAssociateDraft : undefined}
