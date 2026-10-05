@@ -441,22 +441,44 @@ export async function POST(request: NextRequest) {
           ? bodySpecialEventId.trim() || null
           : null;
 
+    let effectiveSpecialEventId = resolvedSpecialEventId;
     if (bodyCityRunType === "SPECIAL") {
-      if (!resolvedSpecialEventId) {
-        return NextResponse.json(
-          { success: false, error: "specialEventId is required for SPECIAL runs" },
-          { status: 400 }
-        );
-      }
-      const parent = await prisma.special_events.findUnique({
-        where: { id: resolvedSpecialEventId },
-        select: { id: true },
-      });
-      if (!parent) {
-        return NextResponse.json(
-          { success: false, error: "Special event not found" },
-          { status: 400 }
-        );
+      if (!effectiveSpecialEventId) {
+        const runTitle =
+          typeof body.title === "string" && body.title.trim()
+            ? body.title.trim().slice(0, 200)
+            : "Special event run";
+        const desc =
+          typeof body.description === "string" && body.description.trim()
+            ? body.description.trim()
+            : null;
+        const parent = await prisma.special_events.create({
+          data: {
+            id: generateId(),
+            name: runTitle,
+            title: runTitle,
+            description: desc,
+            eventDate: null,
+            url: null,
+            brandId: null,
+            partnerExtras: Prisma.JsonNull,
+            staffGeneratedId: runManageStaffId ?? staffHeader ?? null,
+            updatedAt: new Date(),
+          },
+          select: { id: true },
+        });
+        effectiveSpecialEventId = parent.id;
+      } else {
+        const parent = await prisma.special_events.findUnique({
+          where: { id: effectiveSpecialEventId },
+          select: { id: true },
+        });
+        if (!parent) {
+          return NextResponse.json(
+            { success: false, error: "Special event not found" },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -681,12 +703,7 @@ export async function POST(request: NextRequest) {
             ? bodyRunStoreId.trim() || null
             : null,
       raceRegistryId: resolvedRaceRegistryId,
-      specialEventId:
-        bodySpecialEventId === null || bodySpecialEventId === ""
-          ? null
-          : typeof bodySpecialEventId === "string"
-            ? bodySpecialEventId.trim() || null
-            : null,
+      specialEventId: effectiveSpecialEventId,
       partnerExtras: (() => {
         const extras = partnerExtrasForWrite(bodyPartnerExtras);
         return extras ? extras : Prisma.JsonNull;
@@ -698,8 +715,7 @@ export async function POST(request: NextRequest) {
         raceRegistryId: resolvedRaceRegistryId,
         runStoreId:
           typeof bodyRunStoreId === "string" ? bodyRunStoreId.trim() || null : null,
-        specialEventId:
-          typeof bodySpecialEventId === "string" ? bodySpecialEventId.trim() || null : null,
+        specialEventId: effectiveSpecialEventId,
       }),
       updatedAt: new Date(),
     };

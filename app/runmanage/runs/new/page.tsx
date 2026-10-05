@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -22,19 +22,8 @@ import {
 } from "@/components/runmanage/RunManageRunAffiliations";
 import { useRunManageAuth } from "@/components/runmanage/RunManageProviders";
 import RunManageCreateRunScope from "@/components/runmanage/create-run/RunManageCreateRunScope";
-import RunContainerIdentityStrip from "@/components/runmanage/create-run/RunContainerIdentityStrip";
-import {
-  containerIdentityFromScope,
-  defaultCreateRunScopeFork,
-  isCreateScopeComplete,
-  validateCreateRunScope,
-  type CreateRunScopeFork,
-} from "@/lib/runmanage/create-run-scope";
-import {
-  emptySpecialEventDraft,
-  specialEventApiBodyFromDraft,
-  type SpecialEventDraft,
-} from "@/lib/runmanage/special-event-draft";
+import RunPublicDescriptionField from "@/components/runmanage/RunPublicDescriptionField";
+import { validateCreateRunScope } from "@/lib/runmanage/create-run-scope";
 
 export default function RunManageCreateRunPage() {
   const router = useRouter();
@@ -46,9 +35,6 @@ export default function RunManageCreateRunPage() {
   const [affiliations, setAffiliations] = useState<RunAffiliationDraft>(() =>
     emptyAffiliationDraft("CLUB")
   );
-  const [scopeFork, setScopeFork] = useState<CreateRunScopeFork>(() => defaultCreateRunScopeFork());
-  const [specialEvent, setSpecialEvent] = useState<SpecialEventDraft>(() => emptySpecialEventDraft());
-  const [clubDescription, setClubDescription] = useState<string | null>(null);
   const [wizardValues, setWizardValues] = useState<RunInstanceWizardValues>(() =>
     emptyWizardValues(localCalendarYmd(tomorrow))
   );
@@ -69,7 +55,6 @@ export default function RunManageCreateRunPage() {
         runClubId: clubId,
         cityRunType: "CLUB",
       }));
-      setScopeFork({ clubBoltMode: "one_off" });
       void (async () => {
         try {
           const res = await runmanageApi.get(`/api/runmanage/run-clubs/${clubId}`);
@@ -103,65 +88,8 @@ export default function RunManageCreateRunPage() {
     setFrontDoorReady(true);
   }, [searchParams]);
 
-  const scopeComplete = isCreateScopeComplete(
-    wizardValues.title,
-    affiliations,
-    scopeFork,
-    specialEvent
-  );
-
-  useEffect(() => {
-    const clubId = affiliations.runClubId;
-    if (!clubId || affiliations.cityRunType !== "CLUB") {
-      setClubDescription(null);
-      return;
-    }
-    void (async () => {
-      try {
-        const res = await runmanageApi.get(`/api/runmanage/run-clubs/${clubId}`);
-        if (res.data?.success && res.data.runClub) {
-          const desc = (res.data.runClub as { description?: string }).description;
-          setClubDescription(typeof desc === "string" ? desc : null);
-        }
-      } catch {
-        setClubDescription(null);
-      }
-    })();
-  }, [affiliations.runClubId, affiliations.cityRunType]);
-
-  const containerIdentity = useMemo(
-    () =>
-      scopeComplete
-        ? containerIdentityFromScope(wizardValues.title, affiliations, scopeFork, {
-            clubHydrate: { description: clubDescription },
-            specialEvent,
-            raceLabel: imprintedRaceLabel
-              ? {
-                  name: imprintedRaceLabel,
-                }
-              : affiliations.cityRunType === "RACE_SHAKEOUT"
-                ? { name: "Race shakeout" }
-                : null,
-          })
-        : null,
-    [
-      scopeComplete,
-      wizardValues.title,
-      affiliations,
-      scopeFork,
-      clubDescription,
-      specialEvent,
-      imprintedRaceLabel,
-    ]
-  );
-
   const handleCreate = async () => {
-    const scopeErr = validateCreateRunScope(
-      wizardValues.title,
-      affiliations,
-      scopeFork,
-      specialEvent
-    );
+    const scopeErr = validateCreateRunScope(wizardValues.title, affiliations, { clubBoltMode: null });
     if (scopeErr) {
       setError(scopeErr);
       return;
@@ -170,19 +98,6 @@ export default function RunManageCreateRunPage() {
     setSaving(true);
     setError(null);
     try {
-      let specialEventId: string | null = specialEvent.id;
-      if (affiliations.cityRunType === "SPECIAL" && specialEvent.name.trim()) {
-        const evRes = await runmanageApi.post(
-          "/api/runmanage/special-events",
-          specialEventApiBodyFromDraft(specialEvent)
-        );
-        const evId = evRes.data?.specialEvent?.id;
-        if (!evId) {
-          throw new Error(evRes.data?.error || "Failed to create special event parent.");
-        }
-        specialEventId = String(evId);
-        setSpecialEvent((prev) => ({ ...prev, id: specialEventId }));
-      }
       const finalCitySlug = generateCitySlugFromParts(
         wizardValues.meetUpCity,
         wizardValues.meetUpState
@@ -196,7 +111,7 @@ export default function RunManageCreateRunPage() {
       const isTrack = wizardValues.runType?.toLowerCase() === "track";
 
       const payload: Record<string, unknown> = {
-        ...affiliationsToPayload(affiliations, session?.athleteId, { specialEventId }),
+        ...affiliationsToPayload(affiliations, session?.athleteId, { specialEventId: null }),
         ...(imprintedCompanyRaceId ? { companyRaceId: imprintedCompanyRaceId } : {}),
         citySlug: finalCitySlug,
         title: wizardValues.title.trim(),
@@ -263,6 +178,19 @@ export default function RunManageCreateRunPage() {
     }
   };
 
+  const headerSlot = (
+    <div className="mb-4 space-y-3 border-b border-gray-100 pb-4">
+      <RunPublicDescriptionField
+        values={wizardValues}
+        onDescriptionChange={(description) => setWizardValues((v) => ({ ...v, description }))}
+        cityRunType={affiliations.cityRunType}
+        clubName={affiliations.runClubLabel}
+        onError={setError}
+        compact
+      />
+    </div>
+  );
+
   return (
     <div className="py-2">
       <Link
@@ -284,37 +212,19 @@ export default function RunManageCreateRunPage() {
         />
       </label>
       <p className="mt-2 text-sm text-gray-600">
-        Set title, run type, and container attach — then meet-up, miles, pace, and route in the wizard.
+        Pick run type, add title and public description, then fill core details in the wizard.
       </p>
 
-      <div className="mt-6">
+      <div className="mt-4">
         <RunManageCreateRunScope
-          title={wizardValues.title}
           draft={affiliations}
-          fork={scopeFork}
-          specialEvent={specialEvent}
           onDraftChange={setAffiliations}
-          onForkChange={setScopeFork}
-          onSpecialEventChange={setSpecialEvent}
           imprintedCompanyRaceId={imprintedCompanyRaceId}
           imprintedRaceLabel={imprintedRaceLabel}
         />
       </div>
 
-      {!scopeComplete ? (
-        <p className="mt-4 text-sm text-gray-500">
-          Add a title to open the run builder. Container attach is optional unless you picked a club
-          with series bolt.
-        </p>
-      ) : null}
-
-      {frontDoorReady && scopeComplete && containerIdentity ? (
-        <div className="mt-4 max-w-3xl">
-          <RunContainerIdentityStrip identity={containerIdentity} />
-        </div>
-      ) : null}
-
-      {frontDoorReady && scopeComplete ? (
+      {frontDoorReady ? (
         <div className="mt-6">
           {saving ? (
             <div className="flex items-center gap-2 text-gray-500">
@@ -326,19 +236,23 @@ export default function RunManageCreateRunPage() {
               values={wizardValues}
               onChange={setWizardValues}
               context={{
-                variant: "create-scratch",
+                variant: "edit",
+                cityRunType: affiliations.cityRunType,
                 isSeriesInstance: false,
                 clubName: affiliations.runClubLabel,
                 clubId: affiliations.runClubId,
               }}
               titleInPageHeading
+              initialWizardStep="core"
               onSave={() => void handleCreate()}
               saving={saving}
               error={error}
               onErrorChange={setError}
               saveLabel="Create draft run"
               publicSources={null}
-              headerSlot={null}
+              headerSlot={headerSlot}
+              associateDraft={affiliations}
+              onAssociateChange={setAffiliations}
             />
           )}
         </div>

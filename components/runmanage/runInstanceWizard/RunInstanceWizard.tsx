@@ -231,10 +231,7 @@ export default function RunInstanceWizard({
     [context.variant]
   );
 
-  const showAssociateStep =
-    context.variant === "edit" &&
-    (context.cityRunType === "RACE_SHAKEOUT" || context.cityRunType === "SPECIAL") &&
-    Boolean(associateDraft && onAssociateChange && onAssociateSave);
+  const showAssociateStep = Boolean(associateDraft && onAssociateChange);
 
   const visibleWizardSteps = useMemo(() => {
     let steps = isCreateScratch ? stepOrder : isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
@@ -633,7 +630,7 @@ export default function RunInstanceWizard({
             </div>
           )}
 
-          {wizardStep === "associate" && showAssociateStep && associateDraft && onAssociateChange && onAssociateSave ? (
+          {wizardStep === "associate" && showAssociateStep && associateDraft && onAssociateChange ? (
             <RunManageAssociateStep
               cityRunType={context.cityRunType}
               draft={associateDraft}
@@ -645,7 +642,7 @@ export default function RunInstanceWizard({
             />
           ) : null}
 
-          {wizardStep === "core" && isCreateScratch ? (
+          {wizardStep === "core" ? (
             <RunManageOpenCorePanel
               values={values}
               onChange={onChange}
@@ -656,325 +653,13 @@ export default function RunInstanceWizard({
             />
           ) : null}
 
-          {wizardStep === "core" && !isCreateScratch && (
-            <div className="rounded-lg border border-gray-200 bg-white">
-              <div className="border-b border-gray-100 px-4 py-3">
-                <h3 className="text-sm font-semibold text-gray-900">Core details</h3>
-                <p className="mt-1 text-xs text-gray-600">{coreIntro}</p>
-              </div>
-              <div className="px-4">
-                <CoreChecklistRow
-                  label="Title"
-                  value={values.title}
-                  status={renderCoreStatusBadge({
-                    missing: !values.title.trim(),
-                    changed: context.defaultTitle
-                      ? fieldChanged(values.title, context.defaultTitle)
-                      : false,
-                  })}
-                  onEdit={() => toggleCoreEdit("title")}
-                  editOpen={coreEditKey === "title"}
-                >
-                  <input
-                    type="text"
-                    value={values.title}
-                    onChange={(e) => patch({ title: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </CoreChecklistRow>
-
-                {!isSeries && (
-                  <CoreChecklistRow
-                    label="Day of week"
-                    value={values.dayOfWeek || "—"}
-                    status={renderCoreStatusBadge({ instanceOnly: true })}
-                    onEdit={() => toggleCoreEdit("dayOfWeek")}
-                    editOpen={coreEditKey === "dayOfWeek"}
-                  >
-                    <select
-                      value={values.dayOfWeek}
-                      onChange={(e) => patch({ dayOfWeek: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    >
-                      <option value="">—</option>
-                      {[
-                        "Monday",
-                        "Tuesday",
-                        "Wednesday",
-                        "Thursday",
-                        "Friday",
-                        "Saturday",
-                        "Sunday",
-                      ].map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                  </CoreChecklistRow>
-                )}
-
-                <CoreChecklistRow
-                  label="Date / time"
-                  value={dateTimeSummary}
-                  status={renderCoreStatusBadge({
-                    missing: !values.date.trim() || weekdayMismatch,
-                    changed: timeChangedFromSeries,
-                    instanceOnly: isSeries && !timeChangedFromSeries,
-                    series: isSeries && !timeChangedFromSeries && !weekdayMismatch,
-                  })}
-                  onEdit={() => toggleCoreEdit("datetime")}
-                  editOpen={coreEditKey === "datetime"}
-                >
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-900">
-                        {isSeries && context.dayOfWeek ? `${dayLabel} date *` : "Date *"}
-                      </label>
-                      <input
-                        type="date"
-                        value={values.date}
-                        onChange={(e) => {
-                          patch({ date: e.target.value });
-                          onErrorChange?.(null);
-                        }}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                      />
-                      {weekdayMismatch && (
-                        <p className="mt-1 text-xs text-red-700">
-                          Pick a {dayLabel} — this date does not match.
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-900">Start time</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={1}
-                          max={12}
-                          value={values.startTimeHour}
-                          onChange={(e) => patch({ startTimeHour: e.target.value })}
-                          className="w-16 rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                        />
-                        <span className="text-gray-500">:</span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={59}
-                          value={values.startTimeMinute}
-                          onChange={(e) => patch({ startTimeMinute: e.target.value })}
-                          className="w-16 rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                        />
-                        <select
-                          value={values.startTimePeriod}
-                          onChange={(e) => patch({ startTimePeriod: e.target.value })}
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                        >
-                          <option value="AM">AM</option>
-                          <option value="PM">PM</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </CoreChecklistRow>
-
-                <CoreChecklistRow
-                  label="Meet-up"
-                  value={meetUpSummary}
-                  status={renderCoreStatusBadge({
-                    missing: !values.meetUpPoint.trim(),
-                    changed: baseline
-                      ? fieldChanged(values.meetUpPoint, baseline.meetUpPoint) ||
-                        fieldChanged(values.meetUpStreetAddress, baseline.meetUpStreetAddress) ||
-                        fieldChanged(values.meetUpCity, baseline.meetUpCity) ||
-                        fieldChanged(values.meetUpState, baseline.meetUpState)
-                      : false,
-                    series: Boolean(
-                      isSeries &&
-                        baseline &&
-                        !fieldChanged(values.meetUpPoint, baseline.meetUpPoint)
-                    ),
-                  })}
-                  onEdit={() => toggleCoreEdit("meetup")}
-                  editOpen={coreEditKey === "meetup"}
-                >
-                  <GooglePlacesAutocomplete
-                    value={values.meetUpPoint}
-                    onChange={(e) => patch({ meetUpPoint: e.target.value })}
-                    onPlaceSelected={(placeData) => {
-                      const parsed = parseGoogleAddress(placeData.address);
-                      onChange({
-                        ...values,
-                        meetUpPoint: placeData.name || placeData.address,
-                        meetUpStreetAddress: parsed.streetAddress || "",
-                        meetUpCity: parsed.city || "",
-                        meetUpState: parsed.state || "",
-                        meetUpZip: parsed.zip || "",
-                        meetUpPlaceId: placeData.placeId || "",
-                        meetUpLat: String(placeData.lat),
-                        meetUpLng: String(placeData.lng),
-                      });
-                    }}
-                    placeholder="Search for meet-up…"
-                    className="mb-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <input
-                      type="text"
-                      value={values.meetUpStreetAddress}
-                      onChange={(e) => patch({ meetUpStreetAddress: e.target.value })}
-                      placeholder="Street"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    />
-                    <input
-                      type="text"
-                      value={values.meetUpCity}
-                      onChange={(e) => patch({ meetUpCity: e.target.value })}
-                      placeholder="City"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    />
-                    <input
-                      type="text"
-                      value={values.meetUpState}
-                      onChange={(e) => patch({ meetUpState: e.target.value })}
-                      placeholder="State"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    />
-                  </div>
-                </CoreChecklistRow>
-
-                <CoreChecklistRow
-                  label="Finish"
-                  value={finishSummary}
-                  status={renderCoreStatusBadge({
-                    changed: !values.endPointSameAsStart,
-                    instanceOnly: !values.endPointSameAsStart,
-                  })}
-                  onEdit={() => toggleCoreEdit("finish")}
-                  editOpen={coreEditKey === "finish"}
-                >
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={values.endPointSameAsStart}
-                      onChange={(e) => patch({ endPointSameAsStart: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-sky-600"
-                    />
-                    <span className="text-sm text-gray-900">Finish same as start</span>
-                  </label>
-                  {!values.endPointSameAsStart && (
-                    <GooglePlacesAutocomplete
-                      value={values.endPoint}
-                      onChange={(e) => patch({ endPoint: e.target.value })}
-                      onPlaceSelected={(placeData) => {
-                        const parsed = parseGoogleAddress(placeData.address);
-                        onChange({
-                          ...values,
-                          endPoint: placeData.name || placeData.address,
-                          endStreetAddress: parsed.streetAddress || "",
-                          endCity: parsed.city || "",
-                          endState: parsed.state || "",
-                        });
-                      }}
-                      placeholder="Where runners finish"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    />
-                  )}
-                </CoreChecklistRow>
-
-                {!isTrack && (
-                  <CoreChecklistRow
-                    label="Distance / pace"
-                    value={milesPaceSummary}
-                    status={renderCoreStatusBadge({
-                      changed: baseline ? fieldChanged(values.totalMiles, baseline.totalMiles) : false,
-                    })}
-                    onEdit={() => toggleCoreEdit("milesPace")}
-                    editOpen={coreEditKey === "milesPace"}
-                  >
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        value={values.totalMiles}
-                        onChange={(e) => patch({ totalMiles: e.target.value })}
-                        placeholder="Miles"
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                      />
-                      <select
-                        value={values.pace || DEFAULT_PACE_OPTION}
-                        onChange={(e) => patch({ pace: e.target.value })}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                      >
-                        <option value="">Select pace…</option>
-                        {PACE_OPTIONS.map((pace) => (
-                          <option key={pace} value={pace}>
-                            {pace}
-                          </option>
-                        ))}
-                        {values.pace &&
-                          !PACE_OPTIONS.includes(values.pace as (typeof PACE_OPTIONS)[number]) && (
-                            <option value={values.pace}>{values.pace}</option>
-                          )}
-                      </select>
-                    </div>
-                  </CoreChecklistRow>
-                )}
-
-                <CoreChecklistRow
-                  label="Post-run"
-                  value={values.postRunActivity.trim() || "—"}
-                  status={renderCoreStatusBadge({
-                    changed: baseline
-                      ? fieldChanged(values.postRunActivity, baseline.postRunActivity)
-                      : false,
-                  })}
-                  onEdit={() => toggleCoreEdit("postRun")}
-                  editOpen={coreEditKey === "postRun"}
-                >
-                  <input
-                    type="text"
-                    value={values.postRunActivity}
-                    onChange={(e) => patch({ postRunActivity: e.target.value })}
-                    placeholder="Coffee, bagels, social…"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </CoreChecklistRow>
-
-                <CoreChecklistRow
-                  label="Run venue"
-                  value={venueSummary}
-                  status={renderCoreStatusBadge({
-                    missing: !values.runType.trim(),
-                    changed: baseline ? fieldChanged(values.runType, baseline.runType) : false,
-                  })}
-                  onEdit={() => toggleCoreEdit("venue")}
-                  editOpen={coreEditKey === "venue"}
-                >
-                  <select
-                    value={values.runType}
-                    onChange={(e) => handleRunTypeChange(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  >
-                    <option value="">—</option>
-                    {RUN_TYPE_VALUES.map((v) => (
-                      <option key={v} value={v}>
-                        {RUN_TYPE_LABELS[v]}
-                      </option>
-                    ))}
-                  </select>
-                </CoreChecklistRow>
-              </div>
-            </div>
-          )}
 
           {wizardStep === "route" && (!isTrack || isCreateScratch) && (
             <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Route</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  Confirm map, directions, and route description. When the route is firm, go back to
-                  Description to regenerate public copy.
+                  Map, directions, and route description for this run.
                 </p>
               </div>
 
@@ -1198,68 +883,19 @@ export default function RunInstanceWizard({
           {wizardStep === "description" && (
             <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Public description</h3>
+                <h3 className="text-sm font-semibold text-gray-900">Staff notes</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  Draft or generate public copy from source info and core details. Confirm route
-                  next, then return here to regenerate once the route is firm.
+                  Internal only — not shown on the public run page. Public description is edited
+                  above the core fields.
                 </p>
               </div>
-
-              {!isTrack && values.routeDescription.trim() ? (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Route description summary
-                  </p>
-                  <p className="mt-1 line-clamp-4">{values.routeDescription.trim()}</p>
-                </div>
-              ) : null}
-
-              <div>
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <label className="block text-sm font-medium text-gray-900">Public description</label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleDraftDescription}
-                      disabled={generatingDescription}
-                      className="text-xs font-medium text-gray-600 underline hover:text-gray-900 disabled:opacity-50"
-                    >
-                      Quick draft
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleGenerateDescription()}
-                      disabled={generatingDescription}
-                      className="inline-flex items-center gap-1 rounded-lg border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50"
-                    >
-                      {generatingDescription ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-3.5 w-3.5" />
-                      )}
-                      Generate public description
-                    </button>
-                  </div>
-                </div>
-                <textarea
-                  value={values.description}
-                  onChange={(e) => patch({ description: e.target.value })}
-                  rows={6}
-                  placeholder="Instance-specific public copy for this dated run…"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900">Staff notes</label>
-                <textarea
-                  value={values.staffNotes}
-                  onChange={(e) => patch({ staffNotes: e.target.value })}
-                  rows={2}
-                  placeholder="Internal notes — not shown on public page."
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
-              </div>
+              <textarea
+                value={values.staffNotes}
+                onChange={(e) => patch({ staffNotes: e.target.value })}
+                rows={4}
+                placeholder="Internal notes…"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
             </div>
           )}
         </div>

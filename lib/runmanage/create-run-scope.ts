@@ -22,31 +22,13 @@ export function defaultCreateRunScopeFork(): CreateRunScopeFork {
 
 export function validateCreateRunScope(
   title: string,
-  draft: RunAffiliationDraft,
-  fork: CreateRunScopeFork,
+  _draft: RunAffiliationDraft,
+  _fork: CreateRunScopeFork,
   _specialEvent?: SpecialEventDraft | null
 ): string | null {
   if (!title.trim()) {
     return "Add a run title.";
   }
-
-  const type = draft.cityRunType;
-
-  if (type === "INDIVIDUAL") {
-    return "Individual runs are athlete-scoped — not available in staff create.";
-  }
-
-  if (type === "CLUB" && draft.runClubId) {
-    if (!fork.clubBoltMode) return "Choose one-off or from series.";
-    if (fork.clubBoltMode === "series") {
-      return "Series picker is coming soon — choose one-off for now.";
-    }
-  }
-
-  if (type === "RUN_STORE") {
-    return "Run store create is not on this form yet.";
-  }
-
   return null;
 }
 

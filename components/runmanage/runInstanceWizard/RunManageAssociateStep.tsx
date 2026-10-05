@@ -12,7 +12,7 @@ type Props = {
   draft: RunAffiliationDraft;
   onChange: (next: RunAffiliationDraft) => void;
   saving?: boolean;
-  onSave: () => void | Promise<void>;
+  onSave?: () => void | Promise<void>;
   error?: string | null;
   message?: string | null;
 };
@@ -28,15 +28,7 @@ export default function RunManageAssociateStep({
 }: Props) {
   const isShakeout = cityRunType === "RACE_SHAKEOUT";
   const isSpecial = cityRunType === "SPECIAL";
-
-  if (!isShakeout && !isSpecial) {
-    return (
-      <p className="text-sm text-gray-600">
-        Associate is for shakeouts and special runs — club and brand stamps that do not change run
-        type.
-      </p>
-    );
-  }
+  const isClub = cityRunType === "CLUB";
 
   const addExtraClub = (hit: AffiliationPick) => {
     if (draft.partnerExtras.some((e) => e.kind === "CLUB" && e.refId === hit.id)) return;
@@ -70,9 +62,9 @@ export default function RunManageAssociateStep({
         </p>
       </div>
 
-      {isShakeout ? (
+      {(isShakeout || isClub) ? (
         <EntitySearch
-          label="Hosting club"
+          label={isClub ? "Hosting club (optional)" : "Hosting club"}
           placeholder="Search clubs…"
           kind="club"
           selected={draft.runClubPick}
@@ -140,15 +132,19 @@ export default function RunManageAssociateStep({
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {message ? <p className="text-sm text-green-700">{message}</p> : null}
 
-      <button
-        type="button"
-        disabled={saving}
-        onClick={() => void onSave()}
-        className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-      >
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        Save associates
-      </button>
+      {onSave ? (
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void onSave()}
+          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Save associates
+        </button>
+      ) : (
+        <p className="text-xs text-gray-500">Stamps apply when you create or save the run.</p>
+      )}
     </div>
   );
 }
