@@ -107,16 +107,18 @@ export function normalizeActivityLapsFromFit(fitLapData: unknown): DerivedLap[] 
   return payload.laps.map((lap, index) => derivedFromFitLap(lap, index));
 }
 
-/** Prefer Activity Detail laps; fall back to FIT when detail is missing or empty. */
+/** Prefer FIT file laps (warmup/interval/recovery types); fall back to Activity Detail when FIT is missing. */
 export function normalizeActivityLapsPreferDetail(params: {
   detailData?: unknown;
   fitLapData?: unknown;
 }): DerivedLap[] {
+  const fromFit = normalizeActivityLapsFromFit(params.fitLapData);
+  if (fromFit.length > 0) return fromFit;
   if (params.detailData != null && typeof params.detailData === "object") {
     const fromDetail = normalizeActivityLapsFromDetail(params.detailData);
     if (fromDetail.length > 0) return fromDetail;
   }
-  return normalizeActivityLapsFromFit(params.fitLapData);
+  return [];
 }
 
 /**

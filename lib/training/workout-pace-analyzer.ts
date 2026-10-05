@@ -6,10 +6,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import {
-  classifySegmentPhase,
-  isWorkSegmentTitle,
-} from "./workout-performance-analysis";
+import { classifySegmentPhase } from "./workout-performance-analysis";
 import { isRecoveryTitle } from "./segment-summary";
 import {
   normalizePaceTargetEncodingVersion,
@@ -171,35 +168,6 @@ function plannedHasRecoverySegmentWithLaps(
   );
 }
 
-/** Multiple laps on one repeatCount row → alternate work/recovery only when mixed on same segment. */
-function repeatBlockNeedsSegmentPath(
-  plannedSegments: PlannedSegmentRow[],
-  sortedLaps: WorkoutLapRow[]
-): boolean {
-  const modularSeparateRecovery = plannedHasRecoverySegmentWithLaps(
-    plannedSegments,
-    sortedLaps
-  );
-
-  for (const seg of plannedSegments) {
-    const reps = seg.repeatCount ?? 1;
-    if (reps <= 1) continue;
-    const lapsOnSeg = sortedLaps.filter((l) => l.segmentStepOrder === seg.stepOrder);
-    if (lapsOnSeg.length <= 1) continue;
-
-    if (
-      modularSeparateRecovery &&
-      isWorkSegmentTitle(seg.title) &&
-      !lapsOnSeg.some((l) => isRecoveryTitle(l.segmentTitle))
-    ) {
-      continue;
-    }
-
-    return true;
-  }
-  return false;
-}
-
 /** Map prescriptions onto detected workout laps in lapIndex order. Fail open on count mismatch. */
 export function translatePlannedOntoWorkout(params: {
   plannedSegments: PlannedSegmentRow[];
@@ -244,49 +212,6 @@ export function translatePlannedOntoWorkout(params: {
 
     return aimedWorkLap(lap.id, lap.avgPaceSecPerMile, band.min!, band.max);
   });
-
-  const expanded = expandPlannedToLapPrescriptions(plannedSegments);
-  const workLaps = sortedLaps.filter(
-    (l) =>
-      isWorkSegmentTitle(l.segmentTitle) &&
-      !isRecoveryTitle(l.segmentTitle) &&
-      l.avgPaceSecPerMile != null
-  );
-
-  if (repeatBlockNeedsSegmentPath(plannedSegments, sortedLaps)) {
-    return segmentPath;
-  }
-
-  // When expanded plan count matches work laps, prefer expanded mapping for repeats/MP
-  if (expanded.length > 0 && expanded.length === sortedLaps.length) {
-    return sortedLaps.map((lap, i) => {
-      const rx = expanded[i]!;
-      if (rx.kind === "open") {
-        return openAimedLap(lap.id);
-      }
-      return aimedWorkLap(lap.id, lap.avgPaceSecPerMile, rx.min, rx.max);
-    });
-  }
-
-  if (expanded.filter((e) => e.kind === "work").length === workLaps.length && workLaps.length > 0) {
-    let workIdx = 0;
-    return sortedLaps.map((lap) => {
-      const phase = classifySegmentPhase(lap.segmentTitle);
-      const isWork =
-        phase === "work" &&
-        !isRecoveryTitle(lap.segmentTitle) &&
-        lap.avgPaceSecPerMile != null;
-      if (!isWork) {
-        return openAimedLap(lap.id);
-      }
-      const rx = expanded.filter((e) => e.kind === "work")[workIdx] as Extract<
-        ExpandedPrescription,
-        { kind: "work" }
-      >;
-      workIdx += 1;
-      return aimedWorkLap(lap.id, lap.avgPaceSecPerMile, rx.min, rx.max);
-    });
-  }
 
   return segmentPath;
 }

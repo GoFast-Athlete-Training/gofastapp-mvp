@@ -131,7 +131,9 @@ export async function loadWorkoutForAnalysis(params: {
       actualPaceSecPerMile: s.actualPaceSecPerMile,
       actualDurationSeconds: s.actualDurationSeconds,
       actualDistanceMiles: s.actualDistanceMiles,
-      segment_laps: s.segment_laps,
+      segment_laps: workout.garminDetailActivityId
+        ? s.segment_laps.filter((lap) => lap.activityId === workout.garminDetailActivityId)
+        : s.segment_laps,
     })),
   };
 

@@ -20,10 +20,12 @@ import {
   requiresPaceForPaceAnalysis,
   requiresSegmentLevelPaceForPace,
 } from "@/lib/training/workout-paced-segments";
+import type { ActivityMileLapRow } from "@/lib/training/activity-mile-laps";
 import {
-  buildActivityMileLapsFromActivityDetail,
-  type ActivityMileLapRow,
-} from "@/lib/training/activity-mile-laps";
+  mapDerivedLapsForClient,
+  type ActivityDerivedLapRow,
+} from "@/lib/training/activity-detail-projection";
+import { normalizeActivityLapsPreferDetail } from "@/lib/training/lap-converter";
 import { NO_DETAIL_SUPPORT_MESSAGE, workoutHasLapPaceDeltas } from "./workout-pace-analyzer";
 import { formatSecPerMile } from "@/lib/training/race-projection";
 import {
@@ -147,13 +149,16 @@ export type WorkoutPerformanceAnalysis = {
   executionHeadline: string | null;
   executionVerdict: WorkoutExecutionVerdict | null;
   phaseAwareLaps: PhaseAwareLapRow[];
-  /** Mile splits for general runs (no prescribed segments); display-only. */
+  /** @deprecated Mile rebuckets — use activityDerivedLaps */
   activityMileLaps: ActivityMileLapRow[];
+  /** Raw Garmin laps for recorded runs (FIT preferred). */
+  activityDerivedLaps: ActivityDerivedLapRow[];
   hasRealPrescription: boolean;
   scorecard: WorkoutScorecard;
 };
 
 export type { ActivityMileLapRow } from "@/lib/training/activity-mile-laps";
+export type { ActivityDerivedLapRow } from "@/lib/training/activity-detail-projection";
 
 export type WorkoutExecutionVerdictKind =
   | "mostly_on_target"
@@ -1189,14 +1194,17 @@ export function computeWorkoutPerformanceAnalysis(
       })
     : [];
 
-  const activityMileLaps =
-    !hasRealPrescription && !hasSegmentLaps
-      ? buildActivityMileLapsFromActivityDetail({
-          detailData:
-            workout.completedActivityDetailJson ??
-            workout.garmin_detail_activity?.detailData,
-          fitLapData: workout.garmin_detail_activity?.fitLapData,
-        })
+  const activityMileLaps: ActivityMileLapRow[] = [];
+  const activityDerivedLaps =
+    !hasRealPrescription && !hasSegmentLaps && workout.garminDetailActivityId
+      ? mapDerivedLapsForClient(
+          normalizeActivityLapsPreferDetail({
+            detailData:
+              workout.completedActivityDetailJson ??
+              workout.garmin_detail_activity?.detailData,
+            fitLapData: workout.garmin_detail_activity?.fitLapData,
+          })
+        )
       : [];
 
   const resolvedLapSource = hasSegmentLaps ? lapSource : null;
@@ -1219,6 +1227,7 @@ export function computeWorkoutPerformanceAnalysis(
     executionVerdict: null,
     phaseAwareLaps,
     activityMileLaps,
+    activityDerivedLaps,
     hasRealPrescription,
   };
 

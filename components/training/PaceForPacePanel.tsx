@@ -1,7 +1,7 @@
 "use client";
 
 import type {
-  ActivityMileLapRow,
+  ActivityDerivedLapRow,
   PhaseAwareLapRow,
   WorkoutPerformanceAnalysis,
 } from "@/lib/training/workout-performance-analysis";
@@ -35,7 +35,7 @@ function splitsLaps(analysis: WorkoutPerformanceAnalysis | null): PhaseAwareLapR
 
 function hasLapPaceDeltas(analysis: WorkoutPerformanceAnalysis | null): boolean {
   if (!analysis) return false;
-  if (analysis.activityMileLaps.length > 0) return true;
+  if ((analysis.activityDerivedLaps?.length ?? 0) > 0) return true;
   const laps = analysis.phaseAwareLaps;
   return laps.some(
     (lap) =>
@@ -97,31 +97,25 @@ function SplitBar({ lap }: { lap: PhaseAwareLapRow }) {
   );
 }
 
-function MileSplitBar({ lap }: { lap: ActivityMileLapRow }) {
-  const pace = formatSecPerMile(lap.paceSecPerMile);
-  const barWidth =
-    lap.paceSecPerMile != null
-      ? `${Math.min(100, Math.max(18, 600 / lap.paceSecPerMile))}%`
-      : "24%";
+function GarminLapSplitBar({ lap }: { lap: ActivityDerivedLapRow }) {
+  const pace = formatSecPerMile(lap.avgPaceSecPerMile);
+  const dist =
+    lap.distanceMiles != null && lap.distanceMiles > 0
+      ? `${lap.distanceMiles.toFixed(2)} mi`
+      : "—";
+  const time =
+    lap.durationSeconds > 0
+      ? `${Math.floor(lap.durationSeconds / 60)}:${String(lap.durationSeconds % 60).padStart(2, "0")}`
+      : "—";
 
   return (
     <li className="rounded-xl border border-violet-200 bg-white px-4 py-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-        <span className="font-semibold text-gray-900">Mile {lap.mileIndex + 1}</span>
-        <span className="tabular-nums text-gray-800">{pace ?? "—"}</span>
+      <div className="grid grid-cols-5 gap-2 text-sm">
+        <span className="font-semibold text-gray-900">Lap {lap.lapIndex + 1}</span>
+        <span className="tabular-nums text-gray-800">{time}</span>
+        <span className="tabular-nums text-gray-800">{dist}</span>
+        <span className="col-span-2 tabular-nums text-gray-800">{pace ?? "—"}</span>
       </div>
-      <div className="mt-2 h-2 rounded-full bg-violet-100">
-        <div
-          className="h-2 rounded-full bg-violet-600 transition-all"
-          style={{ width: barWidth }}
-        />
-      </div>
-      {lap.durationSeconds != null && lap.durationSeconds > 0 ? (
-        <p className="mt-2 text-xs text-gray-600">
-          {Math.floor(lap.durationSeconds / 60)}:
-          {String(lap.durationSeconds % 60).padStart(2, "0")}
-        </p>
-      ) : null}
     </li>
   );
 }
@@ -137,8 +131,8 @@ export default function PaceForPacePanel({
 }: Props) {
   const available = hasLapPaceDeltas(performanceAnalysis);
   const laps = splitsLaps(performanceAnalysis);
-  const mileLaps = performanceAnalysis?.activityMileLaps ?? [];
-  const showMileSplits = mileLaps.length > 0 && laps.length === 0;
+  const garminLaps = performanceAnalysis?.activityDerivedLaps ?? [];
+  const showGarminLaps = garminLaps.length > 0 && laps.length === 0;
 
   if (!garminDetailActivityId) {
     return (
@@ -155,14 +149,14 @@ export default function PaceForPacePanel({
       {available ? (
         <>
           <p className="mt-2 text-sm text-violet-950">
-            {showMileSplits
-              ? "Pace by mile from your Garmin activity."
+            {showGarminLaps
+              ? "Laps from your Garmin activity file."
               : "Prescribed vs actual pace for each lap."}
           </p>
           <ul className="mt-4 space-y-3">
-            {showMileSplits
-              ? mileLaps.map((lap) => (
-                  <MileSplitBar key={`mile-${lap.mileIndex}`} lap={lap} />
+            {showGarminLaps
+              ? garminLaps.map((lap) => (
+                  <GarminLapSplitBar key={`lap-${lap.lapIndex}`} lap={lap} />
                 ))
               : laps.map((lap) => (
                   <SplitBar key={`${lap.segmentId}-${lap.lapIndex}`} lap={lap} />
