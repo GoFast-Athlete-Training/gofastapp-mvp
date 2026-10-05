@@ -21,6 +21,7 @@ export type AffiliationPick = {
   city?: string | null;
   state?: string | null;
   websiteUrl?: string | null;
+  instagramHandle?: string | null;
   kindLabel?: string | null;
 };
 
@@ -70,11 +71,13 @@ const TYPE_HINTS = STAFF_RUN_TYPE_HINTS;
 export const RUN_MANAGE_TYPE_LABELS: Record<RunManageStaffCreateRunType, string> = {
   CLUB: STAFF_RUN_TYPE_LABELS.CLUB,
   SPECIAL: "Special event",
+  RACE_SHAKEOUT: STAFF_RUN_TYPE_LABELS.RACE_SHAKEOUT,
 };
 
 export const RUN_MANAGE_TYPE_HINTS: Record<RunManageStaffCreateRunType, string> = {
-  CLUB: "Search a club — lookup success sets runClubId.",
-  SPECIAL: "Write the event parent, attach brand lead, then bolt the run.",
+  CLUB: "Optional club attach — front door from a club page pre-fills runClubId.",
+  SPECIAL: "Optional event parent — name stamps SPECIAL when set. Brand is Associate later.",
+  RACE_SHAKEOUT: "Race scope — front door from race hub pre-fills the registry. Club or brand is Associate later.",
 };
 
 type SearchKind = "club" | "brand" | "store";
@@ -196,6 +199,7 @@ export function EntitySearch({
           logoUrl?: string | null;
           slug?: string | null;
           websiteUrl?: string | null;
+          instagramHandle?: string | null;
           brandType?: string | null;
           description?: string | null;
         }>;
@@ -205,6 +209,7 @@ export function EntitySearch({
           logoUrl: b.logoUrl,
           slug: b.slug,
           websiteUrl: b.websiteUrl,
+          instagramHandle: b.instagramHandle,
           kindLabel: b.brandType,
           secondary:
             (typeof b.description === "string" && b.description.trim()) || b.brandType || null,
@@ -750,6 +755,10 @@ export function draftFromRun(run: {
   runClubId?: string | null;
   runClub?: RelationSnap | null;
   runBrandId?: string | null;
+  runBrandName?: string | null;
+  runBrandLogoUrl?: string | null;
+  runBrandWebsiteUrl?: string | null;
+  runBrandInstagramHandle?: string | null;
   runBrand?: RelationSnap | null;
   runStoreId?: string | null;
   runStore?: RelationSnap | null;
@@ -762,7 +771,16 @@ export function draftFromRun(run: {
       ? (t as StaffCreateRunType)
       : "SPECIAL";
   const runClubPick = pickFromRelation(run.runClub, run.runClubId);
-  const runBrandPick = pickFromRelation(run.runBrand, run.runBrandId);
+  const runBrandPick =
+    run.runBrandName?.trim() && run.runBrandId
+      ? {
+          id: run.runBrandId,
+          name: run.runBrandName.trim(),
+          logoUrl: run.runBrandLogoUrl ?? null,
+          websiteUrl: run.runBrandWebsiteUrl ?? null,
+          instagramHandle: run.runBrandInstagramHandle ?? null,
+        }
+      : pickFromRelation(run.runBrand, run.runBrandId);
   const runStorePick = pickFromRelation(run.runStore, run.runStoreId);
   return {
     cityRunType,
@@ -780,6 +798,27 @@ export function draftFromRun(run: {
   };
 }
 
+/** Associate tab — stamps only (no cityRunType retarget). */
+export function associateStampsToPayload(draft: RunAffiliationDraft) {
+  const brandFields = {
+    runBrandId: draft.runBrandId,
+    runBrandName: draft.runBrandPick?.name ?? draft.runBrandLabel,
+    runBrandLogoUrl: draft.runBrandPick?.logoUrl ?? null,
+    runBrandWebsiteUrl: draft.runBrandPick?.websiteUrl ?? null,
+    runBrandInstagramHandle: draft.runBrandPick?.instagramHandle ?? null,
+  };
+  if (draft.cityRunType === "SPECIAL") {
+    return {
+      ...brandFields,
+      partnerExtras: draft.partnerExtras.length > 0 ? draft.partnerExtras : null,
+    };
+  }
+  return {
+    runClubId: draft.runClubId,
+    ...brandFields,
+  };
+}
+
 export function affiliationsToPayload(
   draft: RunAffiliationDraft,
   athleteId?: string | null,
@@ -790,6 +829,10 @@ export function affiliationsToPayload(
     cityRunType: draft.cityRunType,
     runClubId: isSpecial ? null : draft.runClubId,
     runBrandId: isSpecial ? null : draft.runBrandId,
+    runBrandName: isSpecial ? null : draft.runBrandPick?.name ?? draft.runBrandLabel,
+    runBrandLogoUrl: isSpecial ? null : draft.runBrandPick?.logoUrl ?? null,
+    runBrandWebsiteUrl: isSpecial ? null : draft.runBrandPick?.websiteUrl ?? null,
+    runBrandInstagramHandle: isSpecial ? null : draft.runBrandPick?.instagramHandle ?? null,
     runStoreId: isSpecial ? null : draft.runStoreId,
     raceRegistryId: isSpecial ? null : draft.raceRegistryId,
     specialEventId: isSpecial ? opts?.specialEventId ?? null : null,

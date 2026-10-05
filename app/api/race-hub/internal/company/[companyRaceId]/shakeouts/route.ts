@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolveActiveRaceByCompanyRaceId } from "@/lib/race-hub-internal-company";
-import { resolveCityRunType } from "@/lib/city-run-type";
 import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
 import {
   assertStaffBearerAuth,
@@ -36,7 +35,7 @@ export async function GET(
     }
 
     const runs = await prisma.city_runs.findMany({
-      where: { raceRegistryId: race.id },
+      where: { raceRegistryId: race.id, cityRunType: "RACE_SHAKEOUT" },
       orderBy: { date: "asc" },
       include: {
         city_run_rsvps: {
@@ -109,13 +108,6 @@ export async function POST(
       !Array.isArray(partnerExtrasRaw)
         ? partnerExtrasRaw
         : null;
-
-    if (!seedFromRace && !runClubId && !runBrandId) {
-      return NextResponse.json(
-        { error: "Attach a club or brand lead, or use seedFromRace for legacy stub create" },
-        { status: 400 },
-      );
-    }
 
     let title =
       typeof body.title === "string" && body.title.trim()
@@ -198,11 +190,7 @@ export async function POST(
         runClubId,
         runBrandId,
         partnerExtras,
-        cityRunType: resolveCityRunType({
-          runClubId,
-          shakeoutDedupeKey: null,
-          raceRegistryId: race.id,
-        }),
+        cityRunType: "RACE_SHAKEOUT",
         updatedAt: new Date(),
       },
       include: {

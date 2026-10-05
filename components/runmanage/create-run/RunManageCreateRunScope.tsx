@@ -1,13 +1,11 @@
 "use client";
 
-import { X } from "lucide-react";
 import {
   EntitySearch,
   emptyAffiliationDraft,
   type RunAffiliationDraft,
   RUN_MANAGE_TYPE_LABELS,
   RUN_MANAGE_TYPE_HINTS,
-  type AffiliationPick,
 } from "@/components/runmanage/RunManageRunAffiliations";
 import {
   RUN_MANAGE_STAFF_CREATE_RUN_TYPES,
@@ -25,6 +23,9 @@ type Props = {
   onDraftChange: (next: RunAffiliationDraft) => void;
   onForkChange: (next: CreateRunScopeFork) => void;
   onSpecialEventChange: (next: SpecialEventDraft) => void;
+  /** Race hub front door — company race id resolved to registry on create. */
+  imprintedCompanyRaceId?: string | null;
+  imprintedRaceLabel?: string | null;
 };
 
 export default function RunManageCreateRunScope({
@@ -35,6 +36,8 @@ export default function RunManageCreateRunScope({
   onDraftChange,
   onForkChange,
   onSpecialEventChange,
+  imprintedCompanyRaceId,
+  imprintedRaceLabel,
 }: Props) {
   const type = draft.cityRunType;
 
@@ -59,29 +62,6 @@ export default function RunManageCreateRunScope({
     ? type
     : "CLUB";
 
-  const addAffiliatedClub = (hit: AffiliationPick) => {
-    if (specialEvent.affiliatedClubs.some((e) => e.kind === "CLUB" && e.refId === hit.id)) return;
-    onSpecialEventChange({
-      ...specialEvent,
-      affiliatedClubs: [
-        ...specialEvent.affiliatedClubs,
-        {
-          kind: "CLUB",
-          refId: hit.id,
-          nameSnapshot: hit.name,
-          logoUrlSnapshot: hit.logoUrl ?? null,
-        },
-      ],
-    });
-  };
-
-  const removeAffiliatedClub = (refId: string) => {
-    onSpecialEventChange({
-      ...specialEvent,
-      affiliatedClubs: specialEvent.affiliatedClubs.filter((e) => e.refId !== refId),
-    });
-  };
-
   return (
     <div className="max-w-3xl space-y-4 rounded-xl border border-gray-200 bg-gray-50/80 p-5">
       <div>
@@ -103,15 +83,41 @@ export default function RunManageCreateRunScope({
         <p className="mt-2 text-xs text-gray-600">
           {RUN_MANAGE_TYPE_HINTS[runTypeValue as RunManageStaffCreateRunType]}
         </p>
-        <p className="mt-2 text-xs text-gray-500">
-          Race shakeouts are built in Race Manage (race hub → Shakeouts) — not on this form.
-        </p>
       </div>
+
+      {type === "RACE_SHAKEOUT" ? (
+        <div className="space-y-3 rounded-lg border border-amber-200/80 bg-white p-4">
+          <p className="text-sm font-semibold text-gray-900">Race scope</p>
+          {imprintedCompanyRaceId || draft.raceRegistryId ? (
+            <p className="text-sm text-gray-700">
+              {imprintedRaceLabel?.trim() || "Race on this hub"}{" "}
+              <span className="text-xs text-gray-500">(registry stamped on save)</span>
+            </p>
+          ) : (
+            <>
+              <p className="text-xs text-gray-600">
+                Optional — attach a prod race registry id, or save as a plain city run and bolt later.
+              </p>
+              <label className="block text-sm">
+                <span className="font-medium text-gray-700">Race registry id</span>
+                <input
+                  type="text"
+                  value={draft.raceRegistryId ?? ""}
+                  onChange={(e) =>
+                    onDraftChange({ ...draft, raceRegistryId: e.target.value.trim() || null })
+                  }
+                  className="mt-1 w-full max-w-md rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+            </>
+          )}
+        </div>
+      ) : null}
 
       {type === "CLUB" ? (
         <>
           <EntitySearch
-            label="Hosting club"
+            label="Hosting club (optional)"
             placeholder="Search clubs…"
             kind="club"
             selected={draft.runClubPick}
@@ -127,51 +133,53 @@ export default function RunManageCreateRunScope({
               onDraftChange({ ...draft, runClubId: null, runClubLabel: null, runClubPick: null })
             }
           />
-          <div>
-            <p className="text-sm font-semibold text-gray-900">Bolt to club container</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setClubBolt("one_off")}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium ${
-                  fork.clubBoltMode === "one_off"
-                    ? "bg-sky-600 text-white"
-                    : "bg-white text-gray-700 ring-1 ring-gray-200"
-                }`}
-              >
-                One-off instance
-              </button>
-              <button
-                type="button"
-                onClick={() => setClubBolt("series")}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium ${
-                  fork.clubBoltMode === "series"
-                    ? "bg-sky-600 text-white"
-                    : "bg-white text-gray-700 ring-1 ring-gray-200"
-                }`}
-              >
-                From series
-              </button>
+          {draft.runClubId ? (
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Bolt to club container</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClubBolt("one_off")}
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                    fork.clubBoltMode === "one_off"
+                      ? "bg-sky-600 text-white"
+                      : "bg-white text-gray-700 ring-1 ring-gray-200"
+                  }`}
+                >
+                  One-off instance
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClubBolt("series")}
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                    fork.clubBoltMode === "series"
+                      ? "bg-sky-600 text-white"
+                      : "bg-white text-gray-700 ring-1 ring-gray-200"
+                  }`}
+                >
+                  From series
+                </button>
+              </div>
+              {fork.clubBoltMode === "series" ? (
+                <p className="mt-2 text-xs text-amber-800">
+                  Series picker coming soon — use one-off until club series attach is wired.
+                </p>
+              ) : null}
             </div>
-            {fork.clubBoltMode === "series" ? (
-              <p className="mt-2 text-xs text-amber-800">
-                Series picker coming soon — use one-off until club series attach is wired.
-              </p>
-            ) : null}
-          </div>
+          ) : null}
         </>
       ) : null}
 
       {type === "SPECIAL" ? (
         <div className="space-y-4 rounded-lg border border-orange-200/80 bg-white p-4">
           <div>
-            <p className="text-sm font-semibold text-gray-900">1. Write the special event</p>
+            <p className="text-sm font-semibold text-gray-900">Special event parent (optional)</p>
             <p className="mt-1 text-xs text-gray-600">
-              Parent record first — the city run bolts with specialEventId after this is complete.
+              Event name stamps SPECIAL when set. Brand and affiliate clubs are Associate after save.
             </p>
           </div>
           <label className="block text-sm">
-            <span className="font-medium text-gray-900">Event name *</span>
+            <span className="font-medium text-gray-900">Event name</span>
             <input
               type="text"
               value={specialEvent.name}
@@ -223,70 +231,11 @@ export default function RunManageCreateRunScope({
               />
             </label>
           </div>
-
-          <div>
-            <p className="text-sm font-semibold text-gray-900">2. Brand lead *</p>
-            <EntitySearch
-              label="Lead brand"
-              placeholder="Search brands…"
-              kind="brand"
-              selected={specialEvent.brandPick}
-              onSelect={(h) =>
-                onSpecialEventChange({
-                  ...specialEvent,
-                  brandId: h.id,
-                  brandPick: { ...h, secondary: h.kindLabel ?? h.secondary },
-                })
-              }
-              onClear={() =>
-                onSpecialEventChange({
-                  ...specialEvent,
-                  brandId: null,
-                  brandPick: null,
-                })
-              }
-            />
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-gray-900">3. Affiliate clubs (optional)</p>
-            <p className="mt-1 text-xs text-gray-600">Clubs on the event — not a second run scope.</p>
-            <div className="mt-2">
-              <EntitySearch
-                label="Add affiliated club"
-                placeholder="Search clubs…"
-                kind="club"
-                selected={null}
-                onSelect={addAffiliatedClub}
-                onClear={() => undefined}
-              />
-            </div>
-            {specialEvent.affiliatedClubs.length > 0 ? (
-              <ul className="mt-3 space-y-2">
-                {specialEvent.affiliatedClubs.map((club) => (
-                  <li
-                    key={club.refId}
-                    className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
-                  >
-                    <span className="font-medium text-gray-900">{club.nameSnapshot}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeAffiliatedClub(club.refId)}
-                      className="rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-800"
-                      aria-label={`Remove ${club.nameSnapshot}`}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
         </div>
       ) : null}
 
       {!title.trim() ? (
-        <p className="text-xs text-gray-500">Add a title above to finish scope.</p>
+        <p className="text-xs text-gray-500">Add a title above to open the run builder.</p>
       ) : null}
     </div>
   );

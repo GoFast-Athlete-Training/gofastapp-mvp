@@ -8,6 +8,7 @@ import {
   type RunWorkflowStatus,
 } from '@/lib/runInstanceApprovalPublish';
 import { ensureCityRunRoute } from '@/lib/city-run/ensure-city-run-route';
+import { attachRunBrandSnap } from '@/lib/runmanage/run-brand-stamp';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -114,14 +115,6 @@ export async function GET(
             },
           },
           runStore: {
-            select: {
-              id: true,
-              name: true,
-              websiteUrl: true,
-              logoUrl: true,
-            },
-          },
-          runBrand: {
             select: {
               id: true,
               name: true,
@@ -270,11 +263,11 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      run: {
+      run: attachRunBrandSnap({
         ...run,
         routePhotos: Array.isArray(run.routePhotos) ? run.routePhotos : null,
         rsvps: run.city_run_rsvps,
-      },
+      }),
     });
   } catch (error: any) {
     if (isMissingCityRunsColumn(error)) {
@@ -366,14 +359,6 @@ export async function PATCH(
               logoUrl: true,
             },
           },
-          runBrand: {
-            select: {
-              id: true,
-              name: true,
-              websiteUrl: true,
-              logoUrl: true,
-            },
-          },
         },
       });
     } catch (error: any) {
@@ -398,7 +383,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      run: updated,
+      run: attachRunBrandSnap(updated),
       message:
         workflowStatus === 'SUBMITTED'
           ? 'Run submitted for approval'

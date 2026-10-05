@@ -5,6 +5,7 @@ export type WizardStep =
   | "intake"
   | "host"
   | "sources"
+  | "associate"
   | "core"
   | "description"
   | "route"
@@ -21,7 +22,14 @@ export type CoreEditKey =
   | "dayOfWeek"
   | null;
 
-export const WIZARD_STEP_ORDER: WizardStep[] = ["sources", "core", "description", "route", "workout"];
+export const WIZARD_STEP_ORDER: WizardStep[] = [
+  "sources",
+  "associate",
+  "core",
+  "description",
+  "route",
+  "workout",
+];
 
 /** Create-from-scratch: scope on page → intake → open core → sources → description → route (always) → workout */
 export const CREATE_SCRATCH_WIZARD_STEP_ORDER: WizardStep[] = [
@@ -54,6 +62,11 @@ export const WIZARD_STEPS: { id: WizardStep; title: string; description: string 
     id: "sources",
     title: "Source info",
     description: "Strava event, web listing, IG post for this run",
+  },
+  {
+    id: "associate",
+    title: "Associate",
+    description: "Optional club or brand — does not change run type",
   },
   { id: "core", title: "Core details", description: "Confirm date, meet-up, miles, pace" },
   {
@@ -134,6 +147,7 @@ export type SeriesBaseline = {
 
 export type RunInstanceWizardContext = {
   variant: "edit" | "create-scratch" | "create-series";
+  cityRunType?: string | null;
   /** Product city_runs.id — required to attach planned workout on edit. */
   cityRunId?: string | null;
   isSeriesInstance?: boolean;

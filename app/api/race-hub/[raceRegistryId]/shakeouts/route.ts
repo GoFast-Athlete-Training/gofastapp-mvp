@@ -29,7 +29,7 @@ export async function GET(
     }
 
     const runs = await prisma.city_runs.findMany({
-      where: { raceRegistryId: race.id },
+      where: { raceRegistryId: race.id, cityRunType: "RACE_SHAKEOUT" },
       orderBy: { date: "asc" },
       include: {
         city_run_rsvps: true,

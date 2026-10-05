@@ -6,7 +6,6 @@
  *
  * Idempotent: skips when matching title / shakeout already exists for the registry.
  */
-import { resolveCityRunType } from "../lib/city-run-type";
 import { inferRegionSlugFromCitySlug } from "../lib/region-slug";
 import { prisma } from "../lib/prisma";
 import {
@@ -96,11 +95,7 @@ async function seedShakeout(
       staffGeneratedId,
       workflowStatus: "DEVELOP",
       published: true,
-      cityRunType: resolveCityRunType({
-        runClubId: null,
-        shakeoutDedupeKey: null,
-        raceRegistryId: race.id,
-      }),
+      cityRunType: "RACE_SHAKEOUT",
       updatedAt: new Date(),
     },
   });

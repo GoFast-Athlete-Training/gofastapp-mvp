@@ -5,6 +5,7 @@ export type SponsorManageBrandRow = {
   name: string;
   slug: string | null;
   websiteUrl: string | null;
+  instagramHandle: string | null;
   logoUrl: string | null;
   brandType: string | null;
   description: string | null;

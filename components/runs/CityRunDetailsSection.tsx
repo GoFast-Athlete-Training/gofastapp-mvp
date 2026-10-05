@@ -62,11 +62,11 @@ export default function CityRunDetailsSection({
         </div>
       ) : null}
 
-      {run.runStore || run.runBrand ? (
+      {run.runStore || run.runBrand || run.runBrandName ? (
         <div className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
-          {(run.runStore?.logoUrl ?? run.runBrand?.logoUrl) ? (
+          {(run.runStore?.logoUrl ?? run.runBrandLogoUrl ?? run.runBrand?.logoUrl) ? (
             <img
-              src={(run.runStore?.logoUrl ?? run.runBrand?.logoUrl) as string}
+              src={(run.runStore?.logoUrl ?? run.runBrandLogoUrl ?? run.runBrand?.logoUrl) as string}
               alt=""
               className="h-14 w-14 rounded-lg border border-gray-100 object-contain"
             />
@@ -76,22 +76,44 @@ export default function CityRunDetailsSection({
               {run.runStore ? "Run store" : "Brand"}
             </div>
             <div className="font-bold text-gray-900">
-              {run.runStore?.name ?? run.runBrand?.name}
+              {run.runStore?.name ?? run.runBrandName ?? run.runBrand?.name}
             </div>
-            {(run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl) ? (
-              <a
-                href={
-                  (run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl)?.startsWith("http")
-                    ? (run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl)!
-                    : `https://${run.runStore?.websiteUrl ?? run.runBrand?.websiteUrl}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-sky-700 hover:underline"
-              >
-                Visit website
-              </a>
-            ) : null}
+            {(() => {
+              const brandWebsite =
+                run.runBrandWebsiteUrl?.trim() ||
+                run.runBrand?.websiteUrl?.trim() ||
+                null;
+              const website = run.runStore?.websiteUrl?.trim() || brandWebsite;
+              if (!website) return null;
+              const href = website.startsWith("http") ? website : `https://${website}`;
+              return (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-sky-700 hover:underline"
+                >
+                  Visit website
+                </a>
+              );
+            })()}
+            {(() => {
+              const handle =
+                run.runBrandInstagramHandle?.trim()?.replace(/^@+/, "") ||
+                run.runBrand?.instagramHandle?.trim()?.replace(/^@+/, "") ||
+                null;
+              if (!handle || run.runStore) return null;
+              return (
+                <a
+                  href={`https://instagram.com/${handle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 block text-sm text-sky-700 hover:underline"
+                >
+                  @{handle}
+                </a>
+              );
+            })()}
           </div>
         </div>
       ) : null}

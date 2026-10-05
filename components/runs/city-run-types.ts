@@ -138,10 +138,16 @@ export interface CityRunDetails {
     websiteUrl?: string | null;
     logoUrl?: string | null;
   } | null;
+  runBrandId?: string | null;
+  runBrandName?: string | null;
+  runBrandLogoUrl?: string | null;
+  runBrandWebsiteUrl?: string | null;
+  runBrandInstagramHandle?: string | null;
   runBrand?: {
     id: string;
     name: string;
     websiteUrl?: string | null;
+    instagramHandle?: string | null;
     logoUrl?: string | null;
   } | null;
   runCrew?: RunCrew | null;

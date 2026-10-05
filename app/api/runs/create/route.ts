@@ -14,7 +14,9 @@ import { stampPlannedWorkoutCityRun } from "@/lib/city-run/stamp-planned-city-ru
 import { resolveWorkoutTargetForAthlete } from "@/lib/training/workout-or-planned-resolve";
 import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
 import { cityRunTypeForWrite } from "@/lib/city-run-type";
+import { resolveActiveRaceByCompanyRaceId } from "@/lib/race-hub-internal-company";
 import { partnerExtrasForWrite } from "@/lib/runmanage/partner-extras";
+import { runBrandStampFieldsFromBody } from "@/lib/runmanage/run-brand-stamp";
 
 export const dynamic = "force-dynamic";
 
@@ -205,6 +207,21 @@ export async function POST(request: NextRequest) {
         : bodyStravaUrlLegacy !== undefined && bodyStravaUrlLegacy !== null
           ? String(bodyStravaUrlLegacy).trim() || null
           : null;
+
+    const bodyCompanyRaceId =
+      typeof (body as { companyRaceId?: unknown }).companyRaceId === "string"
+        ? (body as { companyRaceId: string }).companyRaceId.trim()
+        : "";
+    let resolvedRaceRegistryId =
+      bodyRaceRegistryId === null || bodyRaceRegistryId === ""
+        ? null
+        : typeof bodyRaceRegistryId === "string"
+          ? bodyRaceRegistryId.trim() || null
+          : null;
+    if (!resolvedRaceRegistryId && bodyCompanyRaceId) {
+      const reg = await resolveActiveRaceByCompanyRaceId(bodyCompanyRaceId);
+      if (reg) resolvedRaceRegistryId = reg.id;
+    }
 
     const hadExplicitCity = !!(
       citySlug?.trim() ||
@@ -648,24 +665,22 @@ export async function POST(request: NextRequest) {
       igPostGraphic: igPostGraphic?.trim() || null,
       routeId: resolvedRouteId,
       workoutId: isAthleteJoinMyWorkoutShare ? null : resolvedWorkoutId,
-      runBrandId:
-        bodyRunBrandId === null || bodyRunBrandId === ""
-          ? null
-          : typeof bodyRunBrandId === "string"
-            ? bodyRunBrandId.trim() || null
-            : null,
+      ...runBrandStampFieldsFromBody({
+        runBrandId: bodyRunBrandId,
+        runBrandName: (body as Record<string, unknown>).runBrandName,
+        runBrandLogoUrl: (body as Record<string, unknown>).runBrandLogoUrl,
+        runBrandWebsiteUrl: (body as Record<string, unknown>).runBrandWebsiteUrl,
+        runBrandInstagramHandle: (body as Record<string, unknown>).runBrandInstagramHandle,
+        runBrandLabel: (body as Record<string, unknown>).runBrandLabel,
+        runBrandPick: (body as Record<string, unknown>).runBrandPick,
+      }),
       runStoreId:
         bodyRunStoreId === null || bodyRunStoreId === ""
           ? null
           : typeof bodyRunStoreId === "string"
             ? bodyRunStoreId.trim() || null
             : null,
-      raceRegistryId:
-        bodyRaceRegistryId === null || bodyRaceRegistryId === ""
-          ? null
-          : typeof bodyRaceRegistryId === "string"
-            ? bodyRaceRegistryId.trim() || null
-            : null,
+      raceRegistryId: resolvedRaceRegistryId,
       specialEventId:
         bodySpecialEventId === null || bodySpecialEventId === ""
           ? null
@@ -680,8 +695,7 @@ export async function POST(request: NextRequest) {
         runClubId: finalRunClubId,
         runCrewId: runCrewId?.trim() || null,
         athleteGeneratedId: athleteGeneratedId?.trim() || null,
-        raceRegistryId:
-          typeof bodyRaceRegistryId === "string" ? bodyRaceRegistryId.trim() || null : null,
+        raceRegistryId: resolvedRaceRegistryId,
         runStoreId:
           typeof bodyRunStoreId === "string" ? bodyRunStoreId.trim() || null : null,
         specialEventId:

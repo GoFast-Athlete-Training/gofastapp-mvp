@@ -63,7 +63,6 @@ interface Run {
   runBrandId?: string | null;
   runBrand?: RunBrand | null;
   cityRunType?: string | null;
-  shakeoutDedupeKey?: string | null;
   athleteGeneratedId?: string | null;
   rsvpCount?: number;
   stravaMapUrl?: string | null;

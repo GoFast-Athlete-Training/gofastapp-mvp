@@ -39,6 +39,24 @@ export default function RunContainerIdentityStrip({
     );
   }
 
+  if (identity.kind === "race") {
+    const place = [identity.city, identity.state].filter(Boolean).join(", ");
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3">
+        <span className="flex h-12 w-12 items-center justify-center rounded bg-white text-sm font-bold text-amber-900">
+          R
+        </span>
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+            Race shakeout
+          </p>
+          <p className="truncate text-sm font-semibold text-gray-900">{identity.name}</p>
+          {place ? <p className="text-xs text-gray-600">{place}</p> : null}
+        </div>
+      </div>
+    );
+  }
+
   if (identity.kind === "special_event") {
     return (
       <div className="flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50/60 px-4 py-3">

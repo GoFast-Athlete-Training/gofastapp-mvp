@@ -3,22 +3,9 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-function parseCompanyEventId(
-  shakeoutDedupeKey: string | null,
-  registryId: string,
-): string | null {
-  if (!shakeoutDedupeKey) return null;
-  const prefix = `shk-${registryId}-`;
-  if (!shakeoutDedupeKey.startsWith(prefix)) return null;
-  const rest = shakeoutDedupeKey.slice(prefix.length);
-  const windowIdx = rest.lastIndexOf("-w");
-  if (windowIdx <= 0) return null;
-  return rest.slice(0, windowIdx) || null;
-}
-
 /**
  * GET /api/race-hub/public/shakeouts-by-company-race/[companyRaceId]
- * Public list of synced shakeout city_runs for Content Studio crossover.
+ * Public list of shakeout city_runs for Content Studio crossover.
  */
 export async function GET(
   _request: Request,
@@ -44,34 +31,22 @@ export async function GET(
     const runs = await prisma.city_runs.findMany({
       where: {
         raceRegistryId: { in: registryIds },
-        shakeoutDedupeKey: { not: null },
+        cityRunType: "RACE_SHAKEOUT",
       },
       orderBy: { date: "asc" },
       select: {
         id: true,
         slug: true,
         title: true,
-        shakeoutDedupeKey: true,
-        raceRegistryId: true,
       },
     });
 
-    const seen = new Set<string>();
-    const shakeouts = runs
-      .map((r) => {
-        const companyEventId =
-          parseCompanyEventId(r.shakeoutDedupeKey, r.raceRegistryId ?? "") ?? r.id;
-        const dedupe = r.id;
-        if (seen.has(dedupe)) return null;
-        seen.add(dedupe);
-        return {
-          id: r.id,
-          slug: r.slug,
-          title: r.title,
-          companyEventId,
-        };
-      })
-      .filter(Boolean);
+    const shakeouts = runs.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      title: r.title,
+      companyEventId: r.id,
+    }));
 
     return NextResponse.json({ success: true, shakeouts });
   } catch (err) {

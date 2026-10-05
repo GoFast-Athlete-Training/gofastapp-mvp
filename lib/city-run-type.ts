@@ -14,7 +14,6 @@ export type CityRunRelationshipSnapshot = {
   runClubId?: string | null;
   runCrewId?: string | null;
   athleteGeneratedId?: string | null;
-  shakeoutDedupeKey?: string | null;
   raceRegistryId?: string | null;
   runStoreId?: string | null;
   specialEventId?: string | null;
@@ -24,23 +23,125 @@ export function isCityRunTypeValue(v: unknown): v is CityRunTypeValue {
   return typeof v === 'string' && (CITY_RUN_TYPES as readonly string[]).includes(v);
 }
 
-/** Infer type when staff did not send cityRunType (legacy / machine paths). Shakeout before club. */
+const CONTAINER_KEY_ORDER: (keyof CityRunRelationshipSnapshot)[] = [
+  'raceRegistryId',
+  'specialEventId',
+  'runStoreId',
+  'runClubId',
+  'runCrewId',
+  'athleteGeneratedId',
+];
+
+/** Infer type from container FKs present on the row (machine / legacy paths). */
 export function resolveCityRunType(opts: CityRunRelationshipSnapshot): CityRunTypeValue {
-  if (opts.shakeoutDedupeKey || opts.raceRegistryId) return 'RACE_SHAKEOUT';
-  if (opts.specialEventId) return 'SPECIAL';
-  if (opts.runStoreId) return 'RUN_STORE';
-  if (opts.runClubId) return 'CLUB';
-  if (opts.runCrewId) return 'RUN_CREW';
-  if (opts.athleteGeneratedId) return 'INDIVIDUAL';
+  for (const key of CONTAINER_KEY_ORDER) {
+    const v = opts[key];
+    if (v) {
+      const t = cityRunTypeFromContainerKey(key, v);
+      if (t) return t;
+    }
+  }
   return 'OTHER';
 }
 
+export function cityRunTypeFromContainerKey(
+  key: keyof CityRunRelationshipSnapshot,
+  value: string | null | undefined
+): CityRunTypeValue | null {
+  if (!value) return null;
+  switch (key) {
+    case 'raceRegistryId':
+      return 'RACE_SHAKEOUT';
+    case 'specialEventId':
+      return 'SPECIAL';
+    case 'runStoreId':
+      return 'RUN_STORE';
+    case 'runClubId':
+      return 'CLUB';
+    case 'runCrewId':
+      return 'RUN_CREW';
+    case 'athleteGeneratedId':
+      return 'INDIVIDUAL';
+    default:
+      return null;
+  }
+}
+
+/** True when PATCH only sets associate stamps, not a container retarget. */
+export function isAssociateStampRelationshipPatch(
+  patch: Partial<CityRunRelationshipSnapshot>,
+  existing: CityRunRelationshipSnapshot & { cityRunType?: CityRunTypeValue | null }
+): boolean {
+  const touched = CONTAINER_KEY_ORDER.filter((k) => patch[k] !== undefined);
+  if (touched.length === 0) return false;
+
+  const primaryContainer =
+    existing.cityRunType === 'RACE_SHAKEOUT' && existing.raceRegistryId
+      ? 'raceRegistryId'
+      : existing.cityRunType === 'SPECIAL' && existing.specialEventId
+        ? 'specialEventId'
+        : null;
+
+  if (!primaryContainer) return false;
+
+  if (touched.length === 1 && touched[0] === 'runClubId') return true;
+
+  return false;
+}
+
+/**
+ * Stamp cityRunType from container FKs in this PATCH only.
+ * Returns undefined when the patch should not change type (associate stamp).
+ */
+export function cityRunTypeFromRelationshipPatch(
+  patch: Partial<CityRunRelationshipSnapshot>,
+  existing: CityRunRelationshipSnapshot & { cityRunType?: CityRunTypeValue | null }
+): CityRunTypeValue | undefined {
+  if (isAssociateStampRelationshipPatch(patch, existing)) {
+    return undefined;
+  }
+
+  const touched = CONTAINER_KEY_ORDER.filter((k) => patch[k] !== undefined);
+  if (touched.length === 0) return undefined;
+
+  for (const key of CONTAINER_KEY_ORDER) {
+    if (patch[key] === undefined) continue;
+    if (patch[key]) {
+      return cityRunTypeFromContainerKey(key, patch[key]) ?? 'OTHER';
+    }
+    const merged = { ...existing, ...patch, [key]: null };
+    return resolveCityRunType(merged);
+  }
+
+  return undefined;
+}
+
+/** Stamp from container FKs present on this create body only (priority among set keys). */
+export function cityRunTypeFromCreateSnapshot(
+  snapshot: CityRunRelationshipSnapshot
+): CityRunTypeValue {
+  for (const key of CONTAINER_KEY_ORDER) {
+    const v = snapshot[key];
+    if (v) {
+      const t = cityRunTypeFromContainerKey(key, v);
+      if (t) return t;
+    }
+  }
+  return 'OTHER';
+}
+
+/** Staff create: explicit type is confirmed only when its container FK is set; else plain city run. */
 export function cityRunTypeForWrite(
   explicit: unknown,
   snapshot: CityRunRelationshipSnapshot
 ): CityRunTypeValue {
-  if (isCityRunTypeValue(explicit)) return explicit;
-  return resolveCityRunType(snapshot);
+  const fromContainers = cityRunTypeFromCreateSnapshot(snapshot);
+  if (isCityRunTypeValue(explicit)) {
+    if (explicit === fromContainers && fromContainers !== 'OTHER') return explicit;
+    if (fromContainers !== 'OTHER') return fromContainers;
+    return 'OTHER';
+  }
+  return fromContainers;
 }
 
 /** Merge existing relationship FKs with optional PATCH body fields. */
@@ -55,10 +156,6 @@ export function mergeRelationshipSnapshot(
       patch.athleteGeneratedId !== undefined
         ? patch.athleteGeneratedId
         : existing.athleteGeneratedId,
-    shakeoutDedupeKey:
-      patch.shakeoutDedupeKey !== undefined
-        ? patch.shakeoutDedupeKey
-        : existing.shakeoutDedupeKey,
     raceRegistryId:
       patch.raceRegistryId !== undefined ? patch.raceRegistryId : existing.raceRegistryId,
     runStoreId:
@@ -77,7 +174,6 @@ const RELATIONSHIP_KEYS: (keyof CityRunRelationshipSnapshot)[] = [
   'runClubId',
   'runCrewId',
   'athleteGeneratedId',
-  'shakeoutDedupeKey',
   'raceRegistryId',
   'runStoreId',
   'specialEventId',

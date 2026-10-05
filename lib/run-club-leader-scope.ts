@@ -115,7 +115,6 @@ export const LEADER_CITY_RUN_UPDATABLE_FIELDS = [
 export const STAFF_ONLY_CITY_RUN_FIELDS = [
   'staffNotes',
   'staffGeneratedId',
-  'shakeoutDedupeKey',
   'raceRegistryId',
   'published',
   'stravaEventUrl',

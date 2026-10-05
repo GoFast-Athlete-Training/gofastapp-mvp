@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { resolveCityRunType } from "@/lib/city-run-type";
 import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +47,8 @@ type ShakeoutIn = {
 
 /**
  * POST /api/city-runs/shakeouts/upsert
- * Company prodpush: upsert `city_runs` for each (race_registry × shakeout window).
+ * Legacy Company prodpush — upserts RACE_SHAKEOUT city_runs by registry + date + title.
+ * No dedupe-key prune (hub-authored shakeouts share the same registry).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -107,20 +107,10 @@ export async function POST(request: NextRequest) {
     }
 
     let synced = 0;
-    const results: Array<{ dedupeKey: string; cityRunId: string }> = [];
+    const results: Array<{ cityRunId: string }> = [];
 
     for (const reg of registries) {
       for (const raw of shakeoutsIn as ShakeoutIn[]) {
-        const companyEventId =
-          typeof raw.companyEventId === "string" && raw.companyEventId.trim()
-            ? raw.companyEventId.trim()
-            : "";
-        const windowIndex =
-          typeof raw.windowIndex === "number" && Number.isFinite(raw.windowIndex)
-            ? raw.windowIndex
-            : 0;
-        if (!companyEventId) continue;
-
         const runAtIso =
           typeof raw.runAtIso === "string" && raw.runAtIso.trim()
             ? raw.runAtIso.trim()
@@ -128,7 +118,6 @@ export async function POST(request: NextRequest) {
         const runAt = runAtIso ? new Date(runAtIso) : null;
         if (!runAt || Number.isNaN(runAt.getTime())) continue;
 
-        const dedupeKey = `shk-${reg.id}-${companyEventId}-w${windowIndex}`;
         const title =
           typeof raw.title === "string" && raw.title.trim()
             ? raw.title.trim().slice(0, 200)
@@ -141,7 +130,12 @@ export async function POST(request: NextRequest) {
         const { hour, minute, period } = utcTo12h(runAt);
 
         const existing = await prisma.city_runs.findFirst({
-          where: { shakeoutDedupeKey: dedupeKey },
+          where: {
+            raceRegistryId: reg.id,
+            cityRunType: "RACE_SHAKEOUT",
+            date: runAt,
+            title,
+          },
         });
 
         const common = {
@@ -182,12 +176,7 @@ export async function POST(request: NextRequest) {
           runClubId,
           runSeriesId: null,
           workflowStatus: "DEVELOP" as const,
-          shakeoutDedupeKey: dedupeKey,
-          cityRunType: resolveCityRunType({
-            runClubId,
-            shakeoutDedupeKey: dedupeKey,
-            raceRegistryId: reg.id,
-          }),
+          cityRunType: "RACE_SHAKEOUT" as const,
           updatedAt: new Date(),
         };
 
@@ -196,7 +185,7 @@ export async function POST(request: NextRequest) {
             where: { id: existing.id },
             data: common,
           });
-          results.push({ dedupeKey, cityRunId: existing.id });
+          results.push({ cityRunId: existing.id });
         } else {
           const id = generateCityRunId();
           await prisma.city_runs.create({
@@ -205,51 +194,16 @@ export async function POST(request: NextRequest) {
               ...common,
             },
           });
-          results.push({ dedupeKey, cityRunId: id });
+          results.push({ cityRunId: id });
         }
         synced++;
-      }
-    }
-
-    /**
-     * Company `replaceRaceRunEvents` recreates `race_run_event` rows with new IDs on every save.
-     * Dedupe keys include that id (`shk-{regId}-{companyEventId}-w{i}`), so old `city_runs` ghosts
-     * would never match `findFirst` and would accumulate. After each successful upsert batch,
-     * delete shakeout rows for this registry whose key is not in the current batch.
-     */
-    let pruned = 0;
-    for (const reg of registries) {
-      const prefix = `shk-${reg.id}-`;
-      const keysForReg = results
-        .filter((r) => r.dedupeKey.startsWith(prefix))
-        .map((r) => r.dedupeKey);
-
-      if (keysForReg.length > 0) {
-        const del = await prisma.city_runs.deleteMany({
-          where: {
-            raceRegistryId: reg.id,
-            AND: [
-              { shakeoutDedupeKey: { not: null } },
-              { shakeoutDedupeKey: { notIn: keysForReg } },
-            ],
-          },
-        });
-        pruned += del.count;
-      } else {
-        const del = await prisma.city_runs.deleteMany({
-          where: {
-            raceRegistryId: reg.id,
-            shakeoutDedupeKey: { not: null },
-          },
-        });
-        pruned += del.count;
       }
     }
 
     const response = NextResponse.json({
       success: true,
       synced,
-      pruned,
+      pruned: 0,
       results,
     });
     Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));

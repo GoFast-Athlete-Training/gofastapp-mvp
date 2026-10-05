@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import RunInstanceWizard from "@/components/runmanage/runInstanceWizard/RunInstanceWizard";
 import {
@@ -38,6 +38,7 @@ import {
 
 export default function RunManageCreateRunPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { session } = useRunManageAuth();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -53,6 +54,54 @@ export default function RunManageCreateRunPage() {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imprintedCompanyRaceId, setImprintedCompanyRaceId] = useState<string | null>(null);
+  const [imprintedRaceLabel, setImprintedRaceLabel] = useState<string | null>(null);
+  const [frontDoorReady, setFrontDoorReady] = useState(false);
+
+  useEffect(() => {
+    const clubId = searchParams.get("clubId")?.trim();
+    const companyRaceId = searchParams.get("companyRaceId")?.trim();
+    const typeParam = searchParams.get("cityRunType")?.trim();
+
+    if (clubId) {
+      setAffiliations((prev) => ({
+        ...emptyAffiliationDraft("CLUB"),
+        runClubId: clubId,
+        cityRunType: "CLUB",
+      }));
+      setScopeFork({ clubBoltMode: "one_off" });
+      void (async () => {
+        try {
+          const res = await runmanageApi.get(`/api/runmanage/run-clubs/${clubId}`);
+          const club = res.data?.runClub as { name?: string } | undefined;
+          if (club?.name) {
+            setAffiliations((prev) => ({
+              ...prev,
+              runClubLabel: club.name ?? null,
+              runClubPick: {
+                id: clubId,
+                name: club.name ?? "",
+              },
+            }));
+          }
+        } catch {
+          /* optional hydrate */
+        } finally {
+          setFrontDoorReady(true);
+        }
+      })();
+      return;
+    }
+
+    if (companyRaceId || typeParam === "RACE_SHAKEOUT") {
+      setImprintedCompanyRaceId(companyRaceId ?? null);
+      setAffiliations(emptyAffiliationDraft("RACE_SHAKEOUT"));
+      const raceName = searchParams.get("raceName")?.trim();
+      if (raceName) setImprintedRaceLabel(raceName);
+    }
+
+    setFrontDoorReady(true);
+  }, [searchParams]);
 
   const scopeComplete = isCreateScopeComplete(
     wizardValues.title,
@@ -86,9 +135,24 @@ export default function RunManageCreateRunPage() {
         ? containerIdentityFromScope(wizardValues.title, affiliations, scopeFork, {
             clubHydrate: { description: clubDescription },
             specialEvent,
+            raceLabel: imprintedRaceLabel
+              ? {
+                  name: imprintedRaceLabel,
+                }
+              : affiliations.cityRunType === "RACE_SHAKEOUT"
+                ? { name: "Race shakeout" }
+                : null,
           })
         : null,
-    [scopeComplete, wizardValues.title, affiliations, scopeFork, clubDescription, specialEvent]
+    [
+      scopeComplete,
+      wizardValues.title,
+      affiliations,
+      scopeFork,
+      clubDescription,
+      specialEvent,
+      imprintedRaceLabel,
+    ]
   );
 
   const handleCreate = async () => {
@@ -107,7 +171,7 @@ export default function RunManageCreateRunPage() {
     setError(null);
     try {
       let specialEventId: string | null = specialEvent.id;
-      if (affiliations.cityRunType === "SPECIAL") {
+      if (affiliations.cityRunType === "SPECIAL" && specialEvent.name.trim()) {
         const evRes = await runmanageApi.post(
           "/api/runmanage/special-events",
           specialEventApiBodyFromDraft(specialEvent)
@@ -133,6 +197,7 @@ export default function RunManageCreateRunPage() {
 
       const payload: Record<string, unknown> = {
         ...affiliationsToPayload(affiliations, session?.athleteId, { specialEventId }),
+        ...(imprintedCompanyRaceId ? { companyRaceId: imprintedCompanyRaceId } : {}),
         citySlug: finalCitySlug,
         title: wizardValues.title.trim(),
         dayOfWeek: wizardValues.dayOfWeek?.trim() || null,
@@ -231,23 +296,25 @@ export default function RunManageCreateRunPage() {
           onDraftChange={setAffiliations}
           onForkChange={setScopeFork}
           onSpecialEventChange={setSpecialEvent}
+          imprintedCompanyRaceId={imprintedCompanyRaceId}
+          imprintedRaceLabel={imprintedRaceLabel}
         />
       </div>
 
       {!scopeComplete ? (
         <p className="mt-4 text-sm text-gray-500">
-          Complete scope above to open the run builder. Individual runs are athlete-scoped and not
-          created here.
+          Add a title to open the run builder. Container attach is optional unless you picked a club
+          with series bolt.
         </p>
       ) : null}
 
-      {scopeComplete && containerIdentity ? (
+      {frontDoorReady && scopeComplete && containerIdentity ? (
         <div className="mt-4 max-w-3xl">
           <RunContainerIdentityStrip identity={containerIdentity} />
         </div>
       ) : null}
 
-      {scopeComplete ? (
+      {frontDoorReady && scopeComplete ? (
         <div className="mt-6">
           {saving ? (
             <div className="flex items-center gap-2 text-gray-500">

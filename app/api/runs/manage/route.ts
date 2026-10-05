@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+import { attachRunBrandSnap } from '@/lib/runmanage/run-brand-stamp';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { assertRunManageAuth } from '@/lib/runmanage/require-run-manage-auth';
@@ -44,10 +45,13 @@ const manageRunSelect = {
   athleteGeneratedId: true,
   cityRunType: true,
   runBrandId: true,
+  runBrandName: true,
+  runBrandLogoUrl: true,
+  runBrandWebsiteUrl: true,
+  runBrandInstagramHandle: true,
   runStoreId: true,
   partnerExtras: true,
   raceRegistryId: true,
-  shakeoutDedupeKey: true,
   meetUpPoint: true,
   meetUpStreetAddress: true,
   meetUpCity: true,
@@ -82,13 +86,6 @@ const manageRunSelect = {
       name: true,
       logoUrl: true,
       city: true,
-    },
-  },
-  runBrand: {
-    select: {
-      id: true,
-      name: true,
-      logoUrl: true,
     },
   },
   _count: {
@@ -150,10 +147,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to include rsvpCount
-    const runsWithCounts = runs.map(run => ({
-      ...run,
-      rsvpCount: run._count.city_run_rsvps,
-    }));
+    const runsWithCounts = runs.map((run) =>
+      attachRunBrandSnap({
+        ...run,
+        rsvpCount: run._count.city_run_rsvps,
+      }),
+    );
 
     return NextResponse.json({
       success: true,

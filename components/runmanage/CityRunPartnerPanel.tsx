@@ -12,6 +12,8 @@ type EntityHit = {
   name: string;
   secondary?: string | null;
   logoUrl?: string | null;
+  websiteUrl?: string | null;
+  instagramHandle?: string | null;
 };
 
 type PartnerDisplay = {
@@ -98,6 +100,8 @@ export default function CityRunPartnerPanel({
           name: string;
           slug?: string | null;
           logoUrl?: string | null;
+          websiteUrl?: string | null;
+          instagramHandle?: string | null;
         }>;
         setHits(
           brands.map((b) => ({
@@ -106,6 +110,8 @@ export default function CityRunPartnerPanel({
             name: b.name,
             secondary: b.slug ?? null,
             logoUrl: b.logoUrl ?? null,
+            websiteUrl: b.websiteUrl ?? null,
+            instagramHandle: b.instagramHandle ?? null,
           })),
         );
       } else {
@@ -163,6 +169,10 @@ export default function CityRunPartnerPanel({
       } else if (kind === "brand") {
         await runmanageApi.put(`/api/runs/${runId}`, {
           runBrandId: hit.id,
+          runBrandName: hit.name,
+          runBrandLogoUrl: hit.logoUrl ?? null,
+          runBrandWebsiteUrl: hit.websiteUrl ?? null,
+          runBrandInstagramHandle: hit.instagramHandle ?? null,
           runStoreId: null,
         });
       }

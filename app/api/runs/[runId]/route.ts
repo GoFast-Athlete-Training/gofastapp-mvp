@@ -13,12 +13,14 @@ import { fieldsWhenSettingPublished } from '@/lib/runInstanceApprovalPublish';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 import {
+  cityRunTypeFromRelationshipPatch,
   cityRunTypeFromSnapshot,
   isCityRunTypeValue,
   mergeRelationshipSnapshot,
   relationshipPatchFromBody,
 } from '@/lib/city-run-type';
 import { partnerExtrasForWrite } from '@/lib/runmanage/partner-extras';
+import { attachRunBrandSnap, runBrandStampFieldsFromBody } from '@/lib/runmanage/run-brand-stamp';
 import { syncCityRunRouteFromFields } from '@/lib/city-run/ensure-city-run-route';
 
 const RUNTIME_COMMIT_SHA =
@@ -200,8 +202,6 @@ export async function GET(
         directionsText: true,
         workoutId: true,
         plannedWorkoutId: true,
-        locationId: true,
-        location: { select: { id: true, name: true } },
         workout: {
           select: {
             id: true,
@@ -279,9 +279,10 @@ export async function GET(
         runStore: {
           select: { id: true, name: true, websiteUrl: true, logoUrl: true },
         },
-        runBrand: {
-          select: { id: true, name: true, websiteUrl: true, logoUrl: true },
-        },
+        runBrandName: true,
+        runBrandLogoUrl: true,
+        runBrandWebsiteUrl: true,
+        runBrandInstagramHandle: true,
         runSeries: {
           select: {
             id: true,
@@ -560,8 +561,6 @@ export async function GET(
               segments: displayPlannedWorkout.segments ?? [],
             }
           : null,
-        locationId: run.locationId ?? null,
-        location: run.location ?? null,
         meetUpLat: run.meetUpLat,
         meetUpLng: run.meetUpLng,
         startTimeHour: run.startTimeHour,
@@ -646,8 +645,8 @@ export async function PUT(
         runCrewId: true,
         runStoreId: true,
         athleteGeneratedId: true,
-        shakeoutDedupeKey: true,
         raceRegistryId: true,
+        specialEventId: true,
         cityRunType: true,
         citySlug: true,
       },
@@ -658,29 +657,6 @@ export async function PUT(
     }
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
-
-    // runLocationName: string input → upsert run_locations → set locationId FK
-    if (body.runLocationName !== undefined) {
-      const locationName = body.runLocationName === null || body.runLocationName === '' ? null : String(body.runLocationName).trim();
-      if (locationName) {
-        try {
-          const citySlug = run.citySlug || 'unknown';
-          const nameSlug = locationName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-          const slug = `${citySlug}-${nameSlug}`;
-          const location = await prisma.run_locations.upsert({
-            where: { slug },
-            create: { slug, name: locationName, citySlug: citySlug },
-            update: {},
-            select: { id: true },
-          });
-          updateData.locationId = location.id;
-        } catch (locErr: any) {
-          console.warn('[PUT /api/runs/[runId]] run_locations upsert failed (non-blocking):', locErr?.message);
-        }
-      } else {
-        updateData.locationId = null;
-      }
-    }
 
     // Photo/map fields
     if (body.routePhotos !== undefined) {
@@ -848,9 +824,6 @@ export async function PUT(
     if (relationshipPatch.athleteGeneratedId !== undefined) {
       updateData.athleteGeneratedId = relationshipPatch.athleteGeneratedId;
     }
-    if (relationshipPatch.shakeoutDedupeKey !== undefined) {
-      updateData.shakeoutDedupeKey = relationshipPatch.shakeoutDedupeKey;
-    }
     if (relationshipPatch.raceRegistryId !== undefined) {
       updateData.raceRegistryId = relationshipPatch.raceRegistryId;
     }
@@ -866,14 +839,7 @@ export async function PUT(
           ? null
           : String(body.runStoreId).trim() || null;
     }
-    const runBrandRaw =
-      body.runBrandId !== undefined ? body.runBrandId : body.partnerBrandId;
-    if (runBrandRaw !== undefined) {
-      updateData.runBrandId =
-        runBrandRaw === null || runBrandRaw === ''
-          ? null
-          : String(runBrandRaw).trim() || null;
-    }
+    Object.assign(updateData, runBrandStampFieldsFromBody(body as Record<string, unknown>));
 
     const mergedRelationships = mergeRelationshipSnapshot(run, {
       ...relationshipPatch,
@@ -890,17 +856,23 @@ export async function PUT(
           ? relationshipPatch.athleteGeneratedId
           : (updateData.athleteGeneratedId as string | null | undefined) ??
             run.athleteGeneratedId,
-      shakeoutDedupeKey:
-        relationshipPatch.shakeoutDedupeKey !== undefined
-          ? relationshipPatch.shakeoutDedupeKey
-          : (updateData.shakeoutDedupeKey as string | null | undefined) ??
-            run.shakeoutDedupeKey,
       raceRegistryId:
         relationshipPatch.raceRegistryId !== undefined
           ? relationshipPatch.raceRegistryId
           : (updateData.raceRegistryId as string | null | undefined) ?? run.raceRegistryId,
     });
-    if (body.cityRunType !== undefined) {
+    const typeFromRelationship = cityRunTypeFromRelationshipPatch(relationshipPatch, {
+      ...run,
+      runStoreId:
+        (updateData.runStoreId as string | null | undefined) ?? run.runStoreId ?? null,
+      specialEventId:
+        relationshipPatch.specialEventId !== undefined
+          ? relationshipPatch.specialEventId
+          : run.specialEventId,
+    });
+    if (typeFromRelationship !== undefined) {
+      updateData.cityRunType = typeFromRelationship;
+    } else if (body.cityRunType !== undefined) {
       if (body.cityRunType === null || body.cityRunType === '') {
         updateData.cityRunType = cityRunTypeFromSnapshot({
           ...mergedRelationships,

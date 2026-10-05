@@ -14,8 +14,11 @@ import {
   Sparkles,
   Activity,
   ClipboardList,
+  Users,
   X,
 } from "lucide-react";
+import RunManageAssociateStep from "@/components/runmanage/runInstanceWizard/RunManageAssociateStep";
+import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
 import runmanageApi from "@/lib/runmanage/api-client";
 import GooglePlacesAutocomplete from "@/components/runmanage/GooglePlacesAutocomplete";
 import { parseGoogleAddress } from "@/lib/utils/parseAddress";
@@ -95,6 +98,13 @@ export type RunInstanceWizardProps = {
   initialWizardStep?: WizardStep;
   /** Title is edited in the page heading — core step skips title checklist */
   titleInPageHeading?: boolean;
+  /** Shakeout / special — optional club and brand stamps */
+  associateDraft?: RunAffiliationDraft;
+  onAssociateChange?: (next: RunAffiliationDraft) => void;
+  onAssociateSave?: () => void | Promise<void>;
+  associateSaving?: boolean;
+  associateError?: string | null;
+  associateMessage?: string | null;
 };
 
 function renderCoreStatusBadge(opts: {
@@ -150,6 +160,12 @@ export default function RunInstanceWizard({
   instanceToolbar,
   initialWizardStep,
   titleInPageHeading = false,
+  associateDraft,
+  onAssociateChange,
+  onAssociateSave,
+  associateSaving = false,
+  associateError,
+  associateMessage,
 }: RunInstanceWizardProps) {
   const isCreateScratch = context.variant === "create-scratch";
   const resolvedInitialStep: WizardStep =
@@ -215,10 +231,18 @@ export default function RunInstanceWizard({
     [context.variant]
   );
 
+  const showAssociateStep =
+    context.variant === "edit" &&
+    (context.cityRunType === "RACE_SHAKEOUT" || context.cityRunType === "SPECIAL") &&
+    Boolean(associateDraft && onAssociateChange && onAssociateSave);
+
   const visibleWizardSteps = useMemo(() => {
-    if (isCreateScratch) return stepOrder;
-    return isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
-  }, [isCreateScratch, isTrack, stepOrder]);
+    let steps = isCreateScratch ? stepOrder : isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
+    if (!showAssociateStep) {
+      steps = steps.filter((s) => s !== "associate");
+    }
+    return steps;
+  }, [isCreateScratch, isTrack, stepOrder, showAssociateStep]);
 
   const lastWizardStep = visibleWizardSteps[visibleWizardSteps.length - 1] ?? "workout";
 
@@ -271,10 +295,6 @@ export default function RunInstanceWizard({
       }
       onErrorChange?.(null);
       goToWizardStep(next);
-      return;
-    }
-    if (wizardStep === "sources" && !isCreateScratch) {
-      goToWizardStep("core");
       return;
     }
     if (wizardStep === "core") {
@@ -361,6 +381,7 @@ export default function RunInstanceWizard({
   const wizardStepIcon = (step: WizardStep) => {
     if (step === "intake") return <ClipboardList className="h-4 w-4" />;
     if (step === "sources") return <Link2 className="h-4 w-4" />;
+    if (step === "associate") return <Users className="h-4 w-4" />;
     if (step === "core") return <MapPin className="h-4 w-4" />;
     if (step === "route") return <Route className="h-4 w-4" />;
     if (step === "workout") return <Activity className="h-4 w-4" />;
@@ -376,6 +397,10 @@ export default function RunInstanceWizard({
     }
     if (step === "sources") {
       if (sourcesStepComplete) return "complete";
+      return "idle";
+    }
+    if (step === "associate") {
+      if (associateDraft?.runClubId || associateDraft?.runBrandId) return "complete";
       return "idle";
     }
     if (step === "core") {
@@ -607,6 +632,18 @@ export default function RunInstanceWizard({
               <RunInstanceSourcesPanel values={values} onChange={patch} />
             </div>
           )}
+
+          {wizardStep === "associate" && showAssociateStep && associateDraft && onAssociateChange && onAssociateSave ? (
+            <RunManageAssociateStep
+              cityRunType={context.cityRunType}
+              draft={associateDraft}
+              onChange={onAssociateChange}
+              saving={associateSaving}
+              onSave={onAssociateSave}
+              error={associateError}
+              message={associateMessage}
+            />
+          ) : null}
 
           {wizardStep === "core" && isCreateScratch ? (
             <RunManageOpenCorePanel

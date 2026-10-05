@@ -17,7 +17,7 @@ const raceSelect = {
   courseSlug: true,
 } as const;
 
-export type RaceHubStaffSnapshot = {
+export type RaceHubStaffPreview = {
   race: {
     id: string;
     name: string;
@@ -39,9 +39,10 @@ export type RaceHubStaffSnapshot = {
   infoPackets: unknown[];
 };
 
-export async function loadRaceHubStaffSnapshotBySlug(
+/** Live prod read for race-hub staff preview URL — not a stored snapshot. */
+export async function loadRaceHubStaffPreviewBySlug(
   rawSlug: string
-): Promise<RaceHubStaffSnapshot | null> {
+): Promise<RaceHubStaffPreview | null> {
   const slug = rawSlug?.trim();
   if (!slug) return null;
 
@@ -99,7 +100,10 @@ export async function loadRaceHubStaffSnapshotBySlug(
       },
     }),
     prisma.city_runs.findMany({
-      where: { raceRegistryId: raceId },
+      where: {
+        raceRegistryId: raceId,
+        cityRunType: "RACE_SHAKEOUT",
+      },
       orderBy: { date: "asc" },
       include: {
         city_run_rsvps: {

@@ -3,7 +3,6 @@ export type CockpitBucket = "club" | "individual" | "shakeout" | "special" | "ru
 
 export type CockpitRunShape = {
   cityRunType?: string | null;
-  shakeoutDedupeKey?: string | null;
   runBrandId?: string | null;
   runClubId?: string | null;
   runStoreId?: string | null;
@@ -12,7 +11,7 @@ export type CockpitRunShape = {
 
 export function cockpitBucketForRun(run: CockpitRunShape): CockpitBucket | null {
   const t = run.cityRunType?.toUpperCase();
-  if (t === "RACE_SHAKEOUT" || run.shakeoutDedupeKey) return "shakeout";
+  if (t === "RACE_SHAKEOUT") return "shakeout";
   if (t === "RUN_STORE") return "run_store";
   if (t === "SPECIAL") return "special";
   if (t === "CLUB") return "club";

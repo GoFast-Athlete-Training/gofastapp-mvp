@@ -721,8 +721,6 @@ model cities {
   run_series    run_series[]
   city_runs     city_runs[]
   routes        routes[]
-  run_locations run_locations[]
-
   @@index([name])
   @@index([slug])
 }
@@ -1168,7 +1166,6 @@ model brands {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   run_clubs              run_clubs[]
-  city_runs_run_brand city_runs[] @relation("CityRunRunBrand")
   special_events         special_events[]
   run_stores             run_stores[]
 
@@ -1664,13 +1661,14 @@ model city_runs {
   raceRegistryId      String?
   /// Optional store partner (e.g. local Fleet Feet) — hydrates website/logo on the run.
   runStoreId          String?
-  /// Brand on this run (Sponsor Manage brandId → prod brands snap).
+  /// Brand on this run (Sponsor Manage brand id — no prod brands FK).
   runBrandId          String?
+  runBrandName        String?
+  runBrandLogoUrl     String?
+  runBrandWebsiteUrl  String?
+  runBrandInstagramHandle String?
   /// Staff special-event parent (brand lead lives on special_events).
   specialEventId      String?
-  /// Idempotent key for Company → prod shakeout sync (one row per race_run_event window). Null for normal city_runs.
-  shakeoutDedupeKey   String?              @unique
-  locationId          String?              // FK to run_locations (auto-seeded or manually linked)
   routeId             String?              // Optional saved route (reference path + media)
   workoutId           String?              // Optional structured workout for join-my-workout
   /// Club session prescribe template (athleteId null on linked planned_workouts row).
@@ -1691,9 +1689,7 @@ model city_runs {
   runSeries           run_series?          @relation(fields: [runSeriesId], references: [id], onDelete: SetNull)
   race_registry       race_registry?       @relation("CityRunRaceRegistry", fields: [raceRegistryId], references: [id], onDelete: SetNull)
   runStore            run_stores?          @relation(fields: [runStoreId], references: [id], onDelete: SetNull)
-  runBrand            brands?              @relation("CityRunRunBrand", fields: [runBrandId], references: [id], onDelete: SetNull)
   specialEvent        special_events?      @relation(fields: [specialEventId], references: [id], onDelete: SetNull)
-  location            run_locations?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
   route               routes?              @relation(fields: [routeId], references: [id], onDelete: SetNull)
   workout             workouts?            @relation(fields: [workoutId], references: [id], onDelete: SetNull)
   plannedWorkout      planned_workouts?    @relation("CityRunPlannedTemplate", fields: [plannedWorkoutId], references: [id], onDelete: SetNull)
@@ -1715,7 +1711,6 @@ model city_runs {
   @@index([runStoreId])
   @@index([runBrandId])
   @@index([specialEventId])
-  @@index([locationId])
   @@index([routeId])
   @@index([workoutId])
   @@index([cityRunType])
@@ -3385,35 +3380,4 @@ model training_cohort_announcements {
   @@index([cohortId])
   @@index([staffGeneratedId])
   @@map("training_cohort_announcements")
-}
-
-// Route/location catalogue. Created manually or auto-seeded from run meetUpPoint/title.
-// Raw on creation (just name + citySlug); attributes filled in over time.
-model run_locations {
-  id          String         @id @default(cuid())
-  citySlug    String                               // "dc", "arlington" — same slug pattern as city_runs
-  cityId      String?
-  cities      cities?        @relation(fields: [cityId], references: [id], onDelete: SetNull)
-  name        String                               // "Haines Point", "Custis Trail"
-  slug        String         @unique               // auto-generated from name
-  runType     String?                              // "park" | "track" | "trail" | "neighborhood"
-  shape       RouteShape?
-  terrain     RouteTerrain?
-  surface     RouteSurface?
-  traffic     RouteTraffic?
-  lighting    RouteLighting?
-  shade       RouteShade?
-  vibes       RouteVibe[]    @default([])          // SPEED_WORK, TEMPO, LONG_RUN, etc.
-  loopMiles   Float?                               // distance of one loop/segment
-  notes       String?                              // editorial: "Fast flat loop. No cars. Speed work venue."
-  stravaUrl   String?
-  meetUpPoint String?                              // default start/meet-up description
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  city_runs   city_runs[]
-
-  @@index([citySlug])
-  @@index([cityId])
-  @@index([slug])
-  @@map("run_locations")
 }

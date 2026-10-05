@@ -1,11 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { loadRaceHubStaffSnapshotBySlug } from "@/lib/race-hub/load-staff-hub-snapshot";
+import { loadRaceHubStaffPreviewBySlug } from "@/lib/race-hub/load-race-hub-staff-preview";
 
 /**
  * GET /api/race-hub/public/staff-preview/[slug]
- * Public read-only hub snapshot for racehubstaff content host (no auth).
+ * Public read-only staff preview for racehubstaff content host (no auth).
  */
 export async function GET(
   _request: Request,
@@ -18,12 +18,12 @@ export async function GET(
       return NextResponse.json({ success: false, error: "slug required" }, { status: 400 });
     }
 
-    const snapshot = await loadRaceHubStaffSnapshotBySlug(slug);
-    if (!snapshot) {
+    const preview = await loadRaceHubStaffPreviewBySlug(slug);
+    if (!preview) {
       return NextResponse.json({ success: false, error: "Race not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, ...snapshot });
+    return NextResponse.json({ success: true, ...preview });
   } catch (err) {
     console.error("race-hub public staff-preview GET:", err);
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });

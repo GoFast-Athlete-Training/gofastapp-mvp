@@ -1,8 +1,8 @@
 import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
 import type { SpecialEventDraft } from "@/lib/runmanage/special-event-draft";
 
-/** Staff Run Manage create — club lookup + special event parent only. */
-export const RUN_MANAGE_STAFF_CREATE_RUN_TYPES = ["CLUB", "SPECIAL"] as const;
+/** Staff Run Manage create — confirmed on the type select at top of run builder. */
+export const RUN_MANAGE_STAFF_CREATE_RUN_TYPES = ["CLUB", "SPECIAL", "RACE_SHAKEOUT"] as const;
 
 export type RunManageStaffCreateRunType = (typeof RUN_MANAGE_STAFF_CREATE_RUN_TYPES)[number];
 
@@ -24,7 +24,7 @@ export function validateCreateRunScope(
   title: string,
   draft: RunAffiliationDraft,
   fork: CreateRunScopeFork,
-  specialEvent?: SpecialEventDraft | null
+  _specialEvent?: SpecialEventDraft | null
 ): string | null {
   if (!title.trim()) {
     return "Add a run title.";
@@ -36,27 +36,18 @@ export function validateCreateRunScope(
     return "Individual runs are athlete-scoped — not available in staff create.";
   }
 
-  if (type === "CLUB") {
-    if (!draft.runClubId) return "Attach the hosting club.";
+  if (type === "CLUB" && draft.runClubId) {
     if (!fork.clubBoltMode) return "Choose one-off or from series.";
     if (fork.clubBoltMode === "series") {
       return "Series picker is coming soon — choose one-off for now.";
     }
-    return null;
   }
 
-  if (type === "RUN_STORE" || type === "RACE_SHAKEOUT") {
-    return "This run type is not created in Run Manage — use club or special event.";
+  if (type === "RUN_STORE") {
+    return "Run store create is not on this form yet.";
   }
 
-  if (type === "SPECIAL") {
-    const ev = specialEvent ?? null;
-    if (!ev?.name.trim()) return "Add the special event name.";
-    if (!ev.brandId) return "Attach the brand lead for this event.";
-    return null;
-  }
-
-  return "Choose a run type.";
+  return null;
 }
 
 export function isCreateScopeComplete(
@@ -74,6 +65,7 @@ export const validateAffiliationDraft = validateCreateRunScope;
 export type RunContainerIdentity =
   | { kind: "club"; logoUrl: string | null; name: string; city: string; state: string; tagline: string }
   | { kind: "special_event"; eventName: string; eventTitle: string; logoUrl: string | null; leadName: string; eventDate: string; url: string }
+  | { kind: "race"; name: string; city: string; state: string }
   | { kind: "none" };
 
 export function containerIdentityFromScope(
@@ -83,11 +75,22 @@ export function containerIdentityFromScope(
   opts?: {
     clubHydrate?: { description?: string | null } | null;
     specialEvent?: SpecialEventDraft | null;
+    raceLabel?: { name: string; city?: string | null; state?: string | null } | null;
   }
 ): RunContainerIdentity {
   const type = draft.cityRunType;
   const clubHydrate = opts?.clubHydrate;
   const specialEvent = opts?.specialEvent;
+  const raceLabel = opts?.raceLabel;
+
+  if (type === "RACE_SHAKEOUT" && (raceLabel?.name || draft.raceRegistryId)) {
+    return {
+      kind: "race",
+      name: raceLabel?.name ?? "Race shakeout",
+      city: raceLabel?.city ?? "",
+      state: raceLabel?.state ?? "",
+    };
+  }
 
   if (type === "CLUB" && draft.runClubPick) {
     const tagline =
@@ -102,13 +105,13 @@ export function containerIdentityFromScope(
     };
   }
 
-  if (type === "SPECIAL" && specialEvent?.brandPick) {
+  if (type === "SPECIAL" && specialEvent?.name.trim()) {
     return {
       kind: "special_event",
       eventName: specialEvent.name.trim() || title.trim() || "Special event",
       eventTitle: specialEvent.eventTitle.trim(),
-      logoUrl: specialEvent.brandPick.logoUrl ?? null,
-      leadName: specialEvent.brandPick.name,
+      logoUrl: null,
+      leadName: "",
       eventDate: specialEvent.eventDate.trim(),
       url: specialEvent.url.trim(),
     };

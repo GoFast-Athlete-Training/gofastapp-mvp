@@ -46,6 +46,11 @@ import {
   instanceStaffStateLabel,
 } from "@/lib/runmanage/instance-staff-state";
 import { RunManageRunAffiliationsEditor } from "@/components/runmanage/RunManageRunAffiliationsEditor";
+import {
+  associateStampsToPayload,
+  draftFromRun,
+  type RunAffiliationDraft,
+} from "@/components/runmanage/RunManageRunAffiliations";
 
 export interface Athlete {
   id: string;
@@ -145,8 +150,6 @@ export interface CityRunData {
   runType?: string | null;
   workoutDescription?: string | null;
   directionsText?: string | null;
-  locationId?: string | null;
-  location?: { id: string; name: string } | null;
   stravaEventUrl?: string | null;
   stravaText?: string | null;
   webUrl?: string | null;
@@ -278,8 +281,14 @@ export default function RunManageStaffEditor({
   const autoSavingRef = useRef(false);
   const [isFounder, setIsFounder] = useState(false);
   const [submittingForReview, setSubmittingForReview] = useState(false);
+  const [associateDraft, setAssociateDraft] = useState<RunAffiliationDraft | null>(null);
+  const [associateSaving, setAssociateSaving] = useState(false);
+  const [associateError, setAssociateError] = useState<string | null>(null);
+  const [associateMessage, setAssociateMessage] = useState<string | null>(null);
 
   const isClubContext = Boolean(clubId?.trim());
+  const useAssociateTab =
+    run?.cityRunType === "RACE_SHAKEOUT" || run?.cityRunType === "SPECIAL";
 
   useEffect(() => {
     void runmanageApi.get("/api/runmanage/staff/me").then((res) => {
@@ -303,6 +312,14 @@ export default function RunManageStaffEditor({
   useEffect(() => {
     void fetchRun();
   }, [runId]);
+
+  useEffect(() => {
+    if (run) {
+      setAssociateDraft(draftFromRun(run));
+      setAssociateError(null);
+      setAssociateMessage(null);
+    }
+  }, [run]);
 
   useEffect(() => {
     if (run && staffMode === "edit" && !wizardValues) {
@@ -360,6 +377,23 @@ export default function RunManageStaffEditor({
       if (!opts?.silent) setLoading(false);
     }
   };
+
+  async function handleAssociateSave() {
+    if (!run || !associateDraft) return;
+    setAssociateSaving(true);
+    setAssociateError(null);
+    setAssociateMessage(null);
+    try {
+      await runmanageApi.put(`/api/runs/${run.id}`, associateStampsToPayload(associateDraft));
+      setAssociateMessage("Associates saved.");
+      await fetchRun({ silent: true });
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } }; message?: string };
+      setAssociateError(err.response?.data?.error || err.message || "Save failed");
+    } finally {
+      setAssociateSaving(false);
+    }
+  }
 
   const modePath = (mode: RunInstanceManageMode) => {
     if (mode === "view") return runInstanceViewPath(runId, clubId);
@@ -837,7 +871,7 @@ export default function RunManageStaffEditor({
             </div>
           )}
 
-          {run && staffMode === "edit" ? (
+          {run && staffMode === "edit" && !useAssociateTab ? (
             <RunManageRunAffiliationsEditor
               run={run}
               onSaved={() => fetchRun({ silent: true })}
@@ -869,6 +903,7 @@ export default function RunManageStaffEditor({
             onChange={setWizardValues}
             context={{
               variant: "edit",
+              cityRunType: run.cityRunType,
               isSeriesInstance,
               cityRunId: run.id,
               dayOfWeek: run.dayOfWeek,
@@ -886,6 +921,12 @@ export default function RunManageStaffEditor({
             saveLabel="Save & Preview"
             initialWizardStep={initialWizardStep}
             publicSources={publicSources}
+            associateDraft={useAssociateTab ? associateDraft ?? undefined : undefined}
+            onAssociateChange={useAssociateTab ? setAssociateDraft : undefined}
+            onAssociateSave={useAssociateTab ? () => handleAssociateSave() : undefined}
+            associateSaving={associateSaving}
+            associateError={associateError}
+            associateMessage={associateMessage}
             instanceToolbar={{
               autoSaveStatus,
               published: Boolean(run.published),

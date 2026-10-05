@@ -76,7 +76,7 @@ export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string)
     workflowStatus: run.workflowStatus,
     published: run.published,
     staffGeneratedId: run.staffGeneratedId,
-    shakeoutDedupeKey: run.shakeoutDedupeKey,
+    cityRunType: run.cityRunType,
     gorunPath: `/gorun/${run.id}`,
     runClub: run.runClub ?? null,
     rsvpCount: rsvps.filter((rv) => rv.status === "going").length,
