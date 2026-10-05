@@ -35,7 +35,7 @@ export async function GET(
     }
 
     const runs = await prisma.city_runs.findMany({
-      where: { raceRegistryId: race.id, cityRunType: "RACE_SHAKEOUT" },
+      where: { raceRegistryId: race.id },
       orderBy: { date: "asc" },
       include: {
         city_run_rsvps: {
@@ -90,7 +90,6 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
-    const seedFromRace = body.seedFromRace === true;
 
     const runClubId =
       typeof body.runClubId === "string" && body.runClubId.trim()
@@ -121,22 +120,6 @@ export async function POST(
     let runAt =
       typeof dateRaw === "string" || dateRaw instanceof Date ? new Date(dateRaw) : null;
 
-    if (seedFromRace || !title || !meetUpPoint || !runAt || Number.isNaN(runAt?.getTime() ?? NaN)) {
-      if (!title) {
-        title = `${race.name.trim()} shakeout`.slice(0, 200);
-      }
-      if (!meetUpPoint) {
-        const cityState = [race.city, race.state].filter(Boolean).join(", ");
-        meetUpPoint = (cityState || "Meetup TBD").slice(0, 500);
-      }
-      if (!runAt || Number.isNaN(runAt.getTime())) {
-        const base = new Date(race.raceDate);
-        base.setUTCDate(base.getUTCDate() - 1);
-        base.setUTCHours(10, 0, 0, 0);
-        runAt = base;
-      }
-    }
-
     if (!title || !meetUpPoint || !runAt || Number.isNaN(runAt.getTime())) {
       return NextResponse.json(
         { error: "title, meetUpPoint, and valid date required" },
@@ -150,7 +133,23 @@ export async function POST(
         : citySlugFromRegistry(race.city, race.slug);
     const citySlug = citySlugRaw.slice(0, 64);
 
-    const { hour, minute, period } = utcTo12h(runAt);
+    const bodyHour =
+      body.startTimeHour != null && Number.isFinite(Number(body.startTimeHour))
+        ? Number(body.startTimeHour)
+        : null;
+    const bodyMinute =
+      body.startTimeMinute != null && Number.isFinite(Number(body.startTimeMinute))
+        ? Number(body.startTimeMinute)
+        : null;
+    const bodyPeriod =
+      typeof body.startTimePeriod === "string" && body.startTimePeriod.trim()
+        ? body.startTimePeriod.trim()
+        : null;
+    const fromUtc = utcTo12h(runAt);
+    const hour = bodyHour ?? fromUtc.hour;
+    const minute = bodyMinute ?? fromUtc.minute;
+    const period = bodyPeriod ?? fromUtc.period;
+
     const id = generateCityRunId();
 
     const run = await prisma.city_runs.create({
@@ -159,6 +158,22 @@ export async function POST(
         title,
         date: runAt,
         meetUpPoint,
+        meetUpStreetAddress:
+          body.meetUpStreetAddress != null && String(body.meetUpStreetAddress).trim()
+            ? String(body.meetUpStreetAddress).trim()
+            : null,
+        meetUpCity:
+          body.meetUpCity != null && String(body.meetUpCity).trim()
+            ? String(body.meetUpCity).trim()
+            : null,
+        meetUpState:
+          body.meetUpState != null && String(body.meetUpState).trim()
+            ? String(body.meetUpState).trim()
+            : null,
+        meetUpZip:
+          body.meetUpZip != null && String(body.meetUpZip).trim()
+            ? String(body.meetUpZip).trim()
+            : null,
         meetUpPlaceId:
           body.meetUpPlaceId != null && String(body.meetUpPlaceId).trim()
             ? String(body.meetUpPlaceId).trim()
@@ -167,6 +182,20 @@ export async function POST(
           body.meetUpLat != null && Number.isFinite(body.meetUpLat) ? body.meetUpLat : null,
         meetUpLng:
           body.meetUpLng != null && Number.isFinite(body.meetUpLng) ? body.meetUpLng : null,
+        endPoint:
+          body.endPoint != null && String(body.endPoint).trim()
+            ? String(body.endPoint).trim()
+            : null,
+        endStreetAddress:
+          body.endStreetAddress != null && String(body.endStreetAddress).trim()
+            ? String(body.endStreetAddress).trim()
+            : null,
+        endCity:
+          body.endCity != null && String(body.endCity).trim() ? String(body.endCity).trim() : null,
+        endState:
+          body.endState != null && String(body.endState).trim()
+            ? String(body.endState).trim()
+            : null,
         totalMiles:
           body.totalMiles != null && Number.isFinite(body.totalMiles) ? body.totalMiles : null,
         pace: body.pace != null && String(body.pace).trim() ? String(body.pace).trim() : null,
@@ -177,6 +206,53 @@ export async function POST(
         postRunActivity:
           body.postRunActivity != null && String(body.postRunActivity).trim()
             ? String(body.postRunActivity).trim()
+            : null,
+        dayOfWeek:
+          body.dayOfWeek != null && String(body.dayOfWeek).trim()
+            ? String(body.dayOfWeek).trim()
+            : null,
+        runType:
+          body.runType != null && String(body.runType).trim() ? String(body.runType).trim() : null,
+        workoutDescription:
+          body.workoutDescription != null && String(body.workoutDescription).trim()
+            ? String(body.workoutDescription).trim()
+            : null,
+        directionsText:
+          body.directionsText != null && String(body.directionsText).trim()
+            ? String(body.directionsText).trim()
+            : null,
+        stravaMapUrl:
+          body.stravaMapUrl != null && String(body.stravaMapUrl).trim()
+            ? String(body.stravaMapUrl).trim()
+            : null,
+        mapImageUrl:
+          body.mapImageUrl != null && String(body.mapImageUrl).trim()
+            ? String(body.mapImageUrl).trim()
+            : null,
+        routePhotos: Array.isArray(body.routePhotos) ? body.routePhotos : undefined,
+        stravaEventUrl:
+          body.stravaEventUrl != null && String(body.stravaEventUrl).trim()
+            ? String(body.stravaEventUrl).trim()
+            : null,
+        stravaText:
+          body.stravaText != null && String(body.stravaText).trim()
+            ? String(body.stravaText).trim()
+            : null,
+        webUrl:
+          body.webUrl != null && String(body.webUrl).trim() ? String(body.webUrl).trim() : null,
+        webText:
+          body.webText != null && String(body.webText).trim() ? String(body.webText).trim() : null,
+        igPostText:
+          body.igPostText != null && String(body.igPostText).trim()
+            ? String(body.igPostText).trim()
+            : null,
+        staffNotes:
+          body.staffNotes != null && String(body.staffNotes).trim()
+            ? String(body.staffNotes).trim()
+            : null,
+        routeNeighborhood:
+          body.routeNeighborhood != null && String(body.routeNeighborhood).trim()
+            ? String(body.routeNeighborhood).trim()
             : null,
         startTimeHour: hour,
         startTimeMinute: minute,
