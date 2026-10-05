@@ -169,7 +169,11 @@ function normalizeGoalDistanceLabel(raw: unknown): string {
     .join(' ');
 }
 
-type ActivePlanSummary = { name: string; hasSchedule: boolean };
+type ActivePlanSummary = {
+  planId?: string | null;
+  name: string;
+  hasSchedule: boolean;
+};
 type GoingRunRow = {
   id: string;
   title: string;
@@ -188,6 +192,7 @@ type RaceSignupWithRegistry = {
   distanceLabel?: string | null;
   city?: string | null;
   state?: string | null;
+  goalTime?: string | null;
   race_registry: {
     id: string;
     slug: string | null;
@@ -409,7 +414,14 @@ export default function AthleteHomePage() {
       setUpcomingSessions(Array.isArray(d.sessions) ? d.sessions : []);
       setActivePlanSummary(
         d.activePlanSummary && typeof d.activePlanSummary.name === 'string'
-          ? d.activePlanSummary
+          ? {
+              name: d.activePlanSummary.name,
+              hasSchedule: Boolean(d.activePlanSummary.hasSchedule),
+              planId:
+                typeof d.activePlanSummary.planId === 'string'
+                  ? d.activePlanSummary.planId
+                  : null,
+            }
           : null
       );
     } else {
@@ -730,6 +742,7 @@ export default function AthleteHomePage() {
 
   const goalRaceIsoStr = raceDateToIsoString(goalRace?.raceDate);
   const goalPhase = getRacePhaseLocal(goalRaceIsoStr);
+  const goalIsPastRace = goalPhase === 'post_early' || goalPhase === 'post_cooled';
   const goalDaysUntil = raceCalendarDaysFromTodayLocal(goalRaceIsoStr);
 
   const nextTrainingIncomplete =
@@ -784,8 +797,29 @@ export default function AthleteHomePage() {
       : null;
 
   const showTrainingAtGlance =
+    !goalIsPastRace &&
     !goalIsCompleteForModal &&
     (Boolean(activePlanSummary?.hasSchedule) || Boolean(primaryGoal));
+
+  const primaryGoalAthleteRaceId =
+    typeof primaryGoal?.athleteRaceId === 'string'
+      ? primaryGoal.athleteRaceId
+      : typeof primaryGoal?.id === 'string'
+        ? primaryGoal.id
+        : null;
+
+  const nextUpcomingSignupForPlan =
+    raceSignups
+      .filter((s) => {
+        const d = signupDaysUntil(s);
+        if (d == null || d <= 0) return false;
+        if (primaryGoalAthleteRaceId && s.id === primaryGoalAthleteRaceId) return false;
+        return true;
+      })
+      .sort((a, b) => (signupDaysUntil(a) ?? 99) - (signupDaysUntil(b) ?? 99))[0] ?? null;
+
+  const activePlanIdForPostRace =
+    activePlanSummary?.planId?.trim() || null;
 
   const goalDistanceNorm = normalizeGoalDistanceLabel(primaryGoal?.distance);
 
@@ -1099,11 +1133,95 @@ export default function AthleteHomePage() {
                       </p>
                     </div>
                   </div>
+                      <div className="flex shrink-0 flex-col gap-2 self-start sm:items-end">
                   <Link
                     href={`/race-hub/${primaryRaceRegistryId}#log-result`}
-                    className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 self-start"
+                    className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
                   >
                     Log your result
+                  </Link>
+                  {nextUpcomingSignupForPlan ? (
+                    <Link
+                      href={
+                        nextUpcomingSignupForPlan.goalTime?.trim()
+                          ? `/training-setup?athleteRaceId=${encodeURIComponent(nextUpcomingSignupForPlan.id)}`
+                          : nextUpcomingSignupForPlan.race_registry.slug
+                            ? `/myrace/${nextUpcomingSignupForPlan.race_registry.slug}`
+                            : '/races'
+                      }
+                      className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                    >
+                      Train for {signupDisplayName(nextUpcomingSignupForPlan)}
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/races"
+                      className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                    >
+                      Find your next race
+                    </Link>
+                  )}
+                  {activePlanIdForPostRace ? (
+                    <Link
+                      href={`/training-setup/${activePlanIdForPostRace}`}
+                      className="text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900"
+                    >
+                      Analyze your plan
+                    </Link>
+                  ) : null}
+                </div>
+                </div>
+              </div>
+            ) : primaryGoal &&
+              goalPhase === 'post_cooled' &&
+              primaryRaceRegistryId &&
+              goalRace ? (
+              <div className="mb-4 rounded-2xl border-2 border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                  Race complete
+                </p>
+                <h2 className="text-xl font-bold text-gray-900">{goalRace.name}</h2>
+                {goalRace.distanceLabel ? (
+                  <p className="text-sm text-gray-600">{goalRace.distanceLabel}</p>
+                ) : null}
+                <p className="mt-2 text-sm text-gray-700">
+                  Your training history is saved. Ready to find the next one?
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3 items-center">
+                  {nextUpcomingSignupForPlan ? (
+                    <Link
+                      href={
+                        nextUpcomingSignupForPlan.goalTime?.trim()
+                          ? `/training-setup?athleteRaceId=${encodeURIComponent(nextUpcomingSignupForPlan.id)}`
+                          : nextUpcomingSignupForPlan.race_registry.slug
+                            ? `/myrace/${nextUpcomingSignupForPlan.race_registry.slug}`
+                            : '/races'
+                      }
+                      className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                    >
+                      Train for {signupDisplayName(nextUpcomingSignupForPlan)}
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/races"
+                      className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                    >
+                      Find your next race
+                    </Link>
+                  )}
+                  {activePlanIdForPostRace ? (
+                    <Link
+                      href={`/training-setup/${activePlanIdForPostRace}`}
+                      className="inline-flex justify-center rounded-lg text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900"
+                    >
+                      Analyze your plan
+                    </Link>
+                  ) : null}
+                  <Link
+                    href={`/race-hub/${primaryRaceRegistryId}#log-result`}
+                    className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
+                  >
+                    Log result
                   </Link>
                 </div>
               </div>
@@ -1719,7 +1837,8 @@ export default function AthleteHomePage() {
 
             {weekPlanProgress &&
             weekPlanProgress.sessionsPlanned > 0 &&
-            activePlanSummary?.hasSchedule ? (
+            activePlanSummary?.hasSchedule &&
+            !goalIsPastRace ? (
               <div className="mb-6 rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3 text-sm text-gray-800">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                   This week
