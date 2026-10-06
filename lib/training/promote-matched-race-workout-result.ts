@@ -71,16 +71,22 @@ export async function findMatchedRaceWorkoutForAthleteRace(
   });
   if (!athleteRace?.raceDate) return null;
 
-  const racePlan = await prisma.race_plans.findFirst({
-    where: { athleteRaceId, athleteId },
-    select: { title: true },
-  });
+  const [racePlan, trainingPlan] = await Promise.all([
+    prisma.race_plans.findFirst({
+      where: { athleteRaceId, athleteId },
+      select: { title: true },
+    }),
+    prisma.training_plans.findFirst({
+      where: { athleteId, athleteRaceId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true },
+    }),
+  ]);
 
   const names = raceNameCandidates({
     athleteRaceName: athleteRace.name,
     racePlanTitle: racePlan?.title ?? null,
   });
-  if (names.length === 0) return null;
 
   const raceYmd = ymdFromDate(athleteRace.raceDate);
   const { start, end } = utcDayRangeFromYmd(raceYmd);
@@ -95,6 +101,7 @@ export async function findMatchedRaceWorkoutForAthleteRace(
       id: true,
       title: true,
       workoutType: true,
+      planId: true,
       garminDetailActivityId: true,
       actualDurationSeconds: true,
       actualDistanceMeters: true,
@@ -102,9 +109,23 @@ export async function findMatchedRaceWorkoutForAthleteRace(
     orderBy: [{ actualDistanceMeters: "desc" }, { updatedAt: "desc" }],
   });
 
-  const matched = workouts.filter((w) =>
-    names.some((name) => raceTitlesAlign(name, w.title))
-  );
+  let matched = names.length
+    ? workouts.filter((w) => names.some((name) => raceTitlesAlign(name, w.title)))
+    : [];
+
+  if (matched.length === 0 && trainingPlan?.id) {
+    matched = workouts.filter((w) => w.planId === trainingPlan.id);
+  }
+
+  if (matched.length === 0) {
+    matched = workouts.filter((w) => {
+      const core = normalizedRaceTitleKey(w.title);
+      return names.some((name) => {
+        const nk = normalizedRaceTitleKey(name);
+        return nk.length > 4 && (core.includes(nk) || nk.includes(core));
+      });
+    });
+  }
 
   if (matched.length === 0) return null;
 
@@ -189,7 +210,6 @@ export async function tryPromoteRaceWorkoutAfterGarminStamp(
   });
 
   for (const ar of athleteRaces) {
-    if (!raceTitlesAlign(ar.name, workout.title)) continue;
     try {
       await promoteMatchedRaceWorkoutToResultIfNeeded(athleteId, ar.id);
     } catch (err) {

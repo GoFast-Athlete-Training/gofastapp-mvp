@@ -44,6 +44,8 @@ import {
 } from "@/lib/training/hydrate-plan-day";
 import { planScheduleLooksStructured } from "@/lib/training/plan-schedule-schema";
 import { getRacePhaseLocal } from "@/lib/race-calendar-phase";
+import { isInRaceCloseOutWindow } from "@/lib/training/race-plan-closeout";
+import { RacePlanCloseOutCard } from "@/components/training/RacePlanCloseOutCard";
 import {
   planRaceDisplayName,
   planTitleRaceMismatch,
@@ -192,6 +194,8 @@ export default function TrainingHubPage() {
   const [pushingGarmin, setPushingGarmin] = useState(false);
   const [garminPushMessage, setGarminPushMessage] = useState<string | null>(null);
   const [showMatchPanel, setShowMatchPanel] = useState(false);
+  /** ACTIVE plan in the 2-day post-race close-out window. */
+  const [closeOutPlanId, setCloseOutPlanId] = useState<string | null>(null);
   /** Active plan in DB is past race day — prompt next goal instead of full schedule UI. */
   const [pastRacePlan, setPastRacePlan] = useState<{
     id: string;
@@ -259,6 +263,7 @@ export default function TrainingHubPage() {
     setMyRacePoint(null);
     setRaceReadiness(null);
     setPastRacePlan(null);
+    setCloseOutPlanId(null);
     setPastRaceResultStatus(null);
     setWeekDays([]);
     setParkedPlans([]);
@@ -358,7 +363,19 @@ export default function TrainingHubPage() {
       setRaceReadiness(readiness ?? null);
       setMyRacePoint(myRace ?? null);
 
-      const planPhase = getRacePhaseLocal(plan.race_registry?.raceDate);
+      const raceDateIso =
+        typeof plan.race_registry?.raceDate === "string"
+          ? plan.race_registry.raceDate
+          : plan.race_registry?.raceDate != null
+            ? String(plan.race_registry.raceDate)
+            : null;
+      const planPhase = getRacePhaseLocal(raceDateIso);
+      if (isInRaceCloseOutWindow(raceDateIso)) {
+        setPlanDetail(null);
+        setCloseOutPlanId(plan.id);
+        setWeekDays([]);
+        return;
+      }
       if (planPhase === "post_early" || planPhase === "post_cooled") {
         setPlanDetail(null);
         setPastRacePlan({
@@ -366,15 +383,9 @@ export default function TrainingHubPage() {
           name: plan.name,
           raceName: plan.race_registry?.name ?? null,
           raceId: plan.raceId ?? plan.race_registry?.id ?? null,
-          raceDate:
-            typeof plan.race_registry?.raceDate === "string"
-              ? plan.race_registry.raceDate
-              : plan.race_registry?.raceDate != null
-                ? String(plan.race_registry.raceDate)
-                : null,
+          raceDate: raceDateIso,
         });
         setWeekDays([]);
-        // Probe whether the athlete already logged a result + reflection
         const raceRegistryId = plan.raceId ?? plan.race_registry?.id;
         if (raceRegistryId) {
           fetch(`/api/race-results?raceRegistryId=${encodeURIComponent(raceRegistryId)}`, {
@@ -856,7 +867,7 @@ export default function TrainingHubPage() {
           </div>
         )}
 
-        {authReady && !loading && !planDetail && !pastRacePlan && !legacyPlanReselect && (
+        {authReady && !loading && !planDetail && !pastRacePlan && !closeOutPlanId && !legacyPlanReselect && (
           <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Choose a race to train for</h2>
             <p className="text-sm text-gray-600 mb-6">
@@ -889,7 +900,15 @@ export default function TrainingHubPage() {
           </div>
         )}
 
-        {authReady && !loading && pastRacePlan && pastRacePhase === "post_early" && (
+        {authReady && !loading && closeOutPlanId && (
+          <RacePlanCloseOutCard
+            planId={closeOutPlanId}
+            className="mb-8"
+            onArchived={() => void loadHub()}
+          />
+        )}
+
+        {authReady && !loading && pastRacePlan && pastRacePhase === "post_early" && !closeOutPlanId && (
           <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/80 p-8 shadow-sm mb-8">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-1">
               Race complete
@@ -899,40 +918,19 @@ export default function TrainingHubPage() {
               <p className="text-base text-gray-700 mb-4">{pastRacePlan.raceName}</p>
             )}
             <p className="text-sm text-gray-600 mb-5">
-              How did it go? Log your finish time and reflection while it&apos;s fresh.
+              Ready to start training again? Find another race and we&apos;ll start fresh.
             </p>
-
-            {pastRaceResultStatus && (!pastRaceResultStatus.hasResult || !pastRaceResultStatus.hasReflection) && pastRacePlan.raceId && (
-              <div className="mb-5 space-y-2">
-                {!pastRaceResultStatus.hasResult && (
-                  <Link
-                    href={`/race-hub/${pastRacePlan.raceId}#log-result`}
-                    className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
-                  >
-                    Log your finish time
-                  </Link>
-                )}
-                {pastRaceResultStatus.hasResult && !pastRaceResultStatus.hasReflection && (
-                  <Link
-                    href={`/race-hub/${pastRacePlan.raceId}#log-result`}
-                    className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-800 hover:bg-blue-100"
-                  >
-                    Add a race reflection
-                  </Link>
-                )}
-              </div>
-            )}
 
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/races"
-                className="inline-flex justify-center rounded-xl border-2 border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                className="inline-flex justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
               >
-                Find your next race
+                Find another race
               </Link>
               <Link
                 href={`/training-setup/${pastRacePlan.id}`}
-                className="inline-flex justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                className="inline-flex justify-center rounded-xl border-2 border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
               >
                 Analyze your plan
               </Link>
@@ -968,29 +966,17 @@ export default function TrainingHubPage() {
               </Link>
             </div>
 
-            {pastRaceResultStatus && (!pastRaceResultStatus.hasResult || !pastRaceResultStatus.hasReflection) && pastRacePlan.raceId && (
+            {pastRaceResultStatus && !pastRaceResultStatus.hasResult ? (
               <div className="pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-500 mb-2">Still need to capture your race?</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                  {!pastRaceResultStatus.hasResult && (
-                    <Link
-                      href={`/race-hub/${pastRacePlan.raceId}#log-result`}
-                      className="font-medium text-emerald-700 hover:text-emerald-800"
-                    >
-                      Log result
-                    </Link>
-                  )}
-                  {pastRaceResultStatus.hasResult && !pastRaceResultStatus.hasReflection && (
-                    <Link
-                      href={`/race-hub/${pastRacePlan.raceId}#log-result`}
-                      className="font-medium text-blue-700 hover:text-blue-800"
-                    >
-                      Add reflection
-                    </Link>
-                  )}
-                </div>
+                <p className="text-xs text-gray-500 mb-2">Still need your finish on file?</p>
+                <Link
+                  href="/activities?view=all"
+                  className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
+                >
+                  Find your activity to match to this race
+                </Link>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 

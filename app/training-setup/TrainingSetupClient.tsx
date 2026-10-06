@@ -9,6 +9,7 @@ import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import { raceCalendarBeforeTodayUtc } from "@/lib/training/plan-utils";
+import { isInRaceCloseOutWindow } from "@/lib/training/race-plan-closeout";
 import {
   presetMatchesRaceDistance,
   raceDistanceForPresetMatch,
@@ -82,7 +83,8 @@ type ActivePlanLite = {
   lifecycleStatus: string;
   planSchedule: unknown;
   _count?: { planned_workouts: number };
-  race_registry: { name: string } | null;
+  race_registry: { name: string; raceDate?: string | null } | null;
+  athlete_race?: { raceDate?: string | null } | null;
 };
 
 type PresetForWizard = {
@@ -381,6 +383,17 @@ export default function TrainingSetupClient() {
     const wizardRaceId = wizardGoal.athleteRaceId ?? wizardGoal.id;
     const active = activePlans.find((p) => p.lifecycleStatus === "ACTIVE");
     if (!active?.athleteRaceId || active.athleteRaceId === wizardRaceId) return null;
+    const raceDateIso =
+      active.athlete_race?.raceDate ??
+      active.race_registry?.raceDate ??
+      null;
+    if (
+      raceDateIso &&
+      (isInRaceCloseOutWindow(String(raceDateIso)) ||
+        raceCalendarBeforeTodayUtc(String(raceDateIso)))
+    ) {
+      return null;
+    }
     return active;
   }, [activePlans, wizardGoal]);
 

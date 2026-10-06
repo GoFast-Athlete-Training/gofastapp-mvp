@@ -48,6 +48,16 @@ export async function GET(
         logisticsInfo: true,
         gearDropInstructions: true,
         summaryPhrase: true,
+        course_segments: {
+          orderBy: { order: "asc" },
+          select: {
+            order: true,
+            name: true,
+            mileMarker: true,
+            description: true,
+            runTip: true,
+          },
+        },
       },
     });
 

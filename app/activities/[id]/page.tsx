@@ -71,6 +71,9 @@ export default function ActivityDetailPage() {
   const [hubPost, setHubPost] = useState<ActivityPostOwnerPayload | null>(null);
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [matchedPlanRaceId, setMatchedPlanRaceId] = useState<string | null>(null);
+  const [stampingResults, setStampingResults] = useState(false);
+  const [resultsStamped, setResultsStamped] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +92,12 @@ export default function ActivityDetailPage() {
         activity?: ActivityPayload;
         derivedLaps?: DerivedLapPayload[];
         hasDetail?: boolean;
+        matchedWorkout?: {
+          training_plans?: {
+            athleteRaceId?: string | null;
+            lifecycleStatus?: string | null;
+          } | null;
+        } | null;
         error?: string;
       };
       if (!res.ok) {
@@ -101,6 +110,9 @@ export default function ActivityDetailPage() {
       setActivity(json.activity ?? null);
       setDerivedLaps(json.derivedLaps ?? []);
       setHasDetail(json.hasDetail ?? false);
+      const planRaceId = json.matchedWorkout?.training_plans?.athleteRaceId?.trim() || null;
+      setMatchedPlanRaceId(planRaceId);
+      setResultsStamped(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load activity");
       setActivity(null);
@@ -135,6 +147,33 @@ export default function ActivityDetailPage() {
       }
     })();
   }, [activityId]);
+
+  async function handleMakeTheseMyResults() {
+    setStampingResults(true);
+    setError(null);
+    try {
+      const u = auth.currentUser;
+      if (!u) return;
+      const token = await u.getIdToken();
+      const res = await fetch("/api/races/make-activity-my-results", {
+        method: "POST",
+        headers: {
+          ...athleteBearerFetchHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ activityId }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        throw new Error(json.error || "Could not save results");
+      }
+      setResultsStamped(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save results");
+    } finally {
+      setStampingResults(false);
+    }
+  }
 
   async function handleDeleteActivity() {
     if (
@@ -368,6 +407,40 @@ export default function ActivityDetailPage() {
                   )}
                 </div>
 
+                {activity.ingestionStatus === "MATCHED" && matchedPlanRaceId ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-5 mb-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <h2 className="text-sm font-semibold text-emerald-950">Race finish</h2>
+                        <p className="text-sm text-emerald-900/90 mt-0.5">
+                          This run is matched to your training plan race. Use its duration as your
+                          official finish, then close out the plan on Training.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={stampingResults || resultsStamped}
+                        onClick={() => void handleMakeTheseMyResults()}
+                        className="shrink-0 inline-flex justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {resultsStamped
+                          ? "Saved — open Training to reflect"
+                          : stampingResults
+                            ? "Saving…"
+                            : "Make these my results"}
+                      </button>
+                    </div>
+                    {resultsStamped ? (
+                      <Link
+                        href="/training"
+                        className="mt-3 inline-flex text-sm font-semibold text-emerald-800 hover:underline"
+                      >
+                        Close out your plan →
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div className="rounded-xl border border-gray-200 bg-white p-5 mb-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex items-start gap-3">
@@ -375,11 +448,10 @@ export default function ActivityDetailPage() {
                         <Flag className="w-5 h-5 shrink-0" aria-hidden />
                       </div>
                       <div>
-                        <h2 className="text-sm font-semibold text-gray-900">Race day?</h2>
+                        <h2 className="text-sm font-semibold text-gray-900">Different race?</h2>
                         <p className="text-sm text-gray-600 mt-0.5">
-                          Tie this Garmin activity to a race in our catalog — we&apos;ll use the
-                          activity duration as your finish time (you can still enter an official time
-                          from the race hub).
+                          Tie this activity to another race in our catalog if it wasn&apos;t your plan
+                          race day.
                         </p>
                       </div>
                     </div>

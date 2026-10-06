@@ -38,9 +38,18 @@ type ResolvedRace = {
   description?: string | null;
 };
 
+type CourseSegmentRow = {
+  order: number;
+  name: string;
+  mileMarker?: string | null;
+  description?: string | null;
+  runTip?: string | null;
+};
+
 type RaceExtras = {
   courseSlug: string | null;
   courseMapUrl: string | null;
+  courseSegments: CourseSegmentRow[];
 };
 
 type Signup = {
@@ -167,12 +176,14 @@ export default function MyRacePage() {
         race?: {
           courseSlug?: string | null;
           courseMapUrl?: string | null;
+          course_segments?: CourseSegmentRow[];
         };
       }>(`/race-registry/${encodeURIComponent(raceRegistryId)}`);
       const r = data.race;
       setRaceExtras({
         courseSlug: r?.courseSlug ?? null,
         courseMapUrl: r?.courseMapUrl ?? null,
+        courseSegments: r?.course_segments ?? [],
       });
     } catch {
       setRaceExtras(null);
@@ -580,7 +591,8 @@ export default function MyRacePage() {
                   Plan for it
                 </h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  Set your goal time and pacing here — no need to open training setup for race-week prep.
+                  Set your goal time here. Training lives in your plan until race week, when pacing guidance
+                  unlocks for this race.
                 </p>
               </div>
 
@@ -617,17 +629,15 @@ export default function MyRacePage() {
                 <RacePaceHubTabs
                   raceForGoal={raceForGoal}
                   goal={effectiveGoal}
-                  defaultTab="build"
-                  racePlanContext={
-                    signup?.id && raceForGoal?.raceDate
-                      ? {
-                          athleteRaceId: signup.id,
-                          raceDate: String(raceForGoal.raceDate).slice(0, 10),
-                          planId: trainingPlanId,
-                          title: raceForGoal.name,
-                        }
-                      : undefined
+                  courseSegments={raceExtras?.courseSegments ?? []}
+                  showRaceWeekPlan={
+                    daysUntilRace(raceForGoal.raceDate) <= 7 &&
+                    daysUntilRace(raceForGoal.raceDate) >= 0
                   }
+                  hasPlanForRace={hasPlanForRace}
+                  trainingPlanId={trainingPlanId}
+                  activePlanHasSchedule={Boolean(activePlanSummary?.hasSchedule)}
+                  athleteRaceId={signup!.id}
                 />
               </div>
 

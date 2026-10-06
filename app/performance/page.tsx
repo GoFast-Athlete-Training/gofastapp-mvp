@@ -13,6 +13,7 @@ import {
   WhereYouStandPanel,
 } from "@/components/training/WhereYouStandPanel";
 import type { PerformanceSummary } from "@/lib/training/performance-summary";
+import { RacePlanCloseOutCard } from "@/components/training/RacePlanCloseOutCard";
 import type { WeekPerformanceSnapshot } from "@/lib/training/week-performance-types";
 import type { WhereYouStandSnapshot } from "@/lib/training/where-you-stand";
 
@@ -24,6 +25,7 @@ type PerformanceSummaryResponse = {
   weekDays: PerformanceSummary["weekDays"];
   whereYouStand: WhereYouStandSnapshot | null;
   currentFiveKPace: string | null;
+  inRaceCloseOut?: boolean;
 };
 
 export default function PerformancePage() {
@@ -75,26 +77,49 @@ export default function PerformancePage() {
           <p className="text-red-600">{error}</p>
         ) : (
           <>
-            {summary?.weekPerformance && summary.weekPerformance.sessionsPlanned > 0 ? (
+            {summary?.inRaceCloseOut && summary.planId ? (
+              <RacePlanCloseOutCard
+                planId={summary.planId}
+                className="mb-6"
+                onArchived={() => void load()}
+              />
+            ) : null}
+
+            {!summary?.inRaceCloseOut &&
+            summary?.weekPerformance &&
+            summary.weekPerformance.sessionsPlanned > 0 ? (
               <PerformanceWeekSummary
                 weekPerformance={summary.weekPerformance}
                 planName={summary.planName}
                 weekNumber={summary.weekNumber}
               />
-            ) : summary?.planId ? (
+            ) : summary?.planId && !summary.inRaceCloseOut ? (
               <section className="rounded-xl border border-gray-200 bg-gray-50 px-5 py-4 mb-6 text-sm text-gray-600">
                 No scheduled sessions this week yet.
               </section>
+            ) : !summary?.planId ? (
+              <section className="rounded-xl border border-gray-200 bg-white px-5 py-6 mb-6">
+                <h2 className="text-lg font-semibold text-gray-900">Ready to start training again?</h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  Pick your next race and build a plan — your finished builds live in training history.
+                </p>
+                <Link
+                  href="/races"
+                  className="mt-4 inline-flex rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                >
+                  Find another race
+                </Link>
+              </section>
             ) : null}
 
-            {summary?.weekDays && summary.weekDays.length > 0 ? (
+            {!summary?.inRaceCloseOut && summary?.weekDays && summary.weekDays.length > 0 ? (
               <PerformanceWeekPlan
                 weekDays={summary.weekDays}
                 onOpenWorkout={(id) => router.push(`/workouts/${id}`)}
               />
             ) : null}
 
-            {summary?.whereYouStand ? (
+            {!summary?.inRaceCloseOut && summary?.whereYouStand ? (
               <WhereYouStandPanel
                 stand={summary.whereYouStand}
                 planId={summary.planId}

@@ -19,6 +19,8 @@ import {
 } from "@/lib/training/where-you-stand";
 import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
 import { goalAthleteRaceSelect } from "@/lib/goal-race-display";
+import { ensureRetiredActivePlansForPastRaces } from "@/lib/training/plan-lifecycle";
+import { isInRaceCloseOutWindow } from "@/lib/training/race-plan-closeout";
 
 export type PerformanceWeekDay = {
   workoutId: string | null;
@@ -39,11 +41,15 @@ export type PerformanceSummary = {
   whereYouStand: WhereYouStandSnapshot | null;
   /** @deprecated Use whereYouStand.fiveK */
   currentFiveKPace: string | null;
+  /** Active plan is in post-race close-out — skip current-week missed rollup. */
+  inRaceCloseOut: boolean;
 };
 
 export async function loadPerformanceSummary(
   athleteId: string
 ): Promise<PerformanceSummary> {
+  await ensureRetiredActivePlansForPastRaces(athleteId);
+
   const athlete = await prisma.athlete.findUnique({
     where: { id: athleteId },
     select: { fiveKPace: true },
@@ -76,10 +82,12 @@ export async function loadPerformanceSummary(
   let weekNumber: number | null = null;
   let weekDays: PerformanceWeekDay[] = [];
   let whereYouStand: WhereYouStandSnapshot | null = null;
+  let inRaceCloseOut = false;
 
   if (activePlan) {
     const terminal = resolvePlanTerminalRaceDisplay(activePlan);
     const raceDate = terminal?.raceDate ?? activePlan.race_registry?.raceDate ?? null;
+    inRaceCloseOut = isInRaceCloseOutWindow(raceDate);
     const raceName = terminal?.name ?? activePlan.race_registry?.name ?? null;
     const raceDistanceMiles =
       terminal?.distanceMeters != null && Number.isFinite(Number(terminal.distanceMeters))
@@ -89,6 +97,7 @@ export async function loadPerformanceSummary(
           ? metersToMiles(Number(activePlan.race_registry.distanceMeters))
           : null;
 
+    if (!inRaceCloseOut) {
     const effectiveWeeks = effectiveTrainingWeekCount(
       activePlan.startDate,
       activePlan.totalWeeks,
@@ -171,6 +180,7 @@ export async function loadPerformanceSummary(
               : null,
         };
       });
+    }
   }
 
   return {
@@ -181,5 +191,6 @@ export async function loadPerformanceSummary(
     weekDays,
     whereYouStand,
     currentFiveKPace: athlete?.fiveKPace ?? null,
+    inRaceCloseOut,
   };
 }

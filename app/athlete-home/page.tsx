@@ -1128,17 +1128,17 @@ export default function AthleteHomePage() {
                         </p>
                       ) : null}
                       <p className="mt-2 text-sm text-gray-700">
-                        Log your finish time while it&apos;s fresh — it stays on your profile, not race
-                        chatter.
+                        Close out your build — we&apos;ll pull your finish from Activity when it&apos;s matched,
+                        then save a reflection and move this plan to history.
                       </p>
                     </div>
                   </div>
                       <div className="flex shrink-0 flex-col gap-2 self-start sm:items-end">
                   <Link
-                    href={`/race-hub/${primaryRaceRegistryId}#log-result`}
+                    href="/training"
                     className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
                   >
-                    Log your result
+                    Close out this plan
                   </Link>
                   {nextUpcomingSignupForPlan ? (
                     <Link
@@ -1243,15 +1243,15 @@ export default function AthleteHomePage() {
                         </p>
                       ) : null}
                       <p className="mt-2 text-sm text-gray-700">
-                        Log your finish time while it&apos;s fresh — it stays on your profile.
+                        Find your race-day activity in Activity, then close out your plan on Training.
                       </p>
                     </div>
                   </div>
                   <Link
-                    href={`/race-hub/${signupPostEarlyNoGoal.race_registry.id}#log-result`}
+                    href="/activities?view=all"
                     className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 self-start"
                   >
-                    Log your result
+                    Find your activity
                   </Link>
                 </div>
               </div>
@@ -1505,7 +1505,7 @@ export default function AthleteHomePage() {
                           </>
                         ) : (
                           <p className="text-sm text-gray-700 mt-3 leading-relaxed">
-                            Nice work. Log your finish time for goal vs. actual and PR detection — or
+                            Nice work. Find your race-day activity to match to this race on Activity, or
                             set your next goal when you&apos;re ready.
                           </p>
                         )}
@@ -1517,7 +1517,7 @@ export default function AthleteHomePage() {
                         onClick={() => setLogResultOpen(true)}
                         className="mt-3 inline-flex justify-center rounded-xl border-2 border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 w-full"
                       >
-                        {primaryRaceResult ? 'Update your result' : 'Log your result'}
+                        {primaryRaceResult ? 'Update your result' : 'Find activity to match'}
                       </button>
                     ) : null}
                     <Link

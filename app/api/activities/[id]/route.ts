@@ -11,7 +11,13 @@ const activityInclude = {
     include: {
       segments: { orderBy: { stepOrder: "asc" as const } },
       training_plans: {
-        select: { id: true, name: true, currentFiveKPace: true },
+        select: {
+          id: true,
+          name: true,
+          currentFiveKPace: true,
+          athleteRaceId: true,
+          lifecycleStatus: true,
+        },
       },
     },
   },

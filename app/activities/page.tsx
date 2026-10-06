@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Activity, ChevronLeft, ChevronRight, LineChart, Zap } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
 import AthleteSidebar from '@/components/athlete/AthleteSidebar';
@@ -63,9 +63,15 @@ function ingestionClasses(status: string): string {
   }
 }
 
+type HistoryView = 'week' | 'all';
+
 export default function ActivitiesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [authReady, setAuthReady] = useState(false);
+  const [historyView, setHistoryView] = useState<HistoryView>(() =>
+    searchParams.get('view') === 'all' ? 'all' : 'week'
+  );
   const [weekStart, setWeekStart] = useState(() => getSundayWeekStart(new Date()));
   const [filter, setFilter] = useState<ActivityHistoryFilter>('all');
   const [items, setItems] = useState<ActivityHistoryRow[]>([]);
@@ -86,7 +92,7 @@ export default function ActivitiesPage() {
 
   const weekStats = useMemo(() => computeWeekStats(items), [items]);
 
-  const loadWeek = useCallback(
+  const loadActivities = useCallback(
     async (append = false, cursor?: string | null) => {
       if (append) setLoadingMore(true);
       else setLoading(true);
@@ -96,11 +102,13 @@ export default function ActivitiesPage() {
         if (!u) return;
         const token = await u.getIdToken();
         const params = new URLSearchParams({
-          from: formatLocalYmd(weekStart),
-          to: formatLocalYmd(weekEndExclusive),
           filter,
           limit: '50',
         });
+        if (historyView === 'week') {
+          params.set('from', formatLocalYmd(weekStart));
+          params.set('to', formatLocalYmd(weekEndExclusive));
+        }
         if (append && cursor) params.set('cursor', cursor);
 
         const res = await fetch(`/api/activities?${params.toString()}`, {
@@ -126,8 +134,14 @@ export default function ActivitiesPage() {
         setLoadingMore(false);
       }
     },
-    [weekStart, weekEndExclusive, filter]
+    [weekStart, weekEndExclusive, filter, historyView]
   );
+
+  function setHistoryViewAndUrl(next: HistoryView) {
+    setHistoryView(next);
+    const qs = next === 'all' ? '?view=all' : '';
+    router.replace(`/activities${qs}`, { scroll: false });
+  }
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -139,8 +153,8 @@ export default function ActivitiesPage() {
 
   useEffect(() => {
     if (!authReady) return;
-    void loadWeek(false);
-  }, [authReady, loadWeek]);
+    void loadActivities(false);
+  }, [authReady, loadActivities]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -171,30 +185,52 @@ export default function ActivitiesPage() {
             </div>
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setWeekStart((prev) => addDays(prev, -7))}
-                  className="rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50"
-                  aria-label="Previous week"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <div className="min-w-[180px] text-center">
-                  <p className="text-sm font-semibold text-gray-900">{weekLabel}</p>
-                  {isCurrentWeek ? (
-                    <p className="text-xs text-orange-600 font-medium">This week</p>
-                  ) : null}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
+                  {(['week', 'all'] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setHistoryViewAndUrl(value)}
+                      className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize ${
+                        historyView === value
+                          ? 'bg-orange-100 text-orange-800'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {value === 'week' ? 'Week' : 'All'}
+                    </button>
+                  ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setWeekStart((prev) => addDays(prev, 7))}
-                  disabled={isCurrentWeek}
-                  className="rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-                  aria-label="Next week"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
+                {historyView === 'week' ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setWeekStart((prev) => addDays(prev, -7))}
+                      className="rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50"
+                      aria-label="Previous week"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <div className="min-w-[180px] text-center">
+                      <p className="text-sm font-semibold text-gray-900">{weekLabel}</p>
+                      {isCurrentWeek ? (
+                        <p className="text-xs text-orange-600 font-medium">This week</p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setWeekStart((prev) => addDays(prev, 7))}
+                      disabled={isCurrentWeek}
+                      className="rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                      aria-label="Next week"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-gray-900">All activities · newest first</p>
+                )}
               </div>
 
               <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
@@ -215,6 +251,7 @@ export default function ActivitiesPage() {
               </div>
             </div>
 
+            {historyView === 'week' ? (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-1.5 rounded-lg bg-orange-100">
@@ -249,6 +286,7 @@ export default function ActivitiesPage() {
                 </div>
               </div>
             </div>
+            ) : null}
 
             {loading ? (
               <div className="flex justify-center py-16">
@@ -260,8 +298,12 @@ export default function ActivitiesPage() {
               <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
                 <p className="text-gray-600">
                   {filter === 'unmatched'
-                    ? 'No unmatched activities this week.'
-                    : 'No activities this week yet.'}
+                    ? historyView === 'all'
+                      ? 'No unmatched activities yet.'
+                      : 'No unmatched activities this week.'
+                    : historyView === 'all'
+                      ? 'No activities yet.'
+                      : 'No activities this week yet.'}
                 </p>
               </div>
             ) : (
@@ -331,10 +373,10 @@ export default function ActivitiesPage() {
                     <button
                       type="button"
                       disabled={loadingMore}
-                      onClick={() => void loadWeek(true, nextCursor)}
+                      onClick={() => void loadActivities(true, nextCursor)}
                       className="rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                     >
-                      {loadingMore ? 'Loading…' : 'Load older this week'}
+                      {loadingMore ? 'Loading…' : historyView === 'all' ? 'Load older' : 'Load older this week'}
                     </button>
                   </div>
                 ) : null}

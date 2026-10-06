@@ -8,6 +8,7 @@ import { rematerializeFuturePlannedWorkoutsForPlan } from "@/lib/training/remate
 import { utcDateOnly } from "@/lib/training/plan-utils";
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
 import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
+import { shouldAutoArchivePlanForRaceDate } from "@/lib/training/race-plan-closeout";
 
 /** Race calendar day strictly before today (UTC) — aligns with training hub "past race" treatment. */
 export function isRaceCalendarBeforeTodayUtc(raceDate: Date | null | undefined): boolean {
@@ -190,6 +191,64 @@ export async function restoreParkedPlan(params: {
   );
 
   return { ok: true };
+}
+
+/** Archive one ACTIVE plan for this athlete (cleanup + cascade). */
+export async function archiveTrainingPlan(
+  athleteId: string,
+  planId: string
+): Promise<boolean> {
+  const row = await prisma.training_plans.findFirst({
+    where: {
+      id: planId,
+      athleteId,
+      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+    },
+    select: { id: true },
+  });
+  if (!row) return false;
+
+  await prisma.training_plans.update({
+    where: { id: planId },
+    data: {
+      lifecycleStatus: TrainingPlanLifecycle.ARCHIVED,
+      updatedAt: new Date(),
+    },
+  });
+
+  await cascadeLinkedGoalAfterPlanArchived(planId, athleteId);
+  await cleanupFutureGarminSchedulesForPlan({ planId, athleteId });
+  await cleanupFutureWorkoutsForRetiredPlan({ planId, athleteId });
+  return true;
+}
+
+/**
+ * Auto-archive ACTIVE plans whose race is past the close-out window (2+ days after race day).
+ */
+export async function ensureRetiredActivePlansForPastRaces(
+  athleteId: string
+): Promise<string[]> {
+  const activePlans = await prisma.training_plans.findMany({
+    where: {
+      athleteId,
+      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+    },
+    select: {
+      id: true,
+      athlete_race: { select: { raceDate: true } },
+      race_registry: { select: { raceDate: true } },
+    },
+  });
+
+  const archivedIds: string[] = [];
+  for (const plan of activePlans) {
+    const raceDate =
+      plan.athlete_race?.raceDate ?? plan.race_registry?.raceDate ?? null;
+    if (!shouldAutoArchivePlanForRaceDate(raceDate)) continue;
+    const ok = await archiveTrainingPlan(athleteId, plan.id);
+    if (ok) archivedIds.push(plan.id);
+  }
+  return archivedIds;
 }
 
 /** Copy Athlete.fiveKPace onto the single ACTIVE training plan (if any). */

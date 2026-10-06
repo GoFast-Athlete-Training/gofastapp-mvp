@@ -17,7 +17,10 @@ import {
   buildPlanRaceSnapshots,
   planRaceSnapshotsToPrismaJson,
 } from "@/lib/training/plan-race-snapshots";
-import { isRaceCalendarBeforeTodayUtc } from "@/lib/training/plan-lifecycle";
+import {
+  ensureRetiredActivePlansForPastRaces,
+  isRaceCalendarBeforeTodayUtc,
+} from "@/lib/training/plan-lifecycle";
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
 import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
 import { isAthletePresetBlueprintComplete } from "@/lib/training/athlete-preset-blueprint";
@@ -401,6 +404,8 @@ export async function GET(request: NextRequest) {
     }
     const { athlete } = auth;
 
+    await ensureRetiredActivePlansForPastRaces(athlete.id);
+
     const statusParam = request.nextUrl.searchParams.get("status")?.toLowerCase();
     const lifecycleFilter =
       statusParam === "active"
@@ -436,7 +441,8 @@ export async function GET(request: NextRequest) {
         currentFiveKPace: true,
         createdAt: true,
         updatedAt: true,
-        race_registry: { select: { name: true } },
+        race_registry: { select: { name: true, raceDate: true } },
+        athlete_race: { select: { raceDate: true } },
         _count: { select: { planned_workouts: true } },
       },
     });
