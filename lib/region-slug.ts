@@ -1,15 +1,23 @@
 import { toCitySlug } from '@/lib/seriesSlug';
 
-/** citySlug → regionSlug when a suburb/metro should reel into a region button. */
+/** Metro batch key for DC-area city slugs (matches seeded `regions.slug`). */
+export const DMV_REGION_SLUG = 'dmv';
+
+/** @deprecated Use DMV_REGION_SLUG */
+export const DC_REGION_SLUG = DMV_REGION_SLUG;
+
 const CITY_SLUG_TO_REGION: Record<string, string> = {
-  dc: 'dc',
-  arlington: 'dc',
-  bethesda: 'dc',
-  alexandria: 'dc',
+  dc: DMV_REGION_SLUG,
+  arlington: DMV_REGION_SLUG,
+  bethesda: DMV_REGION_SLUG,
+  alexandria: DMV_REGION_SLUG,
 };
 
-export const DC_REGION_SLUG = 'dc';
+const REGION_TO_CITY_SLUGS: Record<string, string[]> = {
+  [DMV_REGION_SLUG]: ['dc', 'arlington', 'bethesda', 'alexandria'],
+};
 
+/** Sync fallback when city row is not loaded — aligned with seeded cities.regionId. */
 export function inferRegionSlugFromCitySlug(
   citySlug: string | null | undefined
 ): string | null {
@@ -36,7 +44,13 @@ export function athleteCityToSlug(
 export function citySlugsForRegion(regionSlug: string | null | undefined): string[] {
   const region = regionSlug?.trim().toLowerCase();
   if (!region) return [];
-  return Object.entries(CITY_SLUG_TO_REGION)
-    .filter(([, r]) => r === region)
-    .map(([city]) => city);
+  if (region === 'dc') {
+    return REGION_TO_CITY_SLUGS[DMV_REGION_SLUG] ?? [];
+  }
+  return REGION_TO_CITY_SLUGS[region] ?? [];
+}
+
+export function isDmvRegionSlug(regionSlug: string | null | undefined): boolean {
+  const r = regionSlug?.trim().toLowerCase();
+  return r === DMV_REGION_SLUG || r === 'dc';
 }

@@ -31,6 +31,9 @@ import {
   startOfWeekMonday,
   ymdLocal,
 } from "@/components/runmanage/RunManageWeekStrip";
+import { DMV_REGION_SLUG, isDmvRegionSlug } from "@/lib/region-slug";
+
+const REGION_CITY_FILTER_PREFIX = "region:";
 
 interface RunClub {
   id: string;
@@ -50,6 +53,7 @@ interface Run {
   id: string;
   title: string;
   citySlug: string;
+  regionSlug?: string | null;
   meetUpPoint: string;
   meetUpCity: string | null;
   meetUpState: string | null;
@@ -156,13 +160,23 @@ export function RunManageDashboardHome() {
 
   const cityOptions = useMemo(() => {
     const map = new Map<string, string>();
+    let hasDmv = false;
     for (const r of runs) {
+      if (isDmvRegionSlug(r.regionSlug)) {
+        hasDmv = true;
+        continue;
+      }
       const key = (r.citySlug || r.meetUpCity || "").trim().toLowerCase();
       if (!key) continue;
       const label = r.meetUpCity?.trim() || r.citySlug?.trim() || key;
       map.set(key, label);
     }
-    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    const options: Array<[string, string]> = [];
+    if (hasDmv) {
+      options.push([`${REGION_CITY_FILTER_PREFIX}${DMV_REGION_SLUG}`, "DMV"]);
+    }
+    options.push(...[...map.entries()].sort((a, b) => a[1].localeCompare(b[1])));
+    return options;
   }, [runs]);
 
   const clubOptions = useMemo(() => {
@@ -179,11 +193,16 @@ export function RunManageDashboardHome() {
   const scopedRuns = useMemo(() => {
     let list = runs;
     if (selectedCityKey) {
-      list = list.filter((r) => {
-        const slug = (r.citySlug || "").trim().toLowerCase();
-        const city = (r.meetUpCity || "").trim().toLowerCase();
-        return slug === selectedCityKey || city === selectedCityKey;
-      });
+      if (selectedCityKey.startsWith(REGION_CITY_FILTER_PREFIX)) {
+        const region = selectedCityKey.slice(REGION_CITY_FILTER_PREFIX.length);
+        list = list.filter((r) => (r.regionSlug || "").trim().toLowerCase() === region);
+      } else {
+        list = list.filter((r) => {
+          const slug = (r.citySlug || "").trim().toLowerCase();
+          const city = (r.meetUpCity || "").trim().toLowerCase();
+          return slug === selectedCityKey || city === selectedCityKey;
+        });
+      }
     }
     return list;
   }, [runs, selectedCityKey]);

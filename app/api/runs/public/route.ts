@@ -27,10 +27,11 @@ export async function GET(request: Request) {
       searchParams.get('citySlug')?.trim() ||
       searchParams.get('gofastCity')?.trim() ||
       undefined;
+    const regionSlug = searchParams.get('regionSlug')?.trim() || undefined;
     const day = searchParams.get('day') || undefined;
     const runClubSlug = searchParams.get('runClubSlug') || undefined;
 
-    const runs = await getRuns({ citySlug, day, runClubSlug });
+    const runs = await getRuns({ citySlug, regionSlug, day, runClubSlug });
 
     return NextResponse.json({
       success: true,

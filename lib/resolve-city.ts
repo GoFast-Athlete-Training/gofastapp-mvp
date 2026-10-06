@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { prisma as defaultPrisma } from "@/lib/prisma";
+import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
 import { toCitySlug } from "@/lib/seriesSlug";
 
 export type ResolvedCity = {
@@ -31,16 +32,32 @@ export async function findOrCreateCityBySlug(
 
   let city = await db.cities.findFirst({
     where: { slug: { equals: normalized, mode: "insensitive" } },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      regionId: true,
+    },
   });
   if (!city) {
+    const regionSlug = inferRegionSlugFromCitySlug(normalized);
     city = await db.cities.create({
       data: {
         id: normalized,
         name: cityName?.trim() || normalized,
         slug: normalized,
+        regionId: regionSlug ?? undefined,
         updatedAt: new Date(),
       },
     });
+  } else if (!city.regionId) {
+    const regionSlug = inferRegionSlugFromCitySlug(normalized);
+    if (regionSlug) {
+      city = await db.cities.update({
+        where: { id: city.id },
+        data: { regionId: regionSlug, updatedAt: new Date() },
+      });
+    }
   }
 
   return {

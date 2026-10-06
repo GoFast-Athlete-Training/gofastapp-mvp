@@ -710,19 +710,33 @@ model city_run_activity_links {
   @@index([activityId])
 }
 
+model regions {
+  id        String   @id
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  cities    cities[]
+
+  @@index([slug])
+}
+
 model cities {
   id            String          @id
   slug          String          @unique
   name          String
   state         String?
+  regionId      String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime
+  region        regions?        @relation(fields: [regionId], references: [id], onDelete: SetNull)
   run_clubs     run_clubs[]
   run_series    run_series[]
   city_runs     city_runs[]
   routes        routes[]
   @@index([name])
   @@index([slug])
+  @@index([regionId])
 }
 
 model go_fast_companies {
@@ -1635,7 +1649,7 @@ model city_runs {
   athleteGeneratedId  String?
   staffGeneratedId    String?
   citySlug            String
-  /// Inferred metro/region for discover reel-in (e.g. arlington → dc). Not a rewrite of citySlug.
+  /// Metro batch key from cities.region (e.g. dmv). Not a rewrite of citySlug.
   regionSlug          String?
   cityId              String?
   cities              cities?              @relation(fields: [cityId], references: [id], onDelete: SetNull)

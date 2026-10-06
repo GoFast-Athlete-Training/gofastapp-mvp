@@ -38,6 +38,7 @@ const manageRunSelect = {
   slug: true,
   title: true,
   citySlug: true,
+  regionSlug: true,
   dayOfWeek: true,
   date: true,
   runClubId: true,
