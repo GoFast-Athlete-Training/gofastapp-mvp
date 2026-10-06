@@ -44,6 +44,7 @@ import RunInstanceSourcesPanel, { hasRunInstanceSources } from "./RunInstanceSou
 import TrackWorkoutBuilder from "./TrackWorkoutBuilder";
 import RunClubPublicSourcesCard, {
   type RunClubPublicSources,
+  type RunInstancePublicReadout,
 } from "./RunClubPublicSourcesCard";
 import WizardInstanceToolbar from "./WizardInstanceToolbar";
 import type { AutoSaveStatus } from "@/components/runclub/edit/SaveStatusPill";
@@ -77,6 +78,7 @@ export type RunInstanceWizardProps = {
   headerSlot?: ReactNode;
   /** Club public links + overview — shown above wizard steps in every flow when set. */
   publicSources?: RunClubPublicSources | null;
+  instancePublicReadout?: RunInstancePublicReadout | null;
   /** Sticky sidebar: autosave status, lifecycle, submit/publish, preview link. */
   instanceToolbar?: {
     autoSaveStatus: AutoSaveStatus;
@@ -117,6 +119,7 @@ export default function RunInstanceWizard({
   hideFooter = false,
   headerSlot,
   publicSources,
+  instancePublicReadout,
   instanceToolbar,
   initialWizardStep,
   titleInPageHeading = false,
@@ -438,8 +441,12 @@ export default function RunInstanceWizard({
     onErrorChange?.(null);
     try {
       const instanceContext = buildInstanceContextFromValues(values);
+      const mode = values.description.trim() ? "smooth" : "from_core";
       const res = await runmanageApi.post("/api/runs/run-description-generate", {
+        mode,
+        cityRunType: context.cityRunType ?? undefined,
         clubName: context.clubName ?? undefined,
+        title: values.title.trim() || undefined,
         isSeriesInstance: isSeries,
         ...(isSeries && context.seriesContext
           ? {
@@ -455,7 +462,9 @@ export default function RunInstanceWizard({
               runType: values.runType || undefined,
               workoutDescription: isTrack
                 ? values.trackWorkoutDescription || undefined
-                : values.routeDescription || undefined,
+                : undefined,
+              routeDescription: !isTrack ? values.routeDescription || undefined : undefined,
+              workoutTitle: isTrack ? values.attachedWorkoutTitle || undefined : undefined,
               totalMiles: values.totalMiles || undefined,
               pace: values.pace || undefined,
               postRunActivity: values.postRunActivity || undefined,
@@ -486,7 +495,9 @@ export default function RunInstanceWizard({
   return (
     <div className="space-y-4">
       {headerSlot}
-      {publicSources ? <RunClubPublicSourcesCard runClub={publicSources} /> : null}
+      {publicSources || instancePublicReadout ? (
+        <RunClubPublicSourcesCard runClub={publicSources} instance={instancePublicReadout} />
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
         <aside className="lg:sticky lg:top-4 lg:self-start">

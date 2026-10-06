@@ -70,6 +70,7 @@ export async function GET(
         totalMiles: series.totalMiles,
         routeNeighborhood: series.routeNeighborhood,
         workoutDescription: series.workoutDescription,
+        seriesPhotoUrl: series.seriesPhotoUrl,
         postRunActivity: series.postRunActivity,
         seriesRunRawText: series.seriesRunRawText,
         runClubId: series.runClubId,
@@ -157,7 +158,7 @@ export async function PUT(
     }
 
     const allowed = [
-      'name', 'description', 'runType', 'totalMiles', 'routeNeighborhood', 'workoutDescription', 'postRunActivity', 'seriesRunRawText', 'citySlug', 'meetUpPoint', 'meetUpStreetAddress',
+      'name', 'description', 'runType', 'totalMiles', 'routeNeighborhood', 'workoutDescription', 'seriesPhotoUrl', 'postRunActivity', 'seriesRunRawText', 'citySlug', 'meetUpPoint', 'meetUpStreetAddress',
       'meetUpCity', 'meetUpState', 'meetUpPlaceId', 'meetUpLat', 'meetUpLng',
       'endPoint', 'endStreetAddress', 'endCity', 'endState',
       'startTimeHour', 'startTimeMinute', 'startTimePeriod', 'startDate', 'endDate', 'slug',
@@ -209,6 +210,7 @@ export async function PUT(
         totalMiles: series.totalMiles,
         routeNeighborhood: series.routeNeighborhood,
         workoutDescription: series.workoutDescription,
+        seriesPhotoUrl: series.seriesPhotoUrl,
         postRunActivity: series.postRunActivity,
         seriesRunRawText: series.seriesRunRawText,
         runClubId: series.runClubId,

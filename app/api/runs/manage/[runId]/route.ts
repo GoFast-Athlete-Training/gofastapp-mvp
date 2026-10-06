@@ -114,6 +114,15 @@ export async function GET(
               stravaUrl: true,
             },
           },
+          runSeries: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              dayOfWeek: true,
+              seriesPhotoUrl: true,
+            },
+          },
           runStore: {
             select: {
               id: true,

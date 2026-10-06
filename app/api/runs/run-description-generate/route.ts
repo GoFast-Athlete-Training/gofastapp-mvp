@@ -13,6 +13,11 @@ export async function POST(request: NextRequest) {
   const cityRunType =
     typeof body.cityRunType === "string" ? body.cityRunType.trim() : null;
 
+  const workoutFromBody =
+    typeof body.workoutDescription === "string" ? body.workoutDescription : null;
+  const routeFromBody =
+    typeof body.routeDescription === "string" ? body.routeDescription : null;
+
   const result = await generatePublicRunDescription({
     mode,
     cityRunType,
@@ -31,6 +36,11 @@ export async function POST(request: NextRequest) {
     dateYmd: typeof body.dateYmd === "string" ? body.dateYmd : null,
     postRunActivity: typeof body.postRunActivity === "string" ? body.postRunActivity : null,
     runType: typeof body.runType === "string" ? body.runType : null,
+    routeNeighborhood:
+      typeof body.routeNeighborhood === "string" ? body.routeNeighborhood : null,
+    workoutDescription: workoutFromBody,
+    workoutTitle: typeof body.workoutTitle === "string" ? body.workoutTitle : null,
+    routeDescription: routeFromBody,
   });
 
   if (!result.success) {

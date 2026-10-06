@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
 import type { RunInstanceWizardValues } from "@/components/runmanage/runInstanceWizard/shared";
+import { isTrackRun } from "@/lib/runTypes";
 
 type Props = {
   values: RunInstanceWizardValues;
@@ -23,6 +24,7 @@ export default function RunPublicDescriptionField({
   compact = false,
 }: Props) {
   const [generating, setGenerating] = useState(false);
+  const isTrack = isTrackRun(values.runType);
 
   const runGenerate = async (mode: "smooth" | "from_core") => {
     setGenerating(true);
@@ -40,6 +42,10 @@ export default function RunPublicDescriptionField({
         dateYmd: values.date.trim() || undefined,
         postRunActivity: values.postRunActivity.trim() || undefined,
         runType: values.runType.trim() || undefined,
+        routeNeighborhood: values.routeNeighborhood.trim() || undefined,
+        workoutDescription: isTrack ? values.trackWorkoutDescription.trim() || undefined : undefined,
+        workoutTitle: isTrack ? values.attachedWorkoutTitle.trim() || undefined : undefined,
+        routeDescription: !isTrack ? values.routeDescription.trim() || undefined : undefined,
       });
       if (res.data?.success && res.data.description) {
         onDescriptionChange(String(res.data.description).trim());

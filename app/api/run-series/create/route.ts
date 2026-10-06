@@ -17,6 +17,22 @@ function generateId(): string {
   return `c${timestamp}${random}`;
 }
 
+function defaultSeriesName(input: {
+  clubName: string;
+  canonicalDay: string;
+  runType: string | null;
+  startTimePeriod: string | null | undefined;
+}): string {
+  const dayLabel =
+    input.canonicalDay.charAt(0) + input.canonicalDay.slice(1).toLowerCase();
+  if (input.runType === 'track') {
+    const period = (input.startTimePeriod || 'PM').trim().toUpperCase();
+    const trackLabel = period === 'AM' ? 'Track Morning' : 'Track Night';
+    return `${input.clubName} ${dayLabel} ${trackLabel}`;
+  }
+  return `${input.clubName} ${dayLabel} Run`;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_COMPANY_APP_URL || 'https://gofasthq.gofastcrushgoals.com',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -242,7 +258,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const baseName = name?.trim() || `${runClub.name} ${canonicalDay.charAt(0) + canonicalDay.slice(1).toLowerCase()} Run`;
+    const allowedRunTypesEarly = new Set(['track', 'trail', 'neighborhood', 'park']);
+    const runTypeForName =
+      runType != null && allowedRunTypesEarly.has(String(runType).trim().toLowerCase())
+        ? String(runType).trim().toLowerCase()
+        : setup?.runType ?? null;
+    const baseName =
+      name?.trim() ||
+      setup?.name?.trim() ||
+      defaultSeriesName({
+        clubName: runClub.name,
+        canonicalDay,
+        runType: runTypeForName,
+        startTimePeriod: startTimePeriod?.trim() || setup?.startTimePeriod || null,
+      });
 
     const descriptionExplicit = Object.prototype.hasOwnProperty.call(body, 'description');
     let seriesDescription: string | null;

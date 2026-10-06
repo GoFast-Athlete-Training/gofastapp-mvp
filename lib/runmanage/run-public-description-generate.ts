@@ -1,4 +1,5 @@
 import { getOpenAIClient } from "@/lib/services/race-parse/openai-json";
+import { isTrackRun } from "@/lib/runTypes";
 
 export type PublicDescriptionGenerateInput = {
   mode: "smooth" | "from_core";
@@ -12,13 +13,18 @@ export type PublicDescriptionGenerateInput = {
   dateYmd?: string | null;
   postRunActivity?: string | null;
   runType?: string | null;
+  routeNeighborhood?: string | null;
+  workoutDescription?: string | null;
+  workoutTitle?: string | null;
+  routeDescription?: string | null;
 };
 
 export async function generatePublicRunDescription(
-  input: PublicDescriptionGenerateInput
+  input: PublicDescriptionGenerateInput,
 ): Promise<{ success: true; description: string } | { success: false; error: string }> {
   const isShakeout = input.cityRunType === "RACE_SHAKEOUT";
   const existing = input.existingDescription?.trim() ?? "";
+  const track = isTrackRun(input.runType);
 
   if (input.mode === "smooth" && !existing) {
     return { success: false, error: "Type or paste a rough description first." };
@@ -27,6 +33,22 @@ export async function generatePublicRunDescription(
   if (input.mode === "from_core" && !input.meetUpPoint?.trim()) {
     return { success: false, error: "Add meet-up and core details first." };
   }
+
+  const workoutBlock = track
+    ? [
+        input.workoutTitle && `Attached workout title: ${input.workoutTitle}`,
+        input.workoutDescription?.trim() &&
+          `Workout session (include in public copy — do not invent intervals not listed here):\n${input.workoutDescription.trim()}`,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : [
+        input.routeNeighborhood?.trim() && `Route area: ${input.routeNeighborhood.trim()}`,
+        input.routeDescription?.trim() &&
+          `Route notes (weave into public copy):\n${input.routeDescription.trim()}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
 
   const contextLines = [
     input.title && `Run title: ${input.title}`,
@@ -38,6 +60,7 @@ export async function generatePublicRunDescription(
     input.pace && `Pace: ${input.pace}`,
     input.postRunActivity && `Post-run: ${input.postRunActivity}`,
     input.runType && `Venue: ${input.runType}`,
+    workoutBlock || null,
     existing && `Draft to refine:\n${existing}`,
   ]
     .filter(Boolean)
@@ -47,8 +70,12 @@ export async function generatePublicRunDescription(
     ? `You write public-facing copy for a race shakeout run (easy social run before a marathon or race).
 Mention brand hosts, shoe try-ons, or swag only when the draft mentions them — do not invent perks.
 2-4 sentences, friendly, no markdown.`
-    : `You write public-facing copy for a group run listing.
-2-4 sentences, friendly, no markdown. Use meet-up, distance, and pace when provided.`;
+    : track
+      ? `You write public-facing copy for a group track workout listing.
+2-4 sentences, friendly, no markdown. Include meet-up and summarize the attached workout in plain language.
+Do not invent reps, paces, or intervals that are not in the workout session text.`
+      : `You write public-facing copy for a group run listing.
+2-4 sentences, friendly, no markdown. Include meet-up, distance, pace, and where the route goes when route notes are provided.`;
 
   const user =
     input.mode === "smooth"

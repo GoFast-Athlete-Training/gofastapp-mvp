@@ -107,6 +107,13 @@ export interface CityRunData {
   published?: boolean;
   dayOfWeek: string | null;
   runSeriesId?: string | null;
+  runSeries?: {
+    id: string;
+    slug?: string | null;
+    name?: string | null;
+    dayOfWeek?: string | null;
+    seriesPhotoUrl?: string | null;
+  } | null;
   runClub: RunClub | null;
   runClubId?: string | null;
   runBrandId?: string | null;
@@ -936,6 +943,13 @@ export default function RunManageStaffEditor({
               </div>
             }
             publicSources={publicSources}
+            instancePublicReadout={{
+              cityRunId: run.id,
+              slug: run.slug,
+              citySlug: run.citySlug,
+              description: wizardValues.description,
+              seriesPhotoUrl: run.runSeries?.seriesPhotoUrl ?? null,
+            }}
             associateDraft={useAssociateTab ? associateDraft ?? undefined : undefined}
             onAssociateChange={useAssociateTab ? setAssociateDraft : undefined}
             onAssociateSave={useAssociateTab ? () => handleAssociateSave() : undefined}

@@ -1782,6 +1782,7 @@ model run_series {
   totalMiles          Float?               // typical distance — seeds city_runs.totalMiles
   routeNeighborhood   String?              // route/area context — seeds city_runs.routeNeighborhood
   workoutDescription  String?              // workout focus — seeds city_runs.workoutDescription
+  seriesPhotoUrl      String?              // recurring workout / track session hero (Instagram-style)
   postRunActivity     String?              // post-run social — seeds city_runs.postRunActivity
   endPoint            String?              // end/finish location (null = same as meetUpPoint)
   endStreetAddress    String?
