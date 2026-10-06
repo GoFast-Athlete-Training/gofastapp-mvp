@@ -19,9 +19,14 @@ import {
   isRunPast,
   type CityRunCheckin,
   type CityRunDetails,
+  type CityRunRsvp,
 } from '@/components/runs/city-run-types';
 import { isCityRunToday } from '@/lib/city-run-clock';
-import { hasSocialRunLifecycle, resolveRunRsvpCopy } from '@/lib/city-run-copy';
+import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
+import {
+  mapPublicRunToCityRunDetails,
+  type PublicCityRunPayload,
+} from '@/lib/city-run/map-public-run-to-details';
 
 export default function GoRunPage() {
   const params = useParams();
@@ -34,15 +39,16 @@ export default function GoRunPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rsvpLoading, setRsvpLoading] = useState(false);
+  const [isGuestSession, setIsGuestSession] = useState(false);
 
   useEffect(() => {
     if (!runId) return;
 
-    // Always wait for Firebase to resolve before fetching run. Otherwise we can
-    // fire GET /api/runs/[runId] before auth has restored (e.g. athleteId in
-    // localStorage but currentUser still null) and get 401.
+    // Wait for Firebase to resolve: guests load public APIs; signed-in athletes use authed run.
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       unsubscribe();
+      const guest = !user;
+      setIsGuestSession(guest);
       if (user) {
         const athleteId = LocalStorageAPI.getAthleteId();
         if (!athleteId) {
@@ -59,15 +65,54 @@ export default function GoRunPage() {
           }
         }
       }
-      fetchAll();
+      void fetchAll(guest);
     });
   }, [runId]);
 
-  const fetchAll = async () => {
+  const fetchAll = async (guest: boolean) => {
     try {
       setLoading(true);
+      setError(null);
 
-      // Run fetch is the critical path — fail fast if this 404s or errors
+      if (guest) {
+        const segment = encodeURIComponent(runId);
+        const runRes = await fetch(`/api/runs/public/${segment}`, { cache: 'no-store' });
+        const runJson = (await runRes.json()) as {
+          success?: boolean;
+          run?: PublicCityRunPayload;
+          error?: string;
+        };
+        if (!runRes.ok || !runJson.success || !runJson.run) {
+          setError(runRes.status === 404 ? 'Run not found' : runJson.error || 'Run not found');
+          setRun(null);
+          return;
+        }
+
+        let rsvps: CityRunRsvp[] = [];
+        try {
+          const rsvpRes = await fetch(`/api/runs/${segment}/rsvp`, { cache: 'no-store' });
+          const rsvpJson = (await rsvpRes.json()) as {
+            success?: boolean;
+            rsvps?: CityRunRsvp[];
+          };
+          if (rsvpRes.ok && rsvpJson.success && Array.isArray(rsvpJson.rsvps)) {
+            rsvps = rsvpJson.rsvps;
+          }
+        } catch (rsvpErr) {
+          console.warn('gorun: public RSVP list failed', rsvpErr);
+        }
+
+        const loaded = mapPublicRunToCityRunDetails(runJson.run, rsvps);
+        setRun(loaded);
+        setCheckins([]);
+        setMyCheckin(null);
+
+        if (loaded.slug && runId && loaded.slug !== runId) {
+          router.replace(`/gorun/${loaded.slug}`);
+        }
+        return;
+      }
+
       const runRes = await api.get(`/runs/${runId}`);
       if (!runRes.data.success || !runRes.data.run) {
         setError('Run not found');
@@ -80,8 +125,6 @@ export default function GoRunPage() {
         router.replace(`/gorun/${loaded.slug}`);
       }
 
-      // Checkin fetch is secondary — a 401/500 here (e.g. missing migration on
-      // preview DB, or unauthenticated guest) must NOT kill the run page
       try {
         const checkinRes = await api.get(`/runs/${runId}/checkin`);
         if (checkinRes.data.success) {
@@ -106,17 +149,21 @@ export default function GoRunPage() {
     }
   };
 
+  const joinRunPath = (r: CityRunDetails) =>
+    `/join/run/${encodeURIComponent(r.slug ?? r.id)}`;
+
   const handleRsvp = async (status: 'going' | 'not-going') => {
     if (!run) return;
+    if (isGuestSession || !auth.currentUser) {
+      if (status === 'going') {
+        router.push(joinRunPath(run));
+      }
+      return;
+    }
     setRsvpLoading(true);
     try {
-      const res = await api.post(`/runs/${run.id}/rsvp`, { status });
-      const slug = res.data?.runClubSlug as string | null | undefined;
-      if (status === 'going' && res.data?.redirectToClub && slug) {
-        router.push(`/runclub/${slug}`);
-        return;
-      }
-      await fetchAll();
+      await api.post(`/runs/${run.id}/rsvp`, { status });
+      await fetchAll(false);
     } catch (err: any) {
       console.error('RSVP error:', err);
     } finally {
@@ -126,10 +173,14 @@ export default function GoRunPage() {
 
   const handleCheckin = async () => {
     if (!run) return;
+    if (isGuestSession || !auth.currentUser) {
+      router.push(joinRunPath(run));
+      return;
+    }
     setRsvpLoading(true);
     try {
       await api.post(`/runs/${run.id}/checkin`, {});
-      await fetchAll(); // re-fetch → myCheckin set → routes to CityRunPostRunContainer
+      await fetchAll(false);
     } catch (err: any) {
       console.error('Checkin error:', err);
     } finally {
@@ -196,26 +247,24 @@ export default function GoRunPage() {
   }
 
   if (run.currentRSVP === 'going') {
-    const clubSlug = run.runClub?.slug;
-    if (clubSlug) {
-      if (typeof window !== 'undefined') {
-        router.replace(`/runclub/${clubSlug}`);
-      }
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
-        </div>
-      );
-    }
     return (
       <>
         <TopNav />
-        <CityRunGoingContainer run={run} onLeave={fetchAll} />
+        <CityRunGoingContainer run={run} onLeave={() => void fetchAll(isGuestSession)} />
       </>
     );
   }
 
-  return <CityRunPreRSVP run={run} onRsvp={handleRsvp} onCheckin={handleCheckin} rsvpLoading={rsvpLoading} onBack={() => router.push('/gorun')} allowCheckin={hasSocialRunLifecycle(run)} />;
+  return (
+    <CityRunPreRSVP
+      run={run}
+      onRsvp={handleRsvp}
+      onCheckin={handleCheckin}
+      rsvpLoading={rsvpLoading}
+      onBack={() => router.push('/gorun')}
+      allowCheckin={hasSocialRunLifecycle(run) && !isGuestSession}
+    />
+  );
 }
 
 // ─── Pre-RSVP Container ────────────────────────────────────────────────────────
