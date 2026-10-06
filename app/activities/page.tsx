@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Activity, ChevronLeft, ChevronRight, LineChart, Zap } from 'lucide-react';
@@ -65,7 +65,7 @@ function ingestionClasses(status: string): string {
 
 type HistoryView = 'week' | 'all';
 
-export default function ActivitiesPage() {
+function ActivitiesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [authReady, setAuthReady] = useState(false);
@@ -386,5 +386,19 @@ export default function ActivitiesPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function ActivitiesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+          <p className="text-neutral-600">Loading activities…</p>
+        </div>
+      }
+    >
+      <ActivitiesPageContent />
+    </Suspense>
   );
 }
