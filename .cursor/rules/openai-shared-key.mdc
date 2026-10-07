@@ -1,0 +1,21 @@
+---
+description: Never write OPENAI_API_KEY — user keeps shared org key on Vercel
+alwaysApply: true
+---
+
+# OpenAI env — shared key, do not overwrite
+
+Across GoFast / Razors / Ignite Vercel projects, the user keeps a **shared `OPENAI_API_KEY`**. It is already configured on the stacks that need it.
+
+## Do not
+
+- Add, update, or delete `OPENAI_API_KEY` or `OPENAI_MODEL` on Vercel unless the user **explicitly** names one key and one project to set
+- Overwrite an existing Vercel env value while "fixing" OpenAI errors — that breaks the shared key other apps rely on
+- Commit real keys to `.env` or the repo
+
+## Do
+
+- Point at `.env.example` variable names and **which Vercel project** must have the var for the code path under debug
+- Let the user confirm or rotate keys in the dashboard — agents diagnose, user owns secrets
+
+Same spirit as app-management `vercel-env`: report missing env, do not bulk-write Vercel secrets.
