@@ -208,6 +208,10 @@ type RaceSignupWithRegistry = {
   };
 };
 
+function signupDaysUntil(s: RaceSignupWithRegistry): number | null {
+  return raceCalendarDaysFromTodayLocal(signupClaimRaceDateIso(s));
+}
+
 function planDayMilesHome(meters: number | null | undefined): string {
   if (meters == null || !Number.isFinite(meters) || meters <= 0) return '—';
   const mi = meters / 1609.34;
@@ -822,9 +826,6 @@ export default function AthleteHomePage() {
     activePlanSummary?.planId?.trim() || null;
 
   const goalDistanceNorm = normalizeGoalDistanceLabel(primaryGoal?.distance);
-
-  const signupDaysUntil = (s: RaceSignupWithRegistry) =>
-    raceCalendarDaysFromTodayLocal(signupClaimRaceDateIso(s));
 
   const raceDaySignupForHome = raceSignups.find((s) => signupDaysUntil(s) === 0);
   const upcomingRaceSignupForHome = !raceDaySignupForHome
