@@ -2,20 +2,22 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildPublicDescriptionSystemPrompt,
+  CLUB_VOICE_BAN,
   containsBannedFirstPerson,
-  FIRST_PERSON_BAN,
   TRACK_PUBLIC_DESCRIPTION_SYSTEM,
   trackDescriptionNeedsRetry,
+  trackIntroIsTooLiteral,
   workoutSessionHasMultiplePieces,
 } from "./run-public-description-prompts";
 
-test("track prompt requires third person, bans first person, and line-per-piece format", () => {
+test("track prompt invites by club name and still splits workout lines", () => {
   const prompt = buildPublicDescriptionSystemPrompt({ isShakeout: false, track: true });
   assert.equal(prompt, TRACK_PUBLIC_DESCRIPTION_SYSTEM);
-  assert.match(prompt, /Third person/);
-  assert.match(prompt, new RegExp(FIRST_PERSON_BAN.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").slice(0, 40)));
-  assert.match(prompt, /One line per distinct piece/);
-  assert.match(prompt, /Do not merge the workout into one paragraph/);
+  assert.match(prompt, /inviting sentence that names the club/);
+  assert.match(prompt, /camaraderie/);
+  assert.match(prompt, /one line per distinct workout piece/);
+  assert.match(prompt, /No @ shorthand/);
+  assert.match(prompt, new RegExp(CLUB_VOICE_BAN.slice(0, 24)));
 });
 
 test("road and shakeout prompts include first-person ban", () => {
@@ -25,7 +27,7 @@ test("road and shakeout prompts include first-person ban", () => {
   assert.match(shakeout, /Never use first or second person/);
 });
 
-test("containsBannedFirstPerson flags we/your marketing copy", () => {
+test("containsBannedFirstPerson flags club voice and allows a join invite", () => {
   assert.equal(
     containsBannedFirstPerson(
       "Join us this Tuesday as we kick things off with a warmup.",
@@ -33,7 +35,24 @@ test("containsBannedFirstPerson flags we/your marketing copy", () => {
     true,
   );
   assert.equal(
-    containsBannedFirstPerson("Northeast Track Club. Tuesday at Eastern Senior High School."),
+    containsBannedFirstPerson(
+      "Join Northeast Track Club this Tuesday for a night of track and camaraderie.",
+    ),
+    false,
+  );
+});
+
+test("trackIntroIsTooLiteral flags a date-and-place fact line", () => {
+  assert.equal(
+    trackIntroIsTooLiteral(
+      "Northeast Track Club on October 6 at Eastern Senior High School. All paces welcome.",
+    ),
+    true,
+  );
+  assert.equal(
+    trackIntroIsTooLiteral(
+      "Join Northeast Track Club this Tuesday at Eastern Senior High School for a night of track and camaraderie.",
+    ),
     false,
   );
 });
@@ -52,8 +71,17 @@ test("trackDescriptionNeedsRetry for paragraph with first person", () => {
   assert.equal(trackDescriptionNeedsRetry(bad, workout), true);
 });
 
-test("trackDescriptionNeedsRetry accepts line-based objective copy", () => {
-  const good = `Northeast Track Club. Tuesday at Eastern Senior High School. All paces welcome.
+test("trackDescriptionNeedsRetry rejects a dry fact opener", () => {
+  const dry = `Northeast Track Club on October 6 at Eastern Senior High School. All paces welcome.
+Warmup: 1 mile
+2–3 × 1600m @ 10K → 5K
+Cooldown: 1 mile`;
+  const workout = "1-mile warmup, 2–3 intervals of 1600m, cooldown";
+  assert.equal(trackDescriptionNeedsRetry(dry, workout), true);
+});
+
+test("trackDescriptionNeedsRetry accepts an invite plus workout lines", () => {
+  const good = `Join Northeast Track Club this Tuesday at Eastern Senior High School for a night of track and camaraderie. All paces welcome.
 Warmup: 1 mile
 2–3 × 1600m between 10K and 5K pace
 1000m at 5K pace

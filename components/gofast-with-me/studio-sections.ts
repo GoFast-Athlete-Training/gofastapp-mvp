@@ -93,6 +93,10 @@ export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
   members: 'Who follows your athlete community — see all roster',
 };
 
+/** External route — athlete link page editor (not a StudioView). */
+export const STUDIO_LINK_PAGE_HREF = '/profile/links';
+export const STUDIO_LINK_PAGE_LABEL = 'Link page';
+
 export const STUDIO_ROUTES_NAV_LABEL = 'Routes';
 
 export const STUDIO_ROUTES_DESCRIPTION =

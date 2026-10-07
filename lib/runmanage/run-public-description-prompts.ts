@@ -16,18 +16,28 @@ export type PublicDescriptionGenerateInput = {
   routeDescription?: string | null;
 };
 
-/** Shared copy rules for all public run descriptions. */
+/** Shared copy rules for road, park, trail, and shakeout descriptions. */
 export const FIRST_PERSON_BAN = `Never use first or second person: no we, we'll, we're, our, us, your. Write in third person about the club or run. Do not write as GoFast or as the platform.`;
 
-export const TRACK_PUBLIC_DESCRIPTION_SYSTEM = `You write public-facing copy for a group track workout listing on GoFast.
+/** Track listings may address the reader. They must not speak as the club. */
+export const CLUB_VOICE_BAN = `Do not write as the club or as GoFast. Never use we, we'll, we're, our, us, or let's. Name the club. Addressing the reader (Join {club}…, you) is fine.`;
+
+export const TRACK_PUBLIC_DESCRIPTION_SYSTEM = `You write public-facing copy for a group track workout listing.
 
 Output format (plain text, no markdown):
-- Line 1: Objective intro only — club name when provided, day or date when provided, meet-up location. Third person. Mention "All paces welcome" only when pace is Various or all paces. No hype words (energizing, camaraderie, push your limits, boost fitness, join us, come out).
-- Following lines: One line per distinct piece from the workout session text, in order (warmup, each interval set, cooldown). Use concise labels like "Warmup: 1 mile" or "2–3 × 1600m between 10K and 5K pace".
-- Do not invent reps, distances, paces, or intervals not in the workout session text. Preserve ranges such as 2–3 as written.
-- Do not merge the workout into one paragraph.
+1. One inviting sentence that names the club and asks people to join that club for the session. Weave the day and meet-up into the sentence. A little warmth is fine, such as a night of track and camaraderie. Do not open with a dry fact line like "Club Name on October 6 at School. All paces welcome." Mention all paces only when pace is Various or all paces, inside the sentence if it fits.
+2. Then one line per distinct workout piece, in order, in plain words. Examples: "Warmup: 1 mile", "2–3 × 1600m between 10K and 5K pace", "1000m at 5K pace", "Cooldown: 1 mile". Write paces in words. No @ shorthand and no arrows.
+3. Do not invent reps, distances, paces, or intervals. Preserve ranges such as 2–3 as written. Do not fold the pieces back into the intro sentence.
 
-${FIRST_PERSON_BAN}`;
+Example:
+Join Northeast Track Club this Tuesday at Eastern Senior High School for a night of track and camaraderie. All paces welcome.
+Warmup: 1 mile
+2–3 × 1600m between 10K and 5K pace
+1000m at 5K pace
+600m at 5K pace
+Cooldown: 1 mile
+
+${CLUB_VOICE_BAN}`;
 
 export const TRACK_PUBLIC_DESCRIPTION_STRICT_RETRY = `${TRACK_PUBLIC_DESCRIPTION_SYSTEM}
 
@@ -96,18 +106,29 @@ export function buildPublicDescriptionUserMessage(
 ): string {
   if (mode === "smooth") {
     if (track) {
-      return `Reformat this public track description into the required line-based format (intro line, then one line per workout piece):\n\n${existing}\n\nContext:\n${contextLines}`;
+      return `Rewrite this public track description: one inviting sentence that names the club, then one plain-language line per workout piece. Do not open with a dry date-and-place fact line.\n\n${existing}\n\nContext:\n${contextLines}`;
     }
     return `Smooth and polish this public description:\n\n${existing}\n\nContext:\n${contextLines}`;
   }
   if (track) {
-    return `Write a public track description from these core details using the required line-based format:\n\n${contextLines}`;
+    return `Write a public track description from these core details: one inviting sentence that names the club, then one plain-language line per workout piece.\n\n${contextLines}`;
   }
   return `Write a public description from these core details:\n\n${contextLines}`;
 }
 
 const FIRST_PERSON_RE =
-  /\b(we|we'll|we're|weve|we've|our|us|your|join us|come out and|let's|lets)\b/i;
+  /\b(we|we'll|we're|weve|we've|our|us|join us|let's|lets)\b/i;
+
+/** Dry opener: "Club Name on October 6 at School." with no invite. */
+const LITERAL_INTRO_RE =
+  /\bon\s+(january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2})\b/i;
+
+export function trackIntroIsTooLiteral(text: string): boolean {
+  const first = text.split(/\n/)[0]?.trim() ?? "";
+  if (!first) return true;
+  if (/\b(join|come join|night of|camaraderie)\b/i.test(first)) return false;
+  return LITERAL_INTRO_RE.test(first);
+}
 
 export function containsBannedFirstPerson(text: string): boolean {
   return FIRST_PERSON_RE.test(text);
@@ -145,6 +166,7 @@ export function trackDescriptionNeedsRetry(
   const text = output.trim();
   if (!text) return true;
   if (containsBannedFirstPerson(text)) return true;
+  if (trackIntroIsTooLiteral(text)) return true;
   if (!workoutSessionHasMultiplePieces(workoutDescription)) return false;
   const lineCount = text.split(/\n+/).filter((l) => l.trim()).length;
   if (lineCount < 3) return true;

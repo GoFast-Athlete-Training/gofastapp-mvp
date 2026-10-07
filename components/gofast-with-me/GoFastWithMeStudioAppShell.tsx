@@ -5,6 +5,8 @@ import { ArrowLeft } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
 import {
   STUDIO_BUILD_NAV_ORDER,
+  STUDIO_LINK_PAGE_HREF,
+  STUDIO_LINK_PAGE_LABEL,
   STUDIO_MANAGE_NAV_ORDER,
   STUDIO_MY_STORY_LABEL,
   STUDIO_RUNS_TRAINING_NAV_ORDER,
@@ -19,6 +21,8 @@ export type StudioChromeActions = {
   inviteUrl: string;
   onShare: () => void;
   shareLabel?: string;
+  /** Public athletelinks URL when the athlete has a handle. */
+  linkPageUrl?: string;
 };
 
 type Props = {
@@ -76,6 +80,16 @@ export default function GoFastWithMeStudioAppShell({
                 >
                   See Landing Page
                 </Link>
+                {chromeActions.linkPageUrl ? (
+                  <Link
+                    href={chromeActions.linkPageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    See link page
+                  </Link>
+                ) : null}
                 <Link
                   href={chromeActions.hubPreviewUrl}
                   target="_blank"
@@ -167,6 +181,18 @@ export default function GoFastWithMeStudioAppShell({
                 ))}
               </div>
             </div>
+
+            <div>
+              <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                Share
+              </p>
+              <Link
+                href={STUDIO_LINK_PAGE_HREF}
+                className="flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                <span className="min-w-0 flex-1 truncate">{STUDIO_LINK_PAGE_LABEL}</span>
+              </Link>
+            </div>
           </nav>
         </aside>
 
@@ -210,6 +236,12 @@ export default function GoFastWithMeStudioAppShell({
                   onClick={() => onViewChange(item.section)}
                 />
               ))}
+              <Link
+                href={STUDIO_LINK_PAGE_HREF}
+                className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700"
+              >
+                {STUDIO_LINK_PAGE_LABEL}
+              </Link>
             </nav>
           </div>
 

@@ -115,6 +115,19 @@ export default function ShareWithCommunityPage() {
         ) : null}
       </div>
 
+      <section className="rounded-2xl border border-gray-200 bg-white p-5">
+        <h2 className="text-sm font-semibold text-gray-900">Athlete link page</h2>
+        <p className="text-sm text-gray-600 mt-1">
+          A Linktree-style button page on athletelinks — custom URLs, sections, and public titles.
+        </p>
+        <Link
+          href="/profile/links"
+          className="mt-3 inline-flex text-sm font-semibold text-sky-700 hover:text-sky-800"
+        >
+          Edit your link page →
+        </Link>
+      </section>
+
       <section className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5">
         <h2 className="text-sm font-semibold text-gray-900">GoFastWithMe</h2>
         <p className="text-sm text-gray-600 mt-1">

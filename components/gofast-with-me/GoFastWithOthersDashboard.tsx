@@ -10,6 +10,7 @@ import type { GoFastWithMeCreatorType } from "@/lib/gofast-with-me/gofast-with-m
 import type { GoFastWithMeLandingValues } from "@/components/gofast-with-me/GoFastWithMeLandingForm";
 import { normalizeGoFastWithMePhotoType } from "@/lib/gofast-with-me/photo-type";
 import { goFastWithFrontDoorPath } from "@/lib/gofast-with-me/gofast-with-bridge";
+import { athleteLinksPublicUrl } from "@/lib/content/athlete-links-public-url";
 import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
 import GoFastWithMeLandingViewer from "@/components/gofast-with-me/GoFastWithMeLandingViewer";
@@ -334,6 +335,7 @@ export default function GoFastWithOthersDashboard() {
               inviteUrl: shellInvitePath,
               onShare: () => void copyInviteLink(),
               shareLabel: shareCopied ? 'Copied!' : 'Share link',
+              linkPageUrl: gofastHandle ? athleteLinksPublicUrl(gofastHandle) : undefined,
             }
           : undefined
       }
