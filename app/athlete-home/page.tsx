@@ -800,17 +800,21 @@ export default function AthleteHomePage() {
         })
       : null;
 
-  const showTrainingAtGlance =
-    !goalIsPastRace &&
-    !goalIsCompleteForModal &&
-    (Boolean(activePlanSummary?.hasSchedule) || Boolean(primaryGoal));
-
   const primaryGoalAthleteRaceId =
     typeof primaryGoal?.athleteRaceId === 'string'
       ? primaryGoal.athleteRaceId
       : typeof primaryGoal?.id === 'string'
         ? primaryGoal.id
         : null;
+
+  const goalTrainingSetupHref = primaryGoalAthleteRaceId
+    ? `/training-setup?athleteRaceId=${encodeURIComponent(primaryGoalAthleteRaceId)}`
+    : '/training-setup';
+
+  const showTrainingAtGlance =
+    !goalIsPastRace &&
+    !goalIsCompleteForModal &&
+    Boolean(activePlanSummary?.hasSchedule);
 
   const nextUpcomingSignupForPlan =
     raceSignups
@@ -906,7 +910,10 @@ export default function AthleteHomePage() {
     'block rounded-xl border-2 border-sky-200 bg-sky-50/70 p-5 shadow-sm hover:border-sky-300 hover:shadow-md transition-all h-full';
   const cardTraining =
     'block rounded-xl border-2 border-emerald-200 bg-emerald-50/80 p-5 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all h-full';
-  const findRunColSpanLg = showTrainingAtGlance || !goalIsCompleteForModal ? 'lg:col-span-2' : 'lg:col-span-5';
+  const showStartPlanCard =
+    !goalIsCompleteForModal && !primaryGoal && !showTrainingAtGlance;
+  const findRunColSpanLg =
+    showTrainingAtGlance || showStartPlanCard ? 'lg:col-span-2' : 'lg:col-span-5';
 
   const lastActivityDayLabel = lastSyncedActivity
     ? homeLastRunDayLabel(lastSyncedActivity.startTime, null)
@@ -1450,6 +1457,38 @@ export default function AthleteHomePage() {
                       </Link>
                     </div>
                   </div>
+                ) : primaryGoal ? (
+                  <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm h-full flex flex-col">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
+                      Build your plan
+                    </p>
+                    <h2 className="mt-2 text-2xl font-bold text-gray-900 leading-tight">
+                      {raceName || 'Your race'}
+                    </h2>
+                    {goalDistanceNorm ? (
+                      <p className="text-sm text-gray-600 mt-1">{goalDistanceNorm}</p>
+                    ) : null}
+                    {goalDaysLeft != null ? (
+                      <p className="text-sm text-gray-700 mt-2">
+                        {goalDaysLeft === 0
+                          ? 'Race day — build your schedule to stay on track.'
+                          : `${goalDaysLeft} day${goalDaysLeft === 1 ? '' : 's'} until race day.`}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-700 mt-2">
+                        Turn your goal into a week-by-week schedule.
+                      </p>
+                    )}
+                    <p className="text-sm text-gray-600 mt-3 flex-1">
+                      Today&apos;s workout will show up here once your plan is built.
+                    </p>
+                    <Link
+                      href={goalTrainingSetupHref}
+                      className="mt-4 inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 w-full sm:w-auto"
+                    >
+                      Build training plan →
+                    </Link>
+                  </div>
                 ) : (
                   <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full">
                     <p className="text-sm text-gray-700">Start a plan to see today&apos;s sessions here.</p>
@@ -1627,18 +1666,10 @@ export default function AthleteHomePage() {
                         without a recent long run.
                       </p>
                     ) : null}
-                    <div className="mt-3 flex flex-wrap gap-3">
-                      {primaryGoal.goalTime?.trim() ? (
-                        <Link
-                          href={goalRacePlanHref}
-                          className="inline-flex justify-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-                        >
-                          Plan my race →
-                        </Link>
-                      ) : null}
+                    <div className="mt-3">
                       <Link
                         href={goalRaceHref}
-                        className="text-sm font-semibold text-orange-600 hover:text-orange-700 self-center"
+                        className="text-sm font-semibold text-orange-600 hover:text-orange-700"
                       >
                         Open race page →
                       </Link>
@@ -1778,7 +1809,7 @@ export default function AthleteHomePage() {
                     </Link>
                   </div>
                 </div>
-              ) : !goalIsCompleteForModal ? (
+              ) : showStartPlanCard ? (
                 <div
                   className={`${cardTraining} lg:col-span-3 cursor-default hover:border-emerald-200 hover:shadow-sm`}
                 >
