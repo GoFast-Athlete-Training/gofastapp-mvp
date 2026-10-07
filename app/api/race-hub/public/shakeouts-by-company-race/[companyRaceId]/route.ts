@@ -2,10 +2,11 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { serializePublicShakeout } from "@/lib/race-hub-shakeout-utils";
 
 /**
  * GET /api/race-hub/public/shakeouts-by-company-race/[companyRaceId]
- * Public list of shakeout city_runs for Content Studio crossover.
+ * Public list of published shakeout city_runs (Content Studio + race shakeouts page).
  */
 export async function GET(
   _request: Request,
@@ -32,21 +33,15 @@ export async function GET(
       where: {
         raceRegistryId: { in: registryIds },
         cityRunType: "RACE_SHAKEOUT",
+        published: true,
       },
       orderBy: { date: "asc" },
-      select: {
-        id: true,
-        slug: true,
-        title: true,
+      include: {
+        runClub: { select: { id: true, name: true, slug: true } },
       },
     });
 
-    const shakeouts = runs.map((r) => ({
-      id: r.id,
-      slug: r.slug,
-      title: r.title,
-      companyEventId: r.id,
-    }));
+    const shakeouts = runs.map((r) => serializePublicShakeout(r));
 
     return NextResponse.json({ success: true, shakeouts });
   } catch (err) {

@@ -56,6 +56,30 @@ function goingAttendeesFromRsvps(rsvps: ShakeoutRsvpRow[]) {
   return rows.length > 0 ? rows : undefined;
 }
 
+/** Public race shakeouts page + Content Studio prod list (no RSVP / attendee PII). */
+export function serializePublicShakeout(
+  run: city_runs & { runClub?: Pick<run_clubs, "id" | "name" | "slug"> | null },
+) {
+  const hub = serializeHubShakeout({ ...run, city_run_rsvps: [] });
+  return {
+    id: hub.id,
+    slug: run.slug,
+    title: hub.title,
+    companyEventId: run.id,
+    date: hub.date,
+    meetUpPoint: hub.meetUpPoint,
+    totalMiles: hub.totalMiles,
+    pace: hub.pace,
+    description: hub.description,
+    postRunActivity: hub.postRunActivity,
+    startTimeHour: hub.startTimeHour,
+    startTimeMinute: hub.startTimeMinute,
+    startTimePeriod: hub.startTimePeriod,
+    gorunPath: hub.gorunPath,
+    runClub: hub.runClub,
+  };
+}
+
 export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string) {
   const rsvps = run.city_run_rsvps ?? [];
   const goingAttendees = goingAttendeesFromRsvps(rsvps);
