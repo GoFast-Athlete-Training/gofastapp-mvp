@@ -95,7 +95,11 @@ export default function RunPublicDescriptionField({
         rows={compact ? 2 : 3}
         value={values.description}
         onChange={(e) => onDescriptionChange(e.target.value)}
-        placeholder="Who is hosting, what runners can expect…"
+        placeholder={
+          isTrack
+            ? "Intro line (club, day, meet-up), then one line per warmup/interval/cooldown…"
+            : "Factual third-person blurb: club, meet-up, route or pace…"
+        }
         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
       />
     </div>
