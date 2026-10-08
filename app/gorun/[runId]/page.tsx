@@ -348,7 +348,14 @@ function CityRunPreRSVP({
 
           <div className={`space-y-4 ${isSeries ? '' : 'order-1 lg:order-2'}`}>
             {isSeries && run.runSeries ? (
-              <CityRunSeriesPanel series={run.runSeries} runClub={run.runClub} />
+              <CityRunSeriesPanel
+                series={run.runSeries}
+                runClub={run.runClub}
+                occurrenceMeetUpPoint={run.meetUpPoint}
+                occurrenceStartTimeHour={run.startTimeHour}
+                occurrenceStartTimeMinute={run.startTimeMinute}
+                occurrenceStartTimePeriod={run.startTimePeriod}
+              />
             ) : (
               <>
                 <CityRunGoingSummary count={going.length} />

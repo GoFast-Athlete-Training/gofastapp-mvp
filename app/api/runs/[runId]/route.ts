@@ -10,6 +10,10 @@ import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from '
 import { saveRunClub } from '@/lib/save-runclub';
 import { parseRunTotalMiles } from '@/lib/parse-run-total-miles';
 import { fieldsWhenSettingPublished } from '@/lib/runInstanceApprovalPublish';
+import {
+  assertClubRunVerifiedForPublish,
+  isClubReviewStatus,
+} from '@/lib/club-run-club-review';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 import {
@@ -648,6 +652,7 @@ export async function PUT(
         raceRegistryId: true,
         specialEventId: true,
         cityRunType: true,
+        clubReviewStatus: true,
         citySlug: true,
       },
     });
@@ -706,8 +711,31 @@ export async function PUT(
     if (body.igPostGraphic !== undefined) {
       updateData.igPostGraphic = body.igPostGraphic === null || body.igPostGraphic === '' ? null : String(body.igPostGraphic).trim();
     }
+    if (body.clubReviewStatus !== undefined && body.clubReviewStatus !== null) {
+      const nextReview = String(body.clubReviewStatus);
+      if (!isClubReviewStatus(nextReview)) {
+        return NextResponse.json(
+          { error: 'clubReviewStatus must be draft, pending_club_review, or verified' },
+          { status: 400 }
+        );
+      }
+      updateData.clubReviewStatus = nextReview;
+    }
+
     if (body.published !== undefined) {
       const published = body.published === true;
+      if (published) {
+        const gate = assertClubRunVerifiedForPublish({
+          cityRunType: run.cityRunType,
+          clubReviewStatus:
+            updateData.clubReviewStatus != null
+              ? String(updateData.clubReviewStatus)
+              : run.clubReviewStatus,
+        });
+        if (!gate.ok) {
+          return NextResponse.json({ error: gate.error }, { status: 400 });
+        }
+      }
       Object.assign(updateData, fieldsWhenSettingPublished(published));
     }
 

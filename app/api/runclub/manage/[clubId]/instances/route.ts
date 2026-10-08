@@ -91,13 +91,26 @@ export async function POST(
 
     const staffGeneratedId = (await resolveClubAuthorAthleteId(auth.club.id)) ?? undefined;
 
-    const results = await advanceClubInstances({
+    const advance = await advanceClubInstances({
       runClubId: auth.club.id,
       staffGeneratedId,
       runSeriesIds,
-      publishLive: true,
     });
 
+    if (advance.skipped) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        autoAdvanceDisabled: true,
+        runClubId: auth.club.id,
+        created: 0,
+        found: 0,
+        errorCount: 0,
+        results: [],
+      });
+    }
+
+    const results = advance.results;
     const created = results.filter((r) => r.outcome === 'created').length;
     const found = results.filter((r) => r.outcome === 'found_existing').length;
     const errors = results.filter((r) => r.outcome === 'error').length;

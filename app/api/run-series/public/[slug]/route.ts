@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { resolveSeriesOccurrenceFields } from '@/lib/city-run/resolve-series-occurrence-fields';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,6 +93,21 @@ export async function GET(
       },
     });
 
+    const resolvedForNext = nextRun
+      ? resolveSeriesOccurrenceFields({
+          occurrenceMeetUpPoint: nextRun.meetUpPoint,
+          seriesMeetUpPoint: series.meetUpPoint,
+          occurrenceStartTimeHour: nextRun.startTimeHour,
+          occurrenceStartTimeMinute: nextRun.startTimeMinute,
+          occurrenceStartTimePeriod: nextRun.startTimePeriod,
+          seriesStartTimeHour: series.startTimeHour,
+          seriesStartTimeMinute: series.startTimeMinute,
+          seriesStartTimePeriod: series.startTimePeriod,
+          occurrenceDescription: null,
+          seriesDescription: series.description,
+        })
+      : null;
+
     const payload = {
       id: series.id,
       slug: series.slug,
@@ -99,16 +115,18 @@ export async function GET(
       description: series.description,
       dayOfWeek: series.dayOfWeek,
       citySlug: series.citySlug,
-      meetUpPoint: series.meetUpPoint,
+      meetUpPoint: resolvedForNext?.meetUpPoint ?? series.meetUpPoint,
+      meetUpPointSource: resolvedForNext?.meetUpPointSource ?? null,
       meetUpStreetAddress: series.meetUpStreetAddress,
       meetUpCity: series.meetUpCity,
       meetUpState: series.meetUpState,
       meetUpPlaceId: series.meetUpPlaceId,
       meetUpLat: series.meetUpLat,
       meetUpLng: series.meetUpLng,
-      startTimeHour: series.startTimeHour,
-      startTimeMinute: series.startTimeMinute,
-      startTimePeriod: series.startTimePeriod,
+      startTimeHour: resolvedForNext?.startTimeHour ?? series.startTimeHour,
+      startTimeMinute: resolvedForNext?.startTimeMinute ?? series.startTimeMinute,
+      startTimePeriod: resolvedForNext?.startTimePeriod ?? series.startTimePeriod,
+      scheduleSource: resolvedForNext?.scheduleSource ?? null,
       startDate: series.startDate?.toISOString() ?? null,
       endDate: series.endDate?.toISOString() ?? null,
       runClub: series.runClub,

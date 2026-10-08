@@ -3,10 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { assertRunManageAuth } from '@/lib/runmanage/require-run-manage-auth';
-import {
-  bulkDataWhenPublishing,
-  bulkDataWhenSettingWorkflowStatus,
-} from '@/lib/runInstanceApprovalPublish';
+import { bulkDataWhenPublishing } from '@/lib/runInstanceApprovalPublish';
+import { assertClubRunVerifiedForPublish } from '@/lib/club-run-club-review';
 
 /**
  * POST /api/runs/manage/bulk-publish
@@ -25,6 +23,24 @@ export async function POST(request: NextRequest) {
     if (runIds.length === 0) {
       return NextResponse.json(
         { success: false, error: 'runIds must be a non-empty array' },
+        { status: 400 }
+      );
+    }
+
+    const targets = await prisma.city_runs.findMany({
+      where: { id: { in: runIds } },
+      select: { id: true, cityRunType: true, clubReviewStatus: true },
+    });
+
+    const blocked = targets.filter((run) => !assertClubRunVerifiedForPublish(run).ok);
+    if (blocked.length > 0) {
+      const gate = assertClubRunVerifiedForPublish(blocked[0]);
+      return NextResponse.json(
+        {
+          success: false,
+          error: gate.ok ? 'Publish blocked' : gate.error,
+          blockedRunIds: blocked.map((r) => r.id),
+        },
         { status: 400 }
       );
     }

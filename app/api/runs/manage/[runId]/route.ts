@@ -7,6 +7,11 @@ import {
   fieldsWhenSettingWorkflowStatus,
   type RunWorkflowStatus,
 } from '@/lib/runInstanceApprovalPublish';
+import {
+  assertClubRunVerifiedForPublish,
+  isClubReviewStatus,
+} from '@/lib/club-run-club-review';
+import type { ClubReviewStatus } from '@prisma/client';
 import { ensureCityRunRoute } from '@/lib/city-run/ensure-city-run-route';
 import { attachRunBrandSnap } from '@/lib/runmanage/run-brand-stamp';
 
@@ -306,37 +311,71 @@ export async function PATCH(
 
     const { runId } = await params;
     const body = await request.json();
-    const { workflowStatus, staffNotes } = body;
+    const { workflowStatus, staffNotes, clubReviewStatus } = body as {
+      workflowStatus?: string;
+      staffNotes?: string | null;
+      clubReviewStatus?: string;
+    };
 
-    if (!workflowStatus || !VALID_WORKFLOW_STATUSES.includes(workflowStatus)) {
+    const hasWorkflow =
+      workflowStatus != null && VALID_WORKFLOW_STATUSES.includes(workflowStatus as RunWorkflowStatus);
+    const hasClubReview =
+      clubReviewStatus != null && isClubReviewStatus(String(clubReviewStatus));
+
+    if (!hasWorkflow && !hasClubReview) {
       return NextResponse.json(
-        { success: false, error: 'workflowStatus required: DEVELOP, PENDING, SUBMITTED, or APPROVED' },
+        {
+          success: false,
+          error:
+            'Provide workflowStatus (DEVELOP, PENDING, SUBMITTED, APPROVED) and/or clubReviewStatus (draft, pending_club_review, verified)',
+        },
         { status: 400 }
       );
     }
 
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
-      select: { id: true, workflowStatus: true },
+      select: { id: true, workflowStatus: true, cityRunType: true, clubReviewStatus: true },
     });
 
     if (!run) {
       return NextResponse.json({ success: false, error: 'CityRun not found' }, { status: 404 });
     }
 
-    const status = workflowStatus as RunWorkflowStatus;
-    const coupled = fieldsWhenSettingWorkflowStatus(status);
-
     const updateData: {
-      workflowStatus: RunWorkflowStatus;
+      workflowStatus?: RunWorkflowStatus;
+      clubReviewStatus?: ClubReviewStatus;
       updatedAt: Date;
       published?: boolean;
       staffNotes?: string | null;
     } = {
-      workflowStatus: coupled.workflowStatus,
       updatedAt: new Date(),
-      ...(coupled.published !== undefined ? { published: coupled.published } : {}),
     };
+
+    if (hasWorkflow) {
+      const status = workflowStatus as RunWorkflowStatus;
+      const coupled = fieldsWhenSettingWorkflowStatus(status);
+      if (coupled.published === true) {
+        const gate = assertClubRunVerifiedForPublish({
+          cityRunType: run.cityRunType,
+          clubReviewStatus: hasClubReview
+            ? (clubReviewStatus as ClubReviewStatus)
+            : run.clubReviewStatus,
+        });
+        if (!gate.ok) {
+          return NextResponse.json({ success: false, error: gate.error }, { status: 400 });
+        }
+      }
+      updateData.workflowStatus = coupled.workflowStatus;
+      if (coupled.published !== undefined) {
+        updateData.published = coupled.published;
+      }
+    }
+
+    if (hasClubReview) {
+      updateData.clubReviewStatus = clubReviewStatus as ClubReviewStatus;
+    }
+
     if (staffNotes !== undefined) {
       updateData.staffNotes = staffNotes === null || staffNotes === '' ? null : String(staffNotes).trim();
     }
@@ -390,10 +429,16 @@ export async function PATCH(
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      run: attachRunBrandSnap(updated),
-      message:
+    let message = 'Run status updated';
+    if (hasClubReview && !hasWorkflow) {
+      message =
+        clubReviewStatus === 'pending_club_review'
+          ? 'Run marked with club for review'
+          : clubReviewStatus === 'verified'
+            ? 'Run marked club-verified'
+            : 'Club review reset to draft';
+    } else if (hasWorkflow) {
+      message =
         workflowStatus === 'SUBMITTED'
           ? 'Run submitted for approval'
           : workflowStatus === 'APPROVED'
@@ -402,7 +447,13 @@ export async function PATCH(
               ? 'Run moved to pending'
               : workflowStatus === 'DEVELOP'
                 ? 'Run restaged to develop'
-                : 'Run status updated',
+                : message;
+    }
+
+    return NextResponse.json({
+      success: true,
+      run: attachRunBrandSnap(updated),
+      message,
     });
   } catch (error: any) {
     console.error('Error updating run workflow status:', error);

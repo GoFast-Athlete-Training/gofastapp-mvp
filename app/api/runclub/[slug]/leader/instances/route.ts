@@ -100,13 +100,26 @@ export async function POST(
       ? body.runSeriesIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
       : undefined;
 
-    const results = await advanceClubInstances({
+    const advance = await advanceClubInstances({
       runClubId: auth.club.id,
       staffGeneratedId: auth.athlete.id,
       runSeriesIds,
-      publishLive: true,
     });
 
+    if (advance.skipped) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        autoAdvanceDisabled: true,
+        runClubId: auth.club.id,
+        created: 0,
+        found: 0,
+        errorCount: 0,
+        results: [],
+      });
+    }
+
+    const results = advance.results;
     const created = results.filter((r) => r.outcome === 'created').length;
     const found = results.filter((r) => r.outcome === 'found_existing').length;
     const errors = results.filter((r) => r.outcome === 'error').length;

@@ -8,6 +8,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { generateUniqueCityRunSlug } from "@/lib/slug-utils";
 import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
+import { isClubRunAutoAdvanceEnabled } from "@/lib/club-run-auto-advance";
 
 export type RunInstanceSummary = {
   id: string;
@@ -389,6 +390,7 @@ async function duplicateRunForward(
     plannedWorkoutId: prior.plannedWorkoutId,
     workoutId: null,
     cityRunType: prior.runClubId ? 'CLUB' : prior.cityRunType,
+    clubReviewStatus: prior.runClubId ? 'draft' : undefined,
     updatedAt: new Date(),
   };
 
@@ -421,18 +423,26 @@ async function duplicateRunForward(
  * Product-first find-or-create: fill the next N weekly occurrence slots per runSeriesId lane.
  * Does not touch Company acq tables.
  */
+export type AdvanceClubInstancesResult =
+  | { skipped: true; reason: "auto_advance_disabled"; results: AdvanceResult[] }
+  | { skipped: false; results: AdvanceResult[] };
+
 export async function advanceClubInstances(opts: {
   runClubId: string;
   staffGeneratedId?: string | null;
   runSeriesIds?: string[];
-  /** When true, new instances are APPROVED + published (MVP1 default). */
+  /** When true, new instances are APPROVED + published. Auto-advance always creates draft/unpublished. */
   publishLive?: boolean;
   horizonWeeks?: number;
-}): Promise<AdvanceResult[]> {
+}): Promise<AdvanceClubInstancesResult> {
+  if (!isClubRunAutoAdvanceEnabled()) {
+    return { skipped: true, reason: "auto_advance_disabled", results: [] };
+  }
+
   const {
     runClubId,
     staffGeneratedId,
-    publishLive = true,
+    publishLive = false,
     horizonWeeks = DEFAULT_ADVANCE_HORIZON_WEEKS,
   } = opts;
   const filterIds =
@@ -538,5 +548,5 @@ export async function advanceClubInstances(opts: {
     }
   }
 
-  return results;
+  return { skipped: false, results };
 }

@@ -10,6 +10,7 @@ import {
   type RunSeries,
 } from '@/components/runs/city-run-types';
 import { buildClubPastCheckinCopy, resolveRunRsvpCopy, resolveRunPastCheckinCopy } from '@/lib/city-run-copy';
+import { resolveSeriesOccurrenceFields } from '@/lib/city-run/resolve-series-occurrence-fields';
 
 type CityRunDetailsSectionProps = {
   run: CityRunDetails;
@@ -221,14 +222,40 @@ export default function CityRunDetailsSection({
 export function CityRunSeriesPanel({
   series,
   runClub,
+  occurrenceMeetUpPoint,
+  occurrenceStartTimeHour,
+  occurrenceStartTimeMinute,
+  occurrenceStartTimePeriod,
 }: {
   series: RunSeries;
   runClub?: RunClub | null;
+  /** This dated run — wins over series defaults for display. */
+  occurrenceMeetUpPoint?: string | null;
+  occurrenceStartTimeHour?: number | null;
+  occurrenceStartTimeMinute?: number | null;
+  occurrenceStartTimePeriod?: string | null;
 }) {
+  const resolved = resolveSeriesOccurrenceFields({
+    occurrenceMeetUpPoint,
+    seriesMeetUpPoint: series.meetUpPoint,
+    occurrenceStartTimeHour,
+    occurrenceStartTimeMinute,
+    occurrenceStartTimePeriod,
+    seriesStartTimeHour: series.startTimeHour,
+    seriesStartTimeMinute: series.startTimeMinute,
+    seriesStartTimePeriod: series.startTimePeriod,
+  });
+
   const timeStr =
-    series.startTimeHour != null
-      ? `${series.startTimeHour}:${String(series.startTimeMinute ?? 0).padStart(2, '0')} ${series.startTimePeriod ?? 'AM'}`
+    resolved.startTimeHour != null
+      ? `${resolved.startTimeHour}:${String(resolved.startTimeMinute ?? 0).padStart(2, '0')} ${resolved.startTimePeriod ?? 'AM'}`
       : null;
+
+  const displayMeetUp = resolved.meetUpPoint;
+  const locationDiffersFromSeries =
+    resolved.meetUpPointSource === 'occurrence' &&
+    Boolean(series.meetUpPoint?.trim()) &&
+    displayMeetUp?.trim() !== series.meetUpPoint?.trim();
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 
@@ -255,11 +282,11 @@ export function CityRunSeriesPanel({
             <span>{timeStr}</span>
           </div>
         ) : null}
-        {series.meetUpPoint ? (
+        {displayMeetUp ? (
           <div className="flex items-start gap-2">
             <MapPin className="h-3.5 w-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
             <span>
-              {series.meetUpPoint}
+              {displayMeetUp}
               {series.meetUpCity ? (
                 <span className="text-gray-400">
                   {' '}
@@ -292,7 +319,9 @@ export function CityRunSeriesPanel({
 
       <div className="mt-4 pt-4 border-t border-gray-100">
         <p className="text-xs text-gray-500">
-          This is a recurring run — same time, same place every {capitalize(series.dayOfWeek)}.
+          {locationDiffersFromSeries
+            ? `Recurring every ${capitalize(series.dayOfWeek)} — this date meets at the location shown above.`
+            : `This is a recurring run — same time, same place every ${capitalize(series.dayOfWeek)}.`}
         </p>
       </div>
     </div>

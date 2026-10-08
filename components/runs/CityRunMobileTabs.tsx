@@ -118,7 +118,14 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
               />
             ) : null}
             {isSeries && props.run.runSeries ? (
-              <CityRunSeriesPanel series={props.run.runSeries} runClub={props.run.runClub} />
+              <CityRunSeriesPanel
+                series={props.run.runSeries}
+                runClub={props.run.runClub}
+                occurrenceMeetUpPoint={props.run.meetUpPoint}
+                occurrenceStartTimeHour={props.run.startTimeHour}
+                occurrenceStartTimeMinute={props.run.startTimeMinute}
+                occurrenceStartTimePeriod={props.run.startTimePeriod}
+              />
             ) : null}
             <CityRunRsvpPanel
               runIsPast={props.runIsPast}

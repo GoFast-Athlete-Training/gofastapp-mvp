@@ -1656,6 +1656,8 @@ model city_runs {
   slug                String?              @unique // URL-friendly slug: "title-of-run" (generated from title)
   dayOfWeek           String?
   workflowStatus      RunWorkflowStatus    @default(DEVELOP)
+  /// Club/community runs: socialized with the club before go-live. Ignored for non-CLUB cityRunType.
+  clubReviewStatus    ClubReviewStatus     @default(draft)
   /// Public discoverability — independent of workflowStatus editorial pipeline.
   published           Boolean              @default(false)
   endPoint            String?
@@ -3215,6 +3217,13 @@ enum RunWorkflowStatus {
   PENDING
   SUBMITTED
   APPROVED
+}
+
+/// Club-run verification lane — independent of staff workflowStatus. Races/shakeouts ignore.
+enum ClubReviewStatus {
+  draft
+  pending_club_review
+  verified
 }
 
 enum CityRunType {

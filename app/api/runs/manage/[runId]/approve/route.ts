@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { assertRunManageAuth } from '@/lib/runmanage/require-run-manage-auth';
 import { fieldsWhenSettingWorkflowStatus } from '@/lib/runInstanceApprovalPublish';
+import { assertClubRunVerifiedForPublish } from '@/lib/club-run-club-review';
 
 /**
  * POST /api/runs/manage/[runId]/approve
@@ -21,11 +22,16 @@ export async function POST(
 
     const run = await prisma.city_runs.findUnique({
       where: { id: runId },
-      select: { id: true, title: true },
+      select: { id: true, title: true, cityRunType: true, clubReviewStatus: true },
     });
 
     if (!run) {
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
+    }
+
+    const gate = assertClubRunVerifiedForPublish(run);
+    if (!gate.ok) {
+      return NextResponse.json({ success: false, error: gate.error }, { status: 400 });
     }
 
     const updatedRun = await prisma.city_runs.update({

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
 import { advanceClubInstances } from "@/lib/advance-club-instances";
+import { CLUB_RUN_AUTO_ADVANCE_DISABLED_MESSAGE } from "@/lib/club-run-auto-advance";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin":
@@ -53,13 +54,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const results = await advanceClubInstances({
+    const advance = await advanceClubInstances({
       runClubId,
       staffGeneratedId: body.staffGeneratedId,
       runSeriesIds: body.runSeriesIds,
-      publishLive: true,
     });
 
+    if (advance.skipped) {
+      return NextResponse.json(
+        {
+          success: true,
+          skipped: true,
+          autoAdvanceDisabled: true,
+          message: CLUB_RUN_AUTO_ADVANCE_DISABLED_MESSAGE,
+          runClubId,
+          created: 0,
+          found: 0,
+          errorCount: 0,
+          results: [],
+        },
+        { headers: corsHeaders }
+      );
+    }
+
+    const results = advance.results;
     const created = results.filter((r) => r.outcome === "created").length;
     const found = results.filter((r) => r.outcome === "found_existing").length;
     const errors = results.filter((r) => r.outcome === "error").length;

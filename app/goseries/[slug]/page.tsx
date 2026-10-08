@@ -47,6 +47,8 @@ interface Series {
   dayOfWeek: string;
   citySlug: string | null;
   meetUpPoint: string | null;
+  meetUpPointSource?: 'occurrence' | 'series' | null;
+  scheduleSource?: 'occurrence' | 'series' | null;
   meetUpStreetAddress: string | null;
   meetUpCity: string | null;
   meetUpState: string | null;
@@ -313,7 +315,9 @@ export default function GoSeriesPage() {
                 Recurring every {capitalize(series.dayOfWeek)}
               </div>
               <p className="text-orange-700 text-xs leading-relaxed">
-                This is a standing run — same time, same spot every week.
+                {series.meetUpPointSource === 'occurrence'
+                  ? 'The next run may meet at a different spot than the usual series location — check the Next run card.'
+                  : 'This is a standing run — same time, same spot every week.'}{' '}
                 RSVP for any individual run above.
               </p>
             </div>

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/cron/verify-cron-secret";
 import { advanceClubInstances } from "@/lib/advance-club-instances";
+import {
+  CLUB_RUN_AUTO_ADVANCE_DISABLED_MESSAGE,
+  isClubRunAutoAdvanceEnabled,
+} from "@/lib/club-run-auto-advance";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +12,7 @@ export const maxDuration = 300;
 
 /**
  * GET /api/cron/advance-club-run-instances
- * Monday 3:00 AM UTC — fill the next 2 weekly city_runs slots per linked series lane (live).
+ * Monday 3:00 AM UTC — fill the next 2 weekly city_runs slots when CLUB_RUN_AUTO_ADVANCE=true.
  * Product-owned; no Firebase or Company proxy.
  */
 export async function GET(request: NextRequest) {
@@ -17,6 +21,18 @@ export async function GET(request: NextRequest) {
 
   const startedAt = Date.now();
   console.log("[cron/advance-club-run-instances] start");
+
+  if (!isClubRunAutoAdvanceEnabled()) {
+    console.log("[cron/advance-club-run-instances] skipped_auto_advance_disabled");
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      autoAdvanceDisabled: true,
+      message: CLUB_RUN_AUTO_ADVANCE_DISABLED_MESSAGE,
+      totals: { clubs: 0, created: 0, found: 0, skipped: 0, errors: 0 },
+      clubResults: [],
+    });
+  }
 
   try {
     const seriesRows = await prisma.run_series.findMany({
@@ -48,7 +64,11 @@ export async function GET(request: NextRequest) {
 
     for (const runClubId of clubIds) {
       try {
-        const results = await advanceClubInstances({ runClubId, publishLive: true });
+        const advance = await advanceClubInstances({ runClubId });
+        if (advance.skipped) {
+          continue;
+        }
+        const results = advance.results;
         let created = 0;
         let found = 0;
         let skipped = 0;
