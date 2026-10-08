@@ -496,6 +496,7 @@ export async function GET(request: NextRequest, context: Ctx) {
         paceAnchor: workout.workout_catalogue?.paceAnchor ?? null,
         tempoGoalBenchmark,
         goalRacePaceSecPerMile,
+        profileFiveKPace: anchorPaceStr,
       },
       performanceAnalysis,
       performanceSignals,

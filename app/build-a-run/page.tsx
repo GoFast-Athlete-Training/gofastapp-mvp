@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp, Trash2, Users, MapPin, Dumbbell } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
@@ -48,34 +48,84 @@ export default function BuildARunPage() {
         <AthleteSidebar />
         <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Build a Run
+            <div className="mb-8 border-b border-gray-200 pb-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">
+                Run
+              </p>
+              <h1 className="text-3xl font-bold text-gray-900 mt-1 mb-2">
+                Go run with others
               </h1>
               <p className="text-gray-600">
-                Workouts you create yourself — not tied to your training plan.
-                Same as plan workouts once you open them: Garmin, details, and
-                share from the workout screen.
+                Host a group run with a map meetup and invite link, build your own
+                workout, or jump into a RunCrew — not a city club calendar.
               </p>
             </div>
 
             <div className="space-y-10">
-              <section className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/30 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                  Create a workout
-                </h2>
-                <p className="text-sm text-gray-600 mb-4">
-                  Generate or define a session. You&apos;ll open it like any other
-                  workout.
-                </p>
-                <Link
-                  href="/workouts/create?from=build-a-run"
-                  className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
-                >
-                  <Plus className="h-5 w-5" />
-                  New workout
-                </Link>
+              <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-6 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-xl bg-orange-100 p-2.5 shrink-0">
+                    <Users className="h-6 w-6 text-orange-700" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      Create a run
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Set the meetup on the map, pick date and time, and share a
+                      link so others can RSVP — same flow as hosting on mobile.
+                    </p>
+                    <Link
+                      href="/host-a-run"
+                      className="mt-4 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+                    >
+                      <MapPin className="h-5 w-5" />
+                      Host a run &amp; set meetup
+                    </Link>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Already built a workout? Open it and choose &quot;Invite
+                      others&quot; to attach it to a meetup.
+                    </p>
+                  </div>
+                </div>
               </section>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <section className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/30 p-6">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Dumbbell className="h-5 w-5 text-orange-700" />
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      Build a workout
+                    </h2>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Generate or define a session for yourself — Garmin, segments,
+                    and pace from your profile 5K.
+                  </p>
+                  <Link
+                    href="/workouts/create?from=build-a-run"
+                    className="inline-flex items-center gap-2 rounded-xl border border-orange-300 bg-white px-5 py-2.5 text-sm font-semibold text-orange-900 hover:bg-orange-50"
+                  >
+                    <Plus className="h-5 w-5" />
+                    New workout
+                  </Link>
+                </section>
+
+                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                    RunCrew
+                  </h2>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Create or join a crew for recurring group runs and chat.
+                  </p>
+                  <Link
+                    href="/runcrew"
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-sky-800 hover:text-sky-950"
+                  >
+                    Open RunCrew →
+                  </Link>
+                </section>
+              </div>
 
               <StandaloneRunsList />
             </div>

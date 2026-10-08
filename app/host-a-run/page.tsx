@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Users } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
@@ -15,7 +16,31 @@ function todayYmd(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function mapTrainingWorkoutToHostForm(w: {
+  id: string;
+  title?: string | null;
+  workoutType?: string | null;
+  description?: string | null;
+  date?: string | null;
+  estimatedDistanceInMeters?: number | null;
+  segments?: CreateCityRunFormWorkout["segments"];
+  city_runs?: CreateCityRunFormWorkout["city_runs"];
+}): CreateCityRunFormWorkout {
+  return {
+    id: w.id,
+    title: w.title?.trim() || "Hosted group run",
+    workoutType: w.workoutType?.trim() || "Easy",
+    description: w.description ?? null,
+    date: w.date ?? todayYmd(),
+    estimatedDistanceInMeters: w.estimatedDistanceInMeters ?? 5000,
+    segments: Array.isArray(w.segments) ? w.segments : [],
+    city_runs: w.city_runs,
+  };
+}
+
 export default function HostARunPage() {
+  const searchParams = useSearchParams();
+  const workoutIdParam = searchParams.get("workoutId")?.trim() || null;
   const [workout, setWorkout] = useState<CreateCityRunFormWorkout | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,6 +49,20 @@ export default function HostARunPage() {
     setLoading(true);
     setLoadError(null);
     try {
+      if (workoutIdParam) {
+        const { data } = await api.get<{ workout: CreateCityRunFormWorkout }>(
+          `/training/workout/${workoutIdParam}`
+        );
+        const w = data?.workout;
+        if (!w?.id) {
+          setLoadError("Could not load that workout");
+          setWorkout(null);
+          return;
+        }
+        setWorkout(mapTrainingWorkoutToHostForm(w));
+        return;
+      }
+
       const { data } = await api.post<{ workout: CreateCityRunFormWorkout }>("/workouts", {
         title: "Hosted group run",
         workoutType: "Easy",
@@ -59,7 +98,7 @@ export default function HostARunPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [workoutIdParam]);
 
   useEffect(() => {
     void ensureHostWorkout();
@@ -73,11 +112,11 @@ export default function HostARunPage() {
         <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
             <Link
-              href="/gorun"
+              href="/build-a-run"
               className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to runs
+              Back to Run
             </Link>
 
             <div className="flex items-start gap-3 mb-6">

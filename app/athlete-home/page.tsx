@@ -1847,21 +1847,21 @@ export default function AthleteHomePage() {
                     Open meetup →
                   </Link>
                   <p className="text-xs text-sky-900/70 mt-3 pt-3 border-t border-sky-200/80">
-                    <Link href="/gorun" className="font-medium hover:underline">
-                      Browse more runs →
+                    <Link href="/build-a-run" className="font-medium hover:underline">
+                      Go run with others →
                     </Link>
                   </p>
                 </div>
               ) : (
-                <Link href="/gorun" className={`${cardFindRun} ${findRunColSpanLg}`}>
+                <Link href="/build-a-run" className={`${cardFindRun} ${findRunColSpanLg}`}>
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-2">
-                    Find a run with others
+                    Go run with others
                   </h2>
                   <p className="text-gray-800 text-sm leading-relaxed">
-                    RSVP to a community run and show up with a crew. No plan required.
+                    Host a run with a map meetup, build a workout, or join a RunCrew.
                   </p>
                   <span className="text-sm font-semibold text-sky-800 mt-3 inline-block">
-                    Browse runs →
+                    Open Run hub →
                   </span>
                 </Link>
               )}

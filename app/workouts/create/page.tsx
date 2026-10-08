@@ -732,7 +732,7 @@ function CreateWorkoutPageInner() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasPositiveMiles) {
-      alert("Derive a workout first, or add at least one segment.");
+      alert("Build a workout first, or add at least one segment.");
       return;
     }
     setSaving(true);
@@ -1112,7 +1112,7 @@ function CreateWorkoutPageInner() {
                 className="mt-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 <FileText className="w-4 h-4" />
-                {deriving ? "Deriving…" : "Derive workout"}
+                {deriving ? "Building…" : "Build workout"}
               </button>
             </div>
           )}

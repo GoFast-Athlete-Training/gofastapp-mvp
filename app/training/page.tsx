@@ -769,12 +769,6 @@ export default function TrainingHubPage() {
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               <Link
-                href="/build-a-run"
-                className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-900 shadow-sm hover:bg-orange-100"
-              >
-                Build my own workout
-              </Link>
-              <Link
                 href="/training/past-plans"
                 className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm hover:border-gray-300 hover:text-gray-900"
               >
@@ -1586,11 +1580,15 @@ export default function TrainingHubPage() {
               </Link>
               <span className="text-gray-300" aria-hidden>·</span>
               <Link href="/build-a-run" className="font-medium text-gray-800 hover:text-gray-900">
-                Add my own run
+                Build or host a run
               </Link>
               <span className="text-gray-300" aria-hidden>·</span>
-              <Link href="/gorun" className="font-medium text-gray-600 hover:text-gray-900">
-                Find a run with others
+              <Link href="/host-a-run" className="font-medium text-gray-600 hover:text-gray-900">
+                Host with map meetup
+              </Link>
+              <span className="text-gray-300" aria-hidden>·</span>
+              <Link href="/runcrew" className="font-medium text-gray-600 hover:text-gray-900">
+                RunCrew
               </Link>
               <span className="text-gray-300" aria-hidden>·</span>
               <Link href="/workouts" className="font-medium text-gray-600 hover:text-gray-900">

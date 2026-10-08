@@ -18,13 +18,19 @@ function planHubMatch(p: string | null): boolean {
   return (
     p === '/training' ||
     p.startsWith('/training/') ||
-    p.startsWith('/training-setup') ||
-    p.startsWith('/build-a-run')
+    p.startsWith('/training-setup')
   );
 }
 
 function gorunMatch(p: string | null): boolean {
-  return !!p && (p === '/gorun' || p.startsWith('/gorun/') || p === '/host-a-run');
+  if (!p) return false;
+  if (p === '/gorun' || p.startsWith('/gorun/')) return true;
+  return (
+    p === '/build-a-run' ||
+    p === '/host-a-run' ||
+    p === '/workouts/create' ||
+    p.startsWith('/workouts/create/')
+  );
 }
 
 function racesMatch(p: string | null): boolean {
@@ -47,7 +53,7 @@ function goFastWithOthersMatch(p: string | null): boolean {
 
 const primaryTabs: NavItem[] = [
   { id: 'train', label: 'Train', href: '/training', icon: LayoutDashboard, match: planHubMatch },
-  { id: 'run', label: 'Run', href: '/gorun', icon: MapPin, match: gorunMatch },
+  { id: 'run', label: 'Run', href: '/build-a-run', icon: MapPin, match: gorunMatch },
   { id: 'races', label: 'Races', href: '/races', icon: Trophy, match: racesMatch },
   { id: 'health', label: 'Health', href: '/health', icon: Heart, match: healthHubMatch },
 ];

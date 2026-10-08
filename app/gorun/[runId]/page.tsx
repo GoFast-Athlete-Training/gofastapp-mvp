@@ -202,7 +202,7 @@ export default function GoRunPage() {
         <TopNav />
         <div className="max-w-2xl mx-auto px-6 py-12 text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">{error || 'Run not found'}</h1>
-          <button onClick={() => router.push('/gorun')} className="text-orange-500 hover:text-orange-600 font-semibold">
+          <button onClick={() => router.push('/build-a-run')} className="text-orange-500 hover:text-orange-600 font-semibold">
             ← Back to Runs
           </button>
         </div>
@@ -261,7 +261,7 @@ export default function GoRunPage() {
       onRsvp={handleRsvp}
       onCheckin={handleCheckin}
       rsvpLoading={rsvpLoading}
-      onBack={() => router.push('/gorun')}
+      onBack={() => router.push('/build-a-run')}
       allowCheckin={hasSocialRunLifecycle(run) && !isGuestSession}
     />
   );

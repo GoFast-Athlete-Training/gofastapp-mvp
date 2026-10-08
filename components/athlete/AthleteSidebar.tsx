@@ -14,14 +14,13 @@ type NavItem = {
   match?: (pathname: string | null) => boolean;
 };
 
-/** Training hub: schedule, setup, tri-work sandbox, day detail, build-a-run */
+/** Training hub: schedule, setup, tri-work sandbox, day detail */
 function planHubMatch(p: string | null): boolean {
   if (!p) return false;
   return (
     p === "/training" ||
     p.startsWith("/training/") ||
-    p.startsWith("/training-setup") ||
-    p.startsWith("/build-a-run")
+    p.startsWith("/training-setup")
   );
 }
 
@@ -32,11 +31,12 @@ function healthHubMatch(p: string | null): boolean {
 
 function activityHubMatch(p: string | null): boolean {
   if (!p) return false;
+  if (p === "/workouts/create" || p.startsWith("/workouts/create/")) return false;
   return (
     p === "/activities" ||
     p.startsWith("/activities/") ||
     p === "/workouts" ||
-    p.startsWith("/workouts/")
+    (p.startsWith("/workouts/") && !p.startsWith("/workouts/create"))
   );
 }
 
@@ -46,7 +46,15 @@ function performanceHubMatch(p: string | null): boolean {
 }
 
 function gorunMatch(p: string | null): boolean {
-  return !!p && (p === "/gorun" || p.startsWith("/gorun/") || p === "/host-a-run");
+  if (!p) return false;
+  if (p === "/gorun") return true;
+  if (p.startsWith("/gorun/")) return true;
+  return (
+    p === "/build-a-run" ||
+    p === "/host-a-run" ||
+    p === "/workouts/create" ||
+    p.startsWith("/workouts/create/")
+  );
 }
 
 function goFastWithOthersMatch(p: string | null): boolean {
@@ -62,7 +70,7 @@ const primaryNavItems: NavItem[] = [
   },
   {
     label: "Run",
-    href: "/gorun",
+    href: "/build-a-run",
     icon: MapPin,
     match: gorunMatch,
   },
