@@ -57,7 +57,7 @@ export default function RunManageOpenCorePanel({
       <div className="border-b border-gray-100 px-4 py-3">
         <h3 className="text-sm font-semibold text-gray-900">Core details</h3>
         <p className="mt-1 text-xs text-gray-600">
-          Date, meet-up, distance, pace, and venue for this run.
+          Date, meet-up, distance, pace, and run type for this run.
         </p>
       </div>
       <div className="space-y-4 px-4 py-4">
@@ -260,7 +260,7 @@ export default function RunManageOpenCorePanel({
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900">Run venue *</label>
+          <label className="mb-1 block text-sm font-medium text-gray-900">Run type *</label>
           <select
             value={values.runType}
             onChange={(e) => handleRunTypeChange(e.target.value)}
