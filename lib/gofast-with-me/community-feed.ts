@@ -106,7 +106,7 @@ export function composeCommunityFeed(input: ComposeCommunityFeedInput): Communit
   }
 
   for (const post of input.activityPosts) {
-    const sortAt = post.publishedAt || post.activity.startTime;
+    const sortAt = post.publishedAt || post.activity?.startTime || new Date(0).toISOString();
     items.push({
       kind: 'activity',
       id: `activity-${post.id}`,

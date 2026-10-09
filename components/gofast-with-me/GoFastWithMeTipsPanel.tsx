@@ -235,15 +235,15 @@ export default function GoFastWithMeTipsPanel({ athleteId, liveUrl }: Props) {
   return (
     <section id="tips" className="space-y-6 pb-8 max-w-3xl">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Tips</h2>
+        <h2 className="text-lg font-bold text-gray-900">Think Pieces</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Durable training thoughts — build first, then choose Landing page and/or Feed.
+          Essays and riffs — publish to your landing page and/or member feed.
         </p>
       </div>
 
       <div className="rounded-lg border border-violet-200 bg-violet-50/50 px-4 py-3 text-xs text-violet-900">
-        <strong>Tips are not announcements.</strong> Daily log stays under Build. Tips hydrate your
-        public page and community feed when you publish them.
+        <strong>Think pieces are not daily logs.</strong> Training reflections live under Build
+        content. Think pieces hydrate your public page when you publish them.
       </div>
 
       {error ? (

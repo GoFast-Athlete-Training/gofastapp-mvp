@@ -29,6 +29,7 @@ export type GoFastWithMeRecord = {
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
   instagramDescription: string | null;
+  runnerStory: string | null;
 };
 
 export type GoFastWithMeIntroInput = {
@@ -46,6 +47,7 @@ export type GoFastWithMeIntroInput = {
   creatorType?: GoFastWithMeCreatorType | string | null;
   coachSpecialty?: string | null;
   instagramDescription?: string | null;
+  runnerStory?: string | null;
 };
 
 function trimOrNull(value: string | null | undefined): string | null {
@@ -79,11 +81,15 @@ type GoFastWithMeRow = {
   creatorType: string | null;
   coachSpecialty: string | null;
   instagramDescription: string | null;
+  runnerStory: string | null;
 };
 
-function toGoFastWithMeRecord(row: GoFastWithMeRow): GoFastWithMeRecord {
+function toGoFastWithMeRecord(
+  row: Omit<GoFastWithMeRow, 'runnerStory'> & { runnerStory?: string | null }
+): GoFastWithMeRecord {
   return {
     ...row,
+    runnerStory: row.runnerStory ?? null,
     creatorType: normalizeCreatorType(row.creatorType),
   };
 }
@@ -242,6 +248,9 @@ export async function updateGoFastWithMeIntro(
   }
   if (input.instagramDescription !== undefined) {
     data.instagramDescription = trimOrNull(input.instagramDescription);
+  }
+  if (input.runnerStory !== undefined) {
+    data.runnerStory = trimOrNull(input.runnerStory);
   }
 
   const updated = await prisma.gofast_with_me.update({

@@ -15,7 +15,7 @@ export function mapActivityPostsByActivityId(
 ): Map<string, ActivityPostPayload> {
   const map = new Map<string, ActivityPostPayload>();
   for (const post of activityPosts) {
-    map.set(post.activityId, post);
+    if (post.activityId) map.set(post.activityId, post);
   }
   return map;
 }

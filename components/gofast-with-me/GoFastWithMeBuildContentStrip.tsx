@@ -12,28 +12,28 @@ type Props = {
 };
 
 const BUILD_CONTENT_ICONS = {
-  'Daily log': PenLine,
-  Tip: BookOpen,
+  'Training Reflections': PenLine,
+  'Think Pieces': BookOpen,
 } as const;
 
 function buildContentActions(surface: StudioContentSurface) {
-  const feedHint =
+  const reflectionHint =
     surface === 'landing'
-      ? 'Shows as a recent highlight on your public page.'
-      : 'Shows in the member feed.';
+      ? 'Published reflections can surface on your public page.'
+      : 'Published reflections appear in your member feed.';
 
   return [
     {
-      title: 'Daily log' as const,
-      description: `How you're feeling today — ${feedHint.toLowerCase()}`,
-      section: 'community' as const,
+      title: 'Training Reflections' as const,
+      description: `Write training reflections here — optional activity link. ${reflectionHint}`,
+      section: 'reflections' as const,
     },
     {
-      title: 'Tip' as const,
+      title: 'Think Pieces' as const,
       description:
         surface === 'landing'
-          ? 'Evergreen training thoughts — can appear as a highlight on your page.'
-          : 'Evergreen training thoughts — followers revisit from your tips rail.',
+          ? 'Longer training essays — can highlight on your landing page.'
+          : 'Evergreen essays followers revisit from your hub.',
       section: 'content' as const,
       focus: 'tip' as const,
     },
@@ -52,7 +52,7 @@ export default function GoFastWithMeBuildContentStrip({
       <div>
         <h3 className="text-sm font-bold text-gray-900">Build content</h3>
         <p className="text-xs text-gray-600 mt-0.5">
-          Story, daily log, and tips — runs and training live under Runs and Training.
+          Training reflections and think pieces — runs and training live under Runs and Training.
         </p>
       </div>
       <div className="grid gap-2">

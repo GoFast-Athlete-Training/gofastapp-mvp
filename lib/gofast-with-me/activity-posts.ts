@@ -19,18 +19,18 @@ export type ActivityPostActivitySummary = {
 
 export type ActivityPostPayload = {
   id: string;
-  activityId: string;
+  activityId: string | null;
   caption: string | null;
   photoUrl: string | null;
   showMatchedWorkout: boolean;
   publishedAt: string;
-  activity: ActivityPostActivitySummary;
+  activity: ActivityPostActivitySummary | null;
   matchedWorkout: ActivityPostMatchedWorkout | null;
 };
 
 export type ActivityPostOwnerPayload = {
   id: string;
-  activityId: string;
+  activityId: string | null;
   caption: string | null;
   photoUrl: string | null;
   showMatchedWorkout: boolean;
@@ -38,7 +38,7 @@ export type ActivityPostOwnerPayload = {
   isPublished: boolean;
 };
 
-const activityPostInclude = {
+export const activityPostInclude = {
   activity: {
     select: {
       activityName: true,
@@ -71,7 +71,7 @@ type ActivityPostRow = Awaited<
       workoutType: string;
       training_plans: { name: string } | null;
     } | null;
-  };
+  } | null;
 };
 
 function metersToMiles(meters: number | null | undefined): number | null {
@@ -80,7 +80,7 @@ function metersToMiles(meters: number | null | undefined): number | null {
 }
 
 function mapActivitySummary(
-  activity: ActivityPostRow['activity']
+  activity: NonNullable<ActivityPostRow['activity']>
 ): ActivityPostActivitySummary {
   return {
     activityName: activity.activityName,
@@ -95,7 +95,7 @@ function mapMatchedWorkout(
   activity: ActivityPostRow['activity'],
   showMatchedWorkout: boolean
 ): ActivityPostMatchedWorkout | null {
-  if (!showMatchedWorkout || !activity.garmin_detail_workout) return null;
+  if (!activity || !showMatchedWorkout || !activity.garmin_detail_workout) return null;
   return {
     title: activity.garmin_detail_workout.title,
     workoutType: activity.garmin_detail_workout.workoutType,
@@ -112,7 +112,7 @@ export function mapPublishedActivityPost(row: ActivityPostRow): ActivityPostPayl
     photoUrl: row.photoUrl?.trim() || null,
     showMatchedWorkout: row.showMatchedWorkout,
     publishedAt: row.publishedAt.toISOString(),
-    activity: mapActivitySummary(row.activity),
+    activity: row.activity ? mapActivitySummary(row.activity) : null,
     matchedWorkout: mapMatchedWorkout(row.activity, row.showMatchedWorkout),
   };
 }

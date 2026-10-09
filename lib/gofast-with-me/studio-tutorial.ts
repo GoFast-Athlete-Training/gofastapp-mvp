@@ -18,7 +18,7 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'My Community is your studio. Use the header to see your landing page, preview the member hub, and share your invite link. Runs and Training come first — then build content (story, daily log, tips). Manage announcements, chatter, and members from the left nav.',
+    'My Community is your studio. Use the header to see your landing page, preview the member hub, and share your invite link. Landing holds My Story and your full runner story. Runs and Training come first — then build content (training reflections and think pieces). Manage announcements, chatter, and members from the left nav.',
   steps: [
     {
       id: 'page',
@@ -49,17 +49,17 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
       sortOrder: 3,
     },
     {
-      id: 'community',
-      title: 'Daily log — member feed',
+      id: 'reflections',
+      title: 'Training Reflections',
       instruction:
-        'Post how you feel today — updates spill into the member feed.',
+        'Write reflections in studio — optionally link a synced activity. Daily logs stay under Announcements.',
       sortOrder: 4,
     },
     {
       id: 'content',
-      title: 'Tips — durable content',
+      title: 'Think Pieces',
       instruction:
-        'Nutrition and training thoughts followers revisit on the tips rail.',
+        'Title and body essays followers revisit on your public page and hub.',
       sortOrder: 5,
     },
   ],

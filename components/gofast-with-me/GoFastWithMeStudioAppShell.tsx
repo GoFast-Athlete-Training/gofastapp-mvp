@@ -5,10 +5,11 @@ import { ArrowLeft } from 'lucide-react';
 import TopNav from '@/components/shared/TopNav';
 import {
   STUDIO_BUILD_NAV_ORDER,
+  STUDIO_LANDING_LABEL,
+  STUDIO_LANDING_NAV_ORDER,
   STUDIO_LINK_PAGE_HREF,
   STUDIO_LINK_PAGE_LABEL,
   STUDIO_MANAGE_NAV_ORDER,
-  STUDIO_MY_STORY_LABEL,
   STUDIO_RUNS_TRAINING_NAV_ORDER,
   type ContentEditorFocus,
   type StudioSection,
@@ -122,12 +123,20 @@ export default function GoFastWithMeStudioAppShell({
         <aside className="hidden w-56 shrink-0 border-r border-gray-200 bg-white lg:block">
           <nav className="sticky top-0 max-h-[calc(100vh-8rem)] overflow-y-auto px-3 py-4 space-y-5">
             <div>
-              <SidebarButton
-                label={STUDIO_MY_STORY_LABEL}
-                active={activeView === 'page'}
-                onClick={() => onViewChange('page')}
-                badge={landingNeedsAction ? 'action' : undefined}
-              />
+              <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                {STUDIO_LANDING_LABEL}
+              </p>
+              <div className="space-y-0.5">
+                {STUDIO_LANDING_NAV_ORDER.map((item) => (
+                  <SidebarButton
+                    key={item.section}
+                    label={item.label}
+                    active={activeView === item.section}
+                    onClick={() => onViewChange(item.section)}
+                    badge={item.section === 'page' && landingNeedsAction ? 'action' : undefined}
+                  />
+                ))}
+              </div>
             </div>
 
             <div>
@@ -202,12 +211,15 @@ export default function GoFastWithMeStudioAppShell({
               className="flex gap-1 overflow-x-auto px-4 py-2 scrollbar-hide"
               aria-label="Studio navigation"
             >
-              <MobileNavPill
-                label={STUDIO_MY_STORY_LABEL}
-                active={activeView === 'page'}
-                onClick={() => onViewChange('page')}
-                badge={landingNeedsAction}
-              />
+              {STUDIO_LANDING_NAV_ORDER.map((item) => (
+                <MobileNavPill
+                  key={`m-landing-${item.section}`}
+                  label={item.label}
+                  active={activeView === item.section}
+                  onClick={() => onViewChange(item.section)}
+                  badge={item.section === 'page' ? landingNeedsAction : undefined}
+                />
+              ))}
               {STUDIO_RUNS_TRAINING_NAV_ORDER.map((item) => (
                 <MobileNavPill
                   key={`m-rt-${item.section}-${item.focus ?? 'default'}`}

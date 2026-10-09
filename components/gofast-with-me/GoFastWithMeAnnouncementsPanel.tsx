@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
+import GoFastWithMeFeedPanel from '@/components/gofast-with-me/GoFastWithMeFeedPanel';
 
 type Props = {
   athleteId: string;
+  publicSlug: string;
 };
 
-export default function GoFastWithMeAnnouncementsPanel({ athleteId }: Props) {
+export default function GoFastWithMeAnnouncementsPanel({ athleteId, publicSlug }: Props) {
   const [hub, setHub] = useState<ContainerHubPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +39,7 @@ export default function GoFastWithMeAnnouncementsPanel({ athleteId }: Props) {
   }, [loadHub]);
 
   return (
-    <section id="announcements" className="space-y-6 pb-8">
+    <section id="announcements" className="space-y-8 pb-8">
       <div>
         <h2 className="text-lg font-bold text-gray-900">Announcements</h2>
         <p className="text-sm text-gray-600 mt-1">
@@ -65,6 +67,15 @@ export default function GoFastWithMeAnnouncementsPanel({ athleteId }: Props) {
           showHeading={false}
         />
       ) : null}
+
+      <GoFastWithMeFeedPanel
+        athleteId={athleteId}
+        publicSlug={publicSlug}
+        embedded
+        hub={hub}
+        hubLoading={loading}
+        onHubRefresh={loadHub}
+      />
     </section>
   );
 }

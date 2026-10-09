@@ -14,7 +14,8 @@ import { athleteLinksPublicUrl } from "@/lib/content/athlete-links-public-url";
 import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
 import GoFastWithMeLandingViewer from "@/components/gofast-with-me/GoFastWithMeLandingViewer";
-import GoFastWithMeCommunityPanel from "@/components/gofast-with-me/GoFastWithMeCommunityPanel";
+import GoFastWithMeRunnerStoryPanel from "@/components/gofast-with-me/GoFastWithMeRunnerStoryPanel";
+import GoFastWithMeTrainingReflectionsPanel from "@/components/gofast-with-me/GoFastWithMeTrainingReflectionsPanel";
 import GoFastWithMeAnnouncementsPanel from "@/components/gofast-with-me/GoFastWithMeAnnouncementsPanel";
 import GoFastWithMeChatterPanel from "@/components/gofast-with-me/GoFastWithMeChatterPanel";
 import GoFastWithMeMemberManagementPanel from "@/components/gofast-with-me/GoFastWithMeMemberManagementPanel";
@@ -62,6 +63,7 @@ type OwnerGwmRow = {
   gofastWithMePhotoType: string | null;
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
+  runnerStory?: string | null;
   gofastSlugSnapshot?: string;
   slugUsesHandle?: boolean;
 };
@@ -115,6 +117,8 @@ export default function GoFastWithOthersDashboard() {
     setActiveView(section);
     if (section === 'content') {
       setContentFocus(focus ?? 'tip');
+    } else if (section === 'reflections') {
+      setContentFocus(null);
     } else if (section === 'workouts') {
       setContentFocus(focus ?? 'runs');
     } else {
@@ -436,14 +440,28 @@ export default function GoFastWithOthersDashboard() {
               setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
             }}
             onAvatarSaved={(photoURL) => setProfilePhotoURL(photoURL)}
+            onOpenRunnerStory={() => handleViewChange("runnerStory")}
+            runnerStoryPublicUrl={
+              publicSlug
+                ? `${runnerPublicLandingUrl(publicSlug).replace(/\/$/, "")}/story`
+                : null
+            }
           />
         );
-      case "community":
+      case "runnerStory":
         return (
-          <GoFastWithMeCommunityPanel athleteId={athleteId} publicSlug={publicSlug} />
+          <GoFastWithMeRunnerStoryPanel
+            publicSlug={publicSlug}
+            initialRunnerStory={ownerGwm?.runnerStory ?? null}
+            onSaved={(runnerStory) => {
+              setOwnerGwm((prev) => (prev ? { ...prev, runnerStory } : prev));
+            }}
+          />
         );
+      case "reflections":
+        return <GoFastWithMeTrainingReflectionsPanel publicSlug={publicSlug} />;
       case "announcements":
-        return <GoFastWithMeAnnouncementsPanel athleteId={athleteId} />;
+        return <GoFastWithMeAnnouncementsPanel athleteId={athleteId} publicSlug={publicSlug} />;
       case "chatter":
         return <GoFastWithMeChatterPanel athleteId={athleteId} publicSlug={publicSlug} />;
       case "members":

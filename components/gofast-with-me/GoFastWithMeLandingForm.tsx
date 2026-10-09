@@ -38,6 +38,8 @@ type Props = {
   athleteId?: string | null;
   onSaved?: (values: GoFastWithMeLandingValues) => void;
   onAvatarSaved?: (photoURL: string | null) => void;
+  onOpenRunnerStory?: () => void;
+  runnerStoryPublicUrl?: string | null;
 };
 
 const AUTOSAVE_MS = 900;
@@ -116,6 +118,8 @@ export default function GoFastWithMeLandingForm({
   athleteId,
   onSaved,
   onAvatarSaved,
+  onOpenRunnerStory,
+  runnerStoryPublicUrl,
 }: Props) {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -462,7 +466,7 @@ export default function GoFastWithMeLandingForm({
           <label className="block">
             <span className="text-sm font-semibold text-gray-900">About me</span>
             <span className="block text-xs text-gray-500 mt-0.5">
-              Describe yourself so people know what kind of athlete you are and why they should follow.
+              Keep this short — your full life story lives in Runner story under Landing.
             </span>
             <textarea
               value={values.gofastWithMeBio}
@@ -482,6 +486,27 @@ export default function GoFastWithMeLandingForm({
               >
                 Start from profile bio
               </button>
+            ) : null}
+            {onOpenRunnerStory ? (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onOpenRunnerStory}
+                  className="text-xs font-semibold text-orange-700 hover:text-orange-800"
+                >
+                  Edit full runner story →
+                </button>
+                {runnerStoryPublicUrl ? (
+                  <a
+                    href={runnerStoryPublicUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-medium text-gray-600 hover:text-gray-800"
+                  >
+                    Preview story page
+                  </a>
+                ) : null}
+              </div>
             ) : null}
           </label>
 

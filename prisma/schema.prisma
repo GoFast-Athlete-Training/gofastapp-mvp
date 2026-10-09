@@ -410,6 +410,8 @@ model gofast_with_me {
   coachSpecialty     String?
   /// Why visitors should check out Athlete.instagram (handle on athlete row).
   instagramDescription String? @db.Text
+  /// Long-form life story linked from short About me on public landing.
+  runnerStory          String?  @db.Text
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   athlete            Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
@@ -484,17 +486,18 @@ model athlete_run_routes {
 
 /// Athlete-authored social overlay on a synced activity — caption, photo, hub publish.
 model athlete_activity_posts {
-  id                 String             @id @default(cuid())
+  id                 String              @id @default(cuid())
   athleteId          String
-  activityId         String             @unique
-  caption            String?            @db.Text
+  /// Optional — training reflection can stand alone without a synced activity.
+  activityId         String?             @unique
+  caption            String?             @db.Text
   photoUrl           String?
-  showMatchedWorkout Boolean            @default(true)
+  showMatchedWorkout Boolean             @default(true)
   publishedAt        DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  athlete            Athlete            @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  activity           athlete_activities @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  athlete            Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  activity           athlete_activities? @relation(fields: [activityId], references: [id], onDelete: SetNull)
 
   @@index([athleteId, publishedAt])
   @@map("athlete_activity_posts")

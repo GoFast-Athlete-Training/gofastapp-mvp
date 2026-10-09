@@ -4,10 +4,13 @@ import type { GoFastWithMeLandingValues } from '@/components/gofast-with-me/GoFa
 export type StudioManageSection = 'announcements' | 'chatter' | 'members';
 
 /** Build workspaces — content that surfaces on Landing and Community. */
-export type StudioBuildSection = 'community' | 'workouts' | 'content';
+export type StudioBuildSection = 'reflections' | 'workouts' | 'content';
 
-/** Left-nav editor workspaces (My Story + build + manage). */
-export type StudioSection = 'page' | StudioBuildSection | StudioManageSection;
+/** Landing editors — public page identity. */
+export type StudioLandingSection = 'page' | 'runnerStory';
+
+/** Left-nav editor workspaces. */
+export type StudioSection = StudioLandingSection | StudioBuildSection | StudioManageSection;
 
 /** Preview surfaces — last in left nav under View. */
 export type StudioChromeView = 'landingView' | 'communityHome';
@@ -18,10 +21,11 @@ export type StudioPayoutsView = 'payouts';
 /** All routable studio views. */
 export type StudioView = StudioChromeView | StudioPayoutsView | StudioSection;
 
-/** Scroll target inside Tips workspace or Runs/Training split. */
+/** Scroll target inside Think Pieces workspace or Runs/Training split. */
 export type ContentEditorFocus = 'tip' | 'route' | 'runs' | 'training';
 
 export const STUDIO_MY_STORY_LABEL = 'My Story';
+export const STUDIO_RUNNER_STORY_LABEL = 'Runner story';
 
 export const STUDIO_CHROME_VIEWS: StudioChromeView[] = ['landingView', 'communityHome'];
 
@@ -46,13 +50,19 @@ export const STUDIO_CENTRAL_LABEL = STUDIO_COMMUNITY_LABEL;
 
 export const STUDIO_NAV_LABELS: Record<StudioSection, string> = {
   page: STUDIO_MY_STORY_LABEL,
-  community: 'Daily log',
+  runnerStory: STUDIO_RUNNER_STORY_LABEL,
+  reflections: 'Training Reflections',
   workouts: 'Runs',
-  content: 'Tips',
+  content: 'Think Pieces',
   announcements: 'Announcements',
   chatter: 'Chatter',
   members: 'Members',
 };
+
+export const STUDIO_LANDING_NAV_ORDER: Array<{ section: StudioLandingSection; label: string }> = [
+  { section: 'page', label: STUDIO_MY_STORY_LABEL },
+  { section: 'runnerStory', label: STUDIO_RUNNER_STORY_LABEL },
+];
 
 export const STUDIO_RUNS_TRAINING_NAV_ORDER: Array<{
   section: StudioSection;
@@ -69,8 +79,8 @@ export const STUDIO_BUILD_NAV_ORDER: Array<{
   label: string;
   focus?: ContentEditorFocus;
 }> = [
-  { section: 'community', label: 'Daily log' },
-  { section: 'content', label: 'Tips', focus: 'tip' },
+  { section: 'reflections', label: 'Training Reflections' },
+  { section: 'content', label: 'Think Pieces', focus: 'tip' },
 ];
 
 export const STUDIO_MANAGE_NAV_ORDER: Array<{ section: StudioManageSection; label: string }> = [
@@ -84,10 +94,11 @@ export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
 };
 
 export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
-  page: 'Photo, welcome, and about — your public who-am-I page',
-  community: 'How you feel today — posts spill into the member feed',
+  page: 'Photo, welcome, and short about — your public landing',
+  runnerStory: 'Full life story linked from About me',
+  reflections: 'Training reflections for your feed — optional activity link',
   workouts: 'Host join-me runs followers can RSVP to',
-  content: 'Durable tips — nutrition, training thoughts, and what followers revisit',
+  content: 'Essays and riffs — think pieces on your landing and feed',
   announcements: 'Journey updates followers see in your community feed',
   chatter: 'Follower conversation — review and moderate from studio',
   members: 'Who follows your athlete community — see all roster',
@@ -105,7 +116,8 @@ export const STUDIO_ROUTES_DESCRIPTION =
 /** Legacy flat order for tutorials. */
 export const STUDIO_BIN_ORDER: StudioSection[] = [
   'page',
-  'community',
+  'runnerStory',
+  'reflections',
   'workouts',
   'content',
   'announcements',
@@ -121,8 +133,12 @@ export function isStudioManageSection(section: StudioSection): section is Studio
   return section === 'announcements' || section === 'chatter' || section === 'members';
 }
 
+export function isStudioLandingSection(section: StudioSection): section is StudioLandingSection {
+  return section === 'page' || section === 'runnerStory';
+}
+
 export function chromeViewForEditor(section: StudioSection): StudioChromeView {
-  if (section === 'page') return 'landingView';
+  if (section === 'page' || section === 'runnerStory') return 'landingView';
   return 'communityHome';
 }
 

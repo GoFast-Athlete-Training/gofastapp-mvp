@@ -18,6 +18,8 @@ type Props = {
   liveUrl: string;
   onSaved: (values: GoFastWithMeLandingValues) => void;
   onAvatarSaved?: (photoURL: string | null) => void;
+  onOpenRunnerStory?: () => void;
+  runnerStoryPublicUrl?: string | null;
 };
 
 export default function GoFastWithMeWelcomePanel({
@@ -28,6 +30,8 @@ export default function GoFastWithMeWelcomePanel({
   liveUrl,
   onSaved,
   onAvatarSaved,
+  onOpenRunnerStory,
+  runnerStoryPublicUrl,
 }: Props) {
   const complete = isWelcomeContentComplete(landingValues);
 
@@ -80,6 +84,8 @@ export default function GoFastWithMeWelcomePanel({
         athleteId={athleteId}
         onSaved={onSaved}
         onAvatarSaved={onAvatarSaved}
+        onOpenRunnerStory={onOpenRunnerStory}
+        runnerStoryPublicUrl={runnerStoryPublicUrl}
       />
 
       <GoFastWithMeCompanyPanel />

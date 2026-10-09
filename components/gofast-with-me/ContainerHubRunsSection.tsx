@@ -22,7 +22,16 @@ export default function ContainerHubRunsSection({ runs, hostFirstName, isHost }:
         </p>
       </div>
 
-      <HubWeeklyRunStrip runs={runs} />
+      <HubWeeklyRunStrip
+        runs={runs.map((r) => ({
+          id: r.id,
+          title: r.title,
+          date: r.date,
+          citySlug: r.citySlug ?? r.gofastCity ?? 'dc',
+          meetUpPoint: r.meetUpPoint ?? '',
+          gorunPath: r.gorunPath,
+        }))}
+      />
 
       {runs.length > 0 ? (
         <ul className="space-y-2">

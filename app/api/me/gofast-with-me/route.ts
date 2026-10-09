@@ -69,6 +69,7 @@ const INTRO_FIELDS = [
   'creatorType',
   'coachSpecialty',
   'instagramDescription',
+  'runnerStory',
 ] as const;
 
 /** PATCH /api/me/gofast-with-me — update intro fields and/or URL settings */

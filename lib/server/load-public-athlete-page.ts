@@ -20,6 +20,8 @@ import {
   getAthleteCompanyForAthlete,
   toPublicAthleteCompany,
 } from '@/lib/athlete-company/athlete-company-service';
+import { listPublicUpcomingRunsForAthlete } from '@/lib/public-athlete-upcoming-runs';
+import { listPublishedActivityPosts } from '@/lib/gofast-with-me/activity-posts';
 
 const METERS_PER_MILE = 1609.344;
 
@@ -102,6 +104,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
     creatorType: gwmRow.creatorType,
     coachSpecialty: gwmRow.coachSpecialty,
     instagramDescription: gwmRow.instagramDescription,
+    runnerStory: gwmRow.runnerStory,
   };
 
   const now = new Date();
@@ -113,7 +116,6 @@ export async function loadPublicAthletePage(rawHandle: string) {
 
   const [
     athleteRaceRows,
-    upcomingRunsRaw,
     plan,
     lastActivity,
     workoutRows,
@@ -127,29 +129,6 @@ export async function loadPublicAthletePage(rawHandle: string) {
       select: athleteRaceSnapshotSelect,
       orderBy: { raceDate: 'asc' },
       take: 24,
-    }),
-    prisma.city_runs.findMany({
-      where: {
-        athleteGeneratedId: athlete.id,
-        published: true,
-        date: { gte: startOfTodayUtc },
-      },
-      orderBy: { date: 'asc' },
-      take: 20,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        date: true,
-        citySlug: true,
-        meetUpPoint: true,
-        startTimeHour: true,
-        startTimeMinute: true,
-        startTimePeriod: true,
-        workoutId: true,
-        mapImageUrl: true,
-        routePhotos: true,
-      },
     }),
     prisma.training_plans.findFirst({
       where: { athleteId: athlete.id },
@@ -203,62 +182,10 @@ export async function loadPublicAthletePage(rawHandle: string) {
     id: race.raceRegistryId,
   }));
 
-  // Pull RSVP stats for the upcoming runs in a single round-trip
-  const runIds = upcomingRunsRaw.map((r) => r.id);
-  const goingRsvps = runIds.length
-    ? await prisma.city_run_rsvps.findMany({
-        where: { runId: { in: runIds }, status: 'going' },
-        include: {
-          Athlete: {
-            select: {
-              id: true,
-              firstName: true,
-              gofastHandle: true,
-              photoURL: true,
-            },
-          },
-        },
-      })
-    : [];
-
-  const rsvpsByRun = new Map<
-    string,
-    { count: number; avatars: { id: string; firstName: string | null; gofastHandle: string | null; photoURL: string | null }[] }
-  >();
-  for (const r of goingRsvps) {
-    const bucket = rsvpsByRun.get(r.runId) ?? { count: 0, avatars: [] };
-    bucket.count += 1;
-    if (bucket.avatars.length < 4) {
-      bucket.avatars.push({
-        id: r.Athlete.id,
-        firstName: r.Athlete.firstName,
-        gofastHandle: r.Athlete.gofastHandle,
-        photoURL: r.Athlete.photoURL,
-      });
-    }
-    rsvpsByRun.set(r.runId, bucket);
-  }
-
-  const upcomingRuns = upcomingRunsRaw.map((r) => {
-    const stats = rsvpsByRun.get(r.id);
-    return {
-      id: r.id,
-      slug: r.slug,
-      title: r.title,
-      date: r.date.toISOString(),
-      citySlug: r.citySlug,
-      meetUpPoint: r.meetUpPoint,
-      startTimeHour: r.startTimeHour,
-      startTimeMinute: r.startTimeMinute,
-      startTimePeriod: r.startTimePeriod,
-      workoutId: r.workoutId,
-      mapImageUrl: r.mapImageUrl,
-      routePhotos: r.routePhotos,
-      gorunPath: `/gorun/${r.id}`,
-      goingCount: stats?.count ?? 0,
-      goingAvatars: (stats?.avatars ?? []).slice(0, 3),
-    };
-  });
+  const [upcomingRuns, trainingReflections] = await Promise.all([
+    listPublicUpcomingRunsForAthlete(athlete.id, 20),
+    listPublishedActivityPosts(athlete.id, 24),
+  ]);
 
   const planRace = plan?.athlete_race ?? null;
   const explicitPrimary = athleteRaceRows.find((r) => r.isPrimaryRace) ?? null;
@@ -524,6 +451,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
     signedUpRaces,
     upcomingWorkouts,
     upcomingRuns,
+    trainingReflections,
     athleteTips,
     athleteRunRoutes,
     instagramMedia,

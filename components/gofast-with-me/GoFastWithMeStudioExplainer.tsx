@@ -69,7 +69,7 @@ export default function GoFastWithMeStudioExplainer({ onDismiss }: Props) {
           <TutorialRow
             icon={Users}
             label="Build content"
-            description="My Story, daily log, and tips — writing for your landing page and member feed."
+            description="Training reflections and think pieces — writing for your landing page and member feed."
           />
           <TutorialRow
             icon={Users}

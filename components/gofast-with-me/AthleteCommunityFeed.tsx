@@ -81,10 +81,19 @@ export default function AthleteCommunityFeed({ items, hostFirstName, emptyMessag
 
         if (item.kind === 'activity') {
           const { post } = item;
-          const { activity } = post;
-          const distance = formatTrainingDistance(activity.distanceMiles);
-          const duration = formatTrainingDuration(activity.durationSeconds);
+          const activity = post.activity;
+          const distance = activity
+            ? formatTrainingDistance(activity.distanceMiles)
+            : null;
+          const duration = activity
+            ? formatTrainingDuration(activity.durationSeconds)
+            : null;
           const stats = [distance, duration].filter(Boolean).join(' · ');
+          const headline =
+            activity?.activityName?.trim() ||
+            post.caption?.trim()?.slice(0, 80) ||
+            'Training reflection';
+          const when = activity?.startTime ?? post.publishedAt;
           return (
             <article
               key={item.id}
@@ -100,9 +109,7 @@ export default function AthleteCommunityFeed({ items, hostFirstName, emptyMessag
                   className="mt-3 -mx-4 w-[calc(100%+2rem)] max-h-72 object-cover"
                 />
               ) : null}
-              <h3 className="mt-2 text-base font-semibold text-gray-900">
-                {activity.activityName?.trim() || 'Workout'}
-              </h3>
+              <h3 className="mt-2 text-base font-semibold text-gray-900">{headline}</h3>
               {stats ? <p className="mt-1 text-sm text-gray-700">{stats}</p> : null}
               {post.matchedWorkout ? (
                 <p className="mt-2 text-xs text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2">
@@ -113,7 +120,7 @@ export default function AthleteCommunityFeed({ items, hostFirstName, emptyMessag
               {post.caption ? (
                 <p className="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{post.caption}</p>
               ) : null}
-              <p className="mt-2 text-xs text-gray-400">{formatWhen(activity.startTime)}</p>
+              <p className="mt-2 text-xs text-gray-400">{formatWhen(when)}</p>
             </article>
           );
         }

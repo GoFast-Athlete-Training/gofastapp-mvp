@@ -41,9 +41,9 @@ export default function GoFastWithMeCommunityPanel({ athleteId, publicSlug }: Pr
   return (
     <section id="community" className="space-y-6 pb-8">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Daily log</h2>
+        <h2 className="text-lg font-bold text-gray-900">Community workspace</h2>
         <p className="text-sm text-gray-600 mt-1">
-          How you&apos;re feeling today — posts spill into the member feed.
+          Post a quick daily log — it spills into the member feed.
         </p>
       </div>
 
