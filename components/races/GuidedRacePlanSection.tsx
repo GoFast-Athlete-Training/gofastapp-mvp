@@ -92,23 +92,33 @@ export function GuidedRacePlanSection({ race, goal, courseSegments }: Props) {
         </p>
       </div>
 
-      <ul className="space-y-3">
-        {stretches.map((s) => (
-          <li
-            key={s.key}
-            className="rounded-lg border border-violet-100 bg-white px-4 py-3 shadow-sm"
-          >
-            <p className="text-sm font-bold text-violet-900">{s.title}</p>
-            <p className="text-sm text-gray-700 mt-0.5">
-              {s.mileRangeLabel} · <span className="font-semibold tabular-nums">{s.paceBandLabel}</span>
-            </p>
-            <p className="text-xs text-gray-600 mt-1">{s.effortNote}</p>
-            {s.courseNote ? (
-              <p className="text-sm text-gray-800 mt-2 border-t border-violet-50 pt-2">{s.courseNote}</p>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      {stretches.length === 0 ? (
+        <p className="text-sm text-gray-600">
+          Course pacing by segment will appear here once this race has a course guide on GoFast. Your
+          goal time and average pace above are still set for race day.
+        </p>
+      ) : (
+        <ul className="space-y-3">
+          {stretches.map((s) => (
+            <li
+              key={s.key}
+              className="rounded-lg border border-violet-100 bg-white px-4 py-3 shadow-sm"
+            >
+              <p className="text-sm font-bold text-violet-900">{s.title}</p>
+              <p className="text-sm text-gray-700 mt-0.5">
+                {s.mileRangeLabel} ·{" "}
+                <span className="font-semibold tabular-nums">{s.paceBandLabel}</span>
+              </p>
+              <p className="text-xs text-gray-600 mt-1">{s.effortNote}</p>
+              {s.courseNote ? (
+                <p className="text-sm text-gray-800 mt-2 border-t border-violet-50 pt-2">
+                  {s.courseNote}
+                </p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <p className="text-xs text-gray-500">
         Garmin race-day steps live on your training calendar for race morning.

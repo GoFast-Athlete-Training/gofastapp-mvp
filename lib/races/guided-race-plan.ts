@@ -1,5 +1,3 @@
-import { suggestRaceBlocksFromGoal, type RacePacingBlock } from "@/lib/races/race-pacing-blocks";
-
 export type CourseSegmentInput = {
   order: number;
   name: string;
@@ -37,57 +35,46 @@ function parseMileMarker(raw: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function blocksToStretches(blocks: RacePacingBlock[]): GuidedRaceStretch[] {
-  let mile = 0;
-  return blocks.map((b, i) => {
-    const start = mile;
-    const end = mile + b.miles;
-    mile = end;
-    const effortNote =
-      b.kind === "warmup"
-        ? "Settle in — a little easy, then hold."
-        : "Hold steady at your goal effort.";
-    return {
-      key: `block-${i}`,
-      title: b.name,
-      mileRangeLabel: `${start.toFixed(1)}–${end.toFixed(1)} mi`,
-      paceBandLabel: formatPaceBand(b.paceSecPerMiLow, b.paceSecPerMiHigh),
-      effortNote,
-      courseNote: null,
-    };
-  });
+function mileRangeLabel(
+  seg: CourseSegmentInput,
+  index: number,
+  sorted: CourseSegmentInput[]
+): string {
+  const raw = seg.mileMarker?.trim();
+  const embeddedRange = raw?.match(/^(\d+(?:\.\d+)?)\s*[–-]\s*(\d+(?:\.\d+)?)$/);
+  if (embeddedRange) {
+    return `${embeddedRange[1]}–${embeddedRange[2]} mi`;
+  }
+
+  const mileAt = parseMileMarker(seg.mileMarker);
+  const nextMile = parseMileMarker(sorted[index + 1]?.mileMarker ?? null);
+  if (mileAt != null && nextMile != null && nextMile > mileAt) {
+    return `${mileAt.toFixed(1)}–${nextMile.toFixed(1)} mi`;
+  }
+  if (mileAt != null) {
+    return `From mile ${mileAt.toFixed(1)}`;
+  }
+  return raw || `Segment ${index + 1}`;
 }
 
-/** Map course segments + goal pace into a race-week guide. Falls back to coarse blocks. */
+/** Map course segments + goal pace into a race-week guide (course segments only). */
 export function buildGuidedRaceStretches(params: {
   segments: CourseSegmentInput[];
   totalMiles: number;
   goalPaceSecPerMi: number;
 }): GuidedRaceStretch[] {
-  const { segments, totalMiles, goalPaceSecPerMi } = params;
+  const { segments, goalPaceSecPerMi } = params;
   const sorted = segments.slice().sort((a, b) => a.order - b.order);
 
   if (sorted.length === 0) {
-    const blocks = suggestRaceBlocksFromGoal({
-      totalMiles,
-      goalPaceSecPerMi,
-      strategy: "even",
-    });
-    return blocksToStretches(blocks);
+    return [];
   }
 
   const settleFactor = 1.06;
   const stretches: GuidedRaceStretch[] = [];
   for (let i = 0; i < sorted.length; i++) {
     const seg = sorted[i]!;
-    const mileAt = parseMileMarker(seg.mileMarker);
-    const nextMile = parseMileMarker(sorted[i + 1]?.mileMarker ?? null);
-    let rangeLabel = seg.mileMarker?.trim() || `Segment ${i + 1}`;
-    if (mileAt != null && nextMile != null && nextMile > mileAt) {
-      rangeLabel = `${mileAt.toFixed(1)}–${nextMile.toFixed(1)} mi`;
-    } else if (mileAt != null) {
-      rangeLabel = `From mile ${mileAt.toFixed(1)}`;
-    }
+    const rangeLabel = mileRangeLabel(seg, i, sorted);
 
     const isFirst = i === 0;
     const low = Math.round(goalPaceSecPerMi * (isFirst ? settleFactor : 0.99));
