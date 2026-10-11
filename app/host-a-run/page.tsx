@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Users } from "lucide-react";
@@ -38,7 +38,7 @@ function mapTrainingWorkoutToHostForm(w: {
   };
 }
 
-export default function HostARunPage() {
+function HostARunPageInner() {
   const searchParams = useSearchParams();
   const workoutIdParam = searchParams.get("workoutId")?.trim() || null;
   const [workout, setWorkout] = useState<CreateCityRunFormWorkout | null>(null);
@@ -154,5 +154,27 @@ export default function HostARunPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function HostARunPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex flex-col">
+          <TopNav />
+          <div className="flex flex-1 overflow-hidden min-w-0">
+            <AthleteSidebar />
+            <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
+              <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 text-center">
+                <div className="animate-spin rounded-full h-10 w-10 border-2 border-orange-500 border-t-transparent mx-auto" />
+              </div>
+            </main>
+          </div>
+        </div>
+      }
+    >
+      <HostARunPageInner />
+    </Suspense>
   );
 }
