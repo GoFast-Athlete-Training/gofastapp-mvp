@@ -553,7 +553,7 @@ export default function MyRacePage() {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                   >
-                    Course tips
+                    Course details
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 ) : null}

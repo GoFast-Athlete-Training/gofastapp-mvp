@@ -109,7 +109,7 @@ export function RaceHubAtAGlanceSection({
           rel="noopener noreferrer"
           className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 transition-colors"
         >
-          Course tips
+          Course details
           <ExternalLink className="w-4 h-4 shrink-0" />
         </a>
       ) : null}
