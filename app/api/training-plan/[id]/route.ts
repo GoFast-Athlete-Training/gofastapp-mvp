@@ -77,78 +77,6 @@ export async function GET(request: NextRequest, context: Ctx) {
           },
         },
         _count: { select: { planned_workouts: true } },
-        training_plan_preset: {
-          include: {
-            longRunConfig: {
-              include: {
-                positions: {
-                  orderBy: { cyclePosition: "asc" },
-                  include: {
-                    workout_catalogue: {
-                      select: {
-                        id: true,
-                        name: true,
-                        workoutType: true,
-                        slug: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            intervalsConfig: {
-              include: {
-                positions: {
-                  orderBy: { cyclePosition: "asc" },
-                  include: {
-                    workout_catalogue: {
-                      select: {
-                        id: true,
-                        name: true,
-                        workoutType: true,
-                        slug: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            tempoConfig: {
-              include: {
-                positions: {
-                  orderBy: { cyclePosition: "asc" },
-                  include: {
-                    workout_catalogue: {
-                      select: {
-                        id: true,
-                        name: true,
-                        workoutType: true,
-                        slug: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            easyConfig: {
-              include: {
-                positions: {
-                  orderBy: { cyclePosition: "asc" },
-                  include: {
-                    workout_catalogue: {
-                      select: {
-                        id: true,
-                        name: true,
-                        workoutType: true,
-                        slug: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
         athlete_preset: {
           select: {
             id: true,
@@ -202,8 +130,16 @@ export async function GET(request: NextRequest, context: Ctx) {
       plan = { ...plan, name: syncedName };
     }
 
+    const { catalogPresetSummaryForApi } = await import(
+      "@/lib/training/hydrate-catalog-preset-from-training-manage"
+    );
+    const catalogPreset = plan.presetId
+      ? await catalogPresetSummaryForApi(plan.presetId)
+      : null;
+
     const serialized = {
       ...plan,
+      training_plan_preset: catalogPreset,
       startDate: ymdFromDate(plan.startDate),
       race_registry: terminalRace
         ? {
@@ -419,12 +355,12 @@ export async function PATCH(request: NextRequest, context: Ctx) {
             data.presetId = null;
           } else {
             const pid = String(raw).trim();
-            const exists = await prisma.training_plan_preset.findUnique({
-              where: { id: pid },
-              select: { id: true },
-            });
+            const { catalogPresetExistsInTrainingManage } = await import(
+              "@/lib/training/hydrate-catalog-preset-from-training-manage"
+            );
+            const exists = await catalogPresetExistsInTrainingManage(pid);
             if (!exists) {
-              return NextResponse.json({ error: "presetId not found" }, { status: 400 });
+              return NextResponse.json({ error: "presetId not found in Training Manage" }, { status: 400 });
             }
             data.presetId = pid;
           }

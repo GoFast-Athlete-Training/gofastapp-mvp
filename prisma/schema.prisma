@@ -2019,11 +2019,6 @@ model training_plan_preset {
   easyConfig        easy_config?       @relation(fields: [easyConfigId], references: [id], onDelete: SetNull)
   /// JSON: standardMiles, minMiles, paceOffsetSecPerMile, weeklyTargetBufferMiles (easy-day defaults / pace vs 5K anchor)
   easyRunConfig     Json?
-  training_plans  training_plans[]
-  training_cohorts training_cohorts[]
-  public_training_plans public_training_plans[]
-  athlete_presets_as_source athlete_presets[] @relation("AthletePresetSource")
-  athlete_presets_as_promoted athlete_presets[] @relation("AthletePresetPromoted")
 }
 
 /// Athlete-owned training blueprint — never mixed into staff catalog until promoted.
@@ -2081,8 +2076,7 @@ model athlete_presets {
   updatedAt DateTime @updatedAt
 
   athlete          Athlete               @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  sourcePreset     training_plan_preset? @relation("AthletePresetSource", fields: [sourcePresetId], references: [id], onDelete: SetNull)
-  promotedPreset   training_plan_preset? @relation("AthletePresetPromoted", fields: [promotedPresetId], references: [id], onDelete: SetNull)
+  /// Training Manage catalog preset id (no prod FK).
   training_plans   training_plans[]
   longRunOrders    athlete_preset_long_run_order[]
   easyOrders       athlete_preset_easy_order[]
@@ -2521,7 +2515,7 @@ model training_plans {
   race_registry        race_registry?         @relation(fields: [raceId], references: [id])
   athlete_race         athlete_races?         @relation("PlanAthleteRace", fields: [athleteRaceId], references: [id], onDelete: SetNull)
   pace_adjustment_logs pace_adjustment_log[]
-  training_plan_preset training_plan_preset? @relation(fields: [presetId], references: [id])
+  /// Training Manage catalog preset id (no prod FK).
   athlete_preset       athlete_presets?      @relation(fields: [athletePresetId], references: [id], onDelete: SetNull)
   training_cohort      training_cohorts?     @relation(fields: [cohortId], references: [id], onDelete: SetNull)
   cohort_membership    training_cohort_memberships?
@@ -2557,7 +2551,6 @@ model public_training_plans {
 
   author               Athlete                @relation("PublicPlanAuthor", fields: [authorAthleteId], references: [id], onDelete: Cascade)
   sourceTrainingPlan   training_plans         @relation("PublicPlanSource", fields: [sourceTrainingPlanId], references: [id], onDelete: Cascade)
-  sourcePreset         training_plan_preset?  @relation(fields: [sourcePresetId], references: [id], onDelete: SetNull)
   copiedCustomWorkouts plan_custom_workouts[] @relation("CustomWorkoutSourcePublicPlan")
 
   @@index([authorAthleteId])
@@ -3337,7 +3330,7 @@ model training_cohorts {
   updatedAt            DateTime             @updatedAt
 
   race_registry            race_registry                 @relation(fields: [raceId], references: [id])
-  training_plan_preset     training_plan_preset          @relation(fields: [presetId], references: [id])
+  /// Training Manage catalog preset id (no prod FK).
   hostAthlete              Athlete?                      @relation("TrainingCohortHost", fields: [hostAthleteId], references: [id], onDelete: SetNull)
   memberships              training_cohort_memberships[]
   training_plans           training_plans[]

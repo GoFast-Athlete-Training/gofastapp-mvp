@@ -14,6 +14,8 @@ import {
 import { computeCoreVolumeCalendarPreview } from "@/lib/training/core-volume-compute";
 import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
 import { serializeAthletePresetForApi } from "@/lib/training/athlete-preset-blueprint";
+import { fetchTrainingManageTemplatePreset } from "@/lib/training/fetch-training-manage-catalog";
+import { syncAthletePresetToTrainingManage } from "@/lib/training/sync-athlete-preset-to-training-manage";
 
 function numField(v: unknown, fallback: number): number {
   const n = Number(v);
@@ -79,16 +81,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const sourcePreset = await prisma.training_plan_preset.findUnique({
-      where: { id: sourcePresetId },
-      select: {
-        id: true,
-        targetDistanceLabel: true,
-        tempoIdealDow: true,
-        intervalIdealDow: true,
-        longRunDefaultDow: true,
-      },
-    });
+    const sourcePreset = await fetchTrainingManageTemplatePreset(sourcePresetId);
     if (!sourcePreset) {
       return NextResponse.json({ error: "sourcePresetId not found" }, { status: 404 });
     }
@@ -269,6 +262,10 @@ export async function POST(request: NextRequest) {
           })
         ),
       },
+    });
+
+    void syncAthletePresetToTrainingManage(row.id).catch((err) => {
+      console.warn("[syncAthletePresetToTrainingManage]", err);
     });
 
     return NextResponse.json({

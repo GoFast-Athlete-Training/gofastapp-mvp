@@ -5,7 +5,7 @@
 
 import {
   RACE_DISTANCES_MILES,
-  distanceMilesToPaceRaceKey,
+  goalPaceSecondsPerMileFromRaceDistance,
   parsePaceToSecondsPerMile,
   parseRaceTimeToSeconds,
   raceTimeToGoalPaceSecondsPerMile,
@@ -73,10 +73,9 @@ export function goalPaceSecondsPerMileFromPlan(
 ): number | null {
   const t = goalRaceTime?.trim();
   if (!t) return null;
-  const key = distanceMilesToPaceRaceKey(raceDistanceMiles);
   try {
     const sec = parseRaceTimeToSeconds(t);
-    return raceTimeToGoalPaceSecondsPerMile(sec, key);
+    return goalPaceSecondsPerMileFromRaceDistance(sec, raceDistanceMiles);
   } catch {
     return null;
   }

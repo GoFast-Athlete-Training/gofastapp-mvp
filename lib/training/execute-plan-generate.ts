@@ -47,8 +47,10 @@ import { fetchTrainingManagePresetForGenerate } from "@/lib/training/fetch-train
 import { buildWeeklyMileageTargetsByWeek } from "@/lib/training/build-weekly-mileage-curve";
 import {
   applyBuildPhaseLongRunMiles,
-  applyPhaseTaperAndRaceLongRunCaps,
+  applyPhaseTaperLongRunMiles,
+  applyPhaseTaperWeekTotalCaps,
   applyPhaseWeekCataloguePins,
+  applyRaceWeekSlotsFromPreset,
   positionsFromPhaseRotation,
 } from "@/lib/training/apply-phase-preset-generate";
 import { weeklyVolumePeakFromPreset } from "@/lib/training/preset-core";
@@ -125,6 +127,11 @@ export async function executePlanGenerate(params: {
     plan.presetId != null
       ? await fetchTrainingManagePresetForGenerate(plan.presetId)
       : null;
+  if (plan.presetId != null && !phasePreset?.build) {
+    throw new Error(
+      `Training preset "${presetLabel}" was not found in Training Manage or has no build phase. Import or finish the preset in Training Manage.`,
+    );
+  }
   const phaseBuild = phasePreset?.build ?? null;
 
   let longRunPositions =
@@ -235,7 +242,7 @@ export async function executePlanGenerate(params: {
 
   const hasPresetTaperOrRaceWeek =
     (phasePreset?.taper?.weeks?.length ?? 0) > 0 ||
-    (phasePreset?.raceWeek?.weeks?.length ?? 0) > 0;
+    (phasePreset?.raceWeek?.slots?.length ?? 0) > 0;
 
   const placement = assignWorkoutDays({
     planStartDate: plan.startDate,
@@ -304,7 +311,9 @@ export async function executePlanGenerate(params: {
   const vpLegacy = Number(planRow.peakLongRunPoolMiles ?? vol.peakLongRunPoolMiles);
   const peakLongRunPoolMiles =
     peakLongRunSingle != null && peakLongRunSingle > 0
-      ? peakLongRunSingle * cLen
+      ? phaseBuild
+        ? peakLongRunSingle
+        : peakLongRunSingle * cLen
       : vpLegacy;
   if (!Number.isFinite(peakLongRunPoolMiles) || peakLongRunPoolMiles <= 0) {
     throw new Error(
@@ -325,19 +334,19 @@ export async function executePlanGenerate(params: {
       peakWeekNumber: placement.peakWeekNumber ?? placement.taperStartWeekNumber - 1,
       startLongRunMiles: phaseBuild.startLongRunMiles,
       peakLongRunMiles: phaseBuild.peakLongRunMiles,
+      longRunCutback: phaseBuild.longRunCutback ?? null,
       longRunPositions,
     });
-    applyPhaseTaperAndRaceLongRunCaps({
+    applyPhaseTaperLongRunMiles({
       planSchedule: schedule,
       totalWeeks: weekCount,
       taperWeeks: phasePreset?.taper?.weeks,
-      raceWeek: phasePreset?.raceWeek?.weeks,
     });
     applyPhaseWeekCataloguePins({
       planSchedule: schedule,
       totalWeeks: weekCount,
       taperWeeks: phasePreset?.taper?.weeks,
-      raceWeek: phasePreset?.raceWeek?.weeks,
+      raceWeek: null,
     });
   } else {
     applyLongRunSchedule({
@@ -395,7 +404,7 @@ export async function executePlanGenerate(params: {
         presetMinMiles: Math.max(minWeeklyFromPreset, bandMin),
         presetPeakMiles,
         taperWeeks: phasePreset?.taper?.weeks,
-        raceWeek: phasePreset?.raceWeek?.weeks,
+        raceWeek: phasePreset?.raceWeek?.slots ?? null,
       })
     : null;
 
@@ -414,6 +423,23 @@ export async function executePlanGenerate(params: {
     secondaryRaceDistanceMilesByRegistryId,
     weeklyMileageByWeek,
   });
+
+  if (phaseBuild) {
+    applyPhaseTaperWeekTotalCaps({
+      planSchedule: schedule,
+      totalWeeks: weekCount,
+      taperWeeks: phasePreset?.taper?.weeks,
+    });
+  }
+
+  if (phasePreset?.raceWeek?.slots?.length) {
+    applyRaceWeekSlotsFromPreset({
+      planStart: plan.startDate,
+      raceDate: race.raceDate,
+      schedule,
+      slots: phasePreset.raceWeek.slots,
+    });
+  }
 
   const syncedFiveKPace =
     params.athleteFiveKPace?.trim() ||

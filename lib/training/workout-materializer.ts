@@ -301,9 +301,6 @@ export async function materializeWorkoutForPlanDay(params: {
             distanceLabel: true,
           },
         },
-        training_plan_preset: {
-          select: { athletePersonaCapability: true },
-        },
         athlete_preset: {
           select: { id: true },
         },

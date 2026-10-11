@@ -135,17 +135,32 @@ export async function getPublicPlanBySlug(
           distanceLabel: true,
         },
       },
-      training_plan_preset: {
-        select: {
-          id: true,
-          title: true,
-          publicDescription: true,
-        },
-      },
     },
   });
 
-  return plan;
+  return attachCatalogPresetToPlan(plan);
+}
+
+async function attachCatalogPresetToPlan<T extends { presetId: string | null }>(
+  plan: T | null,
+): Promise<(T & { training_plan_preset?: { id: string; title: string; publicDescription: string | null } | null }) | null> {
+  if (!plan) return plan;
+  if (!plan.presetId) return plan;
+
+  const { catalogPresetSummaryForApi } = await import(
+    "@/lib/training/hydrate-catalog-preset-from-training-manage"
+  );
+  const summary = await catalogPresetSummaryForApi(plan.presetId);
+  return summary
+    ? {
+        ...plan,
+        training_plan_preset: {
+          id: summary.id,
+          title: summary.title,
+          publicDescription: summary.publicDescription,
+        },
+      }
+    : plan;
 }
 
 export type PromotePublicPlanInput = {
@@ -667,10 +682,12 @@ export async function adoptPublishedPlanBySlug(
     athleteRaceId: result.athleteRaceId,
   });
 
-  const preset = await prisma.training_plan_preset.findUnique({
-    where: { id: sourcePlan.presetId! },
-    select: { minWeeklyMiles: true },
-  });
+  const { catalogPresetSummaryForApi } = await import(
+    "@/lib/training/hydrate-catalog-preset-from-training-manage"
+  );
+  const preset = sourcePlan.presetId
+    ? await catalogPresetSummaryForApi(sourcePlan.presetId)
+    : null;
 
   const weeklyMileageTarget = prefs?.weeklyMileageTarget ?? 45;
   await executePlanGenerate({

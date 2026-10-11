@@ -44,7 +44,6 @@ export async function GET(
           goalDistance: true,
         },
       },
-      training_plan_preset: true,
       _count: { select: { planned_workouts: true } },
     },
   });
@@ -53,8 +52,16 @@ export async function GET(
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
 
+  const { catalogPresetSummaryForApi } = await import(
+    "@/lib/training/hydrate-catalog-preset-from-training-manage"
+  );
+  const catalogPreset = plan.presetId
+    ? await catalogPresetSummaryForApi(plan.presetId)
+    : null;
+
   const serialized = {
     ...plan,
+    training_plan_preset: catalogPreset,
     startDate: ymdFromDate(plan.startDate),
     race_registry: plan.race_registry
       ? {
@@ -77,6 +84,9 @@ export async function PATCH(
   const { id } = await params;
 
   try {
+    const { catalogPresetSummaryForApi } = await import(
+      "@/lib/training/hydrate-catalog-preset-from-training-manage"
+    );
     const body = await request.json();
     const existing = await prisma.training_plans.findUnique({ where: { id } });
     if (!existing) {
@@ -91,12 +101,15 @@ export async function PATCH(
         data.presetId = null;
       } else {
         const pid = String(raw).trim();
-        const preset = await prisma.training_plan_preset.findUnique({
-          where: { id: pid },
-          select: { id: true },
-        });
-        if (!preset) {
-          return NextResponse.json({ success: false, error: "presetId not found" }, { status: 400 });
+        const { catalogPresetExistsInTrainingManage } = await import(
+          "@/lib/training/hydrate-catalog-preset-from-training-manage"
+        );
+        const exists = await catalogPresetExistsInTrainingManage(pid);
+        if (!exists) {
+          return NextResponse.json(
+            { success: false, error: "presetId not found in Training Manage" },
+            { status: 400 },
+          );
         }
         data.presetId = pid;
       }
@@ -147,15 +160,17 @@ export async function PATCH(
             goalDistance: true,
           },
         },
-        training_plan_preset: {
-          select: { id: true, slug: true, title: true },
-        },
         _count: { select: { planned_workouts: true } },
       },
     });
 
+    const catalogPresetAfter = plan.presetId
+      ? await catalogPresetSummaryForApi(plan.presetId)
+      : null;
+
     const serialized = {
       ...plan,
+      training_plan_preset: catalogPresetAfter,
       startDate: ymdFromDate(plan.startDate),
       race_registry: plan.race_registry
         ? {

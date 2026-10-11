@@ -82,9 +82,36 @@ export const RACE_DISTANCES_MILES: Record<string, number> = {
   half: 13.109375,
   "half marathon": 13.109375,
   "10k": 6.21371,
+  "10m": 10,
   "5k": 3.10686,
   mile: 1,
 };
+
+/**
+ * Canonical race length for pace math when miles fall in a tight standard bucket only.
+ * Returns null for distances like 10-mile (between 10K and half) so callers use actual miles.
+ */
+export function tightStandardRaceMilesForPace(distanceMiles: number): number | null {
+  if (distanceMiles >= 25 && distanceMiles <= 27) return RACE_DISTANCES_MILES.marathon;
+  if (distanceMiles >= 12.5 && distanceMiles <= 14) return RACE_DISTANCES_MILES.half;
+  if (distanceMiles >= 6 && distanceMiles <= 6.5) return RACE_DISTANCES_MILES["10k"];
+  if (distanceMiles >= 3 && distanceMiles <= 3.2) return RACE_DISTANCES_MILES["5k"];
+  if (distanceMiles >= 0.9 && distanceMiles <= 1.1) return RACE_DISTANCES_MILES.mile;
+  return null;
+}
+
+/** Goal pace (sec/mile) from finish time and measured race distance. */
+export function goalPaceSecondsPerMileFromRaceDistance(
+  raceTimeSeconds: number,
+  raceDistanceMiles: number
+): number {
+  if (!Number.isFinite(raceDistanceMiles) || raceDistanceMiles <= 0) {
+    throw new Error(`Invalid race distance miles: ${raceDistanceMiles}`);
+  }
+  const canonical = tightStandardRaceMilesForPace(raceDistanceMiles);
+  const miles = canonical ?? raceDistanceMiles;
+  return Math.round(raceTimeSeconds / miles);
+}
 
 /** Map catalog distance in miles to pace-calculator race key */
 export function distanceMilesToPaceRaceKey(distanceMiles: number): string {

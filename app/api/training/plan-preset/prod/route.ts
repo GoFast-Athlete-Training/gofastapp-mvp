@@ -1,19 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { presetMatchesDistance } from "@/lib/training/preset-distance-match";
+import { fetchTrainingManageCatalogPresets } from "@/lib/training/fetch-training-manage-catalog";
 
 /**
  * GET /api/training/plan-preset/prod
  *
- * Athlete-facing preset list. Optional `distanceMeters` filters to presets
- * compatible with that race distance (or presets with no target label).
- *
- * Query params:
- *   fitnessLevel     string  optional — defaults to "elite" (reserved)
- *   distanceMeters   number  optional — race distance in meters
+ * Athlete-facing catalog list — hydrated from Training Manage (machine lane).
  */
 export async function GET(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -30,25 +25,18 @@ export async function GET(request: NextRequest) {
       ? Math.round(Number(dmRaw))
       : null;
 
-  const rows = await prisma.training_plan_preset.findMany({
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      description: true,
-      publicDescription: true,
-      targetDistanceLabel: true,
-      minWeeklyMiles: true,
-      maxWeeklyMiles: true,
-      baseLongRunPoolMiles: true,
-    },
-  });
+  const rows = await fetchTrainingManageCatalogPresets();
+  if (rows == null) {
+    return NextResponse.json(
+      { success: false, error: "Training catalog unavailable" },
+      { status: 503 },
+    );
+  }
 
   if (rows.length === 0) {
     return NextResponse.json(
       { success: false, error: "No plan preset configured" },
-      { status: 404 }
+      { status: 404 },
     );
   }
 

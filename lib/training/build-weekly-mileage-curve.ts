@@ -1,3 +1,4 @@
+import type { RaceWeekSlotForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
 import type { PhaseWeekRow } from "@/lib/training/phase-week-pins";
 import { TAPER_CALENDAR_WEEKS, taperWeeklyMileageTarget } from "@/lib/training/preset-volume-helpers";
 
@@ -18,7 +19,7 @@ export function buildWeeklyMileageTargetsByWeek(params: {
   presetMinMiles: number;
   presetPeakMiles: number;
   taperWeeks: PhaseWeekRow[] | null | undefined;
-  raceWeek: PhaseWeekRow[] | null | undefined;
+  raceWeek: RaceWeekSlotForGenerate[] | PhaseWeekRow[] | null | undefined;
 }): Map<number, number> {
   const out = new Map<number, number>();
   const taperStart = Math.max(1, Math.floor(params.taperStartWeekNumber));
@@ -47,8 +48,25 @@ export function buildWeeklyMileageTargetsByWeek(params: {
     }
   }
 
-  const raceRow = params.raceWeek?.find((r) => r.weekIndex === 1);
-  const raceCap = raceRow?.totalMilesCap;
+  const slots = params.raceWeek;
+  let raceCap: number | null = null;
+  if (Array.isArray(slots) && slots.length > 0) {
+    const first = slots[0] as RaceWeekSlotForGenerate | PhaseWeekRow;
+    if ("offsetFromRace" in first) {
+      raceCap = (slots as RaceWeekSlotForGenerate[])
+        .filter(
+          (s) =>
+            s.type !== "off" &&
+            s.type !== "race" &&
+            s.prescribedMiles != null &&
+            s.prescribedMiles > 0,
+        )
+        .reduce((sum, s) => sum + (s.prescribedMiles ?? 0), 0);
+    } else {
+      const raceRow = (slots as PhaseWeekRow[]).find((r) => r.weekIndex === 1);
+      raceCap = raceRow?.totalMilesCap ?? null;
+    }
+  }
   out.set(
     params.totalWeeks,
     raceCap != null && raceCap > 0 ? round2(raceCap) : taperWeeklyMileageTarget(peak),

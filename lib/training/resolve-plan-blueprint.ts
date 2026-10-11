@@ -6,9 +6,7 @@ import { prisma } from "@/lib/prisma";
 import {
   athletePresetInclude,
   presetToPlanGenConfig,
-  trainingPlanPresetInclude,
   type LoadedAthletePresetInclude,
-  type LoadedPresetInclude,
   type RotationBlueprintSource,
 } from "@/lib/training/plan-generate-presets-loader";
 import {
@@ -16,6 +14,8 @@ import {
   isAthletePresetBlueprintComplete,
 } from "@/lib/training/athlete-preset-blueprint";
 import type { AthletePresetFitnessPhase, training_plan_preset } from "@prisma/client";
+import { fetchTrainingManagePresetForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
+import { resolvedBlueprintFromTrainingManage } from "@/lib/training/training-manage-blueprint";
 
 export type ResolvedPlanBlueprint = {
   kind: "catalog" | "athlete";
@@ -90,21 +90,9 @@ export async function loadPlanBlueprintForGenerate(params: {
   }
 
   if (plan.presetId) {
-    const rawPreset = await prisma.training_plan_preset.findUnique({
-      where: { id: plan.presetId },
-      include: trainingPlanPresetInclude,
-    });
-    if (!rawPreset) return null;
-
-    return {
-      kind: "catalog",
-      presetId: plan.presetId,
-      athletePresetId: null,
-      rotationPreset: rawPreset as LoadedPresetInclude,
-      volumePreset: rawPreset,
-      label: rawPreset.title,
-      fitnessPhase: "BASE",
-    };
+    const tm = await fetchTrainingManagePresetForGenerate(plan.presetId);
+    if (!tm?.build) return null;
+    return resolvedBlueprintFromTrainingManage(tm);
   }
 
   return null;

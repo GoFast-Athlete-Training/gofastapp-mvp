@@ -29,23 +29,29 @@ export async function GET(request: NextRequest) {
       race_registry: {
         select: { id: true, name: true, raceDate: true },
       },
-      training_plan_preset: {
-        select: { id: true, slug: true, title: true },
-      },
       _count: { select: { planned_workouts: true } },
     },
   });
 
-  const rows = plans.map((p) => ({
-    ...p,
-    startDate: ymdFromDate(p.startDate),
-    race_registry: p.race_registry
-      ? {
-          ...p.race_registry,
-          raceDate: ymdFromDate(p.race_registry.raceDate),
-        }
-      : null,
-  }));
+  const { catalogPresetSummaryForApi } = await import(
+    "@/lib/training/hydrate-catalog-preset-from-training-manage"
+  );
+
+  const rows = await Promise.all(
+    plans.map(async (p) => ({
+      ...p,
+      training_plan_preset: p.presetId
+        ? await catalogPresetSummaryForApi(p.presetId)
+        : null,
+      startDate: ymdFromDate(p.startDate),
+      race_registry: p.race_registry
+        ? {
+            ...p.race_registry,
+            raceDate: ymdFromDate(p.race_registry.raceDate),
+          }
+        : null,
+    })),
+  );
 
   return NextResponse.json({ success: true, plans: rows });
 }

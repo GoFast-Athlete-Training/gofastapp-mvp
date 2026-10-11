@@ -195,9 +195,6 @@ export async function GET(request: NextRequest, context: Ctx) {
                   distanceLabel: true,
                 },
               },
-              training_plan_preset: {
-                select: { athletePersonaCapability: true },
-              },
             },
           },
           garmin_detail_activity: {

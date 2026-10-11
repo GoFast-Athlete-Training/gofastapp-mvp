@@ -1,9 +1,15 @@
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
 import type { PhaseWeekRow } from "@/lib/training/phase-week-pins";
-import type { TrainingManagePresetForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
+import type {
+  RaceWeekSlotForGenerate,
+  TrainingManagePresetForGenerate,
+} from "@/lib/training/fetch-training-manage-preset-for-generate";
 import { TAPER_CALENDAR_WEEKS } from "@/lib/training/preset-volume-helpers";
 import { mapPositionRow } from "@/lib/training/plan-generate-presets-loader";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
+import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
+import { addDaysUtc, utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
+import { WorkoutType as WT } from "@prisma/client";
 
 function round1(n: number): number {
   return Math.max(0, Math.round(n * 10) / 10);
@@ -23,11 +29,13 @@ export function applyBuildPhaseLongRunMiles(input: {
   peakWeekNumber: number;
   startLongRunMiles: number | null;
   peakLongRunMiles: number | null;
+  longRunCutback: number | null;
   longRunPositions: readonly RunTypePosition[];
 }): void {
   const start = input.startLongRunMiles ?? 8;
   const peak = Math.max(start, input.peakLongRunMiles ?? 20);
   const peakWeek = Math.max(1, input.peakWeekNumber);
+  const cutback = Math.max(0, Math.min(1, input.longRunCutback ?? 0));
   const rows = [...input.longRunPositions].sort((a, b) => a.cyclePosition - b.cyclePosition);
 
   for (const week of input.planSchedule) {
@@ -35,7 +43,11 @@ export function applyBuildPhaseLongRunMiles(input: {
     const w = week.weekNumber;
     const denom = Math.max(1, peakWeek - 1);
     const t = w >= peakWeek ? 1 : (w - 1) / denom;
-    const lrMi = round1(start + (peak - start) * t);
+    let lrMi = round1(start + (peak - start) * t);
+    const isPeakWeek = w === peakWeek;
+    if (cutback > 0 && w % 4 === 0 && !isPeakWeek) {
+      lrMi = round1(lrMi * (1 - cutback));
+    }
     const cyclePos = (w - 1) % Math.max(1, rows.length);
     const catId = rows[cyclePos]?.catalogueWorkoutId ?? null;
 
@@ -49,11 +61,11 @@ export function applyBuildPhaseLongRunMiles(input: {
   }
 }
 
-export function applyPhaseTaperAndRaceLongRunCaps(input: {
+/** Taper weeks: set long run to the prescribed cap (not a ceiling). */
+export function applyPhaseTaperLongRunMiles(input: {
   planSchedule: PlanWeekSchedule[];
   totalWeeks: number;
   taperWeeks: PhaseWeekRow[] | null | undefined;
-  raceWeek: PhaseWeekRow[] | null | undefined;
 }): void {
   const taperRows = input.taperWeeks ?? [];
   for (let i = 0; i < TAPER_CALENDAR_WEEKS; i++) {
@@ -65,28 +77,60 @@ export function applyPhaseTaperAndRaceLongRunCaps(input: {
     if (!week) continue;
     for (const d of week.days) {
       if (d.workoutType === "LongRun") {
-        d.miles = round1(Math.min(d.miles, cap));
+        d.miles = round1(cap);
         break;
-      }
-    }
-  }
-
-  const raceRow = input.raceWeek?.find((r) => r.weekIndex === 1);
-  const raceLrCap = raceRow?.longRunCapMiles;
-  if (raceLrCap != null && raceLrCap > 0) {
-    const week = input.planSchedule.find((w) => w.weekNumber === input.totalWeeks);
-    if (week) {
-      for (const d of week.days) {
-        if (d.workoutType === "LongRun") {
-          d.miles = round1(Math.min(d.miles, raceLrCap));
-          break;
-        }
       }
     }
   }
 }
 
-/** Apply catalogue pins on taper + race weeks (tempo / intervals / long run). */
+/** After easy distribution, trim taper weeks to week total caps (long run stays fixed). */
+export function applyPhaseTaperWeekTotalCaps(input: {
+  planSchedule: PlanWeekSchedule[];
+  totalWeeks: number;
+  taperWeeks: PhaseWeekRow[] | null | undefined;
+}): void {
+  const taperRows = input.taperWeeks ?? [];
+  for (let i = 0; i < TAPER_CALENDAR_WEEKS; i++) {
+    const weekNum = input.totalWeeks - TAPER_CALENDAR_WEEKS + 1 + i;
+    const row = taperRows.find((r) => r.weekIndex === i + 1);
+    const weekCap = row?.totalMilesCap;
+    if (weekCap == null || weekCap <= 0) continue;
+    const week = input.planSchedule.find((w) => w.weekNumber === weekNum);
+    if (!week) continue;
+
+    const sum = (): number => week.days.reduce((s, d) => s + d.miles, 0);
+    let safety = 0;
+    while (sum() > weekCap + 0.05 && safety++ < 500) {
+      let shaved = false;
+      for (const d of [...week.days].reverse()) {
+        if (d.workoutType === "LongRun") continue;
+        if (d.workoutType === "Race") continue;
+        if (d.miles <= 0) continue;
+        d.miles = round1(Math.max(0, d.miles - 0.25));
+        shaved = true;
+        if (sum() <= weekCap + 0.05) break;
+      }
+      if (!shaved) break;
+    }
+  }
+}
+
+/** @deprecated Use applyPhaseTaperLongRunMiles — race week caps removed. */
+export function applyPhaseTaperAndRaceLongRunCaps(input: {
+  planSchedule: PlanWeekSchedule[];
+  totalWeeks: number;
+  taperWeeks: PhaseWeekRow[] | null | undefined;
+  raceWeek: PhaseWeekRow[] | null | undefined;
+}): void {
+  applyPhaseTaperLongRunMiles({
+    planSchedule: input.planSchedule,
+    totalWeeks: input.totalWeeks,
+    taperWeeks: input.taperWeeks,
+  });
+}
+
+/** Apply catalogue pins on taper weeks (tempo / intervals / long run). */
 export function applyPhaseWeekCataloguePins(input: {
   planSchedule: PlanWeekSchedule[];
   totalWeeks: number;
@@ -111,6 +155,85 @@ export function applyPhaseWeekCataloguePins(input: {
     const weekNum = input.totalWeeks - TAPER_CALENDAR_WEEKS + 1 + i;
     applyRow(weekNum, taperRows.find((r) => r.weekIndex === i + 1));
   }
+}
 
-  applyRow(input.totalWeeks, input.raceWeek?.find((r) => r.weekIndex === 1));
+function findWeekDayForDateKey(
+  planStart: Date,
+  schedule: PlanWeekSchedule[],
+  dateKey: string,
+): { week: PlanWeekSchedule; dayIndex: number } | null {
+  for (const week of schedule) {
+    for (let i = 0; i < week.days.length; i++) {
+      const day = week.days[i]!;
+      const dt = dateForDayInWeek(planStart, week.weekNumber, day.dow);
+      if (ymdFromDate(dt) === dateKey) {
+        return { week, dayIndex: i };
+      }
+    }
+  }
+  return null;
+}
+
+function workoutTypeForRaceWeekSlot(
+  type: RaceWeekSlotForGenerate["type"],
+): typeof WT.Easy | typeof WT.Tempo | typeof WT.Intervals | null {
+  if (type === "tempo") return WT.Tempo;
+  if (type === "intervals") return WT.Intervals;
+  if (type === "easy" || type === "shakeout-easy") return WT.Easy;
+  return null;
+}
+
+/** Stamp race-week JSON slots onto calendar days (offsets from primary race). */
+export function applyRaceWeekSlotsFromPreset(input: {
+  planStart: Date;
+  raceDate: Date;
+  schedule: PlanWeekSchedule[];
+  slots: RaceWeekSlotForGenerate[];
+}): void {
+  const raceUtc = utcDateOnly(input.raceDate);
+
+  for (const slot of input.slots) {
+    const dateKey = ymdFromDate(addDaysUtc(raceUtc, slot.offsetFromRace));
+
+    if (slot.type === "off") {
+      const located = findWeekDayForDateKey(input.planStart, input.schedule, dateKey);
+      if (located) {
+        located.week.days.splice(located.dayIndex, 1);
+      }
+      continue;
+    }
+
+    if (slot.type === "race") continue;
+
+    const wt = workoutTypeForRaceWeekSlot(slot.type);
+    if (!wt) continue;
+
+    const miles = round1(slot.prescribedMiles ?? 0);
+    const located = findWeekDayForDateKey(input.planStart, input.schedule, dateKey);
+
+    if (located) {
+      const day = located.week.days[located.dayIndex]!;
+      if (day.workoutType === WT.Race) continue;
+      day.workoutType = wt;
+      day.miles = miles;
+      day.catalogueWorkoutId = slot.catalogueWorkoutId;
+      day.planCycleIndex = null;
+      continue;
+    }
+
+    for (const week of input.schedule) {
+      for (let dow = 1; dow <= 7; dow++) {
+        const dt = dateForDayInWeek(input.planStart, week.weekNumber, dow);
+        if (ymdFromDate(dt) !== dateKey) continue;
+        week.days.push({
+          dow,
+          workoutType: wt,
+          miles,
+          catalogueWorkoutId: slot.catalogueWorkoutId,
+          planCycleIndex: null,
+        });
+        week.days.sort((a, b) => a.dow - b.dow);
+      }
+    }
+  }
 }

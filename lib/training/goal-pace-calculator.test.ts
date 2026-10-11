@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   formatPaceMinSec,
+  goalPaceSecondsPerMileFromPlan,
   isPlausibleGoalPaceSecPerMile,
   resolveGoalRacePace,
   resolveRaceDistanceMiles,
   resolveRacePaceSecondsPerMileForPlan,
 } from "./goal-pace-calculator";
+import { goalPaceSecondsPerMileFromRaceDistance } from "@/lib/workout-generator/pace-calculator";
 
 const MCM_METERS = 42195;
 
@@ -86,6 +88,31 @@ test("resolveRacePaceSecondsPerMileForPlan legacy wrapper matches canonical reso
   });
   assert.ok(spm != null);
   assert.ok(spm! >= 400 && spm! <= 430);
+});
+
+const TEN_MILE_METERS = 10 * 1609.344;
+
+test("goal pace for 10-mile race uses actual miles not 10K snap", () => {
+  const spm = goalPaceSecondsPerMileFromPlan("1:09:00", 10);
+  assert.equal(spm, 414);
+  assert.equal(formatPaceMinSec(spm!), "6:54");
+});
+
+test("goal pace for 10K at same finish time stays on 10K distance", () => {
+  const spm = goalPaceSecondsPerMileFromRaceDistance(69 * 60, 6.21371);
+  assert.equal(spm, 666);
+  assert.equal(formatPaceMinSec(spm), "11:06");
+});
+
+test("resolveGoalRacePace derives 6:54/mi for Army Ten-Miler style 10 miles at 1:09:00", () => {
+  const resolved = resolveGoalRacePace({
+    goalTime: "1:09:00",
+    distanceMeters: TEN_MILE_METERS,
+    distanceLabel: "10 Mile",
+  });
+  assert.equal(resolved.source, "derived_from_goal_time");
+  assert.equal(resolved.goalPaceSecPerMile, 414);
+  assert.equal(resolved.goalPaceDisplay, "6:54");
 });
 
 test("resolveRacePaceSecondsPerMileForPlan derives marathon pace from goal time when plan cache is wrong", () => {

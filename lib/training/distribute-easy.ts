@@ -102,7 +102,9 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
         : null;
     const inTaperVolume =
       totalWeeks != null && isTaperVolumeWeek(weekNum, totalWeeks);
-    if (inTaperVolume) {
+    const taperCapFromPreset =
+      weekTargetOverride != null && Number.isFinite(weekTargetOverride) && inTaperVolume;
+    if (inTaperVolume && !taperCapFromPreset) {
       weeklyCap = taperWeeklyMileageTarget(weeklyCap);
     }
 

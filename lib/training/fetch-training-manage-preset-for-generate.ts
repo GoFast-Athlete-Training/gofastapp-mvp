@@ -13,14 +13,23 @@ export type PhaseRotationForGenerate = {
 
 export type TrainingManagePresetForGenerate = {
   id: string;
+  slug: string;
+  title: string;
   minWeeklyMiles: number;
   maxWeeklyMiles: number | null;
   publicDescription: string | null;
   targetDistanceLabel: string | null;
+  tempoIdealDow: number;
+  intervalIdealDow: number;
+  longRunDefaultDow: number;
+  coachPlanOverview: unknown;
+  workoutStructure: unknown;
+  easyRunConfig: unknown;
   build: {
     startLongRunMiles: number | null;
     peakLongRunMiles: number | null;
     peakWeeklyMiles: number | null;
+    longRunCutback: number | null;
     longRunConfig: PhaseRotationForGenerate;
     easyConfig: PhaseRotationForGenerate;
     tempoConfig: PhaseRotationForGenerate;
@@ -32,10 +41,17 @@ export type TrainingManagePresetForGenerate = {
   } | null;
   raceWeek: {
     title: string;
-    shakeoutRunConfigId: string | null;
-    shakeoutDaysPriorToRace: number;
-    weeks: PhaseWeekRow[];
+    slots: RaceWeekSlotForGenerate[];
   } | null;
+};
+
+export type RaceWeekSlotForGenerate = {
+  offsetFromRace: number;
+  runName: string;
+  type: "easy" | "tempo" | "intervals" | "shakeout-easy" | "off" | "race";
+  catalogueWorkoutId: string | null;
+  prescribedMiles: number | null;
+  shakeoutRunConfigId: string | null;
 };
 
 function trainingManageBaseUrl(): string | null {

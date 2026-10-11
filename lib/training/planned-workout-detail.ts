@@ -33,9 +33,6 @@ const plannedDetailInclude = {
           distanceLabel: true,
         },
       },
-      training_plan_preset: {
-        select: { athletePersonaCapability: true },
-      },
     },
   },
 } as const;

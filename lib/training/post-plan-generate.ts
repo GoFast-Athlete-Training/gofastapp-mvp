@@ -81,10 +81,10 @@ export async function planGeneratePostHandler(
     );
 
     if (plan.presetId) {
-      const presetBand = await prisma.training_plan_preset.findUnique({
-        where: { id: plan.presetId },
-        select: { minWeeklyMiles: true, maxWeeklyMiles: true },
-      });
+      const { catalogPresetSummaryForApi } = await import(
+        "@/lib/training/hydrate-catalog-preset-from-training-manage"
+      );
+      const presetBand = await catalogPresetSummaryForApi(plan.presetId);
       if (presetBand) {
         const bandMin = Math.max(1, presetBand.minWeeklyMiles);
         minWeeklyMiles = Math.max(minWeeklyMiles, bandMin);

@@ -6,6 +6,7 @@
 import {
   RACE_DISTANCES_MILES,
   distanceMilesToPaceRaceKey,
+  goalPaceSecondsPerMileFromRaceDistance,
   parseRaceTimeToSeconds,
   raceTimeToGoalPaceSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
@@ -26,6 +27,7 @@ export function normalizeDistanceForPace(
   const d = distance.toLowerCase().trim().replace(/\s+/g, "");
   if (d === "halfmarathon" || d === "half") return "half";
   if (d === "10k" || d === "10km") return "10k";
+  if (d === "10m" || d === "10mile" || d === "10mi") return "10m";
   if (d === "5k" || d === "5km") return "5k";
   if (d === "marathon" || d === "full" || d === "mara") return "marathon";
   if (d === "mile" || d === "1mile" || d === "1mi") return "mile";
@@ -67,12 +69,15 @@ export function deriveGoalPaces(params: {
   let goalRacePace: number;
   let eventMiles: number;
 
-  if (RACE_DISTANCES_MILES[paceKey] != null) {
+  if (params.distanceMiles != null && params.distanceMiles > 0) {
+    eventMiles = params.distanceMiles;
+    goalRacePace = goalPaceSecondsPerMileFromRaceDistance(
+      totalSeconds,
+      params.distanceMiles
+    );
+  } else if (RACE_DISTANCES_MILES[paceKey] != null) {
     eventMiles = RACE_DISTANCES_MILES[paceKey];
     goalRacePace = raceTimeToGoalPaceSecondsPerMile(totalSeconds, paceKey);
-  } else if (params.distanceMiles != null && params.distanceMiles > 0) {
-    eventMiles = params.distanceMiles;
-    goalRacePace = Math.round(totalSeconds / params.distanceMiles);
   } else {
     throw new Error(
       `Cannot derive pace for distance "${params.distance}" without distanceMiles`

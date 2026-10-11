@@ -333,7 +333,6 @@ export async function joinTrainingCohort(
     where: { id: cohortId },
     include: {
       race_registry: true,
-      training_plan_preset: { select: { id: true, targetDistanceLabel: true } },
     },
   });
 
