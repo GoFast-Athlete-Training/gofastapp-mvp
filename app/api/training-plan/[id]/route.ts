@@ -134,7 +134,10 @@ export async function GET(request: NextRequest, context: Ctx) {
       "@/lib/training/hydrate-catalog-preset-from-training-manage"
     );
     const catalogPreset = plan.presetId
-      ? await catalogPresetSummaryForApi(plan.presetId)
+      ? await catalogPresetSummaryForApi(
+          plan.presetId,
+          request.headers.get("authorization"),
+        )
       : null;
 
     const serialized = {
@@ -358,7 +361,10 @@ export async function PATCH(request: NextRequest, context: Ctx) {
             const { catalogPresetExistsInTrainingManage } = await import(
               "@/lib/training/hydrate-catalog-preset-from-training-manage"
             );
-            const exists = await catalogPresetExistsInTrainingManage(pid);
+            const exists = await catalogPresetExistsInTrainingManage(
+              pid,
+              request.headers.get("authorization"),
+            );
             if (!exists) {
               return NextResponse.json({ error: "presetId not found in Training Manage" }, { status: 400 });
             }

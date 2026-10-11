@@ -84,7 +84,10 @@ export async function planGeneratePostHandler(
       const { catalogPresetSummaryForApi } = await import(
         "@/lib/training/hydrate-catalog-preset-from-training-manage"
       );
-      const presetBand = await catalogPresetSummaryForApi(plan.presetId);
+      const presetBand = await catalogPresetSummaryForApi(
+        plan.presetId,
+        request.headers.get("authorization"),
+      );
       if (presetBand) {
         const bandMin = Math.max(1, presetBand.minWeeklyMiles);
         minWeeklyMiles = Math.max(minWeeklyMiles, bandMin);

@@ -1,5 +1,3 @@
-import { internalApiHeaders } from "@/lib/internal-api-auth";
-
 export type TrainingManageCatalogPreset = {
   id: string;
   slug: string;
@@ -32,15 +30,25 @@ function trainingManageBaseUrl(): string | null {
   return base ? base.replace(/\/$/, "") : null;
 }
 
-export async function fetchTrainingManageCatalogPresets(): Promise<
-  TrainingManageCatalogPreset[] | null
-> {
+function bearerHeaders(authorization: string | null | undefined): HeadersInit | null {
+  const auth = authorization?.trim();
+  if (!auth) return null;
+  return {
+    Authorization: auth.startsWith("Bearer ") ? auth : `Bearer ${auth}`,
+    Accept: "application/json",
+  };
+}
+
+export async function fetchTrainingManageCatalogPresets(
+  authorization: string | null | undefined,
+): Promise<TrainingManageCatalogPreset[] | null> {
   const base = trainingManageBaseUrl();
-  if (!base) return null;
+  const headers = bearerHeaders(authorization);
+  if (!base || !headers) return null;
 
   try {
-    const res = await fetch(`${base}/api/internal/plan-preset`, {
-      headers: internalApiHeaders(),
+    const res = await fetch(`${base}/api/training/plan-preset/catalog`, {
+      headers,
       cache: "no-store",
     });
     if (!res.ok) return null;
@@ -65,14 +73,16 @@ export async function fetchTrainingManageCatalogPresets(): Promise<
 
 export async function fetchTrainingManageTemplatePreset(
   presetId: string,
+  authorization: string | null | undefined,
 ): Promise<TrainingManageTemplatePreset | null> {
   const base = trainingManageBaseUrl();
-  if (!base) return null;
+  const headers = bearerHeaders(authorization);
+  if (!base || !headers) return null;
 
   try {
     const res = await fetch(
-      `${base}/api/internal/plan-preset/${encodeURIComponent(presetId)}/template`,
-      { headers: internalApiHeaders(), cache: "no-store" },
+      `${base}/api/training/plan-preset/${encodeURIComponent(presetId)}/template`,
+      { headers, cache: "no-store" },
     );
     if (!res.ok) return null;
     const json = (await res.json()) as {

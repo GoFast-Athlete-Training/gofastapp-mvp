@@ -8,7 +8,7 @@ import { fetchTrainingManageCatalogPresets } from "@/lib/training/fetch-training
 /**
  * GET /api/training/plan-preset/prod
  *
- * Athlete-facing catalog list — hydrated from Training Manage (machine lane).
+ * Athlete-facing catalog list — Prod forwards Firebase Bearer to Training Manage.
  */
 export async function GET(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       ? Math.round(Number(dmRaw))
       : null;
 
-  const rows = await fetchTrainingManageCatalogPresets();
+  const rows = await fetchTrainingManageCatalogPresets(request.headers.get("authorization"));
   if (rows == null) {
     return NextResponse.json(
       { success: false, error: "Training catalog unavailable" },

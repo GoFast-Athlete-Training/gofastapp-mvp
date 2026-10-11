@@ -41,7 +41,10 @@ export async function GET(request: NextRequest) {
     plans.map(async (p) => ({
       ...p,
       training_plan_preset: p.presetId
-        ? await catalogPresetSummaryForApi(p.presetId)
+        ? await catalogPresetSummaryForApi(
+            p.presetId,
+            request.headers.get("authorization"),
+          )
         : null,
       startDate: ymdFromDate(p.startDate),
       race_registry: p.race_registry
