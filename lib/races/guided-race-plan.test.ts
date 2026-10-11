@@ -34,12 +34,12 @@ test("buildGuidedRaceStretches: Army Ten-Miler style segments use course names a
   assert.ok(stretches[0]!.paceBandLabel.includes("/mi"));
 });
 
-test("buildGuidedRaceStretches: empty segments does not emit Early miles fallback", () => {
+test("buildGuidedRaceStretches: empty segments uses even-pace mile targets", () => {
   const stretches = buildGuidedRaceStretches({
     segments: [],
     totalMiles: 10,
     goalPaceSecPerMi: GOAL_PACE,
   });
-  assert.equal(stretches.length, 0);
-  assert.ok(!stretches.some((s) => s.title.includes("Early miles")));
+  assert.equal(stretches.length, 10);
+  assert.ok(stretches.every((s) => s.title.startsWith("Mile ") || s.title.startsWith("Finish")));
 });

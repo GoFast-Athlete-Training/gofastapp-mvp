@@ -107,9 +107,6 @@ async function syncRegistryCourseSegments(
   }
 
   if (incomingIds.length === 0) {
-    await prisma.race_registry_course_segments.deleteMany({
-      where: { raceRegistryId },
-    });
     return;
   }
   await prisma.race_registry_course_segments.deleteMany({

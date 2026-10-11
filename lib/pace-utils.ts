@@ -27,7 +27,18 @@ export function normalizeDistanceForPace(
   const d = distance.toLowerCase().trim().replace(/\s+/g, "");
   if (d === "halfmarathon" || d === "half") return "half";
   if (d === "10k" || d === "10km") return "10k";
-  if (d === "10m" || d === "10mile" || d === "10mi") return "10m";
+  if (
+    d === "10m" ||
+    d === "10mile" ||
+    d === "10mi" ||
+    d === "10miles" ||
+    d === "10-miler" ||
+    d === "10miler" ||
+    d === "tenmiler"
+  ) {
+    return "10m";
+  }
+  if (d === "10 mile" || d === "10 miles") return "10m";
   if (d === "5k" || d === "5km") return "5k";
   if (d === "marathon" || d === "full" || d === "mara") return "marathon";
   if (d === "mile" || d === "1mile" || d === "1mi") return "mile";

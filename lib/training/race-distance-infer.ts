@@ -119,6 +119,8 @@ export function inferDistanceLabelFromRaceName(
   if (/\b15\s*k\b|\b15k\b/.test(n)) return "15K";
   if (/\b50\s*k\b|\b50k\b/.test(n)) return "50K";
   if (/\b100\s*k\b|\b100k\b/.test(n)) return "100K";
+  if (/\bten[\s-]?miler\b/.test(n)) return "10 Mile";
+  if (/\b10[\s-]?miler\b/.test(n)) return "10 Mile";
   if (/\b10\s*mile\b|\b10mi\b/.test(n)) return "10 Mile";
   if (/\bhalf\b/.test(n) && !/\bmarathon\b/.test(n)) return "Half Marathon";
   return null;

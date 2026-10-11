@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
+import { pacingBlocksToRacePlanDocument } from "@/lib/races/race-plan-from-pacing";
+import { racePlanHasBlocks } from "@/lib/races/race-plan-types";
 import type { RaceForGoal, InlineGoalRow } from "@/components/races/InlineGoalForm";
 import { InlineGoalForm } from "@/components/races/InlineGoalForm";
 import { PaceContextCard } from "@/components/athlete/PaceContextCard";
@@ -10,6 +12,7 @@ import {
   RACE_DISTANCES_MILES,
   parseRaceTimeToSeconds,
 } from "@/lib/workout-generator/pace-calculator";
+import { resolveMyRacePlannerDistance } from "@/lib/races/myrace-planner-distance";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { formatFinishClock } from "@/lib/training/race-projection";
 import {
@@ -185,6 +188,8 @@ type Props = {
   embedded?: boolean;
   /** When set, save coarse blocks to the plan race-day workout. */
   raceDayApply?: { planId: string; dateKey: string; title?: string };
+  /** Persist blocks to race_plans (no training plan required). */
+  persistRacePlan?: { athleteRaceId: string; raceDate: string; title: string };
   /** Read-only split preview — no save, no effort calculator. */
   splitOutlookOnly?: boolean;
 };
@@ -196,11 +201,40 @@ export function RacePlanSection({
   hideGoalForm,
   embedded,
   raceDayApply,
+  persistRacePlan,
   splitOutlookOnly = false,
 }: Props) {
   const [strategy, setStrategy] = useState<PacingStrategy>("even");
   const [applyingBlocks, setApplyingBlocks] = useState(false);
   const [applyBlocksMessage, setApplyBlocksMessage] = useState<string | null>(null);
+  const [racePlanId, setRacePlanId] = useState<string | null>(null);
+  const [hasSavedPlan, setHasSavedPlan] = useState(false);
+  const [pushingGarmin, setPushingGarmin] = useState(false);
+
+  const loadPersistedRacePlan = useCallback(async () => {
+    if (!persistRacePlan?.athleteRaceId) return;
+    try {
+      const { data } = await api.get<{
+        racePlanId: string | null;
+        planJson: { blocks?: unknown[] };
+      }>(
+        `races/race-plan?athleteRaceId=${encodeURIComponent(persistRacePlan.athleteRaceId)}`
+      );
+      setRacePlanId(data.racePlanId ?? null);
+      setHasSavedPlan(
+        Boolean(data.racePlanId) &&
+          Array.isArray(data.planJson?.blocks) &&
+          data.planJson.blocks.length > 0
+      );
+    } catch {
+      setRacePlanId(null);
+      setHasSavedPlan(false);
+    }
+  }, [persistRacePlan?.athleteRaceId]);
+
+  useEffect(() => {
+    void loadPersistedRacePlan();
+  }, [loadPersistedRacePlan]);
 
   const derived = useMemo(() => {
     const gTime = goal?.goalTime?.trim();
@@ -219,16 +253,35 @@ export function RacePlanSection({
     }
   }, [goal?.goalTime, race.distanceLabel, race.distanceMeters]);
 
+  const plannerDistance = useMemo(
+    () =>
+      resolveMyRacePlannerDistance({
+        registryMeters: race.distanceMeters,
+        registryLabel: race.distanceLabel,
+        raceName: race.name,
+      }),
+    [race.distanceLabel, race.distanceMeters, race.name]
+  );
+
   const resolvedGoalRacePace = useMemo(() => {
     const gTime = goal?.goalTime?.trim();
     if (!gTime) return null;
     return resolveGoalRacePace({
       goalTime: gTime,
       dbGoalRacePaceSecPerMile: goal?.goalRacePace ?? null,
-      distanceMeters: race.distanceMeters ?? null,
-      distanceLabel: race.distanceLabel ?? null,
+      distanceMeters: plannerDistance.distanceMeters ?? race.distanceMeters ?? null,
+      distanceLabel: plannerDistance.distanceLabel ?? race.distanceLabel ?? null,
+      raceName: race.name,
     });
-  }, [goal?.goalTime, goal?.goalRacePace, race.distanceLabel, race.distanceMeters]);
+  }, [
+    goal?.goalTime,
+    goal?.goalRacePace,
+    plannerDistance.distanceLabel,
+    plannerDistance.distanceMeters,
+    race.distanceLabel,
+    race.distanceMeters,
+    race.name,
+  ]);
 
   const goalRacePace =
     resolvedGoalRacePace?.goalPaceSecPerMile ??
@@ -240,13 +293,13 @@ export function RacePlanSection({
       : derived?.goalPace5K ?? null;
 
   const totalMiles = useMemo(() => {
-    if (race.distanceMeters != null && race.distanceMeters > 0) {
-      return race.distanceMeters / 1609.344;
+    if (plannerDistance.distanceMeters != null && plannerDistance.distanceMeters > 0) {
+      return plannerDistance.distanceMeters / 1609.344;
     }
-    const key = normalizeDistanceForPace(race.distanceLabel ?? "5k", null);
+    const key = normalizeDistanceForPace(plannerDistance.distanceLabel ?? "5k", null);
     const m = RACE_DISTANCES_MILES[key];
     return m ?? RACE_DISTANCES_MILES["5k"];
-  }, [race.distanceLabel, race.distanceMeters]);
+  }, [plannerDistance.distanceLabel, plannerDistance.distanceMeters]);
 
   const pacingBlocks = useMemo(() => {
     if (goalRacePace == null || !Number.isFinite(totalMiles) || totalMiles <= 0) return [];
@@ -272,6 +325,45 @@ export function RacePlanSection({
     }
   }
   const rowsSumSec = pacingBlocks.reduce((a, r) => a + blockSplitSec(r), 0);
+
+  async function handleSaveRacePlanDocument() {
+    if (!persistRacePlan || pacingBlocks.length === 0 || !goalTimeDisplay) return;
+    setApplyingBlocks(true);
+    setApplyBlocksMessage(null);
+    try {
+      const planJson = pacingBlocksToRacePlanDocument({
+        goalTimeDisplay,
+        blocks: pacingBlocks,
+      });
+      const { data } = await api.post<{ racePlanId: string }>("races/race-plan", {
+        athleteRaceId: persistRacePlan.athleteRaceId,
+        raceDate: persistRacePlan.raceDate,
+        title: persistRacePlan.title,
+        planJson,
+      });
+      setRacePlanId(data.racePlanId);
+      setHasSavedPlan(racePlanHasBlocks(planJson));
+      setApplyBlocksMessage("Race-day plan saved.");
+    } catch (err: unknown) {
+      setApplyBlocksMessage(err instanceof Error ? err.message : "Could not save race-day plan.");
+    } finally {
+      setApplyingBlocks(false);
+    }
+  }
+
+  async function handlePushGarminRacePlan() {
+    if (!racePlanId) return;
+    setPushingGarmin(true);
+    setApplyBlocksMessage(null);
+    try {
+      await api.post(`races/race-plan/${encodeURIComponent(racePlanId)}/push-to-garmin`, {});
+      setApplyBlocksMessage("Garmin race-day workout updated.");
+    } catch (err: unknown) {
+      setApplyBlocksMessage(err instanceof Error ? err.message : "Garmin push failed.");
+    } finally {
+      setPushingGarmin(false);
+    }
+  }
 
   async function handleApplyBlocksToRaceDay() {
     if (!raceDayApply || pacingBlocks.length === 0) return;
@@ -431,6 +523,36 @@ export function RacePlanSection({
             </div>
           ) : null}
 
+          {!splitOutlookOnly && persistRacePlan ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={applyingBlocks || pacingBlocks.length === 0}
+                onClick={() => void handleSaveRacePlanDocument()}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                {applyingBlocks
+                  ? "Saving…"
+                  : hasSavedPlan
+                    ? "Update race-day plan"
+                    : "Save race-day plan"}
+              </button>
+              {racePlanId ? (
+                <button
+                  type="button"
+                  disabled={pushingGarmin || !hasSavedPlan}
+                  onClick={() => void handlePushGarminRacePlan()}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {pushingGarmin ? "Pushing…" : "Push to Garmin"}
+                </button>
+              ) : null}
+              {applyBlocksMessage ? (
+                <p className="w-full mt-1 text-sm text-gray-700">{applyBlocksMessage}</p>
+              ) : null}
+            </div>
+          ) : null}
+
           {!splitOutlookOnly && raceDayApply ? (
             <div className="mt-4">
               <button
@@ -441,7 +563,7 @@ export function RacePlanSection({
               >
                 {applyingBlocks ? "Saving…" : "Use these blocks in race plan"}
               </button>
-              {applyBlocksMessage ? (
+              {applyBlocksMessage && !persistRacePlan ? (
                 <p className="mt-2 text-sm text-gray-700">{applyBlocksMessage}</p>
               ) : null}
             </div>

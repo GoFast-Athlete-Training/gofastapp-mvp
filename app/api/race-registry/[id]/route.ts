@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { prisma } from "@/lib/prisma";
+import { hydrateRegistryCourseSegmentsFromRaceManage } from "@/lib/races/hydrate-registry-course-segments";
 
 /** GET /api/race-registry/[id] — one registry row for authenticated athlete (prefill Goals / setup). */
 export async function GET(
@@ -63,6 +64,57 @@ export async function GET(
 
     if (!race) {
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
+    }
+
+    if (race.course_segments.length === 0) {
+      await hydrateRegistryCourseSegmentsFromRaceManage({
+        raceRegistryId: race.id,
+        courseSlug: race.courseSlug,
+        raceSlug: race.slug,
+      });
+      const refreshed = await prisma.race_registry.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          companyRaceId: true,
+          distanceLabel: true,
+          distanceMeters: true,
+          raceDate: true,
+          city: true,
+          state: true,
+          country: true,
+          registrationUrl: true,
+          logoUrl: true,
+          description: true,
+          courseMapUrl: true,
+          courseSlug: true,
+          resultsUrl: true,
+          startTime: true,
+          packetPickupLocation: true,
+          packetPickupDate: true,
+          packetPickupTime: true,
+          packetPickupDescription: true,
+          spectatorInfo: true,
+          logisticsInfo: true,
+          gearDropInstructions: true,
+          summaryPhrase: true,
+          course_segments: {
+            orderBy: { order: "asc" },
+            select: {
+              order: true,
+              name: true,
+              mileMarker: true,
+              description: true,
+              runTip: true,
+            },
+          },
+        },
+      });
+      if (refreshed) {
+        return NextResponse.json({ race: refreshed });
+      }
     }
 
     return NextResponse.json({ race });

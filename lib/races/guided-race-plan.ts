@@ -67,7 +67,7 @@ export function buildGuidedRaceStretches(params: {
   const sorted = segments.slice().sort((a, b) => a.order - b.order);
 
   if (sorted.length === 0) {
-    return [];
+    return buildEvenPaceMileStretches(params.totalMiles, goalPaceSecPerMi);
   }
 
   const settleFactor = 1.06;
@@ -88,6 +88,42 @@ export function buildGuidedRaceStretches(params: {
       effortNote: isFirst ? "Ease in, then settle at goal effort." : "Hold your goal pace band.",
       courseNote: seg.runTip?.trim() || seg.description?.trim() || null,
     });
+  }
+  return stretches;
+}
+
+/** Even-pace mile targets when no course guide segments are mirrored yet. */
+export function buildEvenPaceMileStretches(
+  totalMiles: number,
+  goalPaceSecPerMi: number
+): GuidedRaceStretch[] {
+  if (!Number.isFinite(totalMiles) || totalMiles <= 0 || !Number.isFinite(goalPaceSecPerMi)) {
+    return [];
+  }
+  const stretches: GuidedRaceStretch[] = [];
+  let offset = 0;
+  let mileNum = 0;
+  const eps = 1e-6;
+  while (offset + eps < totalMiles) {
+    const remaining = totalMiles - offset;
+    const len = remaining >= 1 ? 1 : remaining;
+    mileNum += 1;
+    const isLast = remaining <= 1 + eps;
+    const label =
+      isLast && len < 1 - eps
+        ? `Finish (${len.toFixed(2)} mi)`
+        : `Mile ${mileNum}`;
+    const low = Math.round(goalPaceSecPerMi * 0.99);
+    const high = Math.round(goalPaceSecPerMi * 1.01);
+    stretches.push({
+      key: `even-${mileNum}`,
+      title: label,
+      mileRangeLabel: `${offset.toFixed(1)}–${(offset + len).toFixed(1)} mi`,
+      paceBandLabel: formatPaceBand(low, high),
+      effortNote: "Hold steady at goal effort.",
+      courseNote: null,
+    });
+    offset += len;
   }
   return stretches;
 }

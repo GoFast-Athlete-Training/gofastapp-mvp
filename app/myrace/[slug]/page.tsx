@@ -591,13 +591,14 @@ export default function MyRacePage() {
                   Plan for it
                 </h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  Set your goal time here. Training lives in your plan until race week, when pacing guidance
-                  unlocks for this race.
+                  Set your goal time, build a race-day pacing plan, and optionally add a training plan.
                 </p>
               </div>
 
               <div className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-white p-4">
-                <h3 className="text-xs font-bold uppercase tracking-wide text-orange-900">Your goal</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wide text-orange-900">
+                  My race goal
+                </h3>
                 <p className="mt-1 text-sm text-gray-600">Finish time — updates your pace below.</p>
                 <div className="mt-3">
                   <InlineGoalForm
@@ -630,43 +631,62 @@ export default function MyRacePage() {
                   raceForGoal={raceForGoal}
                   goal={effectiveGoal}
                   courseSegments={raceExtras?.courseSegments ?? []}
-                  showRaceWeekPlan={
-                    daysUntilRace(raceForGoal.raceDate) <= 7 &&
-                    daysUntilRace(raceForGoal.raceDate) >= 0
-                  }
-                  hasPlanForRace={hasPlanForRace}
-                  trainingPlanId={trainingPlanId}
-                  activePlanHasSchedule={Boolean(activePlanSummary?.hasSchedule)}
                   athleteRaceId={signup!.id}
+                  raceDate={
+                    raceForGoal.raceDate?.slice(0, 10) ??
+                    new Date().toISOString().slice(0, 10)
+                  }
+                  onGoalSaved={(g) => {
+                    setGoal(g);
+                    setSignup((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            goalTime: g.goalTime ?? prev.goalTime,
+                            goalRacePace: g.goalRacePace ?? prev.goalRacePace,
+                            goalPace5K: g.goalPace5K ?? prev.goalPace5K,
+                          }
+                        : prev
+                    );
+                  }}
                 />
               </div>
 
-              {hasPlanForRace ? (
-                <p className="text-sm text-gray-600">
-                  Training schedule:{" "}
-                  <Link
-                    href={
-                      activePlanSummary?.hasSchedule
-                        ? "/training"
-                        : `/training-setup/${encodeURIComponent(trainingPlanId!)}`
-                    }
-                    className="font-semibold text-emerald-800 hover:underline"
-                  >
-                    {activePlanSummary?.hasSchedule ? "Open training hub" : "Finish plan setup"}
-                  </Link>
+              <div className="rounded-xl border border-emerald-200 bg-white/80 p-4">
+                <h3 className="text-xs font-bold uppercase tracking-wide text-emerald-900">
+                  My training plan
+                </h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  Optional preparation workouts — separate from your race-day pacing plan.
                 </p>
-              ) : goalTimeDisplay ? (
-                <p className="text-sm text-gray-600">
-                  Optional:{" "}
-                  <Link
-                    href={`/training-setup?athleteRaceId=${encodeURIComponent(signup!.id)}`}
-                    className="font-semibold text-emerald-800 hover:underline"
-                  >
-                    Add a training plan
-                  </Link>{" "}
-                  for this race.
-                </p>
-              ) : null}
+                {hasPlanForRace ? (
+                  <p className="mt-3 text-sm text-gray-600">
+                    <Link
+                      href={
+                        activePlanSummary?.hasSchedule
+                          ? "/training"
+                          : `/training-setup/${encodeURIComponent(trainingPlanId!)}`
+                      }
+                      className="font-semibold text-emerald-800 hover:underline"
+                    >
+                      {activePlanSummary?.hasSchedule ? "View training plan" : "Finish plan setup"}
+                    </Link>
+                  </p>
+                ) : goalTimeDisplay ? (
+                  <p className="mt-3 text-sm text-gray-600">
+                    <Link
+                      href={`/training-setup?athleteRaceId=${encodeURIComponent(signup!.id)}`}
+                      className="font-semibold text-emerald-800 hover:underline"
+                    >
+                      Add a training plan
+                    </Link>
+                  </p>
+                ) : (
+                  <p className="mt-3 text-sm text-gray-500">
+                    Set a goal time above to add optional training.
+                  </p>
+                )}
+              </div>
             </section>
           ) : null}
 

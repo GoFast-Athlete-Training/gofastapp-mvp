@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { RaceForGoal, InlineGoalRow } from "@/components/races/InlineGoalForm";
 import { deriveGoalPaces, normalizeDistanceForPace } from "@/lib/pace-utils";
 import { RACE_DISTANCES_MILES } from "@/lib/workout-generator/pace-calculator";
+import { resolveMyRacePlannerDistance } from "@/lib/races/myrace-planner-distance";
 import { resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import {
   buildGuidedRaceStretches,
@@ -26,13 +27,23 @@ function formatSecPerMile(sec: number): string {
 export function GuidedRacePlanSection({ race, goal, courseSegments }: Props) {
   const goalTimeDisplay = goal?.goalTime?.trim() ?? null;
 
+  const plannerDistance = useMemo(
+    () =>
+      resolveMyRacePlannerDistance({
+        registryMeters: race.distanceMeters,
+        registryLabel: race.distanceLabel,
+        raceName: race.name,
+      }),
+    [race.distanceLabel, race.distanceMeters, race.name]
+  );
+
   const totalMiles = useMemo(() => {
-    if (race.distanceMeters != null && race.distanceMeters > 0) {
-      return race.distanceMeters / 1609.344;
+    if (plannerDistance.distanceMeters != null && plannerDistance.distanceMeters > 0) {
+      return plannerDistance.distanceMeters / 1609.344;
     }
-    const key = normalizeDistanceForPace(race.distanceLabel ?? "5k", null);
+    const key = normalizeDistanceForPace(plannerDistance.distanceLabel ?? "5k", null);
     return RACE_DISTANCES_MILES[key] ?? RACE_DISTANCES_MILES["5k"];
-  }, [race.distanceLabel, race.distanceMeters]);
+  }, [plannerDistance.distanceLabel, plannerDistance.distanceMeters]);
 
   const goalRacePace = useMemo(() => {
     const gTime = goal?.goalTime?.trim();
@@ -40,8 +51,9 @@ export function GuidedRacePlanSection({ race, goal, courseSegments }: Props) {
     const resolved = resolveGoalRacePace({
       goalTime: gTime,
       dbGoalRacePaceSecPerMile: goal?.goalRacePace ?? null,
-      distanceMeters: race.distanceMeters ?? null,
-      distanceLabel: race.distanceLabel ?? null,
+      distanceMeters: plannerDistance.distanceMeters ?? race.distanceMeters ?? null,
+      distanceLabel: plannerDistance.distanceLabel ?? race.distanceLabel ?? null,
+      raceName: race.name,
     });
     if (resolved.goalPaceSecPerMile != null) return resolved.goalPaceSecPerMile;
     try {
@@ -54,7 +66,16 @@ export function GuidedRacePlanSection({ race, goal, courseSegments }: Props) {
     } catch {
       return null;
     }
-  }, [goal?.goalTime, goal?.goalRacePace, race.distanceLabel, race.distanceMeters, totalMiles]);
+  }, [
+    goal?.goalTime,
+    goal?.goalRacePace,
+    plannerDistance.distanceLabel,
+    plannerDistance.distanceMeters,
+    race.distanceLabel,
+    race.distanceMeters,
+    race.name,
+    totalMiles,
+  ]);
 
   const stretches = useMemo(() => {
     if (goalRacePace == null) return [];
@@ -80,7 +101,9 @@ export function GuidedRacePlanSection({ race, goal, courseSegments }: Props) {
           Your race plan
         </h3>
         <p className="mt-1 text-sm text-gray-600">
-          Suggested pacing from your goal and this course — tune on race morning if conditions change.
+          {courseSegments.length > 0
+            ? "Suggested pacing from your goal and this course — tune on race morning if conditions change."
+            : "Even-pace targets from your goal — add course segments on GoFast for terrain-aware pacing."}
         </p>
       </div>
 
@@ -94,8 +117,7 @@ export function GuidedRacePlanSection({ race, goal, courseSegments }: Props) {
 
       {stretches.length === 0 ? (
         <p className="text-sm text-gray-600">
-          Course pacing by segment will appear here once this race has a course guide on GoFast. Your
-          goal time and average pace above are still set for race day.
+          Add a goal finish time to see pacing targets for race day.
         </p>
       ) : (
         <ul className="space-y-3">

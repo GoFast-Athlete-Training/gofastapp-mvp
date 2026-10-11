@@ -29,6 +29,13 @@ export async function pushRacePlanToGarminForAthlete(
   try {
     const row = await prisma.race_plans.findFirst({
       where: { id: racePlanId, athleteId },
+      select: {
+        id: true,
+        title: true,
+        raceDate: true,
+        planJson: true,
+        garminWorkoutId: true,
+      },
     });
     if (!row) {
       return { ok: false, code: "not_found", message: "Race plan not found" };
@@ -47,14 +54,19 @@ export async function pushRacePlanToGarminForAthlete(
     });
 
     const client = createGarminTrainingApiForAthlete(athleteId, token);
-    const createResult = await client.createWorkout(garminPayload);
-    const garminWorkoutId = createResult?.workoutId;
-    if (garminWorkoutId == null) {
-      return {
-        ok: false,
-        code: "garmin_api",
-        message: "Garmin did not return a workout id for scheduling",
-      };
+    let garminWorkoutId = row.garminWorkoutId ?? null;
+    if (garminWorkoutId != null) {
+      await client.updateWorkout(garminWorkoutId, garminPayload);
+    } else {
+      const createResult = await client.createWorkout(garminPayload);
+      garminWorkoutId = createResult?.workoutId ?? null;
+      if (garminWorkoutId == null) {
+        return {
+          ok: false,
+          code: "garmin_api",
+          message: "Garmin did not return a workout id for scheduling",
+        };
+      }
     }
 
     const scheduleResult = await scheduleWorkoutOnCalendar(client, {

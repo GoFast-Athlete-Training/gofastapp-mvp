@@ -32,8 +32,19 @@ export function resolveMyRacePlannerDistance(params: {
 }): { distanceLabel: string | null; distanceMeters: number | null } {
   const claimM =
     params.claimMeters != null && params.claimMeters > 0 ? params.claimMeters : null;
-  const regM =
-    params.registryMeters != null && params.registryMeters > 0 ? params.registryMeters : null;
+  let regM =
+    params.registryMeters != null && params.registryMeters > 0
+      ? params.registryMeters
+      : null;
+  const claimLabelEarly = params.claimLabel?.trim() || null;
+  const regLabelEarly = params.registryLabel?.trim() || null;
+  const tenMileHint =
+    inferDistanceLabelFromRaceName(params.raceName) === "10 Mile" ||
+    inferDistanceMetersFromLabel(claimLabelEarly ?? regLabelEarly ?? "") ===
+      Math.round(10 * 1609.344);
+  if (regM === 10000 && tenMileHint) {
+    regM = Math.round(10 * 1609.344);
+  }
   const meters = claimM ?? regM ?? null;
 
   const claimLabel = params.claimLabel?.trim() || null;

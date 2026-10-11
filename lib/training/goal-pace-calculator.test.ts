@@ -104,6 +104,18 @@ test("goal pace for 10K at same finish time stays on 10K distance", () => {
   assert.equal(formatPaceMinSec(spm), "11:06");
 });
 
+test("resolveGoalRacePace rejects stale 10K pace when Ten-Miler name implies 10 miles", () => {
+  const resolved = resolveGoalRacePace({
+    goalTime: "1:09:00",
+    dbGoalRacePaceSecPerMile: 666,
+    distanceMeters: 10000,
+    distanceLabel: "10 Mile",
+    raceName: "Army Ten-Miler",
+  });
+  assert.equal(resolved.source, "derived_from_goal_time");
+  assert.equal(resolved.goalPaceSecPerMile, 414);
+});
+
 test("resolveGoalRacePace derives 6:54/mi for Army Ten-Miler style 10 miles at 1:09:00", () => {
   const resolved = resolveGoalRacePace({
     goalTime: "1:09:00",
@@ -113,6 +125,17 @@ test("resolveGoalRacePace derives 6:54/mi for Army Ten-Miler style 10 miles at 1
   assert.equal(resolved.source, "derived_from_goal_time");
   assert.equal(resolved.goalPaceSecPerMile, 414);
   assert.equal(resolved.goalPaceDisplay, "6:54");
+});
+
+test("resolveGoalRacePace derives ~6:58/mi for MCM 3:02:30", () => {
+  const resolved = resolveGoalRacePace({
+    goalTime: "3:02:30",
+    distanceMeters: MCM_METERS,
+    distanceLabel: "Marathon",
+  });
+  assert.equal(resolved.source, "derived_from_goal_time");
+  assert.ok(resolved.goalPaceSecPerMile != null);
+  assert.ok(resolved.goalPaceSecPerMile! >= 415 && resolved.goalPaceSecPerMile! <= 425);
 });
 
 test("resolveRacePaceSecondsPerMileForPlan derives marathon pace from goal time when plan cache is wrong", () => {

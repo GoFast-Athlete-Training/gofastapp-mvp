@@ -10,6 +10,11 @@ import {
   parseRaceTimeToSeconds,
   raceTimeToGoalPaceSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
+import {
+  inferDistanceLabelFromRaceName,
+  inferDistanceMetersFromLabel,
+  metersForCanonicalDistanceLabel,
+} from "@/lib/training/race-distance-infer";
 import { metersToMiles, normalizeDistanceForPace } from "@/lib/pace-utils";
 
 /** Pace anchor: fitness (5K) vs goal race pace from Athlete snap. */
@@ -113,22 +118,52 @@ export function isPlausibleGoalPaceSecPerMile(secPerMile: number): boolean {
 
 function agreesWithDerived(candidate: number, derived: number | null): boolean {
   if (derived == null) return true;
-  const ratio = candidate / derived;
-  return ratio >= 0.5 && ratio <= 2;
+  const diff = Math.abs(candidate - derived) / derived;
+  return diff <= 0.08;
 }
 
 /** Normalize race distance in miles from registry meters, label, or goal distance key. */
+const TEN_MILE_METERS = Math.round(10 * 1609.344);
+const TEN_K_METERS = 10000;
+
+function isTenMileRaceHint(params: {
+  distanceLabel?: string | null;
+  raceName?: string | null;
+}): boolean {
+  const label = params.distanceLabel?.trim();
+  if (label) {
+    const inferred = inferDistanceMetersFromLabel(label);
+    if (inferred != null && Math.abs(inferred - TEN_MILE_METERS) <= 300) return true;
+  }
+  const fromName = inferDistanceLabelFromRaceName(params.raceName);
+  return fromName === "10 Mile";
+}
+
 export function resolveRaceDistanceMiles(params: {
   distanceMeters?: number | null;
   distanceLabel?: string | null;
   goalDistance?: string | null;
+  raceName?: string | null;
 }): number | null {
-  if (
+  const rawMeters =
     params.distanceMeters != null &&
     Number.isFinite(Number(params.distanceMeters)) &&
     Number(params.distanceMeters) > 0
+      ? Math.round(Number(params.distanceMeters))
+      : null;
+
+  if (
+    rawMeters === TEN_K_METERS &&
+    isTenMileRaceHint({
+      distanceLabel: params.distanceLabel,
+      raceName: params.raceName,
+    })
   ) {
-    const miles = metersToMiles(Number(params.distanceMeters));
+    return RACE_DISTANCES_MILES["10m"];
+  }
+
+  if (rawMeters != null) {
+    const miles = metersToMiles(rawMeters);
     return miles > 0 ? miles : null;
   }
 
@@ -165,11 +200,13 @@ export function resolveGoalRacePace(params: {
   distanceMeters?: number | null;
   distanceLabel?: string | null;
   goalDistance?: string | null;
+  raceName?: string | null;
 }): ResolvedGoalRacePace {
   const raceDistanceMiles = resolveRaceDistanceMiles({
     distanceMeters: params.distanceMeters,
     distanceLabel: params.distanceLabel,
     goalDistance: params.goalDistance,
+    raceName: params.raceName,
   });
 
   const goalTime = params.goalTime?.trim() || null;

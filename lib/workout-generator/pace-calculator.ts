@@ -97,6 +97,7 @@ export function tightStandardRaceMilesForPace(distanceMiles: number): number | n
   if (distanceMiles >= 6 && distanceMiles <= 6.5) return RACE_DISTANCES_MILES["10k"];
   if (distanceMiles >= 3 && distanceMiles <= 3.2) return RACE_DISTANCES_MILES["5k"];
   if (distanceMiles >= 0.9 && distanceMiles <= 1.1) return RACE_DISTANCES_MILES.mile;
+  if (distanceMiles >= 9.5 && distanceMiles <= 10.5) return RACE_DISTANCES_MILES["10m"];
   return null;
 }
 
@@ -120,6 +121,7 @@ export function distanceMilesToPaceRaceKey(distanceMiles: number): string {
   if (distanceMiles >= 6 && distanceMiles <= 6.5) return "10k";
   if (distanceMiles >= 3 && distanceMiles <= 3.2) return "5k";
   if (distanceMiles >= 0.9 && distanceMiles <= 1.1) return "mile";
+  if (distanceMiles >= 9.5 && distanceMiles <= 10.5) return "10m";
   if (distanceMiles > 20) return "marathon";
   if (distanceMiles > 10) return "half";
   if (distanceMiles > 5) return "10k";
