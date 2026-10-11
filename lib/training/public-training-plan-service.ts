@@ -25,6 +25,7 @@ import {
   type PublicPlanCustomWorkoutSnapshot,
   type PublicPlanPreviewSnapshot,
 } from "@/lib/training/public-training-plan-snapshots";
+import { catalogPresetSummaryForApi } from "@/lib/training/hydrate-catalog-preset-from-training-manage";
 
 export type {
   PublicPlanPreviewSnapshot,
@@ -165,14 +166,6 @@ export async function getPublicPlanBySlug(
               raceDate: true,
             },
           },
-        },
-      },
-      sourcePreset: {
-        select: {
-          id: true,
-          title: true,
-          targetDistanceLabel: true,
-          publicDescription: true,
         },
       },
     },
@@ -612,10 +605,7 @@ export async function adoptPublicTrainingPlan(
     athleteRaceId: result.plan.athleteRaceId!,
   });
 
-  const preset = await prisma.training_plan_preset.findUnique({
-    where: { id: publicPlan.sourcePresetId },
-    select: { minWeeklyMiles: true },
-  });
+  const catalogPreset = await catalogPresetSummaryForApi(publicPlan.sourcePresetId);
 
   const weeklyMileageTarget = prefs?.weeklyMileageTarget ?? 45;
   await executePlanGenerate({
@@ -634,7 +624,7 @@ export async function adoptPublicTrainingPlan(
       weeklyMileageTarget: result.plan.weeklyMileageTarget,
     },
     weeklyMileageTarget,
-    minWeeklyMiles: preset?.minWeeklyMiles ?? 40,
+    minWeeklyMiles: catalogPreset?.minWeeklyMiles ?? 40,
   });
 
   return {

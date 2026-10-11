@@ -9,6 +9,7 @@ import {
   createAthleteCatalogueWorkout,
 } from "@/lib/training/athlete-catalogue-create";
 import { normalizeCatalogueAiFields } from "@/lib/training/catalogue-ai-parse";
+import { catalogPresetSummaryForApi } from "@/lib/training/hydrate-catalog-preset-from-training-manage";
 import type { WeeklyVolumeBand } from "@/lib/training/weekly-volume-key";
 
 export type RecommendQualityInput = {
@@ -121,7 +122,7 @@ export async function recommendQualityCatalogueForPreset(
       minWeeklyMiles: true,
       maxWeeklyMiles: true,
       raceDateSnapshot: true,
-      sourcePreset: { select: { targetDistanceLabel: true } },
+      sourcePresetId: true,
       athlete: {
         select: {
           fiveKPace: true,
@@ -176,7 +177,10 @@ export async function recommendQualityCatalogueForPreset(
     goalTime = race?.goalTime?.trim() || null;
   }
 
-  const raceDistanceLabel = preset.sourcePreset?.targetDistanceLabel?.trim() || null;
+  const catalogPreset = preset.sourcePresetId
+    ? await catalogPresetSummaryForApi(preset.sourcePresetId)
+    : null;
+  const raceDistanceLabel = catalogPreset?.targetDistanceLabel?.trim() || null;
 
   const systemPrompt = `You are a running coach creating NEW workout catalogue entries for an athlete's training preset.
 
