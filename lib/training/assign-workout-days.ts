@@ -17,11 +17,10 @@ import {
 } from "@/lib/training/plan-utils";
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
 import {
-  peakWeekNumberFromTotal,
-  taperStartWeekNumberFromTotal,
   longRunCapMilesFromPeakWeekly,
   weekCycleMeta,
 } from "@/lib/training/cycle-blocks";
+import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
 import { raceDayRoleOn } from "@/lib/training/race-day-service";
 
@@ -175,10 +174,13 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
     intervalDow2 = input.intervalIdealDow;
   }
 
-  const taperStartWeekNumber = taperStartWeekNumberFromTotal(input.totalWeeks, lrCycleLen);
+  const phaseSplit = splitPlanWeekPhases(input.totalWeeks);
+  const taperStartWeekNumber = phaseSplit.taperStartWeekNumber;
   const peakWeekNumber =
-    peakWeekNumberFromTotal(input.totalWeeks, lrCycleLen) ??
-    Math.max(1, taperStartWeekNumber - 1);
+    phaseSplit.peakWeekNumber ??
+    (phaseSplit.taperWeekNumbers.length > 0
+      ? phaseSplit.taperWeekNumbers[0]! - 1
+      : Math.max(1, input.totalWeeks - 1));
   const calculatedLongRunMax = longRunCapMilesFromPeakWeekly(input.peakWeeklyMilesForCap);
 
   const out: PlanWeekSchedule[] = [];

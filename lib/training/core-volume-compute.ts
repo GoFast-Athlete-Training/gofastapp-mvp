@@ -9,10 +9,7 @@ import {
   longRunCupSetter,
   type LongRunFitnessPhase,
 } from "@/lib/training/long-run-cup-setter";
-import {
-  peakWeekNumberFromTotal,
-  taperStartWeekNumberFromTotal,
-} from "@/lib/training/cycle-blocks";
+import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
 import {
   addDaysUtc,
   calendarTrainingWeekCount,
@@ -124,11 +121,9 @@ export function computeCoreVolumeCalendarPreview(input: {
     peakLongRunPoolMiles: input.peakLongRunPoolMiles,
     fitnessPhase: input.fitnessPhase,
   });
-  const peakWeekNumber = peakWeekNumberFromTotal(totalWeeks, LONG_RUN_BLOCK_WEEKS);
-  const taperStartWeekNumber = taperStartWeekNumberFromTotal(
-    totalWeeks,
-    LONG_RUN_BLOCK_WEEKS
-  );
+  const phaseSplit = splitPlanWeekPhases(totalWeeks);
+  const peakWeekNumber = phaseSplit.peakWeekNumber;
+  const taperStartWeekNumber = phaseSplit.taperStartWeekNumber;
 
   let peakPoolKey: PeakPoolKeySaturday[] = [];
   if (peakWeekNumber != null && cup.poolMilesByCycle.length > 0) {

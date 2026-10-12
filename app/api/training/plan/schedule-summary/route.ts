@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { resolvePlanScheduleFromPlanRow } from "@/lib/training/plan-schedule-phase-persist";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
@@ -90,13 +91,21 @@ export async function GET(request: NextRequest) {
 
     const plan = await prisma.training_plans.findFirst({
       where: { id: planId, athleteId: auth.athlete.id },
-      select: { planSchedule: true, cyclePoolData: true },
+      select: {
+        planSchedule: true,
+        planScheduleBuild: true,
+        planScheduleTaper: true,
+        planScheduleRaceWeek: true,
+        cyclePoolData: true,
+      },
     });
     if (!plan) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
 
-    const { longRunByWeek, intervalsByWeek, temposByWeek } = extractFromSchedule(plan.planSchedule);
+    const { longRunByWeek, intervalsByWeek, temposByWeek } = extractFromSchedule(
+      resolvePlanScheduleFromPlanRow(plan),
+    );
 
     return NextResponse.json({
       cyclePoolData: (plan.cyclePoolData ?? null) as CyclePoolData,

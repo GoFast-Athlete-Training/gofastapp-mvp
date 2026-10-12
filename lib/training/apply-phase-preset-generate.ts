@@ -4,7 +4,7 @@ import type {
   RaceWeekSlotForGenerate,
   TrainingManagePresetForGenerate,
 } from "@/lib/training/fetch-training-manage-preset-for-generate";
-import { TAPER_CALENDAR_WEEKS } from "@/lib/training/preset-volume-helpers";
+import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
 import { mapPositionRow } from "@/lib/training/plan-generate-presets-loader";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
 import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
@@ -66,10 +66,13 @@ export function applyPhaseTaperLongRunMiles(input: {
   planSchedule: PlanWeekSchedule[];
   totalWeeks: number;
   taperWeeks: PhaseWeekRow[] | null | undefined;
+  taperWeekNumbers?: number[];
 }): void {
   const taperRows = input.taperWeeks ?? [];
-  for (let i = 0; i < TAPER_CALENDAR_WEEKS; i++) {
-    const weekNum = input.totalWeeks - TAPER_CALENDAR_WEEKS + 1 + i;
+  const calendarTaperWeeks =
+    input.taperWeekNumbers ?? splitPlanWeekPhases(input.totalWeeks).taperWeekNumbers;
+  for (let i = 0; i < calendarTaperWeeks.length; i++) {
+    const weekNum = calendarTaperWeeks[i]!;
     const row = taperRows.find((r) => r.weekIndex === i + 1);
     const cap = row?.longRunCapMiles;
     if (cap == null || cap <= 0) continue;
@@ -89,10 +92,13 @@ export function applyPhaseTaperWeekTotalCaps(input: {
   planSchedule: PlanWeekSchedule[];
   totalWeeks: number;
   taperWeeks: PhaseWeekRow[] | null | undefined;
+  taperWeekNumbers?: number[];
 }): void {
   const taperRows = input.taperWeeks ?? [];
-  for (let i = 0; i < TAPER_CALENDAR_WEEKS; i++) {
-    const weekNum = input.totalWeeks - TAPER_CALENDAR_WEEKS + 1 + i;
+  const calendarTaperWeeks =
+    input.taperWeekNumbers ?? splitPlanWeekPhases(input.totalWeeks).taperWeekNumbers;
+  for (let i = 0; i < calendarTaperWeeks.length; i++) {
+    const weekNum = calendarTaperWeeks[i]!;
     const row = taperRows.find((r) => r.weekIndex === i + 1);
     const weekCap = row?.totalMilesCap;
     if (weekCap == null || weekCap <= 0) continue;
@@ -136,6 +142,7 @@ export function applyPhaseWeekCataloguePins(input: {
   totalWeeks: number;
   taperWeeks: PhaseWeekRow[] | null | undefined;
   raceWeek: PhaseWeekRow[] | null | undefined;
+  taperWeekNumbers?: number[];
 }): void {
   const applyRow = (weekNum: number, row: PhaseWeekRow | undefined) => {
     if (!row?.pins.length) return;
@@ -151,8 +158,10 @@ export function applyPhaseWeekCataloguePins(input: {
   };
 
   const taperRows = input.taperWeeks ?? [];
-  for (let i = 0; i < TAPER_CALENDAR_WEEKS; i++) {
-    const weekNum = input.totalWeeks - TAPER_CALENDAR_WEEKS + 1 + i;
+  const calendarTaperWeeks =
+    input.taperWeekNumbers ?? splitPlanWeekPhases(input.totalWeeks).taperWeekNumbers;
+  for (let i = 0; i < calendarTaperWeeks.length; i++) {
+    const weekNum = calendarTaperWeeks[i]!;
     applyRow(weekNum, taperRows.find((r) => r.weekIndex === i + 1));
   }
 }

@@ -54,6 +54,8 @@ import {
   positionsFromPhaseRotation,
 } from "@/lib/training/apply-phase-preset-generate";
 import { weeklyVolumePeakFromPreset } from "@/lib/training/preset-core";
+import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
+import { slicePlanScheduleByPhases } from "@/lib/training/plan-schedule-phase-persist";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -123,13 +125,22 @@ export async function executePlanGenerate(params: {
 
   const planConfig = blueprintToPlanGenConfig(blueprint);
 
+  const weekCountEarly = calendarTrainingWeekCount(plan.startDate, race.raceDate);
+  const phaseSplit = splitPlanWeekPhases(weekCountEarly);
+  const needsBuildPhase = phaseSplit.buildWeekNumbers.length > 0;
+
   const phasePreset =
     plan.presetId != null
       ? await fetchTrainingManagePresetForGenerate(plan.presetId)
       : null;
-  if (plan.presetId != null && !phasePreset?.build) {
+  if (plan.presetId != null && !phasePreset) {
     throw new Error(
-      `Training preset "${presetLabel}" was not found in Training Manage or has no build phase. Import or finish the preset in Training Manage.`,
+      `Training preset "${presetLabel}" was not found in Training Manage. Import or finish the preset in Training Manage.`,
+    );
+  }
+  if (plan.presetId != null && needsBuildPhase && !phasePreset?.build) {
+    throw new Error(
+      `Training preset "${presetLabel}" has no build phase but this plan still has build weeks. Finish the build phase in Training Manage.`,
     );
   }
   const phaseBuild = phasePreset?.build ?? null;
@@ -216,7 +227,8 @@ export async function executePlanGenerate(params: {
         ? prefs.preferredDays
         : [1, 2, 3, 4, 5, 6];
 
-  const weekCount = calendarTrainingWeekCount(plan.startDate, race.raceDate);
+  const weekCount = weekCountEarly;
+  const taperWeekNumbers = phaseSplit.taperWeekNumbers;
   const raceMeters = await resolveGoalRaceMetersForGenerate({
     athleteId,
     race: {
@@ -328,27 +340,34 @@ export async function executePlanGenerate(params: {
   });
 
   if (phaseBuild) {
-    applyBuildPhaseLongRunMiles({
-      planSchedule: schedule,
-      taperStartWeekNumber: placement.taperStartWeekNumber,
-      peakWeekNumber: placement.peakWeekNumber ?? placement.taperStartWeekNumber - 1,
-      startLongRunMiles: phaseBuild.startLongRunMiles,
-      peakLongRunMiles: phaseBuild.peakLongRunMiles,
-      longRunCutback: phaseBuild.longRunCutback ?? null,
-      longRunPositions,
-    });
+    if (needsBuildPhase) {
+      applyBuildPhaseLongRunMiles({
+        planSchedule: schedule,
+        taperStartWeekNumber: placement.taperStartWeekNumber,
+        peakWeekNumber:
+          placement.peakWeekNumber ??
+          phaseSplit.peakWeekNumber ??
+          placement.taperStartWeekNumber - 1,
+        startLongRunMiles: phaseBuild.startLongRunMiles,
+        peakLongRunMiles: phaseBuild.peakLongRunMiles,
+        longRunCutback: phaseBuild.longRunCutback ?? null,
+        longRunPositions,
+      });
+    }
     applyPhaseTaperLongRunMiles({
       planSchedule: schedule,
       totalWeeks: weekCount,
       taperWeeks: phasePreset?.taper?.weeks,
+      taperWeekNumbers,
     });
     applyPhaseWeekCataloguePins({
       planSchedule: schedule,
       totalWeeks: weekCount,
       taperWeeks: phasePreset?.taper?.weeks,
       raceWeek: null,
+      taperWeekNumbers,
     });
-  } else {
+  } else if (needsBuildPhase) {
     applyLongRunSchedule({
       planSchedule: schedule,
       totalWeeks: weekCount,
@@ -356,6 +375,20 @@ export async function executePlanGenerate(params: {
       peakLongRunPoolMiles,
       fitnessPhase: blueprint.fitnessPhase,
       longRunPositions,
+    });
+  } else if ((phasePreset?.taper?.weeks?.length ?? 0) > 0) {
+    applyPhaseTaperLongRunMiles({
+      planSchedule: schedule,
+      totalWeeks: weekCount,
+      taperWeeks: phasePreset?.taper?.weeks,
+      taperWeekNumbers,
+    });
+    applyPhaseWeekCataloguePins({
+      planSchedule: schedule,
+      totalWeeks: weekCount,
+      taperWeeks: phasePreset?.taper?.weeks,
+      raceWeek: null,
+      taperWeekNumbers,
     });
   }
 
@@ -405,6 +438,7 @@ export async function executePlanGenerate(params: {
         presetPeakMiles,
         taperWeeks: phasePreset?.taper?.weeks,
         raceWeek: phasePreset?.raceWeek?.slots ?? null,
+        taperWeekNumbers,
       })
     : null;
 
@@ -429,6 +463,7 @@ export async function executePlanGenerate(params: {
       planSchedule: schedule,
       totalWeeks: weekCount,
       taperWeeks: phasePreset?.taper?.weeks,
+      taperWeekNumbers,
     });
   }
 
@@ -478,12 +513,29 @@ export async function executePlanGenerate(params: {
       ? goalRacePaceDisplayString(mergedGoalTime, raceDistanceMiles)
       : null);
 
+  const phaseSlices = slicePlanScheduleByPhases(schedule, phaseSplit);
+  const buildJson =
+    phaseSlices.build.length > 0
+      ? (phaseSlices.build as unknown as Prisma.InputJsonValue)
+      : Prisma.JsonNull;
+  const taperJson =
+    phaseSlices.taper.length > 0
+      ? (phaseSlices.taper as unknown as Prisma.InputJsonValue)
+      : Prisma.JsonNull;
+  const raceWeekJson =
+    phaseSlices.raceWeek.length > 0
+      ? (phaseSlices.raceWeek as unknown as Prisma.InputJsonValue)
+      : Prisma.JsonNull;
+
   await prisma.training_plans.update({
     where: { id: plan.id },
     data: {
       planSchedule: schedule as unknown as Prisma.InputJsonValue,
+      planScheduleBuild: buildJson,
+      planScheduleTaper: taperJson,
+      planScheduleRaceWeek: raceWeekJson,
       phases: Prisma.JsonNull,
-      peakWeekNumber: placement.peakWeekNumber,
+      peakWeekNumber: placement.peakWeekNumber ?? phaseSplit.peakWeekNumber,
       taperStartWeekNumber: placement.taperStartWeekNumber,
       calculatedLongRunMax: placement.calculatedLongRunMax,
       cyclePoolData: cyclePoolData as unknown as Prisma.InputJsonValue,

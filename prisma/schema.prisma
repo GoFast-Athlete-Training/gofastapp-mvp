@@ -2482,6 +2482,12 @@ model training_plans {
   phases               Json?
   /// Canonical schedule freeze-frame: structured [{ weekNumber, days[] }] or legacy { weekNumber, schedule } strings)
   planSchedule         Json?
+  /// Build-phase weeks only (subset of planSchedule week numbers).
+  planScheduleBuild    Json?
+  /// Taper weeks only (at most two calendar weeks before race week).
+  planScheduleTaper    Json?
+  /// Race week only (calendar week containing goal race day).
+  planScheduleRaceWeek Json?
   /// Derived at generation: approximate week containing peak stimulus (pre-taper macro cycle)
   peakWeekNumber       Int?
   /// 1-based week index where taper macro-cycle begins (last ceil(weeks/4) block start)

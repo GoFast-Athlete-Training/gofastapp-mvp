@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { buildPlanWeekCards } from "@/lib/training/plan-week-cards";
+import { resolvePlanScheduleFromPlanRow } from "@/lib/training/plan-schedule-phase-persist";
 import { workoutHasActuals } from "@/lib/training/workout-has-actuals";
 import {
   currentTrainingWeekNumber,
@@ -139,7 +140,7 @@ export async function GET(request: NextRequest) {
           planId: plan.id,
           athleteId: athlete.id,
           planStartDate: plan.startDate,
-          planSchedule: plan.planSchedule,
+          planSchedule: resolvePlanScheduleFromPlanRow(plan),
           weekNumber: weekNum,
           storedTotalWeeks: plan.totalWeeks,
           raceDate: race?.raceDate ?? null,

@@ -7,6 +7,7 @@ import { buildPlanWeekCards } from "@/lib/training/plan-week-cards";
 import { effectiveTrainingWeekCount } from "@/lib/training/plan-utils";
 import { loadWeekPerformanceSnapshot } from "@/lib/training/week-performance-metrics";
 import { metersToMiles } from "@/lib/pace-utils";
+import { resolvePlanScheduleFromPlanRow } from "@/lib/training/plan-schedule-phase-persist";
 
 /**
  * GET /api/training/plan/week?planId=&weekNumber=
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
       planId: plan.id,
       athleteId: auth.athlete.id,
       planStartDate: plan.startDate,
-      planSchedule: plan.planSchedule,
+      planSchedule: resolvePlanScheduleFromPlanRow(plan),
       weekNumber,
       storedTotalWeeks: plan.totalWeeks,
       raceDate: race?.raceDate ?? null,

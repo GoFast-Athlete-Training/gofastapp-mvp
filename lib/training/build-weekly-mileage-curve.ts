@@ -1,6 +1,7 @@
 import type { RaceWeekSlotForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
 import type { PhaseWeekRow } from "@/lib/training/phase-week-pins";
-import { TAPER_CALENDAR_WEEKS, taperWeeklyMileageTarget } from "@/lib/training/preset-volume-helpers";
+import { taperWeeklyMileageTarget } from "@/lib/training/preset-volume-helpers";
+import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -20,6 +21,7 @@ export function buildWeeklyMileageTargetsByWeek(params: {
   presetPeakMiles: number;
   taperWeeks: PhaseWeekRow[] | null | undefined;
   raceWeek: RaceWeekSlotForGenerate[] | PhaseWeekRow[] | null | undefined;
+  taperWeekNumbers?: number[];
 }): Map<number, number> {
   const out = new Map<number, number>();
   const taperStart = Math.max(1, Math.floor(params.taperStartWeekNumber));
@@ -36,8 +38,11 @@ export function buildWeeklyMileageTargetsByWeek(params: {
   }
 
   const taperRows = params.taperWeeks ?? [];
-  for (let i = 0; i < TAPER_CALENDAR_WEEKS; i++) {
-    const weekNum = params.totalWeeks - TAPER_CALENDAR_WEEKS + 1 + i;
+  const calendarTaperWeeks =
+    params.taperWeekNumbers ??
+    splitPlanWeekPhases(params.totalWeeks).taperWeekNumbers;
+  for (let i = 0; i < calendarTaperWeeks.length; i++) {
+    const weekNum = calendarTaperWeeks[i]!;
     if (weekNum >= taperStart && weekNum < params.totalWeeks) {
       const row = taperRows.find((r) => r.weekIndex === i + 1);
       const cap = row?.totalMilesCap;
