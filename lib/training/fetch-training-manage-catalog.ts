@@ -17,7 +17,10 @@ export type TrainingManageTemplatePreset = {
   id: string;
   slug: string;
   title: string;
+  publicDescription: string | null;
   targetDistanceLabel: string | null;
+  minWeeklyMiles: number;
+  maxWeeklyMiles: number | null;
   tempoIdealDow: number;
   intervalIdealDow: number;
   longRunDefaultDow: number;

@@ -447,6 +447,15 @@ export default function TrainingSetupPlanPage({
     return 40;
   }, [plan?.training_plan_preset?.minWeeklyMiles]);
 
+  const presetMaxWeeklyMiles = useMemo(() => {
+    const raw = (plan?.training_plan_preset as { maxWeeklyMiles?: number | null } | null)
+      ?.maxWeeklyMiles;
+    if (raw != null && Number.isFinite(Number(raw))) {
+      return Math.max(presetMinWeeklyMiles, Math.round(Number(raw)));
+    }
+    return null;
+  }, [plan?.training_plan_preset, presetMinWeeklyMiles]);
+
   const trajectoryContext = useMemo(
     () => (plan ? trajectoryContextFromPlanDetail(plan) : null),
     [plan]
@@ -459,10 +468,15 @@ export default function TrainingSetupPlanPage({
       milesFinite &&
       miles < presetMinWeeklyMiles &&
       weeklyMilesTarget.trim() !== "";
+    const abovePresetCeiling =
+      milesFinite &&
+      presetMaxWeeklyMiles != null &&
+      miles > presetMaxWeeklyMiles &&
+      weeklyMilesTarget.trim() !== "";
     const fewDays = preferredCount > 0 && preferredCount < 4;
     const fourDays = preferredCount === 4;
-    return { belowEngineFloor, fewDays, fourDays };
-  }, [weeklyMilesTarget, preferredCount, presetMinWeeklyMiles]);
+    return { belowEngineFloor, abovePresetCeiling, fewDays, fourDays };
+  }, [weeklyMilesTarget, preferredCount, presetMinWeeklyMiles, presetMaxWeeklyMiles]);
 
   function arraysEqual(a: number[], b: number[]): boolean {
     if (a.length !== b.length) return false;
@@ -515,23 +529,7 @@ export default function TrainingSetupPlanPage({
       );
     } else if (preset == null) {
       msgs.push(
-        "This plan points at a preset that could not be loaded (it may have been removed). Try generating once; contact support if you still see preset errors."
-      );
-    }
-    if (
-      preset != null &&
-      (preset.intervalsConfig == null || !preset.intervalsConfig.positions?.length)
-    ) {
-      msgs.push(
-        "Your preset has no interval rotation configured. Weekly plans may omit interval workouts until rotations are set up."
-      );
-    }
-    if (
-      preset != null &&
-      (preset.tempoConfig == null || !preset.tempoConfig.positions?.length)
-    ) {
-      msgs.push(
-        "Your preset has no tempo rotation configured. Weekly plans may omit tempo workouts until rotations are set up."
+        "This plan’s preset id is not in Training Manage (check GOFAST_TRAINING_MANAGE_URL on prod). Contact support if the preset exists in Training Manage but still does not load."
       );
     }
     return msgs;
@@ -642,7 +640,21 @@ export default function TrainingSetupPlanPage({
     if (!Number.isFinite(targetMiles)) {
       return null;
     }
-    return Math.max(25, Math.min(100, targetMiles));
+    if (targetMiles < presetMinWeeklyMiles) {
+      return null;
+    }
+    if (presetMaxWeeklyMiles != null && targetMiles > presetMaxWeeklyMiles) {
+      return null;
+    }
+    return targetMiles;
+  }
+
+  function weeklyTargetBandErrorMessage(): string {
+    const band =
+      presetMaxWeeklyMiles != null
+        ? `${presetMinWeeklyMiles}–${presetMaxWeeklyMiles} mi/week`
+        : `at least ${presetMinWeeklyMiles} mi/week`;
+    return `Enter your weekly target within this plan’s band (${band}).`;
   }
 
   async function savePlanPreferences(token: string, targetMiles: number) {
@@ -709,7 +721,7 @@ export default function TrainingSetupPlanPage({
       const token = await getToken();
       const targetMiles = resolveTargetMiles();
       if (targetMiles == null) {
-        setError("Please enter a number for your weekly miles.");
+        setError(weeklyTargetBandErrorMessage());
         return;
       }
       const saved = await savePlanPreferences(token, targetMiles);
@@ -731,7 +743,7 @@ export default function TrainingSetupPlanPage({
       const token = await getToken();
       const targetMiles = resolveTargetMiles();
       if (targetMiles == null) {
-        setError("Please enter a number for your weekly miles.");
+        setError(weeklyTargetBandErrorMessage());
         return;
       }
       const saved = await savePlanPreferences(token, targetMiles);
@@ -1229,13 +1241,27 @@ export default function TrainingSetupPlanPage({
               <p className="mb-2 text-xs text-gray-500">
                 Your ballpark for how much you want to run in a normal week—we aim the
                 plan at it.
+                {plan.training_plan_preset ? (
+                  <>
+                    {" "}
+                    This preset allows{" "}
+                    <span className="font-medium text-gray-800">
+                      {presetMinWeeklyMiles}
+                      {presetMaxWeeklyMiles != null
+                        ? `–${presetMaxWeeklyMiles}`
+                        : "+"}{" "}
+                      mi/week
+                    </span>
+                    .
+                  </>
+                ) : null}
               </p>
               <input
                 type="number"
                 inputMode="numeric"
                 step={1}
-                min={25}
-                max={100}
+                min={presetMinWeeklyMiles}
+                max={presetMaxWeeklyMiles ?? undefined}
                 className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                 value={weeklyMilesTarget}
                 onChange={(e) => setWeeklyMilesTarget(e.target.value)}
@@ -1245,16 +1271,20 @@ export default function TrainingSetupPlanPage({
                   className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
                   role="status"
                 >
-                  You entered {Math.round(Number(weeklyMilesTarget))} mi/week. This
-                  plan&apos;s blueprint enforces at least {presetMinWeeklyMiles} mi/week when
-                  we build the schedule, so the generator may use that minimum (or higher)
-                  for weekly totals—especially on weeks with tempo, intervals, and long
-                  runs.
+                  Enter at least {presetMinWeeklyMiles} mi/week for this preset.
                 </p>
               )}
+              {buildWarnings.abovePresetCeiling && presetMaxWeeklyMiles != null ? (
+                <p
+                  className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
+                  role="status"
+                >
+                  Enter at most {presetMaxWeeklyMiles} mi/week for this preset.
+                </p>
+              ) : null}
             </div>
 
-            {plan && trajectoryContext ? (
+            {plan && trajectoryContext && hasSchedule ? (
               <PlanLongRunTrajectorySection
                 planId={planId}
                 getToken={getToken}
