@@ -26,9 +26,10 @@ export async function GET(request: NextRequest) {
   }
 
   const q = request.nextUrl.searchParams.get("q")?.trim().toLowerCase();
+  const all = request.nextUrl.searchParams.get("all") === "1";
   const personas = await prisma.training_plan_persona.findMany({
     orderBy: { updatedAt: "desc" },
-    take: q ? 50 : 200,
+    ...(all ? {} : { take: q ? 50 : 200 }),
     ...(q
       ? {
           where: {

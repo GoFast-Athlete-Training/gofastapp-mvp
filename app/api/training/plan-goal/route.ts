@@ -44,10 +44,11 @@ export async function GET(request: NextRequest) {
   }
 
   const personaId = request.nextUrl.searchParams.get("personaId")?.trim();
+  const all = request.nextUrl.searchParams.get("all") === "1";
   const goals = await prisma.training_plan_goal.findMany({
     where: personaId ? { personaId } : undefined,
     orderBy: { updatedAt: "desc" },
-    take: 200,
+    ...(all ? {} : { take: 200 }),
     include: { persona: true },
   });
 
