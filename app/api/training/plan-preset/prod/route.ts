@@ -1,14 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { presetMatchesDistance } from "@/lib/training/preset-distance-match";
-import { fetchTrainingManageCatalogPresets } from "@/lib/training/fetch-training-manage-catalog";
 
 /**
  * GET /api/training/plan-preset/prod
  *
- * Athlete-facing catalog list — Prod forwards Firebase Bearer to Training Manage.
+ * Athlete-facing catalog list — prod mirror only (no Training Manage hop).
  */
 export async function GET(request: NextRequest) {
   const auth = await requireAthleteFromBearer(request);
@@ -25,13 +25,21 @@ export async function GET(request: NextRequest) {
       ? Math.round(Number(dmRaw))
       : null;
 
-  const rows = await fetchTrainingManageCatalogPresets(request.headers.get("authorization"));
-  if (rows == null) {
-    return NextResponse.json(
-      { success: false, error: "Training catalog unavailable" },
-      { status: 503 },
-    );
-  }
+  const rows = await prisma.training_plan_preset.findMany({
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      publicDescription: true,
+      targetDistanceLabel: true,
+      minWeeklyMiles: true,
+      maxWeeklyMiles: true,
+      tempoIdealDow: true,
+      intervalIdealDow: true,
+      longRunDefaultDow: true,
+    },
+  });
 
   if (rows.length === 0) {
     return NextResponse.json(

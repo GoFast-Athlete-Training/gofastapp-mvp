@@ -43,7 +43,7 @@ import {
   resolvePlanRaceCalendar,
 } from "@/lib/training/race-plan-calendar-service";
 import { resolveGoalRaceMetersForGenerate } from "@/lib/training/resolve-goal-race-meters";
-import { fetchTrainingManagePresetForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
+import { loadPresetPhaseForGenerateFromProd } from "@/lib/training/load-preset-phase-from-prod";
 import { buildWeeklyMileageTargetsByWeek } from "@/lib/training/build-weekly-mileage-curve";
 import {
   applyBuildPhaseLongRunMiles,
@@ -131,16 +131,16 @@ export async function executePlanGenerate(params: {
 
   const phasePreset =
     plan.presetId != null
-      ? await fetchTrainingManagePresetForGenerate(plan.presetId)
+      ? await loadPresetPhaseForGenerateFromProd(plan.presetId)
       : null;
   if (plan.presetId != null && !phasePreset) {
     throw new Error(
-      `Training preset "${presetLabel}" was not found in Training Manage. Import or finish the preset in Training Manage.`,
+      `Training preset "${presetLabel}" is not synced to prod yet. Re-save the preset in Training Manage or contact support.`,
     );
   }
   if (plan.presetId != null && needsBuildPhase && !phasePreset?.build) {
     throw new Error(
-      `Training preset "${presetLabel}" has no build phase but this plan still has build weeks. Finish the build phase in Training Manage.`,
+      `Training preset "${presetLabel}" has no build phase but this plan still has build weeks. Finish the build phase in Training Manage and re-save.`,
     );
   }
   const phaseBuild = phasePreset?.build ?? null;

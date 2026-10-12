@@ -529,7 +529,7 @@ export default function TrainingSetupPlanPage({
       );
     } else if (preset == null) {
       msgs.push(
-        "This plan’s preset id is not in Training Manage (check GOFAST_TRAINING_MANAGE_URL on prod). Contact support if the preset exists in Training Manage but still does not load."
+        "This plan’s training preset is not available on prod yet. Ask staff to re-save the preset in Training Manage, or contact support."
       );
     }
     return msgs;

@@ -2019,6 +2019,10 @@ model training_plan_preset {
   easyConfig        easy_config?       @relation(fields: [easyConfigId], references: [id], onDelete: SetNull)
   /// JSON: standardMiles, minMiles, paceOffsetSecPerMile, weeklyTargetBufferMiles (easy-day defaults / pace vs 5K anchor)
   easyRunConfig     Json?
+  /// Training Manage `loadPresetForGenerate` mirror — build/taper/raceWeek for prod generate.
+  presetPhaseGenerateJson Json?
+  /// Training manager id from last Training Manage → prod prodpush sync.
+  lastSyncedByStaffId     String?
 }
 
 /// Athlete-owned training blueprint — never mixed into staff catalog until promoted.

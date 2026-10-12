@@ -14,7 +14,8 @@ import {
   isAthletePresetBlueprintComplete,
 } from "@/lib/training/athlete-preset-blueprint";
 import type { AthletePresetFitnessPhase, training_plan_preset } from "@prisma/client";
-import { fetchTrainingManagePresetForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
+import { trainingPlanPresetInclude } from "@/lib/training/plan-generate-presets-loader";
+import { loadPresetPhaseForGenerateFromProd } from "@/lib/training/load-preset-phase-from-prod";
 import { resolvedBlueprintFromTrainingManage } from "@/lib/training/training-manage-blueprint";
 
 export type ResolvedPlanBlueprint = {
@@ -90,9 +91,37 @@ export async function loadPlanBlueprintForGenerate(params: {
   }
 
   if (plan.presetId) {
-    const tm = await fetchTrainingManagePresetForGenerate(plan.presetId);
-    if (!tm?.build) return null;
-    return resolvedBlueprintFromTrainingManage(tm);
+    const preset = await prisma.training_plan_preset.findUnique({
+      where: { id: plan.presetId },
+      include: trainingPlanPresetInclude,
+    });
+    const phase = await loadPresetPhaseForGenerateFromProd(plan.presetId);
+    if (!preset || !phase?.build) return null;
+
+    const base = resolvedBlueprintFromTrainingManage(phase);
+    return {
+      ...base,
+      rotationPreset: {
+        ...preset,
+        coachPlanOverview: phase.coachPlanOverview,
+        workoutStructure: phase.workoutStructure,
+        easyRunConfig: phase.easyRunConfig,
+        slug: preset.slug,
+        title: preset.title,
+      },
+      volumePreset: {
+        minWeeklyMiles: preset.minWeeklyMiles,
+        maxWeeklyMiles: preset.maxWeeklyMiles,
+        baseLongRunPoolMiles: preset.baseLongRunPoolMiles,
+        peakLongRunPoolMiles: preset.peakLongRunPoolMiles,
+        taperLongRunPoolMiles: preset.taperLongRunPoolMiles,
+        tempoIdealDow: preset.tempoIdealDow,
+        intervalIdealDow: preset.intervalIdealDow,
+        longRunDefaultDow: preset.longRunDefaultDow,
+        slug: preset.slug,
+        title: preset.title,
+      },
+    };
   }
 
   return null;

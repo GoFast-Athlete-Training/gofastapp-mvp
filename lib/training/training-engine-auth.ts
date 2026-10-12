@@ -5,9 +5,8 @@ import { STAFF_ID_HEADER } from "@/lib/staff-forward-auth";
 export { STAFF_ID_HEADER };
 
 /**
- * Staff-forwarded auth for training engine and companypush receivers from GoFastCompany.
- * Company verifies `company_staff` and forwards `x-gofast-staff-id` + the user's Firebase Bearer token.
- * See `.cursor/rules/companypush-auth.mdc`.
+ * Staff-forwarded auth: Firebase Bearer + `x-gofast-staff-id` (training manager or staff seat id on the wire).
+ * Callers verify the seat server-side before forwarding; prod verifies the token only.
  */
 
 export async function assertStaffBearerAuth(
