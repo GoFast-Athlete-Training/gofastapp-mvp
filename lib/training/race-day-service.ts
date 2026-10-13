@@ -70,9 +70,19 @@ export type ApplyRaceDayRolesInput = {
   totalWeeks: number;
   schedule: PlanWeekSchedule[];
   raceDate: Date;
+  /** Build easy rotation catalogue — stamped on shakeout days instead of null. */
+  defaultEasyCatalogueWorkoutId?: string | null;
   /** Applied to the race-day row (primary/secondary metadata). */
   raceDayPatch?: Partial<PlanDaySchedule>;
 };
+
+function applyEasyShakeoutDay(day: PlanDaySchedule, easyCatalogueId: string | null | undefined): void {
+  const cat = easyCatalogueId?.trim() || null;
+  day.workoutType = WT.Easy;
+  day.miles = 0;
+  day.catalogueWorkoutId = cat;
+  day.planCycleIndex = cat ? 0 : null;
+}
 
 /** Mutates schedule: enforces shakeout / rest / race roles for one race anchor. */
 export function applyRaceDayRolesOnSchedule(input: ApplyRaceDayRolesInput): void {
@@ -89,24 +99,23 @@ export function applyRaceDayRolesOnSchedule(input: ApplyRaceDayRolesInput): void
     }
 
     if (role === "shakeout") {
+      const easyCat = input.defaultEasyCatalogueWorkoutId;
       if (located) {
-        const day = located.week.days[located.dayIndex]!;
-        day.workoutType = WT.Easy;
-        day.miles = 0;
-        day.catalogueWorkoutId = null;
-        day.planCycleIndex = null;
+        applyEasyShakeoutDay(located.week.days[located.dayIndex]!, easyCat);
       } else {
         const pos = findWeekDowForDateKey(input.planStart, input.totalWeeks, dateKey);
         if (pos) {
           const week = input.schedule.find((w) => w.weekNumber === pos.weekNumber);
           if (week) {
-            week.days.push({
+            const day: PlanDaySchedule = {
               dow: pos.dow,
               workoutType: WT.Easy,
               miles: 0,
               catalogueWorkoutId: null,
               planCycleIndex: null,
-            });
+            };
+            applyEasyShakeoutDay(day, easyCat);
+            week.days.push(day);
             week.days.sort((a, b) => a.dow - b.dow);
           }
         }
@@ -160,10 +169,7 @@ export function applyRaceDayRolesOnSchedule(input: ApplyRaceDayRolesInput): void
           day.workoutType === WT.Tempo ||
           day.workoutType === WT.Intervals)
       ) {
-        day.workoutType = WT.Easy;
-        day.miles = 0;
-        day.catalogueWorkoutId = null;
-        day.planCycleIndex = null;
+        applyEasyShakeoutDay(day, input.defaultEasyCatalogueWorkoutId);
       }
     }
   }

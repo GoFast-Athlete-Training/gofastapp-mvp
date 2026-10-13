@@ -21,7 +21,10 @@ import {
   weekCycleMeta,
 } from "@/lib/training/cycle-blocks";
 import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
-import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
+import {
+  catalogueIdForRotation,
+  type RunTypePosition,
+} from "@/lib/training/run-type-config-shared";
 import { raceDayRoleOn } from "@/lib/training/race-day-service";
 
 export type WorkoutDayInput = {
@@ -122,15 +125,6 @@ function resolvedPositions(pos: readonly RunTypePosition[]): RunTypePosition[] {
   return [...pos].sort((a, b) => a.cyclePosition - b.cyclePosition);
 }
 
-function catalogueIdForRotation(
-  positions: readonly RunTypePosition[],
-  cycleIndex: number
-): string | null {
-  const p = resolvedPositions(positions);
-  if (!p.length) return null;
-  const slot = p[cycleIndex % p.length];
-  return slot.catalogueWorkoutId ?? null;
-}
 
 function weekContainsRaceDate(
   planStartDate: Date,

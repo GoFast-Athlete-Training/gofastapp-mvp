@@ -36,6 +36,7 @@ import {
   assertScheduleEasyDaysHaveCatalogue,
   rotationMissingCatalogueWorkout,
 } from "@/lib/training/run-type-config-validation";
+import { catalogueIdForRotation } from "@/lib/training/run-type-config-shared";
 import { parseCoachPlanOverview } from "@/lib/training/preset-strategy";
 import {
   imprintPlanRaceCalendarOnSchedule,
@@ -293,11 +294,14 @@ export async function executePlanGenerate(params: {
     includedSecondaryAthleteRaceIds: includedIds,
   });
 
+  const defaultEasyCatalogueWorkoutId = catalogueIdForRotation(easyPositions, 0);
+
   imprintPlanRaceCalendarOnSchedule({
     planStart: plan.startDate,
     totalWeeks: weekCount,
     schedule,
     calendar,
+    defaultEasyCatalogueWorkoutId,
   });
 
   await persistPlanRaceSnapshots({

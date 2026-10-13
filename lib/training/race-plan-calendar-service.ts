@@ -346,8 +346,10 @@ function applyRecoveryAfterRace(
   schedule: PlanWeekSchedule[],
   startWeekNumber: number,
   raceDow: number,
-  recoveryCount: number
+  recoveryCount: number,
+  defaultEasyCatalogueWorkoutId?: string | null,
 ): void {
+  const easyCat = defaultEasyCatalogueWorkoutId?.trim() || null;
   let remaining = recoveryCount;
   for (let wIdx = 0; wIdx < schedule.length && remaining > 0; wIdx++) {
     const week = schedule[wIdx];
@@ -358,8 +360,8 @@ function applyRecoveryAfterRace(
       if (remaining <= 0) break;
       if (day.workoutType === WT.Tempo || day.workoutType === WT.Intervals) {
         day.workoutType = WT.Easy;
-        day.catalogueWorkoutId = null;
-        day.planCycleIndex = null;
+        day.catalogueWorkoutId = easyCat;
+        day.planCycleIndex = easyCat ? 0 : null;
       }
       day.recoveryAfterRace = true;
       remaining--;
@@ -373,6 +375,8 @@ export function imprintPlanRaceCalendarOnSchedule(params: {
   totalWeeks: number;
   schedule: PlanWeekSchedule[];
   calendar: PlanRaceCalendar;
+  /** Build easy rotation — keep catalogue ids when calendar downgrades to Easy. */
+  defaultEasyCatalogueWorkoutId?: string | null;
 }): ImprintPlanRaceCalendarResult {
   const { schedule, calendar } = params;
   if (!calendar.primary) {
@@ -433,6 +437,7 @@ export function imprintPlanRaceCalendarOnSchedule(params: {
       totalWeeks: params.totalWeeks,
       schedule,
       raceDate: event.raceDate,
+      defaultEasyCatalogueWorkoutId: params.defaultEasyCatalogueWorkoutId,
       raceDayPatch: {
         athleteRaceId: event.athleteRaceId,
         raceRegistryId: event.raceRegistryId,
@@ -445,7 +450,8 @@ export function imprintPlanRaceCalendarOnSchedule(params: {
       schedule,
       pos.weekNumber,
       pos.dow,
-      recoveryDaysAfterSecondary(raceDistanceMiles(event))
+      recoveryDaysAfterSecondary(raceDistanceMiles(event)),
+      params.defaultEasyCatalogueWorkoutId,
     );
   }
 

@@ -51,6 +51,7 @@ test("imprintPlanRaceCalendarOnSchedule replaces long run on secondary race day"
     planStart: baseInput.planStartDate,
     totalWeeks: baseInput.totalWeeks,
     schedule,
+    defaultEasyCatalogueWorkoutId: "easy-1",
     calendar: {
       primary: calendarEntry({
         athleteRaceId: "mcm-ar",
@@ -82,6 +83,15 @@ test("imprintPlanRaceCalendarOnSchedule replaces long run on secondary race day"
   assert.equal(raceDay.athleteRaceId, "boulder-ar");
   assert.equal(raceDay.raceRegistryId, "boulder-id");
   assert.equal(raceDay.replacedWorkoutType, WT.LongRun);
+
+  const easyWithoutCatalogue = schedule.some((w) =>
+    w.days.some((d) => d.workoutType === WT.Easy && !d.catalogueWorkoutId?.trim()),
+  );
+  assert.equal(
+    easyWithoutCatalogue,
+    false,
+    "calendar imprint should not leave Easy days without a catalogue workout",
+  );
 });
 
 test("imprintPlanRaceCalendarOnSchedule is no-op with zero secondary events", () => {

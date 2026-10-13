@@ -13,6 +13,16 @@ export type RunTypeConfigInput = {
   positions: RunTypePosition[];
 };
 
+export function catalogueIdForRotation(
+  positions: readonly RunTypePosition[],
+  cycleIndex: number,
+): string | null {
+  const sorted = [...positions].sort((a, b) => a.cyclePosition - b.cyclePosition);
+  if (sorted.length === 0) return null;
+  const slot = sorted[cycleIndex % sorted.length];
+  return slot?.catalogueWorkoutId?.trim() || null;
+}
+
 export function runTypeConfigPositionsToInputs(
   workoutType: WorkoutType,
   positions: Array<{

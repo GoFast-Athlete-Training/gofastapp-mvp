@@ -42,10 +42,12 @@ test("applyRaceDayRolesOnSchedule removes rest and downgrades shakeout long runs
     totalWeeks: 4,
     schedule,
     raceDate,
+    defaultEasyCatalogueWorkoutId: "easy-cat-1",
   });
 
-  const byDow = new Map(schedule[0]!.days.map((d) => [d.dow, d.workoutType]));
-  assert.equal(byDow.get(5), "Easy");
+  const byDow = new Map(schedule[0]!.days.map((d) => [d.dow, d]));
+  assert.equal(byDow.get(5)?.workoutType, "Easy");
+  assert.equal(byDow.get(5)?.catalogueWorkoutId, "easy-cat-1");
   assert.equal(byDow.has(6), false);
-  assert.equal(byDow.get(7), "Race");
+  assert.equal(byDow.get(7)?.workoutType, "Race");
 });
