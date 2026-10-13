@@ -7,6 +7,7 @@ import type {
 import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
 import { mapPositionRow } from "@/lib/training/plan-generate-presets-loader";
 import type { RunTypePosition } from "@/lib/training/run-type-config-shared";
+import { catalogueIdForRotation } from "@/lib/training/run-type-config-shared";
 import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
 import { addDaysUtc, utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import { WorkoutType as WT } from "@prisma/client";
@@ -58,6 +59,43 @@ export function applyBuildPhaseLongRunMiles(input: {
       d.planCycleIndex = cyclePos;
       break;
     }
+  }
+}
+
+/** Ensure a long-run day exists on taper weeks when a LR cap is set but pass 1 did not place one. */
+export function ensureTaperLongRunDays(input: {
+  planSchedule: PlanWeekSchedule[];
+  totalWeeks: number;
+  taperWeeks: PhaseWeekRow[] | null | undefined;
+  taperWeekNumbers?: number[];
+  preferredLongRunDow: number;
+  longRunPositions: readonly RunTypePosition[];
+}): void {
+  const taperRows = input.taperWeeks ?? [];
+  const calendarTaperWeeks =
+    input.taperWeekNumbers ?? splitPlanWeekPhases(input.totalWeeks).taperWeekNumbers;
+  const lrDow = Math.min(7, Math.max(1, Math.floor(input.preferredLongRunDow || 6)));
+  const defaultCatId = catalogueIdForRotation(input.longRunPositions, 0);
+
+  for (let i = 0; i < calendarTaperWeeks.length; i++) {
+    const weekNum = calendarTaperWeeks[i]!;
+    const row = taperRows.find((r) => r.weekIndex === i + 1);
+    const cap = row?.longRunCapMiles;
+    if (cap == null || cap <= 0) continue;
+    const week = input.planSchedule.find((w) => w.weekNumber === weekNum);
+    if (!week) continue;
+    const hasLr = week.days.some((d) => d.workoutType === "LongRun");
+    if (hasLr) continue;
+    const cyclePos = (weekNum - 1) % Math.max(1, input.longRunPositions.length);
+    week.days.push({
+      dow: lrDow,
+      workoutType: "LongRun",
+      miles: 0,
+      catalogueWorkoutId:
+        catalogueIdForRotation(input.longRunPositions, cyclePos) ?? defaultCatId,
+      planCycleIndex: cyclePos,
+    });
+    week.days.sort((a, b) => a.dow - b.dow);
   }
 }
 
@@ -190,6 +228,16 @@ function workoutTypeForRaceWeekSlot(
   if (type === "intervals") return WT.Intervals;
   if (type === "easy" || type === "shakeout-easy") return WT.Easy;
   return null;
+}
+
+/** Stamp taper-week JSON slots (same shape as race week; offsets -14…-1). */
+export function applyTaperWeekSlotsFromPreset(input: {
+  planStart: Date;
+  raceDate: Date;
+  schedule: PlanWeekSchedule[];
+  slots: RaceWeekSlotForGenerate[];
+}): void {
+  applyRaceWeekSlotsFromPreset(input);
 }
 
 /** Stamp race-week JSON slots onto calendar days (offsets from primary race). */

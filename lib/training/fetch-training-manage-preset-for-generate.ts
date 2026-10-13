@@ -42,6 +42,7 @@ export type TrainingManagePresetForGenerate = {
   taper: {
     name: string;
     weeks: PhaseWeekRow[];
+    slots?: RaceWeekSlotForGenerate[];
   } | null;
   raceWeek: {
     title: string;

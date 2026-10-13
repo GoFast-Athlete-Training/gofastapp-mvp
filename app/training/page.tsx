@@ -213,6 +213,7 @@ export default function TrainingHubPage() {
   const [scheduledRuns, setScheduledRuns] = useState<ScheduledRunJson[]>([]);
   const [planRacePlannerHref, setPlanRacePlannerHref] = useState<string | null>(null);
   const [planRaceHubHref, setPlanRaceHubHref] = useState<string | null>(null);
+  const [blueprintSetupHint, setBlueprintSetupHint] = useState<string | null>(null);
 
   const pastRacePhase = useMemo(
     () => (pastRacePlan?.raceDate ? getRacePhaseLocal(pastRacePlan.raceDate) : null),
@@ -670,6 +671,37 @@ export default function TrainingHubPage() {
   const showTrainingHub = !!planDetail && hasSchedule(planDetail);
   const showIncompletePlan = !!planDetail && !hasSchedule(planDetail);
 
+  useEffect(() => {
+    if (!planDetail || hasSchedule(planDetail)) {
+      setBlueprintSetupHint(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const u = auth.currentUser;
+        if (!u) return;
+        const token = await u.getIdToken();
+        const res = await fetch(
+          `/api/training/plan/blueprint-readiness?planId=${encodeURIComponent(planDetail.id)}`,
+          { headers: athleteBearerFetchHeaders(token) },
+        );
+        const data = (await res.json()) as {
+          errors?: string[];
+          shortPlanWarning?: string | null;
+        };
+        if (data.errors?.length) {
+          setBlueprintSetupHint(data.errors.join(" "));
+        } else if (data.shortPlanWarning) {
+          setBlueprintSetupHint(data.shortPlanWarning);
+        } else {
+          setBlueprintSetupHint(null);
+        }
+      } catch {
+        setBlueprintSetupHint(null);
+      }
+    })();
+  }, [planDetail]);
+
   const todayKey = localTodayKey();
   const focusKey = selectedDayKey || todayKey;
   const focusPlanDay = weekDays.find((d) => d.dateKey === focusKey) ?? null;
@@ -990,6 +1022,9 @@ export default function TrainingHubPage() {
             <p className="mt-3 text-sm text-amber-950/90">
               Generate your schedule in setup to see workouts here each week.
             </p>
+            {blueprintSetupHint ? (
+              <p className="mt-3 text-sm font-medium text-amber-950">{blueprintSetupHint}</p>
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-3">
               <Link
                 href={`/training-setup/${planDetail.id}`}

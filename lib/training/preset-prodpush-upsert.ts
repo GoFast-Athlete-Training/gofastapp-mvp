@@ -369,6 +369,7 @@ async function upsertTaperPreset(tx: Tx, raw: Record<string, unknown>): Promise<
     week2TotalMiles: num(raw.week2TotalMiles) ?? null,
     week2LongRunMiles: num(raw.week2LongRunMiles) ?? null,
     weekPins: (raw.weekPins as Prisma.InputJsonValue) ?? [],
+    slots: (raw.slots as Prisma.InputJsonValue) ?? [],
     longRunConfigId: rotations.longRunConfigId ?? str(raw.longRunConfigId) ?? null,
     intervalsConfigId: rotations.intervalsConfigId ?? str(raw.intervalsConfigId) ?? null,
     tempoConfigId: rotations.tempoConfigId ?? str(raw.tempoConfigId) ?? null,

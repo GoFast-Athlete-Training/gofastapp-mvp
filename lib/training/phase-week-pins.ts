@@ -12,13 +12,29 @@ export type PhaseWeekRow = {
   pins: PhaseWeekPin[];
 };
 
-export function parsePhaseWeekRows(raw: unknown): PhaseWeekRow[] {
-  const base = [1, 2, 3, 4].map((weekIndex) => ({
-    weekIndex,
-    totalMilesCap: null as number | null,
-    longRunCapMiles: null as number | null,
-    pins: [] as PhaseWeekPin[],
+export const PHASE_WEEK_LABELS = ["W1", "W2", "W3", "W4"] as const;
+
+export function defaultPhaseWeekRows(weekCount = 4): PhaseWeekRow[] {
+  const count = Math.max(1, Math.min(4, weekCount));
+  return Array.from({ length: count }, (_, i) => ({
+    weekIndex: i + 1,
+    totalMilesCap: null,
+    longRunCapMiles: null,
+    pins: [],
   }));
+}
+
+export function defaultTaperPhaseWeekRows(): PhaseWeekRow[] {
+  return defaultPhaseWeekRows(2);
+}
+
+function numOrNull(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  return null;
+}
+
+export function parsePhaseWeekRows(raw: unknown, weekCount = 4): PhaseWeekRow[] {
+  const base = defaultPhaseWeekRows(weekCount);
   if (!Array.isArray(raw)) return base;
   return base.map((row) => {
     const found = raw.find((item) => {
@@ -42,8 +58,6 @@ export function parsePhaseWeekRows(raw: unknown): PhaseWeekRow[] {
         }
       }
     }
-    const numOrNull = (v: unknown) =>
-      typeof v === "number" && Number.isFinite(v) ? v : null;
     return {
       weekIndex: row.weekIndex,
       totalMilesCap: numOrNull(found.totalMilesCap),
@@ -53,15 +67,31 @@ export function parsePhaseWeekRows(raw: unknown): PhaseWeekRow[] {
   });
 }
 
+/** True when any taper week row has volume caps (preset-driven taper, not generic heuristics). */
+export function presetTaperHasVolumeCaps(weeks: PhaseWeekRow[] | null | undefined): boolean {
+  if (!weeks?.length) return false;
+  return weeks.some(
+    (r) =>
+      (r.totalMilesCap != null && r.totalMilesCap > 0) ||
+      (r.longRunCapMiles != null && r.longRunCapMiles > 0),
+  );
+}
+
+/** Legacy taper week1/week2 scalars → first two chrome rows; weekPins wins when present. */
 export function phaseWeekRowsFromLegacyTaper(taper: {
   week1TotalMiles: number | null;
   week1LongRunMiles: number | null;
   week2TotalMiles: number | null;
   week2LongRunMiles: number | null;
+  weekPins?: unknown;
   weeks?: PhaseWeekRow[];
 }): PhaseWeekRow[] {
   if (taper.weeks && taper.weeks.length > 0) return taper.weeks;
-  const parsed = parsePhaseWeekRows(null);
+  const parsed = parsePhaseWeekRows(taper.weekPins, 2);
+  const hasPinData = parsed.some(
+    (r) => r.totalMilesCap != null || r.longRunCapMiles != null || r.pins.length > 0,
+  );
+  if (hasPinData) return parsed;
   return parsed.map((row) => {
     if (row.weekIndex === 1) {
       return {
@@ -79,4 +109,16 @@ export function phaseWeekRowsFromLegacyTaper(taper: {
     }
     return row;
   });
+}
+
+export function taperLegacyScalarsFromWeekRows(rows: PhaseWeekRow[]) {
+  const w1 = rows.find((r) => r.weekIndex === 1);
+  const w2 = rows.find((r) => r.weekIndex === 2);
+  return {
+    week1TotalMiles: w1?.totalMilesCap ?? null,
+    week1LongRunMiles: w1?.longRunCapMiles ?? null,
+    week2TotalMiles: w2?.totalMilesCap ?? null,
+    week2LongRunMiles: w2?.longRunCapMiles ?? null,
+    weekPins: rows,
+  };
 }

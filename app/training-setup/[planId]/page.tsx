@@ -35,6 +35,7 @@ import {
 import PlanSecondaryRacesReview, {
   type SecondaryRaceCandidate,
 } from "@/components/training/PlanSecondaryRacesReview";
+import { PlanBlueprintReadinessPanel } from "@/components/training/PlanBlueprintReadinessPanel";
 import {
   PlanLongRunTrajectorySection,
   trajectoryContextFromPlanDetail,
@@ -1217,6 +1218,16 @@ export default function TrainingSetupPlanPage({
                 </ul>
               </div>
             )}
+
+            {!hasSchedule && plan ? (
+              <PlanBlueprintReadinessPanel
+                planId={plan.id}
+                startDateYmd={plan.startDate}
+                raceDateYmd={plan.race_registry?.raceDate ?? null}
+                getToken={getToken}
+                onStartDateSaved={() => void loadPlan()}
+              />
+            ) : null}
 
             {(showPreferencesEditor || !hasSchedule) && secondaryCandidates.length > 0 ? (
               <PlanSecondaryRacesReview

@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { phaseWeekRowsFromLegacyTaper } from "@/lib/training/phase-week-pins";
+import { mergePresetWithPhaseGenerateJson } from "@/lib/training/merge-preset-phase-generate-json";
 import { parseRaceWeekSlots } from "@/lib/training/race-week-slots";
+import { parseTaperWeekSlots } from "@/lib/training/taper-week-slots";
 import type { TrainingManagePresetForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
 
 const rotationInclude = {
@@ -78,7 +80,11 @@ export async function loadPresetForGenerateFromProd(
   const legacyTempo = mapRotation(row.tempoConfig);
   const legacyIntervals = mapRotation(row.intervalsConfig);
 
-  return {
+  const taperSlots = row.taperPreset
+    ? parseTaperWeekSlots(row.taperPreset.slots)
+    : [];
+
+  const loaded: TrainingManagePresetForGenerate = {
     id: row.id,
     slug: row.slug,
     title: row.title,
@@ -127,6 +133,7 @@ export async function loadPresetForGenerateFromProd(
       ? {
           name: row.taperPreset.name,
           weeks: phaseWeekRowsFromLegacyTaper(row.taperPreset),
+          slots: taperSlots.length > 0 ? taperSlots : undefined,
         }
       : null,
     raceWeek: row.raceWeekPreset
@@ -136,4 +143,6 @@ export async function loadPresetForGenerateFromProd(
         }
       : null,
   };
+
+  return mergePresetWithPhaseGenerateJson(loaded, row.presetPhaseGenerateJson);
 }

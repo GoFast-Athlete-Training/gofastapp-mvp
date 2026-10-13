@@ -52,8 +52,11 @@ import {
   applyPhaseTaperWeekTotalCaps,
   applyPhaseWeekCataloguePins,
   applyRaceWeekSlotsFromPreset,
+  applyTaperWeekSlotsFromPreset,
+  ensureTaperLongRunDays,
   positionsFromPhaseRotation,
 } from "@/lib/training/apply-phase-preset-generate";
+import { presetTaperHasVolumeCaps } from "@/lib/training/phase-week-pins";
 import { weeklyVolumePeakFromPreset } from "@/lib/training/preset-core";
 import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
 import { slicePlanScheduleByPhases } from "@/lib/training/plan-schedule-phase-persist";
@@ -359,6 +362,14 @@ export async function executePlanGenerate(params: {
         longRunPositions,
       });
     }
+    ensureTaperLongRunDays({
+      planSchedule: schedule,
+      totalWeeks: weekCount,
+      taperWeeks: phasePreset?.taper?.weeks,
+      taperWeekNumbers,
+      preferredLongRunDow: plan.preferredLongRunDow ?? planConfig.longRunDefaultDow ?? 6,
+      longRunPositions,
+    });
     applyPhaseTaperLongRunMiles({
       planSchedule: schedule,
       totalWeeks: weekCount,
@@ -380,8 +391,17 @@ export async function executePlanGenerate(params: {
       peakLongRunPoolMiles,
       fitnessPhase: blueprint.fitnessPhase,
       longRunPositions,
+      usePresetTaperLongRunCaps: presetTaperHasVolumeCaps(phasePreset?.taper?.weeks),
     });
   } else if ((phasePreset?.taper?.weeks?.length ?? 0) > 0) {
+    ensureTaperLongRunDays({
+      planSchedule: schedule,
+      totalWeeks: weekCount,
+      taperWeeks: phasePreset?.taper?.weeks,
+      taperWeekNumbers,
+      preferredLongRunDow: plan.preferredLongRunDow ?? planConfig.longRunDefaultDow ?? 6,
+      longRunPositions,
+    });
     applyPhaseTaperLongRunMiles({
       planSchedule: schedule,
       totalWeeks: weekCount,
@@ -433,7 +453,10 @@ export async function executePlanGenerate(params: {
   applyIntervalSchedule({ planSchedule: schedule, catalogueRowsById });
   assertScheduleEasyDaysHaveCatalogue(schedule);
 
-  const weeklyMileageByWeek = phaseBuild
+  const usePresetWeeklyMileageCurve =
+    phaseBuild != null || presetTaperHasVolumeCaps(phasePreset?.taper?.weeks);
+
+  const weeklyMileageByWeek = usePresetWeeklyMileageCurve
     ? buildWeeklyMileageTargetsByWeek({
         totalWeeks: weekCount,
         taperStartWeekNumber: placement.taperStartWeekNumber,
@@ -463,12 +486,21 @@ export async function executePlanGenerate(params: {
     weeklyMileageByWeek,
   });
 
-  if (phaseBuild) {
+  if (usePresetWeeklyMileageCurve) {
     applyPhaseTaperWeekTotalCaps({
       planSchedule: schedule,
       totalWeeks: weekCount,
       taperWeeks: phasePreset?.taper?.weeks,
       taperWeekNumbers,
+    });
+  }
+
+  if (phasePreset?.taper?.slots?.length) {
+    applyTaperWeekSlotsFromPreset({
+      planStart: plan.startDate,
+      raceDate: race.raceDate,
+      schedule,
+      slots: phasePreset.taper.slots,
     });
   }
 

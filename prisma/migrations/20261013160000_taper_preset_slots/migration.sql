@@ -1,0 +1,2 @@
+ALTER TABLE "taper_preset"
+ADD COLUMN IF NOT EXISTS "slots" JSONB NOT NULL DEFAULT '[]';

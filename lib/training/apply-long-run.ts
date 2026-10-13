@@ -32,6 +32,8 @@ export type ApplyLongRunInput = {
   taperLongRunPoolMiles?: number;
   /** Sum of preset distributionWeights need not equal 1; we normalize inside the macro block */
   longRunPositions: readonly RunTypePosition[];
+  /** Preset taper caps / applyPhaseTaperLongRunMiles own taper weeks — skip template LR scaling. */
+  usePresetTaperLongRunCaps?: boolean;
 };
 
 function round1(n: number): number {
@@ -120,6 +122,7 @@ export function applyLongRunSchedule(input: ApplyLongRunInput): void {
     let lrMi: number;
     let catalogueWorkoutId: string | null;
     if (isTaperVolumeWeek(wn, totalWeeks)) {
+      if (input.usePresetTaperLongRunCaps) continue;
       const taperIdx = wn - (totalWeeks - TAPER_CALENDAR_WEEKS + 1);
       const templateMi = taperDefaults[taperIdx] ?? taperDefaults[taperDefaults.length - 1] ?? 8;
       lrMi = round1(templateMi * taperScale);

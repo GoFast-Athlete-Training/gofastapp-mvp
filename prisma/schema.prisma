@@ -2192,6 +2192,8 @@ model taper_preset {
   week2TotalMiles   Float?
   week2LongRunMiles Float?
   weekPins          Json   @default("[]")
+  /// Per-day taper stamps (offsets from goal race); optional until slot editor is used.
+  slots             Json   @default("[]")
 
   longRunConfigId   String?
   intervalsConfigId String?
