@@ -16,7 +16,7 @@ function round1(n: number): number {
 }
 
 export function positionsFromPhaseRotation(
-  config: TrainingManagePresetForGenerate["build"]["longRunConfig"],
+  config: NonNullable<TrainingManagePresetForGenerate["build"]>["longRunConfig"],
 ): ReturnType<typeof mapPositionRow>[] {
   if (!config?.positions?.length) return [];
   return config.positions.map(mapPositionRow);
