@@ -30,11 +30,15 @@ export type TrainingManagePresetForGenerate = {
     peakLongRunMiles: number | null;
     peakWeeklyMiles: number | null;
     longRunCutback: number | null;
+    longRunConfigId?: string | null;
+    easyConfigId?: string | null;
+    tempoConfigId?: string | null;
+    intervalsConfigId?: string | null;
     longRunConfig: PhaseRotationForGenerate;
     easyConfig: PhaseRotationForGenerate;
     tempoConfig: PhaseRotationForGenerate;
     intervalsConfig: PhaseRotationForGenerate;
-  };
+  } | null;
   taper: {
     name: string;
     weeks: PhaseWeekRow[];

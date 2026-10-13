@@ -864,6 +864,9 @@ model race_registry_course_segments {
   mileMarker       String?
   description      String?
   runTip           String?
+  guideLandmarks   String?
+  guideWater       String?
+  guideElevation   String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -2023,6 +2026,107 @@ model training_plan_preset {
   presetPhaseGenerateJson Json?
   /// Training manager id from last Training Manage → prod prodpush sync.
   lastSyncedByStaffId     String?
+
+  buildPresetId    String?
+  taperPresetId    String?
+  raceWeekPresetId String?
+  buildPreset      build_preset?     @relation(fields: [buildPresetId], references: [id], onDelete: SetNull)
+  taperPreset      taper_preset?     @relation(fields: [taperPresetId], references: [id], onDelete: SetNull)
+  raceWeekPreset   race_week_preset? @relation(fields: [raceWeekPresetId], references: [id], onDelete: SetNull)
+
+  snapPeakLongRunMiles Float?
+  snapPeakWeeklyMiles  Int?
+  snapTaperWeek1TotalMiles   Float?
+  snapTaperWeek1LongRunMiles Float?
+  snapTaperWeek2TotalMiles   Float?
+  snapTaperWeek2LongRunMiles Float?
+
+  @@index([buildPresetId])
+  @@index([taperPresetId])
+  @@index([raceWeekPresetId])
+}
+
+/// Build phase mirror (Training Manage build_preset).
+model build_preset {
+  id   String @id @default(cuid())
+  name String
+
+  startLongRunMiles Float?
+  peakLongRunMiles  Float?
+  longRunCutback    Float?
+  maxWeeklyMiles    Int?
+
+  longRunConfigId   String?
+  intervalsConfigId String?
+  tempoConfigId     String?
+  easyConfigId      String?
+
+  longRunConfig   long_run_config?  @relation("BuildLongRun", fields: [longRunConfigId], references: [id], onDelete: SetNull)
+  intervalsConfig intervals_config? @relation("BuildIntervals", fields: [intervalsConfigId], references: [id], onDelete: SetNull)
+  tempoConfig     tempo_config?     @relation("BuildTempo", fields: [tempoConfigId], references: [id], onDelete: SetNull)
+  easyConfig      easy_config?      @relation("BuildEasy", fields: [easyConfigId], references: [id], onDelete: SetNull)
+
+  presets training_plan_preset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([longRunConfigId])
+  @@index([intervalsConfigId])
+  @@index([tempoConfigId])
+  @@index([easyConfigId])
+}
+
+model taper_preset {
+  id                String @id @default(cuid())
+  name              String
+  week1TotalMiles   Float?
+  week1LongRunMiles Float?
+  week2TotalMiles   Float?
+  week2LongRunMiles Float?
+  weekPins          Json   @default("[]")
+
+  longRunConfigId   String?
+  intervalsConfigId String?
+  tempoConfigId     String?
+  easyConfigId      String?
+
+  longRunConfig   long_run_config?  @relation("TaperLongRun", fields: [longRunConfigId], references: [id], onDelete: SetNull)
+  intervalsConfig intervals_config? @relation("TaperIntervals", fields: [intervalsConfigId], references: [id], onDelete: SetNull)
+  tempoConfig     tempo_config?     @relation("TaperTempo", fields: [tempoConfigId], references: [id], onDelete: SetNull)
+  easyConfig      easy_config?      @relation("TaperEasy", fields: [easyConfigId], references: [id], onDelete: SetNull)
+
+  presets training_plan_preset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([longRunConfigId])
+  @@index([intervalsConfigId])
+  @@index([tempoConfigId])
+  @@index([easyConfigId])
+}
+
+model shakeout_run_config {
+  id                   String @id @default(cuid())
+  name                 String
+  totalMiles           Float
+  paceOffsetSecPerMile Int    @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([name])
+}
+
+model race_week_preset {
+  id    String @id @default(cuid())
+  title String
+  slots Json   @default("[]")
+
+  presets training_plan_preset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// Athlete-owned training blueprint — never mixed into staff catalog until promoted.
@@ -2323,9 +2427,11 @@ model long_run_config {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  positions       long_run_config_position[]
-  usedByPresets   training_plan_preset[]
-  athletePresets  athlete_presets[]
+  positions          long_run_config_position[]
+  usedByPresets      training_plan_preset[]
+  athletePresets     athlete_presets[]
+  usedByBuildPresets build_preset[] @relation("BuildLongRun")
+  usedByTaperPresets taper_preset[] @relation("TaperLongRun")
 
   @@index([name])
 }
@@ -2358,9 +2464,11 @@ model intervals_config {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  positions      intervals_config_position[]
-  usedByPresets    training_plan_preset[]
-  athletePresets   athlete_presets[]
+  positions          intervals_config_position[]
+  usedByPresets      training_plan_preset[]
+  athletePresets     athlete_presets[]
+  usedByBuildPresets build_preset[] @relation("BuildIntervals")
+  usedByTaperPresets taper_preset[] @relation("TaperIntervals")
 
   @@index([name])
 }
@@ -2390,9 +2498,11 @@ model tempo_config {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  positions      tempo_config_position[]
-  usedByPresets    training_plan_preset[]
-  athletePresets   athlete_presets[]
+  positions          tempo_config_position[]
+  usedByPresets      training_plan_preset[]
+  athletePresets     athlete_presets[]
+  usedByBuildPresets build_preset[] @relation("BuildTempo")
+  usedByTaperPresets taper_preset[] @relation("TaperTempo")
 
   @@index([name])
 }
@@ -2422,9 +2532,11 @@ model easy_config {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  positions      easy_config_position[]
-  usedByPresets    training_plan_preset[]
-  athletePresets   athlete_presets[]
+  positions          easy_config_position[]
+  usedByPresets      training_plan_preset[]
+  athletePresets     athlete_presets[]
+  usedByBuildPresets build_preset[] @relation("BuildEasy")
+  usedByTaperPresets taper_preset[] @relation("TaperEasy")
 
   @@index([name])
 }

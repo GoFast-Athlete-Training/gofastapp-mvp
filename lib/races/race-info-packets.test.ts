@@ -119,6 +119,26 @@ test("course packet includes segment descriptions", () => {
   assert.equal(course!.segments![0]!.description, "Flat opening mile through downtown.");
 });
 
+test("course packet passes guide card fields on segments", () => {
+  const race = baseRace({
+    courseSegments: [
+      {
+        order: 1,
+        name: "Mile 5",
+        guideLandmarks: "Memorial Bridge",
+        guideWater: "Both sides",
+        guideElevation: "Gentle climb",
+      },
+    ],
+  });
+
+  const result = buildRaceInfoPackets(race, signedUpAthlete());
+  const seg = result.packets.find((p) => p.kind === "course")?.segments?.[0];
+  assert.equal(seg?.guideLandmarks, "Memorial Bridge");
+  assert.equal(seg?.guideWater, "Both sides");
+  assert.equal(seg?.guideElevation, "Gentle climb");
+});
+
 test("training tips packet is retired (never visible)", () => {
   const race = baseRace({
     courseSegments: [{ order: 1, name: "Mile 20", runTip: "Break up the wall." }],

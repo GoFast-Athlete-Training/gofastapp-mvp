@@ -6,6 +6,9 @@ type PublicCourseSegment = {
   mileMarker?: string | null;
   description?: string | null;
   guideExperience?: string | null;
+  guideLandmarks?: string | null;
+  guideWater?: string | null;
+  guideElevation?: string | null;
   runTip?: string | null;
 };
 
@@ -75,6 +78,12 @@ export async function hydrateRegistryCourseSegmentsFromRaceManage(params: {
       typeof seg.mileMarker === "string" ? seg.mileMarker.trim() || null : null;
     const runTip =
       typeof seg.runTip === "string" ? seg.runTip.trim() || null : null;
+    const guideLandmarks =
+      typeof seg.guideLandmarks === "string" ? seg.guideLandmarks.trim() || null : null;
+    const guideWater =
+      typeof seg.guideWater === "string" ? seg.guideWater.trim() || null : null;
+    const guideElevation =
+      typeof seg.guideElevation === "string" ? seg.guideElevation.trim() || null : null;
 
     await prisma.race_registry_course_segments.upsert({
       where: { companySegmentId },
@@ -86,6 +95,9 @@ export async function hydrateRegistryCourseSegmentsFromRaceManage(params: {
         mileMarker,
         description,
         runTip,
+        guideLandmarks,
+        guideWater,
+        guideElevation,
       },
       update: {
         raceRegistryId: params.raceRegistryId,
@@ -94,6 +106,9 @@ export async function hydrateRegistryCourseSegmentsFromRaceManage(params: {
         mileMarker,
         description,
         runTip,
+        guideLandmarks,
+        guideWater,
+        guideElevation,
       },
     });
   }

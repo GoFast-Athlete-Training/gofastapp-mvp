@@ -103,6 +103,9 @@ function buildCoursePacket(
       mileMarker: s.mileMarker ?? null,
       description: s.description ?? null,
       runTip: s.runTip ?? null,
+      guideLandmarks: s.guideLandmarks ?? null,
+      guideWater: s.guideWater ?? null,
+      guideElevation: s.guideElevation ?? null,
     }));
 
   const courseMapUrl = trim(race.courseMapUrl);

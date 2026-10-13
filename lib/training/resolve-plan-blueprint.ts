@@ -15,7 +15,7 @@ import {
 } from "@/lib/training/athlete-preset-blueprint";
 import type { AthletePresetFitnessPhase, training_plan_preset } from "@prisma/client";
 import { trainingPlanPresetInclude } from "@/lib/training/plan-generate-presets-loader";
-import { loadPresetPhaseForGenerateFromProd } from "@/lib/training/load-preset-phase-from-prod";
+import { loadPresetForGenerateFromProd } from "@/lib/training/load-preset-for-generate-prod";
 import { resolvedBlueprintFromTrainingManage } from "@/lib/training/training-manage-blueprint";
 
 export type ResolvedPlanBlueprint = {
@@ -95,7 +95,7 @@ export async function loadPlanBlueprintForGenerate(params: {
       where: { id: plan.presetId },
       include: trainingPlanPresetInclude,
     });
-    const phase = await loadPresetPhaseForGenerateFromProd(plan.presetId);
+    const phase = await loadPresetForGenerateFromProd(plan.presetId);
     if (!preset || !phase?.build) return null;
 
     const base = resolvedBlueprintFromTrainingManage(phase);

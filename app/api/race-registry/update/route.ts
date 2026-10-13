@@ -83,6 +83,12 @@ async function syncRegistryCourseSegments(
       typeof o.description === "string" ? o.description.trim() || null : null;
     const runTip =
       typeof o.runTip === "string" ? o.runTip.trim() || null : null;
+    const guideLandmarks =
+      typeof o.guideLandmarks === "string" ? o.guideLandmarks.trim() || null : null;
+    const guideWater =
+      typeof o.guideWater === "string" ? o.guideWater.trim() || null : null;
+    const guideElevation =
+      typeof o.guideElevation === "string" ? o.guideElevation.trim() || null : null;
 
     await prisma.race_registry_course_segments.upsert({
       where: { companySegmentId },
@@ -94,6 +100,9 @@ async function syncRegistryCourseSegments(
         mileMarker,
         description,
         runTip,
+        guideLandmarks,
+        guideWater,
+        guideElevation,
       },
       update: {
         raceRegistryId,
@@ -102,6 +111,9 @@ async function syncRegistryCourseSegments(
         mileMarker,
         description,
         runTip,
+        guideLandmarks,
+        guideWater,
+        guideElevation,
       },
     });
   }

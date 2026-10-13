@@ -24,6 +24,9 @@ export type RaceInfoPacketSegment = {
   mileMarker?: string | null;
   description?: string | null;
   runTip?: string | null;
+  guideLandmarks?: string | null;
+  guideWater?: string | null;
+  guideElevation?: string | null;
 };
 
 export type RaceInfoPacket = {
@@ -84,6 +87,9 @@ export type RaceInfoPacketRaceInput = {
     mileMarker?: string | null;
     description?: string | null;
     runTip?: string | null;
+    guideLandmarks?: string | null;
+    guideWater?: string | null;
+    guideElevation?: string | null;
   }>;
 };
 
