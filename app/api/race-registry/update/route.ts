@@ -61,13 +61,15 @@ async function syncRegistryCourseSegments(
   for (const item of segments) {
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
-    const companySegmentId =
-      typeof o.companySegmentId === "string" && o.companySegmentId.trim()
-        ? o.companySegmentId.trim()
-        : typeof o.id === "string" && o.id.trim()
-          ? o.id.trim()
-          : "";
-    if (!companySegmentId) continue;
+    const sourceSegmentId =
+      typeof o.sourceSegmentId === "string" && o.sourceSegmentId.trim()
+        ? o.sourceSegmentId.trim()
+        : typeof o.companySegmentId === "string" && o.companySegmentId.trim()
+          ? o.companySegmentId.trim()
+          : typeof o.id === "string" && o.id.trim()
+            ? o.id.trim()
+            : "";
+    if (!sourceSegmentId) continue;
     const orderRaw = o.order;
     const order =
       typeof orderRaw === "number" && Number.isFinite(orderRaw)
@@ -76,7 +78,7 @@ async function syncRegistryCourseSegments(
     const name =
       typeof o.name === "string" ? o.name.trim() : String(o.name ?? "").trim();
     if (!name) continue;
-    incomingIds.push(companySegmentId);
+    incomingIds.push(sourceSegmentId);
     const mileMarker =
       typeof o.mileMarker === "string" ? o.mileMarker.trim() || null : null;
     const description =
@@ -91,10 +93,10 @@ async function syncRegistryCourseSegments(
       typeof o.guideElevation === "string" ? o.guideElevation.trim() || null : null;
 
     await prisma.race_registry_course_segments.upsert({
-      where: { companySegmentId },
+      where: { sourceSegmentId },
       create: {
         raceRegistryId,
-        companySegmentId,
+        sourceSegmentId,
         order,
         name,
         mileMarker,
@@ -124,7 +126,7 @@ async function syncRegistryCourseSegments(
   await prisma.race_registry_course_segments.deleteMany({
     where: {
       raceRegistryId,
-      companySegmentId: { notIn: incomingIds },
+      sourceSegmentId: { notIn: incomingIds },
     },
   });
 }

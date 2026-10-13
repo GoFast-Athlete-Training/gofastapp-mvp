@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 type PublicCourseSegment = {
+  id?: string | null;
   order: number;
   name: string;
   mileMarker?: string | null;
@@ -18,12 +19,6 @@ function raceManageBaseUrl(): string | null {
     process.env.NEXT_PUBLIC_GOFAST_RACE_MANAGE_URL?.trim() ||
     null
   );
-}
-
-function stableSegmentId(courseSlug: string, order: number, name: string): string {
-  const slug = courseSlug.trim().toLowerCase();
-  const safeName = name.trim().slice(0, 40).replace(/[^a-z0-9]+/gi, "-");
-  return `rm-public:${slug}:${order}:${safeName || "seg"}`;
 }
 
 /**
@@ -70,8 +65,10 @@ export async function hydrateRegistryCourseSegmentsFromRaceManage(params: {
   for (const seg of segments.slice().sort((a, b) => a.order - b.order)) {
     const name = seg.name?.trim();
     if (!name) continue;
-    const companySegmentId = stableSegmentId(slug, seg.order, name);
-    incomingIds.push(companySegmentId);
+    const sourceSegmentId =
+      typeof seg.id === "string" && seg.id.trim() ? seg.id.trim() : "";
+    if (!sourceSegmentId) continue;
+    incomingIds.push(sourceSegmentId);
     const description =
       seg.description?.trim() || seg.guideExperience?.trim() || null;
     const mileMarker =
@@ -86,10 +83,10 @@ export async function hydrateRegistryCourseSegmentsFromRaceManage(params: {
       typeof seg.guideElevation === "string" ? seg.guideElevation.trim() || null : null;
 
     await prisma.race_registry_course_segments.upsert({
-      where: { companySegmentId },
+      where: { sourceSegmentId },
       create: {
         raceRegistryId: params.raceRegistryId,
-        companySegmentId,
+        sourceSegmentId,
         order: seg.order,
         name,
         mileMarker,
@@ -117,7 +114,7 @@ export async function hydrateRegistryCourseSegmentsFromRaceManage(params: {
     await prisma.race_registry_course_segments.deleteMany({
       where: {
         raceRegistryId: params.raceRegistryId,
-        companySegmentId: { notIn: incomingIds },
+        sourceSegmentId: { notIn: incomingIds },
       },
     });
   }
