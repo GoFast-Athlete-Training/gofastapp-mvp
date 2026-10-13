@@ -74,16 +74,11 @@ export async function POST(request: Request) {
     // Firebase Admin SDK uses 'name' field for displayName in decoded token
     // Check both 'name' and 'displayName' fields (though 'displayName' is less common)
     const displayName = decodedToken.name || decodedToken.displayName || undefined;
-    const picture = decodedToken.picture || undefined;
     
     console.log('👤 ATHLETE CREATE: Firebase token name:', displayName || 'missing');
-    console.log('📸 ATHLETE CREATE: Firebase token picture:', picture ? 'present' : 'missing');
-    if (picture) {
-      console.log('📸 ATHLETE CREATE: Picture URL:', picture.substring(0, 50) + '...');
-    }
     
     // Log all available token fields for debugging
-    const relevantFields = Object.keys(decodedToken).filter(k => ['name', 'email', 'picture', 'displayName'].includes(k));
+    const relevantFields = Object.keys(decodedToken).filter(k => ['name', 'email', 'displayName'].includes(k));
     console.log('🔍 ATHLETE CREATE: Available token fields:', relevantFields);
     if (decodedToken.name && decodedToken.displayName && decodedToken.name !== decodedToken.displayName) {
       console.warn('⚠️ ATHLETE CREATE: name field differs from displayName field. name:', decodedToken.name, 'displayName:', decodedToken.displayName);
@@ -176,7 +171,7 @@ export async function POST(request: Request) {
     // Check if athlete already exists to preserve user-edited profile data
     const existingAthlete = await prisma.athlete.findUnique({
       where: { firebaseId },
-      select: { id: true, firstName: true, lastName: true, photoURL: true }
+      select: { id: true, firstName: true, lastName: true }
     });
 
     // Use upsert pattern to atomically handle create/update and prevent race conditions
@@ -246,13 +241,6 @@ export async function POST(request: Request) {
         console.log('👤 ATHLETE CREATE: No displayName in token, skipping name sync');
       } else {
         console.log('👤 ATHLETE CREATE: displayName exists but normalized to null - skipping name sync');
-      }
-    }
-    // Sync photoURL only if athlete doesn't already have one set
-    if (picture !== undefined) {
-      createData.photoURL = picture || undefined;
-      if (!existingAthlete?.photoURL) {
-        updateData.photoURL = picture || undefined;
       }
     }
     // companyId is always derived from GoFastCompany (ultra container)

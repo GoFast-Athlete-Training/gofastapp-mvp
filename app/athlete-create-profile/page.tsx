@@ -210,14 +210,11 @@ function AthleteCreateProfileInner() {
       }
       LocalStorageAPI.setAthleteId(athleteId);
 
-      const photoURL = firebaseUser.photoURL || null;
-
       await api.put(`/athlete/${athleteId}/profile`, {
         firstName: formData.firstName,
         lastName: formData.lastName,
         gofastHandle: formData.gofastHandle.trim().toLowerCase(),
         city: formData.city,
-        photoURL,
       });
 
       let nextPath = '/welcome';

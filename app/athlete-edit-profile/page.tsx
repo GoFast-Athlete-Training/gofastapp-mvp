@@ -108,7 +108,7 @@ function AthleteEditProfileInner() {
               ? String(stored.weeklyMileage)
               : '',
           profilePhoto: null,
-          profilePhotoPreview: stored.photoURL || auth.currentUser?.photoURL || null,
+          profilePhotoPreview: stored.photoURL || null,
         });
       })
       .catch(() => {
@@ -226,16 +226,19 @@ function AthleteEditProfileInner() {
     beginSave();
     setLoading(true);
     try {
-      const photoURL = formData.profilePhotoPreview || firebaseUser.photoURL || null;
-      await api.put(`/athlete/${athleteId}/profile`, {
+      const preview = formData.profilePhotoPreview?.trim() || null;
+      const profilePayload: Record<string, unknown> = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         phoneNumber: formData.phoneNumber || null,
         gofastHandle: formData.gofastHandle.trim().toLowerCase(),
         city: formData.city,
         state: formData.state || null,
-        photoURL,
-      });
+      };
+      if (preview && !preview.startsWith('blob:')) {
+        profilePayload.photoURL = preview;
+      }
+      await api.put(`/athlete/${athleteId}/profile`, profilePayload);
       setSuccess('Profile Info — saved.');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { field?: string; message?: string; error?: string } } };
