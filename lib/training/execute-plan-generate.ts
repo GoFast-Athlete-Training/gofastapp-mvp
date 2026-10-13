@@ -294,14 +294,15 @@ export async function executePlanGenerate(params: {
     includedSecondaryAthleteRaceIds: includedIds,
   });
 
-  const defaultEasyCatalogueWorkoutId = catalogueIdForRotation(easyPositions, 0);
-
   imprintPlanRaceCalendarOnSchedule({
     planStart: plan.startDate,
     totalWeeks: weekCount,
     schedule,
     calendar,
-    defaultEasyCatalogueWorkoutId,
+    modularRaceWeek: hasPresetTaperOrRaceWeek,
+    defaultEasyCatalogueWorkoutId: hasPresetTaperOrRaceWeek
+      ? undefined
+      : catalogueIdForRotation(easyPositions, 0),
   });
 
   await persistPlanRaceSnapshots({

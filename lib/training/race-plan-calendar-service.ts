@@ -375,7 +375,12 @@ export function imprintPlanRaceCalendarOnSchedule(params: {
   totalWeeks: number;
   schedule: PlanWeekSchedule[];
   calendar: PlanRaceCalendar;
-  /** Build easy rotation — keep catalogue ids when calendar downgrades to Easy. */
+  /**
+   * Preset taper/race week owns the goal-race window — only stamp secondary races on their dates.
+   * Legacy plans without preset race week still run shakeout/rest/recovery around secondaries.
+   */
+  modularRaceWeek?: boolean;
+  /** Build easy rotation — legacy path only when calendar downgrades to Easy. */
   defaultEasyCatalogueWorkoutId?: string | null;
 }): ImprintPlanRaceCalendarResult {
   const { schedule, calendar } = params;
@@ -431,6 +436,10 @@ export function imprintPlanRaceCalendarOnSchedule(params: {
       weekNumber: pos.weekNumber,
       replacedWorkoutType: replacedType,
     });
+
+    if (params.modularRaceWeek) {
+      continue;
+    }
 
     applyRaceDayRolesOnSchedule({
       planStart: params.planStart,

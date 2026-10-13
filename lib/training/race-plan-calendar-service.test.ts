@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { WorkoutType as WT } from "@prisma/client";
 import { assignWorkoutDays } from "@/lib/training/assign-workout-days";
+import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
+import { ymdFromDate } from "@/lib/training/plan-utils";
 import {
   imprintPlanRaceCalendarOnSchedule,
   type PlanRaceCalendarEntry,
@@ -92,6 +94,56 @@ test("imprintPlanRaceCalendarOnSchedule replaces long run on secondary race day"
     false,
     "calendar imprint should not leave Easy days without a catalogue workout",
   );
+});
+
+test("imprintPlanRaceCalendarOnSchedule modularRaceWeek skips shakeout/rest/recovery", () => {
+  const { schedule } = assignWorkoutDays(baseInput);
+  const boulderDate = new Date("2026-09-12T00:00:00.000Z");
+  const shakeoutYmd = "2026-09-10";
+  const restYmd = "2026-09-11";
+
+  function typeOn(ymd: string): string | null {
+    for (const week of schedule) {
+      for (const day of week.days) {
+        const dt = dateForDayInWeek(baseInput.planStartDate, week.weekNumber, day.dow);
+        if (ymdFromDate(dt) === ymd) return day.workoutType;
+      }
+    }
+    return null;
+  }
+
+  const beforeShakeout = typeOn(shakeoutYmd);
+  const beforeRest = typeOn(restYmd);
+  assert.ok(beforeShakeout, "expected a workout on shakeout-adjacent day before imprint");
+
+  imprintPlanRaceCalendarOnSchedule({
+    planStart: baseInput.planStartDate,
+    totalWeeks: baseInput.totalWeeks,
+    schedule,
+    modularRaceWeek: true,
+    calendar: {
+      primary: calendarEntry({
+        athleteRaceId: "mcm-ar",
+        raceRegistryId: "mcm-id",
+        raceName: "Marine Corps Marathon",
+        raceDate: baseInput.raceDate,
+        role: "PRIMARY",
+        inclusion: "INCLUDED",
+      }),
+      secondaries: [
+        calendarEntry({
+          athleteRaceId: "boulder-ar",
+          raceRegistryId: "boulder-id",
+          raceName: "Boulder Half",
+          raceDate: boulderDate,
+        }),
+      ],
+    },
+  });
+
+  assert.equal(typeOn(shakeoutYmd), beforeShakeout, "modular path must not rewrite days before secondary");
+  assert.equal(typeOn(restYmd), beforeRest, "modular path must not clear rest day before secondary");
+  assert.equal(typeOn("2026-09-12"), WT.Race);
 });
 
 test("imprintPlanRaceCalendarOnSchedule is no-op with zero secondary events", () => {

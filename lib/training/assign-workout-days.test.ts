@@ -133,7 +133,7 @@ test("Sunday race: Friday shakeout Saturday rest Sunday race", () => {
     preferredDays: [2, 4, 5, 6],
   });
 
-  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Easy");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Tempo");
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-24"), null);
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Race");
   assert.equal(hasLongRunNearRace(schedule, planStart, raceDate), false);
@@ -150,7 +150,7 @@ test("Monday race: Saturday shakeout Sunday rest Monday race", () => {
     preferredDays: [2, 4, 5, 6],
   });
 
-  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Easy");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Tempo");
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-26"), null);
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-27"), "Race");
   assert.equal(hasLongRunNearRace(schedule, planStart, raceDate), false);
@@ -167,7 +167,7 @@ test("Saturday race: Thursday shakeout Friday rest", () => {
     preferredDays: [2, 4, 5, 6],
   });
 
-  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Easy");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Tempo");
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-24"), null);
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Race");
 });
@@ -228,9 +228,31 @@ test("5-week Sunday race: last week is a normal training week, not race-only", (
   assert.ok(typesBeforeRace.includes("Tempo") || typesBeforeRace.includes("Intervals"));
   assert.ok(typesBeforeRace.includes("Easy"));
 
-  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Easy");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Tempo");
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-24"), null);
   assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), "Race");
+});
+
+test("preset race week (standardRaceWeek false): no generic shakeout/rest/race reservation", () => {
+  const planStart = new Date("2026-09-21T00:00:00.000Z");
+  const raceDate = new Date("2026-10-25T00:00:00.000Z");
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    planStartDate: planStart,
+    raceDate,
+    totalWeeks: 5,
+    preferredDays: [1, 2, 3, 4, 5, 6],
+    standardRaceWeek: false,
+  });
+
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-23"), "Easy");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-24"), "LongRun");
+  assert.equal(workoutTypeOnDate(schedule, planStart, "2026-10-25"), null);
+  assert.equal(
+    schedule.flatMap((w) => w.days).some((d) => d.workoutType === "Race"),
+    false,
+    "preset path does not reserve goal-race day here — race week preset applies later"
+  );
 });
 
 test("Monday race fold: last week still has normal training days, not race-only", () => {
