@@ -33,7 +33,7 @@ npm run prisma:status
 npm run prisma:migrate
 ```
 
-`npm run build` already runs `migrate deploy` before `next build`.
+`npm run build` runs [`scripts/prisma-migrate-deploy.mjs`](../scripts/prisma-migrate-deploy.mjs) before `next build`. It skips deploy when status is up to date (avoids advisory locks on most builds), retries **P1002** lock timeouts, and on Vercel uses `PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK=1` only on the final retry.
 
 ## When **not** to use `migrate dev`
 
