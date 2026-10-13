@@ -1,9 +1,20 @@
-import { contentAthleteLinkTreeFetch } from "@/lib/content/athlete-link-tree-client";
-import type { AthleteLinkTreeDetail } from "@/lib/content/athlete-link-tree-types";
+import { put } from "@vercel/blob";
+import {
+  loadEditableAthleteTree,
+  reloadAthleteLinkTreeDetail,
+} from "@/lib/athlete-link-tree/athlete-link-tree-service";
 import { requireAthleteWithHandleForLinks } from "@/lib/content/require-athlete-link-tree";
+import prisma from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+
+const MAX_BYTES = 5 * 1024 * 1024;
+const ALLOWED = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+]);
 
 type RouteContext = { params: Promise<{ linkId: string }> };
 
@@ -13,34 +24,60 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ success: false, error: gate.error }, { status: gate.status });
   }
 
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  if (!token) {
+    return NextResponse.json(
+      { success: false, error: "Image upload is not configured on this deployment" },
+      { status: 500 },
+    );
+  }
+
   const { linkId } = await context.params;
-  const incoming = await request.formData();
-  const file = incoming.get("file");
+  const loaded = await loadEditableAthleteTree(gate.athlete.id);
+  if (!loaded.ok) {
+    return NextResponse.json({ success: false, error: loaded.error }, { status: loaded.status });
+  }
+  const treeId = loaded.tree.id;
+
+  const link = await prisma.athlete_link_tree_links.findFirst({
+    where: { id: linkId, treeId },
+  });
+  if (!link) {
+    return NextResponse.json({ success: false, error: "Link not found" }, { status: 404 });
+  }
+
+  const formData = await request.formData();
+  const file = formData.get("file");
   if (!(file instanceof File)) {
     return NextResponse.json({ success: false, error: "Choose an image file" }, { status: 400 });
   }
 
-  const outbound = new FormData();
-  outbound.append("file", file);
-
-  const res = await contentAthleteLinkTreeFetch(
-    gate.athlete.id,
-    `/links/${encodeURIComponent(linkId)}/image`,
-    { method: "POST", body: outbound, headers: {} },
-  );
-
-  const data = (await res.json()) as {
-    success?: boolean;
-    tree?: AthleteLinkTreeDetail;
-    error?: string;
-  };
-
-  if (!res.ok || !data.success || !data.tree) {
+  const ext = ALLOWED.get(file.type);
+  if (!ext) {
     return NextResponse.json(
-      { success: false, error: data.error || "Failed to upload image" },
-      { status: res.status >= 400 ? res.status : 502 },
+      { success: false, error: "Image must be JPG, PNG, or WebP" },
+      { status: 400 },
     );
   }
+  if (file.size > MAX_BYTES) {
+    return NextResponse.json({ success: false, error: "Image must be 5MB or smaller" }, { status: 400 });
+  }
 
-  return NextResponse.json({ success: true, tree: data.tree });
+  const blob = await put(
+    `athlete-link-trees/${treeId}/${linkId}/${crypto.randomUUID()}.${ext}`,
+    file,
+    { access: "public", token },
+  );
+
+  await prisma.athlete_link_tree_links.update({
+    where: { id: linkId },
+    data: { linkLogoUrl: blob.url, emoji: null },
+  });
+
+  const tree = await reloadAthleteLinkTreeDetail(gate.athlete.id);
+  if (!tree) {
+    return NextResponse.json({ success: false, error: "Link tree not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true, linkLogoUrl: blob.url, tree });
 }

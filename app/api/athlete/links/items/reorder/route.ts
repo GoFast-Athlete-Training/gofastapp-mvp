@@ -1,6 +1,9 @@
-import { contentAthleteLinkTreeFetch } from "@/lib/content/athlete-link-tree-client";
-import type { AthleteLinkTreeDetail } from "@/lib/content/athlete-link-tree-types";
+import {
+  loadEditableAthleteTree,
+  reloadAthleteLinkTreeDetail,
+} from "@/lib/athlete-link-tree/athlete-link-tree-service";
 import { requireAthleteWithHandleForLinks } from "@/lib/content/require-athlete-link-tree";
+import prisma from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -11,23 +14,55 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: gate.error }, { status: gate.status });
   }
 
-  const body = await request.json();
-  const res = await contentAthleteLinkTreeFetch(gate.athlete.id, "/links/reorder", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  const data = (await res.json()) as {
-    success?: boolean;
-    tree?: AthleteLinkTreeDetail;
-    error?: string;
-  };
+  const loaded = await loadEditableAthleteTree(gate.athlete.id);
+  if (!loaded.ok) {
+    return NextResponse.json({ success: false, error: loaded.error }, { status: loaded.status });
+  }
+  const treeId = loaded.tree.id;
 
-  if (!res.ok || !data.success || !data.tree) {
+  const body = (await request.json()) as { linkId?: string; direction?: number };
+  const linkId = body.linkId?.trim();
+  const direction = body.direction;
+  if (!linkId || (direction !== -1 && direction !== 1)) {
     return NextResponse.json(
-      { success: false, error: data.error || "Failed to reorder" },
-      { status: res.status >= 400 ? res.status : 502 },
+      { success: false, error: "linkId and direction (-1 or 1) are required" },
+      { status: 400 },
     );
   }
 
-  return NextResponse.json({ success: true, tree: data.tree });
+  const links = await prisma.athlete_link_tree_links.findMany({
+    where: { treeId },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    select: { id: true, sortOrder: true },
+  });
+
+  const index = links.findIndex((l) => l.id === linkId);
+  const targetIndex = index + direction;
+  if (index < 0 || targetIndex < 0 || targetIndex >= links.length) {
+    return NextResponse.json(
+      { success: false, error: "Cannot move link in that direction" },
+      { status: 400 },
+    );
+  }
+
+  const current = links[index];
+  const neighbor = links[targetIndex];
+
+  await prisma.$transaction([
+    prisma.athlete_link_tree_links.update({
+      where: { id: current.id },
+      data: { sortOrder: neighbor.sortOrder },
+    }),
+    prisma.athlete_link_tree_links.update({
+      where: { id: neighbor.id },
+      data: { sortOrder: current.sortOrder },
+    }),
+  ]);
+
+  const tree = await reloadAthleteLinkTreeDetail(gate.athlete.id);
+  if (!tree) {
+    return NextResponse.json({ success: false, error: "Link tree not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true, tree });
 }

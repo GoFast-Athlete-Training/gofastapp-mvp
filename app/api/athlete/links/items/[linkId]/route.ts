@@ -1,11 +1,20 @@
-import { contentAthleteLinkTreeFetch } from "@/lib/content/athlete-link-tree-client";
-import type { AthleteLinkTreeDetail } from "@/lib/content/athlete-link-tree-types";
+import {
+  loadEditableAthleteTree,
+  reloadAthleteLinkTreeDetail,
+} from "@/lib/athlete-link-tree/athlete-link-tree-service";
+import { normalizeLinkEmoji } from "@/lib/athlete-link-tree/link-emoji";
+import { normalizeLinkDestination } from "@/lib/athlete-link-tree/link-validation";
 import { requireAthleteWithHandleForLinks } from "@/lib/content/require-athlete-link-tree";
+import prisma from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ linkId: string }> };
+
+async function loadLink(treeId: string, linkId: string) {
+  return prisma.athlete_link_tree_links.findFirst({ where: { id: linkId, treeId } });
+}
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const gate = await requireAthleteWithHandleForLinks(request);
@@ -14,26 +23,77 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   const { linkId } = await context.params;
-  const body = await request.json();
-  const res = await contentAthleteLinkTreeFetch(
-    gate.athlete.id,
-    `/links/${encodeURIComponent(linkId)}`,
-    { method: "PATCH", body: JSON.stringify(body) },
-  );
-  const data = (await res.json()) as {
-    success?: boolean;
-    tree?: AthleteLinkTreeDetail;
-    error?: string;
-  };
-
-  if (!res.ok || !data.success || !data.tree) {
-    return NextResponse.json(
-      { success: false, error: data.error || "Failed to save link" },
-      { status: res.status >= 400 ? res.status : 502 },
-    );
+  const loaded = await loadEditableAthleteTree(gate.athlete.id);
+  if (!loaded.ok) {
+    return NextResponse.json({ success: false, error: loaded.error }, { status: loaded.status });
+  }
+  const treeId = loaded.tree.id;
+  const link = await loadLink(treeId, linkId);
+  if (!link) {
+    return NextResponse.json({ success: false, error: "Link not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ success: true, tree: data.tree });
+  const body = (await request.json()) as {
+    name?: string;
+    publicLabel?: string | null;
+    internalDescription?: string | null;
+    description?: string | null;
+    linkLogoUrl?: string | null;
+    emoji?: string | null;
+    url?: string | null;
+  };
+
+  const data: {
+    name?: string;
+    publicLabel?: string | null;
+    internalDescription?: string | null;
+    description?: string | null;
+    linkLogoUrl?: string | null;
+    emoji?: string | null;
+    url?: string | null;
+  } = {};
+
+  if (body.name !== undefined) {
+    const name = body.name.trim();
+    if (!name) {
+      return NextResponse.json({ success: false, error: "name cannot be empty" }, { status: 400 });
+    }
+    data.name = name;
+  }
+  if (body.publicLabel !== undefined) data.publicLabel = body.publicLabel?.trim() || null;
+  if (body.internalDescription !== undefined) {
+    data.internalDescription = body.internalDescription?.trim() || null;
+  }
+  if (body.description !== undefined) data.description = body.description?.trim() || null;
+  if (body.linkLogoUrl !== undefined) {
+    data.linkLogoUrl = body.linkLogoUrl?.trim() || null;
+    if (data.linkLogoUrl) data.emoji = null;
+  }
+  if (body.emoji !== undefined) {
+    const emoji = body.emoji === null ? null : normalizeLinkEmoji(body.emoji);
+    if (body.emoji !== null && body.emoji.trim() && !emoji) {
+      return NextResponse.json({ success: false, error: "Invalid emoji" }, { status: 400 });
+    }
+    data.emoji = emoji;
+    if (emoji) data.linkLogoUrl = null;
+  }
+
+  if (!link.isSection && body.url !== undefined) {
+    const dest = normalizeLinkDestination({ url: body.url });
+    if (dest.error) {
+      return NextResponse.json({ success: false, error: dest.error }, { status: 400 });
+    }
+    data.url = dest.url;
+  }
+
+  await prisma.athlete_link_tree_links.update({ where: { id: linkId }, data });
+
+  const tree = await reloadAthleteLinkTreeDetail(gate.athlete.id);
+  if (!tree) {
+    return NextResponse.json({ success: false, error: "Link tree not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true, tree });
 }
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
@@ -43,23 +103,20 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   }
 
   const { linkId } = await context.params;
-  const res = await contentAthleteLinkTreeFetch(
-    gate.athlete.id,
-    `/links/${encodeURIComponent(linkId)}`,
-    { method: "DELETE" },
-  );
-  const data = (await res.json()) as {
-    success?: boolean;
-    tree?: AthleteLinkTreeDetail;
-    error?: string;
-  };
-
-  if (!res.ok || !data.success || !data.tree) {
-    return NextResponse.json(
-      { success: false, error: data.error || "Failed to delete link" },
-      { status: res.status >= 400 ? res.status : 502 },
-    );
+  const loaded = await loadEditableAthleteTree(gate.athlete.id);
+  if (!loaded.ok) {
+    return NextResponse.json({ success: false, error: loaded.error }, { status: loaded.status });
+  }
+  const link = await loadLink(loaded.tree.id, linkId);
+  if (!link) {
+    return NextResponse.json({ success: false, error: "Link not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ success: true, tree: data.tree });
+  await prisma.athlete_link_tree_links.delete({ where: { id: linkId } });
+  const tree = await reloadAthleteLinkTreeDetail(gate.athlete.id);
+  if (!tree) {
+    return NextResponse.json({ success: false, error: "Link tree not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true, tree });
 }

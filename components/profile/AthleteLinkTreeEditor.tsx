@@ -169,7 +169,7 @@ export function AthleteLinkTreeEditor() {
           </Link>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold text-gray-900">Link page</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Custom Link Tree</h1>
           {handleSlug ? (
             <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-900">
               Athlete · athletelinks /{handleSlug}

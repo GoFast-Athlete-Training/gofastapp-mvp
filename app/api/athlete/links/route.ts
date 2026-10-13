@@ -1,19 +1,15 @@
-import { contentAthleteLinkTreeFetch } from "@/lib/content/athlete-link-tree-client";
+import {
+  createAthleteLinkTree,
+  findAthleteLinkTreeByAthleteId,
+  toAthleteLinkTreeDetail,
+} from "@/lib/athlete-link-tree/athlete-link-tree-service";
 import { athleteLinksPublicUrl } from "@/lib/content/athlete-links-public-url";
 import type { AthleteLinkTreeDetail } from "@/lib/content/athlete-link-tree-types";
 import { requireAthleteWithHandleForLinks } from "@/lib/content/require-athlete-link-tree";
+import prisma from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-
-async function parseTreeResponse(res: Response) {
-  const data = (await res.json()) as {
-    success?: boolean;
-    tree?: AthleteLinkTreeDetail;
-    error?: string;
-  };
-  return { res, data };
-}
 
 /** GET — load athlete link tree (create on first visit) */
 export async function GET(request: NextRequest) {
@@ -22,27 +18,35 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: gate.error }, { status: gate.status });
   }
 
-  let res = await contentAthleteLinkTreeFetch(gate.athlete.id, "", { method: "GET" });
-  let { data } = await parseTreeResponse(res);
+  let tree = await findAthleteLinkTreeByAthleteId(gate.athlete.id);
 
-  if (res.status === 404) {
-    res = await contentAthleteLinkTreeFetch(gate.athlete.id, "", {
-      method: "POST",
-      body: JSON.stringify({ slug: gate.slug, name: gate.displayName }),
+  if (!tree) {
+    const slugClash = await prisma.athlete_link_trees.findUnique({
+      where: { slug: gate.slug },
+      select: { athleteId: true },
     });
-    ({ data } = await parseTreeResponse(res));
+    if (slugClash && slugClash.athleteId !== gate.athlete.id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "That public link is already taken — choose a different GoFast handle",
+        },
+        { status: 409 },
+      );
+    }
+
+    tree = await createAthleteLinkTree({
+      athleteId: gate.athlete.id,
+      slug: gate.slug,
+      name: gate.displayName,
+    });
   }
 
-  if (!res.ok || !data.success || !data.tree) {
-    return NextResponse.json(
-      { success: false, error: data.error || "Failed to load link page" },
-      { status: res.status >= 400 ? res.status : 502 },
-    );
-  }
+  const detail: AthleteLinkTreeDetail = toAthleteLinkTreeDetail(tree);
 
   return NextResponse.json({
     success: true,
-    tree: data.tree,
+    tree: detail,
     handle: gate.handle,
     shareUrl: athleteLinksPublicUrl(gate.handle),
   });
@@ -55,19 +59,44 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: false, error: gate.error }, { status: gate.status });
   }
 
-  const body = await request.json();
-  const res = await contentAthleteLinkTreeFetch(gate.athlete.id, "", {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-  const { data } = await parseTreeResponse(res);
-
-  if (!res.ok || !data.success || !data.tree) {
-    return NextResponse.json(
-      { success: false, error: data.error || "Failed to save" },
-      { status: res.status >= 400 ? res.status : 502 },
-    );
+  const existing = await findAthleteLinkTreeByAthleteId(gate.athlete.id);
+  if (!existing) {
+    return NextResponse.json({ success: false, error: "Link tree not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ success: true, tree: data.tree });
+  const body = await request.json();
+  const data: {
+    name?: string;
+    logoUrl?: string | null;
+    internalDescription?: string | null;
+    publicLabel?: string | null;
+    publicDescription?: string | null;
+  } = {};
+
+  if (body.name !== undefined) {
+    const name = String(body.name).trim();
+    if (!name) {
+      return NextResponse.json({ success: false, error: "name cannot be empty" }, { status: 400 });
+    }
+    data.name = name;
+  }
+  if (body.logoUrl !== undefined) data.logoUrl = body.logoUrl?.trim() || null;
+  if (body.internalDescription !== undefined) {
+    data.internalDescription = body.internalDescription?.trim() || null;
+  }
+  if (body.publicLabel !== undefined) data.publicLabel = body.publicLabel?.trim() || null;
+  if (body.publicDescription !== undefined) {
+    data.publicDescription = body.publicDescription?.trim() || null;
+  }
+
+  if (Object.keys(data).length > 0) {
+    await prisma.athlete_link_trees.update({ where: { id: existing.id }, data });
+  }
+
+  const tree = await findAthleteLinkTreeByAthleteId(gate.athlete.id);
+  if (!tree) {
+    return NextResponse.json({ success: false, error: "Link tree not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true, tree: toAthleteLinkTreeDetail(tree) });
 }

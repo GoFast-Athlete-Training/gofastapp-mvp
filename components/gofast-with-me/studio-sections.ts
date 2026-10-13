@@ -106,7 +106,13 @@ export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
 
 /** External route — athlete link page editor (not a StudioView). */
 export const STUDIO_LINK_PAGE_HREF = '/profile/links';
-export const STUDIO_LINK_PAGE_LABEL = 'Link page';
+export const STUDIO_LINK_PAGE_LABEL = 'Custom Link Tree';
+
+/** Build content nav — external route to link tree editor. */
+export const STUDIO_BUILD_LINK_TREE_NAV = {
+  href: STUDIO_LINK_PAGE_HREF,
+  label: STUDIO_LINK_PAGE_LABEL,
+} as const;
 
 export const STUDIO_ROUTES_NAV_LABEL = 'Routes';
 
