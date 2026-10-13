@@ -103,12 +103,12 @@ export async function loadPlanBlueprintForGenerate(params: {
       ...base,
       rotationPreset: {
         ...preset,
-        coachPlanOverview: phase.coachPlanOverview,
-        workoutStructure: phase.workoutStructure,
-        easyRunConfig: phase.easyRunConfig,
+        coachPlanOverview: phase.coachPlanOverview ?? preset.coachPlanOverview,
+        workoutStructure: phase.workoutStructure ?? preset.workoutStructure,
+        easyRunConfig: phase.easyRunConfig ?? preset.easyRunConfig,
         slug: preset.slug,
         title: preset.title,
-      },
+      } as RotationBlueprintSource,
       volumePreset: {
         minWeeklyMiles: preset.minWeeklyMiles,
         maxWeeklyMiles: preset.maxWeeklyMiles,
