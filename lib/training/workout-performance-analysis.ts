@@ -749,7 +749,7 @@ export function buildWorkoutExecutionVerdict(params: {
       else verdict = "off_plan";
       if (distStatus !== "on_plan" && actualMiles != null && plannedMiles != null) {
         if (distStatus === "over" && verdict === "mostly_on_target") verdict = "partial";
-        else if (distStatus === "under" && ratio === 0) verdict = "off_plan";
+        else if (distStatus === "short" && ratio === 0) verdict = "off_plan";
       }
     } else {
       const paceInRange = paceSummary === "Pace in range";

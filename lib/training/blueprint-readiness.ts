@@ -3,7 +3,7 @@ import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { loadPresetForGenerateFromProd } from "@/lib/training/load-preset-for-generate-prod";
 import { loadPlanBlueprintForGenerate } from "@/lib/training/resolve-plan-blueprint";
 import { rotationMissingCatalogueWorkout } from "@/lib/training/run-type-config-validation";
-import { mapPositionRow, trainingPlanPresetInclude } from "@/lib/training/plan-generate-presets-loader";
+import { mapPositionRow } from "@/lib/training/plan-generate-presets-loader";
 import { positionsFromPhaseRotation } from "@/lib/training/apply-phase-preset-generate";
 import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
 import { presetTaperHasVolumeCaps } from "@/lib/training/phase-week-pins";
@@ -51,7 +51,6 @@ export async function computeBlueprintReadiness(input: {
     where: { id: input.planId, athleteId: input.athleteId },
     include: {
       athlete_race: { select: { raceDate: true } },
-      training_plan_preset: { include: trainingPlanPresetInclude },
     },
   });
   if (!planRow) return null;
@@ -94,8 +93,7 @@ export async function computeBlueprintReadiness(input: {
     warnings.push("Preset has no race week slots — goal race day may use rotation defaults.");
   }
 
-  const rotationPreset =
-    blueprint?.rotationPreset ?? planRow.training_plan_preset ?? null;
+  const rotationPreset = blueprint?.rotationPreset ?? null;
   const easyPositions = phasePreset?.build?.easyConfig
     ? positionsFromPhaseRotation(phasePreset.build.easyConfig)
     : (rotationPreset &&
@@ -126,7 +124,7 @@ export async function computeBlueprintReadiness(input: {
     errors,
     warnings,
     presetId,
-    presetTitle: phasePreset?.title ?? blueprint?.label ?? planRow.training_plan_preset?.title ?? null,
+    presetTitle: phasePreset?.title ?? blueprint?.label ?? null,
     presetSlug: phasePreset?.slug ?? null,
     totalWeeks,
     weeksToGoal: totalWeeks,

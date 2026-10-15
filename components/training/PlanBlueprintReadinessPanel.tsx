@@ -61,6 +61,11 @@ export function PlanBlueprintReadinessPanel({
     setLoadError(null);
     try {
       const token = await getToken();
+      if (!token) {
+        setLoadError("Sign in to load blueprint readiness");
+        setReadiness(null);
+        return;
+      }
       const res = await fetch(
         `/api/training/plan/blueprint-readiness?planId=${encodeURIComponent(planId)}`,
         { headers: athleteBearerFetchHeaders(token) },
@@ -88,6 +93,10 @@ export function PlanBlueprintReadinessPanel({
     setStartSaveError(null);
     try {
       const token = await getToken();
+      if (!token) {
+        setStartSaveError("Sign in to update start date");
+        return;
+      }
       const res = await fetch(`/api/training-plan/${planId}`, {
         method: "PATCH",
         headers: {
