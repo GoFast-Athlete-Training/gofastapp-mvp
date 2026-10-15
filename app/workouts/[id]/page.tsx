@@ -599,6 +599,11 @@ function newClientKey(): string {
 /** Always edit distance segments in miles — never convert to meters in the modify UI. */
 function formatMilesForEditInput(miles: number): string {
   if (!Number.isFinite(miles) || miles <= 0) return "";
+  if (miles < 1) {
+    const rounded = Math.round(miles * 1000) / 1000;
+    const asStr = rounded.toFixed(3);
+    return asStr.replace(/\.?0+$/, "") || "0";
+  }
   const roundedTenth = Math.round(miles * 10) / 10;
   if (Math.abs(roundedTenth - Math.round(roundedTenth)) < 1e-9) {
     return String(Math.round(roundedTenth));
@@ -2983,37 +2988,57 @@ export default function WorkoutDetailPage() {
                         </dt>
                         {!isLogged && !isEditing ? (
                           <dd className="space-y-2">
-                            {quickEditable.durationType === "DISTANCE" ? (
-                              <div className="flex flex-wrap items-center gap-2 max-w-xs">
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={quickEditable.durationValue}
-                                  onChange={(e) =>
-                                    patchQuickSegmentOverride(segment.id, {
-                                      durationValue: e.target.value,
-                                    })
-                                  }
-                                  className="flex-1 min-w-[5rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                                />
-                                <span className="rounded bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-900">
-                                  mi
-                                </span>
-                              </div>
-                            ) : (
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={quickEditable.durationValue}
+                            <div className="flex flex-wrap items-center gap-2 max-w-md">
+                              <select
+                                value={quickEditable.durationType}
                                 onChange={(e) =>
                                   patchQuickSegmentOverride(segment.id, {
-                                    durationValue: e.target.value,
+                                    durationType:
+                                      e.target.value === "TIME" ? "TIME" : "DISTANCE",
                                   })
                                 }
-                                className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                                placeholder="Minutes"
-                              />
-                            )}
+                                className="rounded-lg border border-gray-300 px-2 py-2 text-sm bg-white"
+                              >
+                                <option value="DISTANCE">Distance</option>
+                                <option value="TIME">Time</option>
+                              </select>
+                              {quickEditable.durationType === "DISTANCE" ? (
+                                <>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={quickEditable.durationValue}
+                                    onChange={(e) =>
+                                      patchQuickSegmentOverride(segment.id, {
+                                        durationValue: e.target.value,
+                                      })
+                                    }
+                                    className="flex-1 min-w-[5rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                                  />
+                                  <span className="rounded bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-900">
+                                    mi
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={quickEditable.durationValue}
+                                    onChange={(e) =>
+                                      patchQuickSegmentOverride(segment.id, {
+                                        durationValue: e.target.value,
+                                      })
+                                    }
+                                    className="flex-1 min-w-[5rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                                    placeholder="Minutes"
+                                  />
+                                  <span className="rounded bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-900">
+                                    min
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           </dd>
                         ) : (
                           <dd className="text-base text-gray-900 font-medium">

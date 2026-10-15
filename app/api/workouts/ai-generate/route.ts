@@ -12,6 +12,10 @@ import {
   descriptorsToWorkoutSteps,
   type WorkoutStep,
 } from "@/lib/training/prescription";
+import {
+  parsedPasteToAiGenerateResponse,
+  tryParsePastedWorkoutText,
+} from "@/lib/training/parse-pasted-workout";
 
 export const dynamic = "force-dynamic";
 
@@ -384,6 +388,14 @@ export async function POST(request: NextRequest) {
       (goalPace != null && String(goalPace).trim() || (raceTime != null && raceDistance != null));
 
     if (hasSourceText) {
+      const deterministic = tryParsePastedWorkoutText(sourceText, workoutType);
+      if (deterministic) {
+        const result = parsedPasteToAiGenerateResponse(
+          deterministic,
+          athlete.fiveKPace
+        );
+        return NextResponse.json(result);
+      }
       const result = await parseSourceTextWithOpenAI(sourceText, workoutType);
       return NextResponse.json(result);
     }

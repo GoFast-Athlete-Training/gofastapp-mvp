@@ -28,7 +28,9 @@ const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals", "Race"] as const
 const PACE_SLOT_ENC = 2 as const;
 
 export interface SlotData {
-  miles: number;
+  durationType: "DISTANCE" | "TIME";
+  /** Miles when DISTANCE, minutes when TIME. */
+  durationValue: number;
   /** Prescription step title from catalogue (e.g. Work) — preserved on save. */
   segmentTitle?: string;
   /** PACE API valueLow (sec/km, v2) — faster bound; same as detail editor “Pace low”. */
@@ -38,6 +40,14 @@ export interface SlotData {
   hrMin?: number;
   hrMax?: number;
   repeatCount?: number;
+}
+
+function emptySlot(): SlotData {
+  return { durationType: "DISTANCE", durationValue: 0 };
+}
+
+function slotHasPositiveDuration(slot: SlotData | null | undefined): boolean {
+  return (slot?.durationValue ?? 0) > 0;
 }
 
 type ApiSegment = {
@@ -151,17 +161,18 @@ function apiSegmentsToSlots(segments: ApiSegment[]): {
 
   for (const seg of segments) {
     const title = (seg.title ?? "").toLowerCase();
-    const durationType = String(seg.durationType ?? "DISTANCE").toUpperCase();
-    let miles = 0;
+    const durationType =
+      String(seg.durationType ?? "DISTANCE").toUpperCase() === "TIME" ? "TIME" : "DISTANCE";
+    let durationValue = 0;
     if (durationType === "TIME") {
-      // Minutes must not be shown as miles; prefer distance from title ("15 mile run").
-      miles = extractMilesFromTitle(seg.title ?? "") ?? 0;
-    } else {
-      miles =
+      durationValue =
         typeof seg.durationValue === "number" && seg.durationValue > 0 ? seg.durationValue : 0;
-      if (miles === 0) {
+    } else {
+      durationValue =
+        typeof seg.durationValue === "number" && seg.durationValue > 0 ? seg.durationValue : 0;
+      if (durationValue === 0) {
         const fromTitle = extractMilesFromTitle(seg.title ?? "");
-        if (fromTitle != null) miles = fromTitle;
+        if (fromTitle != null) durationValue = fromTitle;
       }
     }
     let paceValueLow: number | undefined;
@@ -185,7 +196,8 @@ function apiSegmentsToSlots(segments: ApiSegment[]): {
       }
     }
     const slot: SlotData = {
-      miles,
+      durationType,
+      durationValue,
       segmentTitle: seg.title?.trim() || undefined,
       paceValueLow,
       paceValueHigh,
@@ -208,7 +220,11 @@ function apiSegmentsToSlots(segments: ApiSegment[]): {
 
 function slotOneLine(slot: SlotData): string {
   const dist =
-    slot.miles > 0 ? formatSegmentDistance(slot.miles) : "";
+    slot.durationValue > 0
+      ? slot.durationType === "TIME"
+        ? `${slot.durationValue} min`
+        : formatSegmentDistance(slot.durationValue)
+      : "";
   const low = slot.paceValueLow != null ? secPerKmToPaceDisplay(slot.paceValueLow) : "";
   const high = slot.paceValueHigh != null ? secPerKmToPaceDisplay(slot.paceValueHigh) : "";
   const pace = low && high ? (low === high ? `${low}/mi` : `${low}-${high}/mi`) : "";
@@ -324,10 +340,10 @@ function CreateWorkoutPageInner() {
 
   const hasSlots = warmup !== null || mainSegments.length > 0 || cooldown !== null;
 
-  const hasPositiveMiles =
-    (warmup?.miles ?? 0) > 0 ||
-    (cooldown?.miles ?? 0) > 0 ||
-    mainSegments.some((s) => s.miles > 0);
+  const hasPositiveDuration =
+    slotHasPositiveDuration(warmup) ||
+    slotHasPositiveDuration(cooldown) ||
+    mainSegments.some((s) => slotHasPositiveDuration(s));
 
   const selectedCatalogueLabel = useMemo(() => {
     if (!selectedCatalogueId) return null;
@@ -379,7 +395,9 @@ function CreateWorkoutPageInner() {
             segs.map((seg) => {
               const paceTarget = seg.targets?.find((t) => t.type === "PACE");
               return {
-                miles: seg.durationType === "DISTANCE" ? seg.durationValue : 0,
+                durationType:
+                  seg.durationType === "TIME" ? ("TIME" as const) : ("DISTANCE" as const),
+                durationValue: seg.durationValue,
                 segmentTitle: seg.title,
                 paceValueLow: paceTarget?.valueLow,
                 paceValueHigh: paceTarget?.valueHigh,
@@ -456,10 +474,10 @@ function CreateWorkoutPageInner() {
     const ctx = `${label} segment`;
     const base =
       editingTarget.kind === "warmup"
-        ? warmup ?? { miles: 0 }
+        ? warmup ?? emptySlot()
         : editingTarget.kind === "cooldown"
-          ? cooldown ?? { miles: 0 }
-          : mainSegments[editingTarget.index] ?? { miles: 0 };
+          ? cooldown ?? emptySlot()
+          : mainSegments[editingTarget.index] ?? emptySlot();
 
     let paceValueLow: number | undefined;
     if (!editingPaceLowMin.trim() && !editingPaceLowSec.trim()) {
@@ -535,7 +553,8 @@ function CreateWorkoutPageInner() {
     setCooldown(null);
     setMainSegments(
       blocks.map((b) => ({
-        miles: b.miles,
+        durationType: "DISTANCE" as const,
+        durationValue: b.miles,
         segmentTitle: b.name,
         paceValueLow: secondsPerMileToSecondsPerKm(b.paceSecPerMiLow),
         paceValueHigh: secondsPerMileToSecondsPerKm(b.paceSecPerMiHigh),
@@ -577,9 +596,12 @@ function CreateWorkoutPageInner() {
         setMainSegments(slots.mainSegments);
         setCooldown(slots.cooldown);
         const totalMi =
-          (slots.warmup?.miles ?? 0) +
-          slots.mainSegments.reduce((a, s) => a + s.miles, 0) +
-          (slots.cooldown?.miles ?? 0);
+          (slots.warmup?.durationType === "DISTANCE" ? slots.warmup.durationValue : 0) +
+          slots.mainSegments.reduce(
+            (a, s) => a + (s.durationType === "DISTANCE" ? s.durationValue : 0),
+            0
+          ) +
+          (slots.cooldown?.durationType === "DISTANCE" ? slots.cooldown.durationValue : 0);
         setName(`${workoutType} — ${totalMi.toFixed(1)} mi`);
         setDescription(`Pasted splits (${slots.mainSegments.length} segments).`);
         return;
@@ -731,7 +753,7 @@ function CreateWorkoutPageInner() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasPositiveMiles) {
+    if (!hasPositiveDuration) {
       alert("Build a workout first, or add at least one segment.");
       return;
     }
@@ -759,43 +781,28 @@ function CreateWorkoutPageInner() {
         repeatCount: number | undefined;
       }> = [];
       let step = 1;
-      if (warmup && warmup.miles > 0) {
+      const pushSlotSegment = (slot: SlotData, defaultTitle: string) => {
+        if (!slotHasPositiveDuration(slot)) return;
         segments.push({
           stepOrder: step++,
-          title: warmup.segmentTitle?.trim() || "Warmup",
-          durationType: "DISTANCE",
-          durationValue: warmup.miles,
-          targets: buildTargets(warmup),
-          repeatCount: warmup.repeatCount,
+          title: slot.segmentTitle?.trim() || defaultTitle,
+          durationType: slot.durationType,
+          durationValue: slot.durationValue,
+          targets: buildTargets(slot),
+          repeatCount: slot.repeatCount,
         });
-      }
-      const mainsWithMiles = mainSegments.filter((s) => s.miles > 0);
+      };
+      if (warmup) pushSlotSegment(warmup, "Warmup");
+      const mainsWithDuration = mainSegments.filter((s) => slotHasPositiveDuration(s));
       let mainOrdinal = 0;
       for (const slot of mainSegments) {
-        if (slot.miles > 0) {
-          mainOrdinal++;
-          const defaultMainTitle =
-            mainsWithMiles.length === 1 ? "Work" : `Segment ${mainOrdinal}`;
-          segments.push({
-            stepOrder: step++,
-            title: slot.segmentTitle?.trim() || defaultMainTitle,
-            durationType: "DISTANCE",
-            durationValue: slot.miles,
-            targets: buildTargets(slot),
-            repeatCount: slot.repeatCount,
-          });
-        }
+        if (!slotHasPositiveDuration(slot)) continue;
+        mainOrdinal++;
+        const defaultMainTitle =
+          mainsWithDuration.length === 1 ? "Work" : `Segment ${mainOrdinal}`;
+        pushSlotSegment(slot, defaultMainTitle);
       }
-      if (cooldown && cooldown.miles > 0) {
-        segments.push({
-          stepOrder: step++,
-          title: cooldown.segmentTitle?.trim() || "Cooldown",
-          durationType: "DISTANCE",
-          durationValue: cooldown.miles,
-          targets: buildTargets(cooldown),
-          repeatCount: cooldown.repeatCount,
-        });
-      }
+      if (cooldown) pushSlotSegment(cooldown, "Cooldown");
 
       if (raceDayMode) {
         if (!racePlanId || !raceDateKey) {
@@ -1190,8 +1197,8 @@ function CreateWorkoutPageInner() {
                               type="button"
                               onClick={() => {
                                 setSelectedCatalogueId(null);
-                                if (kind === "warmup") setWarmup({ miles: 0 });
-                                else setCooldown({ miles: 0 });
+                                if (kind === "warmup") setWarmup(emptySlot());
+                                else setCooldown(emptySlot());
                                 setEditingTarget({ kind });
                                 setEditingPaceLowMin("");
                                 setEditingPaceLowSec("");
@@ -1229,18 +1236,38 @@ function CreateWorkoutPageInner() {
                       {isEditing && slot && (
                         <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Miles</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                            <select
+                              value={slot.durationType}
+                              onChange={(e) => {
+                                const durationType =
+                                  e.target.value === "TIME" ? ("TIME" as const) : ("DISTANCE" as const);
+                                setSelectedCatalogueId(null);
+                                const next = { ...slot, durationType, durationValue: 0 };
+                                if (kind === "warmup") setWarmup(next);
+                                else setCooldown(next);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            >
+                              <option value="DISTANCE">Distance (mi)</option>
+                              <option value="TIME">Time (min)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {slot.durationType === "TIME" ? "Minutes" : "Miles"}
+                            </label>
                             <input
                               type="number"
-                              step="0.1"
+                              step={slot.durationType === "TIME" ? 1 : 0.01}
                               min={0}
-                              value={slot.miles ?? ""}
+                              value={slot.durationValue ?? ""}
                               onChange={(e) => {
-                                const miles = parseFloat(e.target.value) || 0;
+                                const durationValue = parseFloat(e.target.value) || 0;
                                 setSelectedCatalogueId(null);
-                                if (kind === "warmup")
-                                  setWarmup({ ...slot, miles });
-                                else setCooldown({ ...slot, miles });
+                                const next = { ...slot, durationValue };
+                                if (kind === "warmup") setWarmup(next);
+                                else setCooldown(next);
                               }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                             />
@@ -1368,18 +1395,40 @@ function CreateWorkoutPageInner() {
                       {isEditing && (
                         <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Miles</label>
-                            <input
-                              type="number"
-                              step="0.1"
-                              min={0}
-                              value={slot.miles ?? ""}
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                            <select
+                              value={slot.durationType}
                               onChange={(e) => {
-                                const miles = parseFloat(e.target.value) || 0;
+                                const durationType =
+                                  e.target.value === "TIME" ? ("TIME" as const) : ("DISTANCE" as const);
                                 setSelectedCatalogueId(null);
                                 setMainSegments((prev) => {
                                   const copy = [...prev];
-                                  copy[index] = { ...copy[index], miles };
+                                  copy[index] = { ...copy[index], durationType, durationValue: 0 };
+                                  return copy;
+                                });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            >
+                              <option value="DISTANCE">Distance (mi)</option>
+                              <option value="TIME">Time (min)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {slot.durationType === "TIME" ? "Minutes" : "Miles"}
+                            </label>
+                            <input
+                              type="number"
+                              step={slot.durationType === "TIME" ? 1 : 0.01}
+                              min={0}
+                              value={slot.durationValue ?? ""}
+                              onChange={(e) => {
+                                const durationValue = parseFloat(e.target.value) || 0;
+                                setSelectedCatalogueId(null);
+                                setMainSegments((prev) => {
+                                  const copy = [...prev];
+                                  copy[index] = { ...copy[index], durationValue };
                                   return copy;
                                 });
                               }}
@@ -1489,7 +1538,7 @@ function CreateWorkoutPageInner() {
                   onClick={() => {
                     setSelectedCatalogueId(null);
                     const nextIndex = mainSegments.length;
-                    setMainSegments((prev) => [...prev, { miles: 0 }]);
+                    setMainSegments((prev) => [...prev, emptySlot()]);
                     setEditingTarget({ kind: "main", index: nextIndex });
                     setEditingPaceLowMin("");
                     setEditingPaceLowSec("");
@@ -1508,7 +1557,7 @@ function CreateWorkoutPageInner() {
                 </Link>
                 <button
                   type="submit"
-                  disabled={saving || !name || !hasPositiveMiles}
+                  disabled={saving || !name || !hasPositiveDuration}
                   className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? "Saving…" : "Create workout"}
