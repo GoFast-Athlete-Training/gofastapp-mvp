@@ -121,7 +121,7 @@ export default function ShareWithCommunityPage() {
           A Linktree-style button page on athletelinks — custom URLs, sections, and public titles.
         </p>
         <Link
-          href="/profile/links"
+          href="/gofast-with-others?studio=content&view=linkTree"
           className="mt-3 inline-flex text-sm font-semibold text-sky-700 hover:text-sky-800"
         >
           Edit your link page →

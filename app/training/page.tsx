@@ -62,6 +62,9 @@ import { RaceDayGoalBanner } from "@/components/races/RaceDayGoalBanner";
 import { AthleteRacePoint } from "@/components/races/AthleteRacePoint";
 import type { MyRacePointJson } from "@/lib/races/load-my-race";
 import { buildRaceDayBuilderHref } from "@/lib/training/race-day-builder-href";
+import GoFastWithMeSetupPanel from "@/components/gofast-with-me/GoFastWithMeSetupPanel";
+import type { ShareHubPlanStatus } from "@/lib/profile/share-creator-card-logic";
+import { LocalStorageAPI } from "@/lib/localstorage";
 
 type PlanDetailHub = {
   id: string;
@@ -214,6 +217,10 @@ export default function TrainingHubPage() {
   const [planRacePlannerHref, setPlanRacePlannerHref] = useState<string | null>(null);
   const [planRaceHubHref, setPlanRaceHubHref] = useState<string | null>(null);
   const [blueprintSetupHint, setBlueprintSetupHint] = useState<string | null>(null);
+  const [shareHubPlan, setShareHubPlan] = useState<ShareHubPlanStatus | null>(null);
+  const [shareHubPlanLoading, setShareHubPlanLoading] = useState(true);
+  const [planShareLandingSlug, setPlanShareLandingSlug] = useState("");
+  const [planShareFirstName, setPlanShareFirstName] = useState<string | null>(null);
 
   const pastRacePhase = useMemo(
     () => (pastRacePlan?.raceDate ? getRacePhaseLocal(pastRacePlan.raceDate) : null),
@@ -471,6 +478,34 @@ export default function TrainingHubPage() {
     if (!authReady) return;
     void loadHub();
   }, [authReady, loadHub]);
+
+  const refreshShareHubPlan = useCallback(async () => {
+    setShareHubPlanLoading(true);
+    try {
+      const athleteId = LocalStorageAPI.getAthleteId();
+      const [hubRes, gwmRes, profileRes] = await Promise.all([
+        api.get("/me/share-hub-status"),
+        api.get("/me/gofast-with-me"),
+        athleteId ? api.get(`/athlete/${athleteId}`) : Promise.resolve(null),
+      ]);
+      if (hubRes.data?.status?.plan) {
+        setShareHubPlan(hubRes.data.status.plan as ShareHubPlanStatus);
+      }
+      const gwm = gwmRes.data?.gofastWithMe as { gofastSlugSnapshot?: string } | null;
+      const handle = profileRes?.data?.athlete?.gofastHandle?.trim();
+      setPlanShareLandingSlug(gwm?.gofastSlugSnapshot ?? handle ?? "");
+      setPlanShareFirstName(profileRes?.data?.athlete?.firstName ?? null);
+    } catch {
+      /* keep last known */
+    } finally {
+      setShareHubPlanLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
+    void refreshShareHubPlan();
+  }, [authReady, refreshShareHubPlan]);
 
   const fetchWeekDays = useCallback(
     async (wn: number) => {
@@ -817,6 +852,18 @@ export default function TrainingHubPage() {
             </div>
           </div>
         </div>
+
+        {authReady && !loading ? (
+          <div className="mb-8">
+            <GoFastWithMeSetupPanel
+              plan={shareHubPlan}
+              landingSlug={planShareLandingSlug}
+              firstName={planShareFirstName}
+              loading={shareHubPlanLoading}
+              onRefresh={refreshShareHubPlan}
+            />
+          </div>
+        ) : null}
 
         {loading && (
           <p className="mb-6 text-sm text-gray-500">Loading your training…</p>

@@ -21,6 +21,7 @@ type MatchedActivity = {
 type WorkoutLike = {
   id: string;
   title: string;
+  workoutType?: string | null;
   description?: string | null;
   planId?: string | null;
   plannedWorkoutId?: string | null;
@@ -146,6 +147,7 @@ export function CompletedWorkoutResults({
       <PaceForPacePanel
         garminDetailActivityId={workout.garminDetailActivityId}
         performanceAnalysis={performanceAnalysis}
+        workoutType={workout.workoutType}
       />
 
       {workout.garminDetailActivityId ? (

@@ -931,3 +931,42 @@ test("hybrid easy with multiple work segments classifies HYBRID", () => {
     assert.ok(analysis.executionHeadline || analysis.executionVerdict?.verdict);
   }
 });
+
+test("easy run with mile laps uses mile on-target headline not segment reps", () => {
+  const targets = [{ type: "PACE" as const, valueLow: 290, valueHigh: 310 }];
+  const analysis = computeWorkoutPerformanceAnalysis({
+    workoutType: "Easy",
+    targetPaceSecPerMile: 467,
+    targetPaceSecPerMileHigh: 499,
+    paceDeltaSecPerMile: -14,
+    actualAvgPaceSecPerMile: 513,
+    actualDistanceMeters: 6.52 * 1609.34,
+    estimatedDistanceInMeters: 4 * 1609.34,
+    actualDurationSeconds: 3360,
+    completedActivityDetailJson: { laps: [] },
+    garminDetailActivityId: "act-easy-miles",
+    garmin_detail_activity: { detailData: { laps: [] }, hydratedAt: new Date() },
+    segments: [
+      {
+        id: "work-1",
+        title: "Work",
+        stepOrder: 1,
+        targets,
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: 513,
+        actualDurationSeconds: 3360,
+        actualDistanceMiles: 6.52,
+        segment_laps: [
+          { lapIndex: 0, avgPaceSecPerMile: 592, prescribedPaceMinSecPerMile: 467, prescribedPaceMaxSecPerMile: 499 },
+          { lapIndex: 1, avgPaceSecPerMile: 506, prescribedPaceMinSecPerMile: 467, prescribedPaceMaxSecPerMile: 499 },
+          { lapIndex: 2, avgPaceSecPerMile: 487, prescribedPaceMinSecPerMile: 467, prescribedPaceMaxSecPerMile: 499 },
+          { lapIndex: 3, avgPaceSecPerMile: 499, prescribedPaceMinSecPerMile: 467, prescribedPaceMaxSecPerMile: 499 },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(analysis.executionHeadline, "2 of 4 miles on target");
+  assert.equal(analysis.executionVerdict?.verdict, "partial");
+  assert.ok(!analysis.scorecard.workEffort?.summary?.includes("reps on target"));
+});

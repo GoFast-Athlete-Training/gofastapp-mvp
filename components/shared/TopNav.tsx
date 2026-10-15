@@ -7,7 +7,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
-import { Home, Settings, Wallet, Footprints, Activity, LineChart } from 'lucide-react';
+import { Settings, Wallet, Footprints, Link2 } from 'lucide-react';
 
 interface TopNavProps {
   showBack?: boolean;
@@ -66,34 +66,9 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
             )}
           </div>
 
-          {/* Right: Home, Workouts, Settings, Profile & Actions */}
+          {/* Right: quick links not duplicated in left rail, profile & actions */}
           <div className="flex items-center gap-1 sm:gap-3">
-            {/* Home — desktop/top redundancy; mobile uses bottom nav */}
-            <Link
-              href="/athlete-home"
-              className="hidden sm:inline-flex p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
-              title="Home"
-            >
-              <Home className="h-5 w-5" />
-            </Link>
-
-            {/* Performance / workout log hub — also in mobile More menu */}
-            <Link
-              href="/performance"
-              className="hidden sm:inline-flex p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
-              title="Performance"
-            >
-              <LineChart className="h-5 w-5" />
-            </Link>
-
-            {/* Activity history */}
-            <Link
-              href="/activities"
-              className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
-              title="Activity"
-            >
-              <Activity className="h-5 w-5" />
-            </Link>
+            <TopNavLinksLink />
 
             <Suspense
               fallback={
@@ -156,6 +131,27 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
         </div>
       </div>
     </header>
+  );
+}
+
+function TopNavLinksLink() {
+  const pathname = usePathname();
+  const active =
+    pathname === '/gofast-with-others' || !!pathname?.startsWith('/gofast-with-others/');
+
+  return (
+    <Link
+      href="/gofast-with-others?studio=content&view=linkTree"
+      className={`p-2 rounded-lg transition ${
+        active
+          ? 'bg-gray-100 text-gray-900'
+          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+      }`}
+      title="Links"
+      aria-current={active ? 'page' : undefined}
+    >
+      <Link2 className="h-5 w-5" />
+    </Link>
   );
 }
 

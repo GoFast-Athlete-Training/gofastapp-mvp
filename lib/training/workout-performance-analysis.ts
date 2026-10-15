@@ -419,6 +419,8 @@ function computeWorkEffortScorecard(params: {
   actualAvgPaceSecPerMile: number | null;
   targetPaceSecPerMile: number | null;
   targetPaceSecPerMileHigh: number | null;
+  /** When set, omit segment rep / work-mi copy (mile-based easy/long headline owns pace). */
+  suppressSegmentRepSummary?: boolean;
 }): WorkEffortScorecard | null {
   const segmentRows =
     params.workSegmentActual?.segments.filter((row) => row.actualPaceSecPerMile != null) ?? [];
@@ -441,23 +443,28 @@ function computeWorkEffortScorecard(params: {
     }
 
     const parts: string[] = [];
-    if (params.workRepsOnTarget) {
-      parts.push(
-        `${params.workRepsOnTarget.onTarget} of ${params.workRepsOnTarget.total} reps on target`
-      );
+    if (!params.suppressSegmentRepSummary) {
+      if (params.workRepsOnTarget) {
+        parts.push(
+          `${params.workRepsOnTarget.onTarget} of ${params.workRepsOnTarget.total} reps on target`
+        );
+      }
+      if (totalWorkMiles > 0) {
+        parts.push(
+          `${workMilesOnTarget.toFixed(1)} of ${totalWorkMiles.toFixed(1)} work mi on target`
+        );
+      }
     }
-    if (totalWorkMiles > 0) {
-      parts.push(
-        `${workMilesOnTarget.toFixed(1)} of ${totalWorkMiles.toFixed(1)} work mi on target`
-      );
-    } else if (totalWorkMinutes > 0) {
-      parts.push(
-        `${Math.round(workMinutesOnTarget)} of ${Math.round(totalWorkMinutes)} work min on target`
-      );
-    } else if (params.workRepsOnTarget) {
-      parts.push(
-        `${params.workRepsOnTarget.onTarget} of ${params.workRepsOnTarget.total} segments on target`
-      );
+    if (!params.suppressSegmentRepSummary) {
+      if (totalWorkMinutes > 0 && parts.length === 0) {
+        parts.push(
+          `${Math.round(workMinutesOnTarget)} of ${Math.round(totalWorkMinutes)} work min on target`
+        );
+      } else if (params.workRepsOnTarget && parts.length === 0) {
+        parts.push(
+          `${params.workRepsOnTarget.onTarget} of ${params.workRepsOnTarget.total} segments on target`
+        );
+      }
     }
 
     return {
@@ -515,6 +522,13 @@ export function computeWorkoutScorecard(params: {
     plannedMeters != null && plannedMeters > 0 ? plannedMeters / 1609.34 : null;
   const distStatus = distanceStatus(plannedMeters, workout.actualDistanceMeters);
 
+  const mileTargetCounts = easyLongMileTargetCounts({
+    workoutType: workout.workoutType,
+    segments: workout.segments,
+    workoutTargetLow: workout.targetPaceSecPerMile,
+    workoutTargetHigh: workout.targetPaceSecPerMileHigh,
+  });
+
   const workEffort =
     analysis.analysisMode === "completion_only" && !analysis.canJudgeTargetPace
       ? null
@@ -525,6 +539,7 @@ export function computeWorkoutScorecard(params: {
           actualAvgPaceSecPerMile: workout.actualAvgPaceSecPerMile,
           targetPaceSecPerMile: workout.targetPaceSecPerMile,
           targetPaceSecPerMileHigh: workout.targetPaceSecPerMileHigh,
+          suppressSegmentRepSummary: mileTargetCounts != null,
         });
 
   return {
@@ -551,13 +566,70 @@ function paceRangeSummary(
   return lo ?? hi;
 }
 
+/** Easy/Long continuous runs: score work-phase laps as miles (in_range only). */
+export function easyLongMileTargetCounts(params: {
+  workoutType: string;
+  segments: PerformanceAnalysisSegmentInput[];
+  workoutTargetLow: number | null;
+  workoutTargetHigh: number | null;
+}): { onTarget: number; total: number } | null {
+  const category = deriveWorkoutVisualCategory(params.workoutType, params.segments);
+  if (category !== "EASY" && category !== "LONG") return null;
+
+  const laps = buildPhaseAwareLapRows({
+    segments: params.segments,
+    workoutTargetLow: params.workoutTargetLow,
+    workoutTargetHigh: params.workoutTargetHigh,
+  }).filter((lap) => lap.phase === "work" && lap.paceSecPerMile != null);
+
+  if (laps.length < 2) return null;
+
+  let onTarget = 0;
+  for (const lap of laps) {
+    const label = paceVsTargetLabel(
+      lap.paceSecPerMile,
+      lap.targetPaceSecPerMile ?? params.workoutTargetLow,
+      lap.targetPaceSecPerMileHigh ??
+        params.workoutTargetHigh ??
+        lap.targetPaceSecPerMile ??
+        params.workoutTargetLow
+    );
+    if (label === "in_range") onTarget++;
+  }
+
+  return { onTarget, total: laps.length };
+}
+
+function formatEasyLongMileHeadline(counts: { onTarget: number; total: number }): string {
+  const unit = counts.total === 1 ? "mile" : "miles";
+  return `${counts.onTarget} of ${counts.total} ${unit} on target`;
+}
+
 export function buildExecutionHeadline(params: {
   scorecard: WorkoutScorecard;
   workRepsOnTarget: WorkRepsOnTarget | null;
   canJudgeTargetPace: boolean;
   completionOnlyMessage: string | null;
+  workoutType?: string;
+  segments?: PerformanceAnalysisSegmentInput[];
+  workoutTargetLow?: number | null;
+  workoutTargetHigh?: number | null;
 }): string | null {
   const { scorecard, workRepsOnTarget, canJudgeTargetPace, completionOnlyMessage } = params;
+
+  if (
+    params.workoutType != null &&
+    params.segments != null &&
+    params.workoutTargetLow !== undefined
+  ) {
+    const mileCounts = easyLongMileTargetCounts({
+      workoutType: params.workoutType,
+      segments: params.segments,
+      workoutTargetLow: params.workoutTargetLow ?? null,
+      workoutTargetHigh: params.workoutTargetHigh ?? null,
+    });
+    if (mileCounts) return formatEasyLongMileHeadline(mileCounts);
+  }
 
   if (workRepsOnTarget != null && workRepsOnTarget.total > 0) {
     return `${workRepsOnTarget.onTarget} of ${workRepsOnTarget.total} work reps on target`;
@@ -660,20 +732,41 @@ export function buildWorkoutExecutionVerdict(params: {
       notes.push("Easy envelope on plan");
     }
   } else if (category === "EASY" || category === "LONG") {
-    const paceInRange = paceSummary === "Pace in range";
-    const pacePartial =
-      paceSummary === "Pace faster than target" || paceSummary === "Pace slower than target";
+    const mileCounts =
+      params.segments != null
+        ? easyLongMileTargetCounts({
+            workoutType: params.workoutType,
+            segments: params.segments,
+            workoutTargetLow: params.targetPaceSecPerMile,
+            workoutTargetHigh: params.targetPaceSecPerMileHigh,
+          })
+        : null;
 
-    if (distStatus === "on_plan" && (paceInRange || (!paceSummary && params.canJudgeTargetPace))) {
-      verdict = "mostly_on_target";
-    } else if (distStatus === "on_plan" && pacePartial) {
-      verdict = "partial";
-    } else if (distStatus === "on_plan") {
-      verdict = "mostly_on_target";
-    } else if (actualMiles != null && plannedMiles != null) {
-      verdict = distStatus === "over" ? "partial" : "off_plan";
+    if (mileCounts) {
+      const ratio = mileCounts.onTarget / mileCounts.total;
+      if (ratio >= 1) verdict = "mostly_on_target";
+      else if (ratio > 0) verdict = "partial";
+      else verdict = "off_plan";
+      if (distStatus !== "on_plan" && actualMiles != null && plannedMiles != null) {
+        if (distStatus === "over" && verdict === "mostly_on_target") verdict = "partial";
+        else if (distStatus === "under" && ratio === 0) verdict = "off_plan";
+      }
+    } else {
+      const paceInRange = paceSummary === "Pace in range";
+      const pacePartial =
+        paceSummary === "Pace faster than target" || paceSummary === "Pace slower than target";
+
+      if (distStatus === "on_plan" && (paceInRange || (!paceSummary && params.canJudgeTargetPace))) {
+        verdict = "mostly_on_target";
+      } else if (distStatus === "on_plan" && pacePartial) {
+        verdict = "partial";
+      } else if (distStatus === "on_plan") {
+        verdict = "mostly_on_target";
+      } else if (actualMiles != null && plannedMiles != null) {
+        verdict = distStatus === "over" ? "partial" : "off_plan";
+      }
+      if (paceSummary) notes.push(paceSummary);
     }
-    if (paceSummary) notes.push(paceSummary);
     if (params.scorecard.totalMiles.message) notes.push(params.scorecard.totalMiles.message);
   } else if (category === "RACE") {
     verdict = "completed_only";
@@ -1243,6 +1336,10 @@ export function computeWorkoutPerformanceAnalysis(
         workRepsOnTarget,
         canJudgeTargetPace,
         completionOnlyMessage,
+        workoutType: workout.workoutType,
+        segments: workout.segments,
+        workoutTargetLow: workout.targetPaceSecPerMile,
+        workoutTargetHigh: workout.targetPaceSecPerMileHigh,
       })
     : completionOnlyMessage;
 

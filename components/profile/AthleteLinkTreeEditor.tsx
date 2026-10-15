@@ -9,7 +9,12 @@ import type { AthleteLinkTreeDetail, AthleteLinkTreeLink } from "@/lib/content/a
 
 const EMOJI_PRESETS = ["🌐", "📱", "🏃", "👟", "🔗", "📍"] as const;
 
-export function AthleteLinkTreeEditor() {
+type EditorProps = {
+  /** Render inside GoFast With Me content studio (no profile hub chrome). */
+  embeddedInStudio?: boolean;
+};
+
+export function AthleteLinkTreeEditor({ embeddedInStudio = false }: EditorProps) {
   const [tree, setTree] = useState<AthleteLinkTreeDetail | null>(null);
   const [handle, setHandle] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,15 +165,14 @@ export function AthleteLinkTreeEditor() {
   return (
     <div className="mx-auto max-w-2xl space-y-8 pb-8">
       <div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <Link href="/gofast-with-others" className="text-sky-700 hover:underline">
-            ← GoFastWithMe studio
-          </Link>
-          <Link href="/profile/share" className="text-sky-700 hover:underline">
-            Share hub
-          </Link>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        {!embeddedInStudio ? (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <Link href="/gofast-with-others?studio=content&view=linkTree" className="text-sky-700 hover:underline">
+              ← Content studio
+            </Link>
+          </div>
+        ) : null}
+        <div className={`flex flex-wrap items-center gap-2 ${embeddedInStudio ? "" : "mt-2"}`}>
           <h1 className="text-2xl font-bold text-gray-900">Custom Link Tree</h1>
           {handleSlug ? (
             <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-900">
@@ -177,7 +181,7 @@ export function AthleteLinkTreeEditor() {
           ) : null}
         </div>
         <p className="mt-1 text-sm text-gray-600">
-          Public link buttons on athletelinks — edited here, not in Content Studio.
+          Public link buttons on athletelinks — header, emoji, and URL on each button.
         </p>
         {shareUrl ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -421,75 +425,95 @@ function LinkRow({
         <img src={link.linkLogoUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
       ) : null}
 
-      <label className="block text-sm">
-        <span className="font-medium">Internal title</span>
-        <input
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </label>
+      {link.isSection ? (
+        <label className="block text-sm">
+          <span className="font-medium">Section title</span>
+          <input
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+      ) : null}
 
       {!link.isSection ? (
         <>
           <label className="block text-sm">
-            <span className="font-medium">Public title</span>
+            <span className="font-medium">Button title (public)</span>
             <input
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               value={publicLabel}
               onChange={(e) => setPublicLabel(e.target.value)}
+              placeholder={name.trim() || "What followers see on the button"}
             />
           </label>
-          <label className="block text-sm">
-            <span className="font-medium">Internal description</span>
-            <textarea
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              rows={2}
-              value={internalDescription}
-              onChange={(e) => setInternalDescription(e.target.value)}
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium">Public description</span>
-            <textarea
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </label>
+          <div>
+            <span className="text-sm font-medium">Emoji</span>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {EMOJI_PRESETS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEmoji(e)}
+                  className={`rounded-lg px-2 py-1 text-lg ${emoji === e ? "ring-2 ring-orange-400" : "bg-gray-50"}`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
           <label className="block text-sm">
             <span className="font-medium">URL</span>
             <input
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://"
             />
           </label>
-          <div className="flex flex-wrap gap-2">
-            {EMOJI_PRESETS.map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => setEmoji(e)}
-                className={`rounded-lg px-2 py-1 text-lg ${emoji === e ? "ring-2 ring-orange-400" : "bg-gray-50"}`}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-          <label className="block text-sm">
-            <span className="font-medium">Photo</span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="mt-1 block w-full text-sm"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void uploadPhoto(f);
-              }}
-            />
-          </label>
+          <details className="text-sm text-gray-600">
+            <summary className="cursor-pointer font-medium text-gray-800">More fields</summary>
+            <div className="mt-3 space-y-3">
+              <label className="block">
+                <span className="font-medium">Internal title</span>
+                <input
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+              <label className="block">
+                <span className="font-medium">Public description</span>
+                <textarea
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </label>
+              <label className="block">
+                <span className="font-medium">Internal notes</span>
+                <textarea
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  rows={2}
+                  value={internalDescription}
+                  onChange={(e) => setInternalDescription(e.target.value)}
+                />
+              </label>
+              <label className="block">
+                <span className="font-medium">Photo</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="mt-1 block w-full text-sm"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void uploadPhoto(f);
+                  }}
+                />
+              </label>
+            </div>
+          </details>
         </>
       ) : null}
 

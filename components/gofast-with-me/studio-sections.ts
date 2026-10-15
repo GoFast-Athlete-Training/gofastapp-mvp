@@ -9,8 +9,15 @@ export type StudioBuildSection = 'reflections' | 'workouts' | 'content';
 /** Landing editors — public page identity. */
 export type StudioLandingSection = 'page' | 'runnerStory';
 
-/** Left-nav editor workspaces. */
-export type StudioSection = StudioLandingSection | StudioBuildSection | StudioManageSection;
+/** Custom athletelinks page editor. */
+export type StudioLinkTreeSection = 'linkTree';
+
+/** Left-nav editor workspaces (content studio). */
+export type StudioSection =
+  | StudioLandingSection
+  | StudioBuildSection
+  | StudioManageSection
+  | StudioLinkTreeSection;
 
 /** Preview surfaces — last in left nav under View. */
 export type StudioChromeView = 'landingView' | 'communityHome';
@@ -48,12 +55,16 @@ export const STUDIO_EARNINGS_LABEL = 'Earnings';
 /** @deprecated Use STUDIO_COMMUNITY_LABEL — kept for legacy tutorial copy. */
 export const STUDIO_CENTRAL_LABEL = STUDIO_COMMUNITY_LABEL;
 
+export const STUDIO_LINK_PAGE_LABEL = 'Custom Link Tree';
+export const STUDIO_ROUTES_NAV_LABEL = 'Routes';
+
 export const STUDIO_NAV_LABELS: Record<StudioSection, string> = {
   page: STUDIO_MY_STORY_LABEL,
   runnerStory: STUDIO_RUNNER_STORY_LABEL,
   reflections: 'Training Reflections',
   workouts: 'Runs',
   content: 'Think Pieces',
+  linkTree: STUDIO_LINK_PAGE_LABEL,
   announcements: 'Announcements',
   chatter: 'Chatter',
   members: 'Members',
@@ -99,22 +110,25 @@ export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
   reflections: 'Training reflections for your feed — optional activity link',
   workouts: 'Host join-me runs followers can RSVP to',
   content: 'Essays and riffs — think pieces on your landing and feed',
+  linkTree: 'Public link buttons on athletelinks',
   announcements: 'Journey updates followers see in your community feed',
   chatter: 'Follower conversation — review and moderate from studio',
   members: 'Who follows your athlete community — see all roster',
 };
 
-/** External route — athlete link page editor (not a StudioView). */
-export const STUDIO_LINK_PAGE_HREF = '/profile/links';
-export const STUDIO_LINK_PAGE_LABEL = 'Custom Link Tree';
-
-/** Build content nav — external route to link tree editor. */
-export const STUDIO_BUILD_LINK_TREE_NAV = {
-  href: STUDIO_LINK_PAGE_HREF,
-  label: STUDIO_LINK_PAGE_LABEL,
-} as const;
-
-export const STUDIO_ROUTES_NAV_LABEL = 'Routes';
+/** Single content-studio nav (Build Content door). */
+export const STUDIO_CONTENT_NAV_ORDER: Array<{
+  section: StudioSection;
+  label: string;
+  focus?: ContentEditorFocus;
+}> = [
+  { section: 'page', label: STUDIO_MY_STORY_LABEL },
+  { section: 'runnerStory', label: STUDIO_RUNNER_STORY_LABEL },
+  { section: 'content', label: STUDIO_ROUTES_NAV_LABEL, focus: 'route' },
+  { section: 'reflections', label: 'Training Reflections' },
+  { section: 'content', label: 'Think Pieces', focus: 'tip' },
+  { section: 'linkTree', label: STUDIO_LINK_PAGE_LABEL },
+];
 
 export const STUDIO_ROUTES_DESCRIPTION =
   'Share routes you love — Strava links or favorites from the city catalog';
@@ -123,12 +137,10 @@ export const STUDIO_ROUTES_DESCRIPTION =
 export const STUDIO_BIN_ORDER: StudioSection[] = [
   'page',
   'runnerStory',
-  'reflections',
-  'workouts',
   'content',
-  'announcements',
-  'chatter',
-  'members',
+  'reflections',
+  'content',
+  'linkTree',
 ];
 
 export function isStudioChromeView(view: StudioView): view is StudioChromeView {

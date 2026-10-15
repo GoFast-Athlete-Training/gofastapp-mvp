@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, Heart, LayoutDashboard, LineChart, MapPin, Trophy, Users } from "lucide-react";
+import { Activity, LayoutDashboard, MapPin, Trophy, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import AthleteMobileNav from "@/components/athlete/AthleteMobileNav";
 
@@ -24,11 +24,6 @@ function planHubMatch(p: string | null): boolean {
   );
 }
 
-/** Logged work, metrics, full workout log */
-function healthHubMatch(p: string | null): boolean {
-  return !!p && (p === "/health" || p.startsWith("/health/"));
-}
-
 function activityHubMatch(p: string | null): boolean {
   if (!p) return false;
   if (p === "/workouts/create" || p.startsWith("/workouts/create/")) return false;
@@ -38,11 +33,6 @@ function activityHubMatch(p: string | null): boolean {
     p === "/workouts" ||
     (p.startsWith("/workouts/") && !p.startsWith("/workouts/create"))
   );
-}
-
-function performanceHubMatch(p: string | null): boolean {
-  if (!p) return false;
-  return p === "/performance" || p.startsWith("/performance/");
 }
 
 function gorunMatch(p: string | null): boolean {
@@ -83,22 +73,10 @@ const primaryNavItems: NavItem[] = [
       (path === "/races" || path.startsWith("/races/") || path.startsWith("/myrace/")),
   },
   {
-    label: "Health",
-    href: "/health",
-    icon: Heart,
-    match: healthHubMatch,
-  },
-  {
     label: "Activity",
     href: "/activities",
     icon: Activity,
     match: activityHubMatch,
-  },
-  {
-    label: "Performance",
-    href: "/performance",
-    icon: LineChart,
-    match: performanceHubMatch,
   },
 ];
 

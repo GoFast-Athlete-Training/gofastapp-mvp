@@ -67,7 +67,8 @@ export default function PerformancePage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Performance</h1>
           <p className="text-sm text-gray-600 mt-1">
-            This week&apos;s plan and where you stand — confirm or edit your numbers.
+            Your current training week, plan sessions, and fitness anchors — confirm or edit
+            your numbers.
           </p>
         </div>
 

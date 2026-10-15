@@ -8,7 +8,10 @@ import type {
 import {
   formatPaceTargetRangeDisplay,
   paceRangeDeltaMessage,
+  paceRangeBounds,
+  paceVsTargetLabel,
 } from "@/lib/training/pace-comparison-display";
+import { humanizeSegmentTitle } from "@/lib/training/segment-summary";
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
   if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
@@ -45,24 +48,56 @@ function hasLapPaceDeltas(analysis: WorkoutPerformanceAnalysis | null): boolean 
   );
 }
 
-function phaseLabel(phase: PhaseAwareLapRow["phase"]): string {
-  switch (phase) {
-    case "warmup":
-      return "Warmup";
-    case "work":
-      return "Work";
-    case "recovery":
-      return "Recovery";
-    case "cooldown":
-      return "Cooldown";
-    case "activity":
-      return "Activity";
-    default:
-      return phase;
-  }
+function isGenericWorkTitle(title: string | null | undefined): boolean {
+  const t = title?.trim().toLowerCase() ?? "";
+  return t === "work" || t === "segment";
 }
 
-function SplitBar({ lap }: { lap: PhaseAwareLapRow }) {
+function splitRowTitle(
+  lap: PhaseAwareLapRow,
+  workoutType: string | null | undefined,
+  workOrdinal: number
+): string {
+  if (lap.phase === "warmup") return "Warm-up";
+  if (lap.phase === "cooldown") return "Cool-down";
+  if (lap.phase === "recovery") return "Recovery";
+  if (lap.phase === "activity") return "Activity";
+
+  const wt = workoutType?.trim() ?? "";
+  if ((wt === "Easy" || wt === "LongRun") && lap.phase === "work") {
+    return `Mile ${workOrdinal + 1}`;
+  }
+
+  if (isGenericWorkTitle(lap.segmentTitle)) {
+    return `Rep ${workOrdinal + 1}`;
+  }
+
+  return humanizeSegmentTitle(lap.segmentTitle, workoutType);
+}
+
+function paceBarWidthPercent(
+  actualSecPerMile: number,
+  low: number | null | undefined,
+  high: number | null | undefined
+): number {
+  const b = paceRangeBounds(low, high);
+  if (!b) return 24;
+  const label = paceVsTargetLabel(actualSecPerMile, low, high);
+  if (label === "in_range") return 100;
+  if (label === "slower") {
+    return Math.min(96, Math.max(14, Math.round((b.hi / actualSecPerMile) * 100)));
+  }
+  if (label === "faster") return 96;
+  return 24;
+}
+
+function SplitBar({
+  lap,
+  rowTitle,
+}: {
+  lap: PhaseAwareLapRow;
+  rowTitle: string;
+}) {
   const pace = formatSecPerMile(lap.paceSecPerMile);
   const prescribed =
     lap.targetPaceSecPerMile != null
@@ -71,16 +106,17 @@ function SplitBar({ lap }: { lap: PhaseAwareLapRow }) {
   const label = lapPaceLabel(lap);
   const barWidth =
     lap.paceSecPerMile != null
-      ? `${Math.min(100, Math.max(18, 600 / lap.paceSecPerMile))}%`
+      ? `${paceBarWidthPercent(
+          lap.paceSecPerMile,
+          lap.targetPaceSecPerMile,
+          lap.targetPaceSecPerMileHigh
+        )}%`
       : "24%";
 
   return (
     <li className="rounded-xl border border-violet-200 bg-white px-4 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-        <span className="font-semibold text-gray-900">
-          {phaseLabel(lap.phase)}
-          {lap.segmentTitle ? ` · ${lap.segmentTitle}` : ""}
-        </span>
+        <span className="font-semibold text-gray-900">{rowTitle}</span>
         <span className="tabular-nums text-gray-800">{pace ?? "—"}</span>
       </div>
       <div className="mt-2 h-2 rounded-full bg-violet-100">
@@ -123,11 +159,13 @@ function GarminLapSplitBar({ lap }: { lap: ActivityDerivedLapRow }) {
 type Props = {
   garminDetailActivityId?: string | null;
   performanceAnalysis: WorkoutPerformanceAnalysis | null;
+  workoutType?: string | null;
 };
 
 export default function PaceForPacePanel({
   garminDetailActivityId,
   performanceAnalysis,
+  workoutType,
 }: Props) {
   const available = hasLapPaceDeltas(performanceAnalysis);
   const laps = splitsLaps(performanceAnalysis);
@@ -158,9 +196,23 @@ export default function PaceForPacePanel({
               ? garminLaps.map((lap) => (
                   <GarminLapSplitBar key={`lap-${lap.lapIndex}`} lap={lap} />
                 ))
-              : laps.map((lap) => (
-                  <SplitBar key={`${lap.segmentId}-${lap.lapIndex}`} lap={lap} />
-                ))}
+              : (() => {
+                  let workOrdinal = 0;
+                  return laps.map((lap) => {
+                    const workIndex = lap.phase === "work" ? workOrdinal++ : workOrdinal;
+                    const title =
+                      lap.phase === "work"
+                        ? splitRowTitle(lap, workoutType, workIndex)
+                        : splitRowTitle(lap, workoutType, 0);
+                    return (
+                      <SplitBar
+                        key={`${lap.segmentId}-${lap.lapIndex}`}
+                        lap={lap}
+                        rowTitle={title}
+                      />
+                    );
+                  });
+                })()}
           </ul>
         </>
       ) : (

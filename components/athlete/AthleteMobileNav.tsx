@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, LayoutDashboard, MapPin, Trophy, Heart, Users, X } from 'lucide-react';
+import { Activity, LayoutDashboard, MapPin, Trophy, Users, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 type NavItem = {
@@ -39,12 +39,15 @@ function racesMatch(p: string | null): boolean {
   );
 }
 
-function healthHubMatch(p: string | null): boolean {
-  return !!p && (p === '/health' || p.startsWith('/health/'));
-}
-
-function performanceHubMatch(p: string | null): boolean {
-  return !!p && (p === '/performance' || p.startsWith('/performance/'));
+function activityHubMatch(p: string | null): boolean {
+  if (!p) return false;
+  if (p === '/workouts/create' || p.startsWith('/workouts/create/')) return false;
+  return (
+    p === '/activities' ||
+    p.startsWith('/activities/') ||
+    p === '/workouts' ||
+    (p.startsWith('/workouts/') && !p.startsWith('/workouts/create'))
+  );
 }
 
 function goFastWithOthersMatch(p: string | null): boolean {
@@ -55,17 +58,10 @@ const primaryTabs: NavItem[] = [
   { id: 'train', label: 'Train', href: '/training', icon: LayoutDashboard, match: planHubMatch },
   { id: 'run', label: 'Run', href: '/build-a-run', icon: MapPin, match: gorunMatch },
   { id: 'races', label: 'Races', href: '/races', icon: Trophy, match: racesMatch },
-  { id: 'health', label: 'Health', href: '/health', icon: Heart, match: healthHubMatch },
+  { id: 'activity', label: 'Activity', href: '/activities', icon: Activity, match: activityHubMatch },
 ];
 
 const moreItems: NavItem[] = [
-  {
-    id: 'performance',
-    label: 'Performance',
-    href: '/performance',
-    icon: Activity,
-    match: performanceHubMatch,
-  },
   {
     id: 'gwm',
     label: 'GoFast With Me',

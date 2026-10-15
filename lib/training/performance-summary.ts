@@ -6,7 +6,7 @@ import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
 import {
-  performanceReflectionWeekNumber,
+  currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
 } from "@/lib/training/plan-utils";
 import { buildPlanWeekCards } from "@/lib/training/plan-week-cards";
@@ -103,7 +103,7 @@ export async function loadPerformanceSummary(
       activePlan.totalWeeks,
       raceDate
     );
-    weekNumber = performanceReflectionWeekNumber(activePlan.startDate, effectiveWeeks);
+    weekNumber = currentTrainingWeekNumber(activePlan.startDate, effectiveWeeks);
 
     const [wp, cards, stand] = await Promise.all([
       loadWeekPerformanceSnapshot({
@@ -158,7 +158,6 @@ export async function loadPerformanceSummary(
 
     weekDays = cards
       .filter((c) => c.workoutType !== "Rest" && c.title !== "Rest")
-      .filter((c) => c.garminDetailActivityId != null)
       .map((c) => {
         const status = deriveSessionStatus({
           dateKey: c.dateKey,

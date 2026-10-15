@@ -18,7 +18,7 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'My Community is your studio. Use the header to see your landing page, preview the member hub, and share your invite link. Landing holds My Story and your full runner story. Runs and Training come first — then build content (training reflections and think pieces). Manage announcements, chatter, and members from the left nav.',
+    'My Community has two doors: Build Content for your landing, athletelinks, and writeups; Manage Community opens your follower hub as yourself. Plan sharing lives on the Training page. Host runs from Run in the main app.',
   steps: [
     {
       id: 'page',
@@ -28,38 +28,33 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
       sortOrder: 0,
     },
     {
-      id: 'workouts-runs',
-      title: 'Runs — join-me runs',
-      instruction:
-        'Pick a plan day and invite followers to a hosted GoRun.',
+      id: 'runnerStory',
+      title: 'Runner story',
+      instruction: 'Long-form story linked from the short About me on your landing.',
       sortOrder: 1,
-    },
-    {
-      id: 'workouts-training',
-      title: 'Training — publish your plan',
-      instruction:
-        'Share your active plan so followers can train week-by-week with you.',
-      sortOrder: 2,
     },
     {
       id: 'content-routes',
       title: 'Routes — favorite runs',
-      instruction:
-        'Routes followers browse alongside your hosted runs.',
-      sortOrder: 3,
+      instruction: 'Share routes you love on your public landing.',
+      sortOrder: 2,
     },
     {
       id: 'reflections',
       title: 'Training Reflections',
-      instruction:
-        'Write reflections in studio — optionally link a synced activity. Daily logs stay under Announcements.',
-      sortOrder: 4,
+      instruction: 'Write reflections — optionally link a synced activity.',
+      sortOrder: 3,
     },
     {
       id: 'content',
       title: 'Think Pieces',
-      instruction:
-        'Title and body essays followers revisit on your public page and hub.',
+      instruction: 'Essays followers revisit on your public page.',
+      sortOrder: 4,
+    },
+    {
+      id: 'linkTree',
+      title: 'Custom Link Tree',
+      instruction: 'Public buttons on athletelinks — title, emoji, and URL on each link.',
       sortOrder: 5,
     },
   ],

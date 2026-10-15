@@ -1,5 +1,5 @@
-import { AthleteLinkTreeEditor } from "@/components/profile/AthleteLinkTreeEditor";
+import { redirect } from "next/navigation";
 
 export default function AthleteLinksPage() {
-  return <AthleteLinkTreeEditor />;
+  redirect("/gofast-with-others?studio=content&view=linkTree");
 }
