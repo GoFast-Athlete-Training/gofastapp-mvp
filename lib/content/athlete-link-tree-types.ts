@@ -11,6 +11,7 @@ export type AthleteLinkTreeLink = {
   linkLogoUrl: string | null;
   emoji: string | null;
   url: string | null;
+  athleteRaceId: string | null;
   sortOrder: number;
 };
 

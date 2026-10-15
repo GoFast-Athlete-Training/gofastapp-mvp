@@ -1,4 +1,4 @@
-import { isHydratedLinkKind } from "@/lib/athlete-link-tree/link-kinds";
+import { isGeneratedRaceLinkKind, isHydratedLinkKind } from "@/lib/athlete-link-tree/link-kinds";
 import prisma from "@/lib/prisma";
 import { AthleteLinkTreeLinkKind } from "@prisma/client";
 
@@ -9,7 +9,7 @@ export function normalizeLinkDestination(input: {
   url: string | null;
   error?: string;
 } {
-  if (input.kind && isHydratedLinkKind(input.kind)) {
+  if (input.kind && (isHydratedLinkKind(input.kind) || isGeneratedRaceLinkKind(input.kind))) {
     return { url: null };
   }
   const url = input.url?.trim() || null;

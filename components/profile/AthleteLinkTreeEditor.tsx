@@ -36,14 +36,6 @@ export function AthleteLinkTreeEditor() {
     [tree],
   );
 
-  const hasRacesCard = useMemo(
-    () =>
-      sortedLinks.some(
-        (link) => !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES,
-      ),
-    [sortedLinks],
-  );
-
   const hydrate = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -115,6 +107,19 @@ export function AthleteLinkTreeEditor() {
       setError(err instanceof Error ? err.message : "Failed to add");
     } finally {
       setAdding(false);
+    }
+  }
+
+  async function removeLink(linkId: string) {
+    setError(null);
+    try {
+      const res = await api.delete(`/athlete/links/items/${linkId}`);
+      if (!res.data?.success || !res.data?.tree) {
+        throw new Error(res.data?.error || "Failed to remove");
+      }
+      setTree(res.data.tree);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove");
     }
   }
 
@@ -321,9 +326,9 @@ export function AthleteLinkTreeEditor() {
           <AthleteLinkTreeLinkSources
             publicSlug={publicSlug}
             sortedLinks={sortedLinks}
-            hasRacesCard={hasRacesCard}
             adding={adding}
             onAddLink={addLink}
+            onRemoveLink={removeLink}
           />
         ) : null}
       </section>
@@ -346,9 +351,11 @@ function LinkRow({
   onMove: (id: string, dir: -1 | 1) => void;
   onUpdated: (tree: AthleteLinkTreeDetail) => void;
 }) {
-  const isRacesCard = !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES;
+  const isLegacyRacesCard = !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES;
+  const isGeneratedRace =
+    !link.isSection && link.kind === AthleteLinkTreeLinkKind.ATHLETE_RACE;
   const initialTitle =
-    link.publicLabel?.trim() || link.name.trim() || (isRacesCard ? "My races" : "");
+    link.publicLabel?.trim() || link.name.trim() || (isLegacyRacesCard ? "My races" : "");
 
   const [buttonTitle, setButtonTitle] = useState(initialTitle);
   const [sectionTitle, setSectionTitle] = useState(link.name);
@@ -379,9 +386,9 @@ function LinkRow({
         emoji: emoji.trim() || null,
       };
 
-      if (isRacesCard) {
+      if (isLegacyRacesCard) {
         payload.publicLabel = title;
-      } else {
+      } else if (!isGeneratedRace) {
         payload.url = url.trim();
       }
 
@@ -405,7 +412,7 @@ function LinkRow({
 
   const rowLabel = link.isSection
     ? sectionTitle.trim() || "Section"
-    : buttonTitle.trim() || (isRacesCard ? "Races" : `Link ${index + 1}`);
+    : buttonTitle.trim() || (isLegacyRacesCard ? "Races" : `Link ${index + 1}`);
 
   return (
     <li className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
@@ -414,9 +421,14 @@ function LinkRow({
           {link.isSection ? "Section heading" : "Link"}
           {" · "}
           {rowLabel}
-          {isRacesCard ? (
+          {isGeneratedRace ? (
             <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800 normal-case">
-              GoFast
+              Race
+            </span>
+          ) : null}
+          {isLegacyRacesCard ? (
+            <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 normal-case">
+              Legacy
             </span>
           ) : null}
         </span>
@@ -454,20 +466,33 @@ function LinkRow({
         </label>
       ) : (
         <>
-          {isRacesCard ? (
+          {isGeneratedRace ? (
             <p className="text-sm text-gray-600">
-              Shows your upcoming claimed races — each gets its own button on your public page.
+              Generated from your claimed race — opens your public race card. Uncheck in Add a link →
+              Races to remove.
             </p>
           ) : null}
-          <label className="block text-sm">
-            <span className="font-medium">{isRacesCard ? "Section heading" : "Button title"}</span>
-            <input
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              value={buttonTitle}
-              onChange={(e) => setButtonTitle(e.target.value)}
-            />
-          </label>
-          {!isRacesCard ? (
+          {isLegacyRacesCard ? (
+            <p className="text-sm text-amber-800">
+              Old auto-races slot — remove and use Races checkboxes under a section heading instead.
+            </p>
+          ) : null}
+          {!isGeneratedRace ? (
+            <label className="block text-sm">
+              <span className="font-medium">{isLegacyRacesCard ? "Section heading" : "Button title"}</span>
+              <input
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                value={buttonTitle}
+                onChange={(e) => setButtonTitle(e.target.value)}
+              />
+            </label>
+          ) : (
+            <p className="text-sm font-medium text-gray-900">{link.name}</p>
+          )}
+          {isGeneratedRace && link.url ? (
+            <p className="text-xs text-gray-500 break-all">{link.url}</p>
+          ) : null}
+          {!isLegacyRacesCard && !isGeneratedRace ? (
             <>
               <div>
                 <span className="text-sm font-medium">Emoji</span>
@@ -498,15 +523,17 @@ function LinkRow({
         </>
       )}
 
-      <button
-        type="button"
-        disabled={busy || (link.isSection ? !sectionTitle.trim() : !buttonTitle.trim())}
-        onClick={() => void save()}
-        className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
-      >
-        <Save className="h-4 w-4" />
-        Save
-      </button>
+      {!isGeneratedRace ? (
+        <button
+          type="button"
+          disabled={busy || (link.isSection ? !sectionTitle.trim() : !buttonTitle.trim())}
+          onClick={() => void save()}
+          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" />
+          Save
+        </button>
+      ) : null}
     </li>
   );
 }

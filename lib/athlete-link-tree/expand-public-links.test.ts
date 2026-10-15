@@ -20,6 +20,7 @@ test("expandAthleteLinkTreeLinksForPublic passes custom links through", async ()
       linkLogoUrl: null,
       emoji: "📱",
       url: "https://instagram.com/runner",
+      athleteRaceId: null,
       sortOrder: 0,
     },
   ];

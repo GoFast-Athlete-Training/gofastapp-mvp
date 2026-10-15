@@ -491,6 +491,7 @@ model gofast_with_me {
 enum AthleteLinkTreeLinkKind {
   CUSTOM
   RACES
+  ATHLETE_RACE
 }
 
 model athlete_link_trees {
@@ -520,13 +521,15 @@ model athlete_link_tree_links {
   linkLogoUrl         String?
   emoji               String?
   url                 String?
-  /// CUSTOM = URL button; RACES = hydrates upcoming claimed races on public page.
+  /// CUSTOM = URL button; RACES = legacy; ATHLETE_RACE = generated link to athlete race card.
   kind                AthleteLinkTreeLinkKind  @default(CUSTOM)
+  athleteRaceId       String?
   isSection           Boolean                  @default(false)
   sortOrder           Int                      @default(0)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   tree                athlete_link_trees @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  athlete_race        athlete_races?           @relation(fields: [athleteRaceId], references: [id], onDelete: Cascade)
 
   @@index([treeId])
   @@index([treeId, sortOrder])
@@ -1016,6 +1019,8 @@ model athlete_races {
   successLooksLike     String?  @db.Text
   completionFeeling    String?  @db.Text
   motivationIcon       String?
+  /// Public cheer notes on athlete race card (JSON array of { id, name, message, createdAt }).
+  myCheers             Json     @default("[]")
   /// Athlete-selected Goal race for cheer-on / public primary — at most one per athlete.
   isPrimaryRace    Boolean  @default(false)
   selfDeclaredAt   DateTime @default(now())
@@ -1033,6 +1038,7 @@ model athlete_races {
   training_plans            training_plans[]            @relation("PlanAthleteRace")
   race_trigger_member       race_trigger_athletes?
   race_plan                 race_plans?  @relation("RacePlanAthleteRace")
+  link_tree_links           athlete_link_tree_links[]
 
   @@unique([athleteId, raceRegistryId])
   @@index([athleteId])
