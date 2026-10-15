@@ -18,8 +18,7 @@ export type AthleteLinkSourceCardId =
   | AthleteContentLinkPresetId
   | "races"
   | "routes"
-  | "custom"
-  | "section";
+  | "custom";
 
 export const ATHLETE_LINK_SOURCE_CARDS: Array<{
   id: AthleteLinkSourceCardId;
@@ -34,7 +33,6 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
   { id: "races", title: "Races", hint: "One button per upcoming race" },
   { id: "routes", title: "Route", hint: "Pick a saved Strava route" },
   { id: "custom", title: "Custom link", hint: "Any URL" },
-  { id: "section", title: "Section", hint: "Heading on your page" },
 ];
 
 export const PRESET_EMOJI: Record<AthleteContentLinkPresetId, string> = {

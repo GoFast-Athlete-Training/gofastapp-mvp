@@ -29,7 +29,6 @@ export function AthleteLinkTreeLinkSources({
   onAddLink,
 }: Props) {
   const [source, setSource] = useState<AthleteLinkSourceCardId | null>(null);
-  const [sectionTitle, setSectionTitle] = useState("");
   const [customTitle, setCustomTitle] = useState("");
   const [customUrl, setCustomUrl] = useState("https://");
   const [routes, setRoutes] = useState<AthleteRunRoutePayload[]>([]);
@@ -132,9 +131,9 @@ export function AthleteLinkTreeLinkSources({
     <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-gray-900">Add to your page</h3>
+          <h3 className="font-semibold text-gray-900">Add a link</h3>
           <p className="mt-1 text-sm text-gray-600">
-            Pick what to show — we add the real link, not an editor.
+            Pick a public URL to show as a button — we add the real link, not an editor.
           </p>
         </div>
         {source ? (
@@ -164,7 +163,7 @@ export function AthleteLinkTreeLinkSources({
                 <span className="block font-semibold text-gray-900">{card.title}</span>
                 <span className="mt-0.5 block text-sm text-gray-500">
                   {card.id === "races" && hasRacesCard ? "Already on your page" : card.hint}
-                  {disabled && card.id !== "races" && card.id !== "custom" && card.id !== "section" && card.id !== "routes"
+                  {disabled && card.id !== "races" && card.id !== "custom" && card.id !== "routes"
                     ? " · Already added"
                     : null}
                 </span>
@@ -218,7 +217,7 @@ export function AthleteLinkTreeLinkSources({
           {routesError ? <p className="text-sm text-red-700">{routesError}</p> : null}
           {!routesLoading && !routesError && routes.length === 0 ? (
             <p className="text-sm text-gray-500">
-              No saved routes yet — add routes from Landing &amp; content in My Community.
+              No saved routes yet — add routes from Build content.
             </p>
           ) : null}
           <ul className="max-h-64 space-y-2 overflow-y-auto">
@@ -247,37 +246,6 @@ export function AthleteLinkTreeLinkSources({
             })}
           </ul>
         </div>
-      ) : null}
-
-      {source === "section" ? (
-        <form
-          className="flex flex-col gap-2 sm:flex-row sm:items-end"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!sectionTitle.trim()) return;
-            void onAddLink({ name: sectionTitle.trim(), isSection: true }).then(() => {
-              setSectionTitle("");
-              setSource(null);
-            });
-          }}
-        >
-          <label className="block flex-1 text-sm">
-            <span className="font-medium text-gray-800">Section heading</span>
-            <input
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              value={sectionTitle}
-              onChange={(e) => setSectionTitle(e.target.value)}
-              placeholder="e.g. My training"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={adding || !sectionTitle.trim()}
-            className="shrink-0 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold disabled:opacity-50"
-          >
-            {adding ? "Adding…" : "Add section"}
-          </button>
-        </form>
       ) : null}
 
       {source === "custom" ? (

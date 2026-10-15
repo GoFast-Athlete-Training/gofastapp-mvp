@@ -26,6 +26,8 @@ export function AthleteLinkTreeEditor() {
   const [subtitle, setSubtitle] = useState("");
 
   const [adding, setAdding] = useState(false);
+  const [sectionHeading, setSectionHeading] = useState("");
+  const [addingSection, setAddingSection] = useState(false);
 
   const shareUrl = handle ? athleteLinksPublicUrl(handle) : "";
 
@@ -216,12 +218,18 @@ export function AthleteLinkTreeEditor() {
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
-      <section className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
-        <h2 className="font-semibold text-gray-900">Your page</h2>
+      <section className="rounded-xl border border-sky-100 bg-sky-50/40 p-5 space-y-4 ring-1 ring-sky-100">
+        <div>
+          <h2 className="font-semibold text-gray-900">Page header</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            What people see at the top of gofastlinks — your photo comes from profile; set the title
+            and subtitle here.
+          </p>
+        </div>
         <label className="block text-sm">
           <span className="font-medium">Title</span>
           <input
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
@@ -229,7 +237,7 @@ export function AthleteLinkTreeEditor() {
         <label className="block text-sm">
           <span className="font-medium">Subtitle</span>
           <textarea
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
             rows={2}
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
@@ -243,12 +251,16 @@ export function AthleteLinkTreeEditor() {
           className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
-          {treeBusy ? "Saving…" : "Save"}
+          {treeBusy ? "Saving…" : "Save header"}
         </button>
       </section>
 
       <section className="space-y-4">
         <h2 className="font-semibold text-gray-900">Links on your page</h2>
+        <p className="text-sm text-gray-600 -mt-2">
+          Reorder buttons and section headings below. Headings like &ldquo;About me&rdquo; are yours
+          to name — add them separately from link cards.
+        </p>
         {sortedLinks.length === 0 ? (
           <p className="text-sm text-gray-500">Nothing here yet — add something below.</p>
         ) : (
@@ -266,6 +278,44 @@ export function AthleteLinkTreeEditor() {
             ))}
           </ul>
         )}
+
+        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+          <div>
+            <h3 className="font-semibold text-gray-900">Section heading</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Labels that group your buttons on the public page — not links themselves.
+            </p>
+          </div>
+          <form
+            className="flex flex-col gap-2 sm:flex-row sm:items-end"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const heading = sectionHeading.trim();
+              if (!heading) return;
+              setAddingSection(true);
+              void addLink({ name: heading, isSection: true })
+                .then(() => setSectionHeading(""))
+                .finally(() => setAddingSection(false));
+            }}
+          >
+            <label className="block flex-1 text-sm">
+              <span className="sr-only">Section heading</span>
+              <input
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                value={sectionHeading}
+                onChange={(e) => setSectionHeading(e.target.value)}
+                placeholder="e.g. About me"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={addingSection || adding || !sectionHeading.trim()}
+              className="shrink-0 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {addingSection ? "Adding…" : "Add heading"}
+            </button>
+          </form>
+        </div>
 
         {publicSlug ? (
           <AthleteLinkTreeLinkSources
@@ -361,6 +411,8 @@ function LinkRow({
     <li className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 truncate">
+          {link.isSection ? "Section heading" : "Link"}
+          {" · "}
           {rowLabel}
           {isRacesCard ? (
             <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800 normal-case">
