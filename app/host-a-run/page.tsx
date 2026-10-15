@@ -49,48 +49,24 @@ function HostARunPageInner() {
     setLoading(true);
     setLoadError(null);
     try {
-      if (workoutIdParam) {
-        const { data } = await api.get<{ workout: CreateCityRunFormWorkout }>(
-          `/training/workout/${workoutIdParam}`
+      if (!workoutIdParam) {
+        setLoadError(
+          "Pick how you want to create this run — build a workout, use your plan, or meet up with no workout."
         );
-        const w = data?.workout;
-        if (!w?.id) {
-          setLoadError("Could not load that workout");
-          setWorkout(null);
-          return;
-        }
-        setWorkout(mapTrainingWorkoutToHostForm(w));
-        return;
-      }
-
-      const { data } = await api.post<{ workout: CreateCityRunFormWorkout }>("/workouts", {
-        title: "Hosted group run",
-        workoutType: "Easy",
-        date: todayYmd(),
-        segments: [
-          {
-            stepOrder: 1,
-            title: "Easy run",
-            durationType: "DISTANCE",
-            durationValue: 5000,
-          },
-        ],
-      });
-      const w = data?.workout;
-      if (!w?.id) {
-        setLoadError("Could not prepare your run");
         setWorkout(null);
         return;
       }
-      setWorkout({
-        id: w.id,
-        title: w.title,
-        workoutType: w.workoutType,
-        description: w.description ?? null,
-        date: w.date ?? todayYmd(),
-        estimatedDistanceInMeters: w.estimatedDistanceInMeters ?? 5000,
-        segments: Array.isArray(w.segments) ? w.segments : [],
-      });
+
+      const { data } = await api.get<{ workout: CreateCityRunFormWorkout }>(
+        `/training/workout/${workoutIdParam}`
+      );
+      const w = data?.workout;
+      if (!w?.id) {
+        setLoadError("Could not load that workout");
+        setWorkout(null);
+        return;
+      }
+      setWorkout(mapTrainingWorkoutToHostForm(w));
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };
       setLoadError(err.response?.data?.error || "Could not prepare your run");
@@ -139,16 +115,25 @@ function HostARunPageInner() {
             ) : loadError || !workout ? (
               <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
                 <p>{loadError || "Something went wrong"}</p>
-                <button
-                  type="button"
-                  onClick={() => void ensureHostWorkout()}
-                  className="mt-3 text-sm font-semibold text-red-700 underline"
-                >
-                  Try again
-                </button>
+                {!workoutIdParam ? (
+                  <Link
+                    href="/build-a-run"
+                    className="mt-3 inline-block text-sm font-semibold text-red-800 underline"
+                  >
+                    Back to Create a run choices
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void ensureHostWorkout()}
+                    className="mt-3 text-sm font-semibold text-red-700 underline"
+                  >
+                    Try again
+                  </button>
+                )}
               </div>
             ) : (
-              <CreateCityRunForm workout={workout} hideWorkoutSummary />
+              <CreateCityRunForm workout={workout} />
             )}
           </div>
         </main>

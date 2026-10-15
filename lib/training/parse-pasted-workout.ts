@@ -68,6 +68,31 @@ export function parseBetweenRepRecoveryFromText(text: string): ParsedBetweenRepR
     );
   }
 
+  if (!m) {
+    m = normalized.match(
+      /jog\s*([\d,]+(?:\.\d+)?)\s*(m\b|meter|meters|mi\b|mile|miles|km\b)\s*(?:for\s*)?(?:recovery|rest)/i
+    );
+    if (m) {
+      const raw = parseFloat(m[1].replace(/,/g, ""));
+      const unit = (m[2] || "m").toLowerCase();
+      if (Number.isFinite(raw) && raw > 0) {
+        if (unit === "mi" || unit === "mile" || unit === "miles") {
+          return { recoveryDurationType: "DISTANCE", recoveryDurationValue: raw };
+        }
+        if (unit === "km") {
+          return {
+            recoveryDurationType: "DISTANCE",
+            recoveryDurationValue: Math.round((raw / 1.60934) * 1000) / 1000,
+          };
+        }
+        return {
+          recoveryDurationType: "DISTANCE",
+          recoveryDurationValue: metersToMiles(raw),
+        };
+      }
+    }
+  }
+
   if (!m) return null;
 
   const raw = parseFloat(m[1]);
@@ -94,7 +119,7 @@ export function parseBetweenRepRecoveryFromText(text: string): ParsedBetweenRepR
 
 function parseExplicitPaceBandSecPerMile(context: string): { low: number; high: number } | null {
   const m = context.match(
-    /(\d{1,2}:\d{2})\s*[–\-—]\s*(\d{1,2}:\d{2})\s*(?:\/\s*)?(?:mi(?:le)?s?)?/i
+    /(\d{1,2}:\d{2})\s*[–\-—]\s*(\d{1,2}:\d{2})\s*(?:\/\s*)?(?:mi(?:le)?s?|minutes?\s+per\s+mile)?/i
   );
   if (!m) return null;
   try {
@@ -106,9 +131,31 @@ function parseExplicitPaceBandSecPerMile(context: string): { low: number; high: 
   }
 }
 
+/** Single clock pace e.g. "at 6:15 minutes per mile". */
+function parseExplicitSinglePaceSecPerMile(context: string): number | null {
+  const m =
+    context.match(
+      /(?:at|@)\s*(\d{1,2}:\d{2})\s*(?:minutes?\s+per\s+mile|\/\s*mi\b|per\s+mile)?/i
+    ) ?? context.match(/(\d{1,2}:\d{2})\s*minutes?\s+per\s+mile/i);
+  if (!m) return null;
+  try {
+    return parsePaceToSecondsPerMile(m[1].trim());
+  } catch {
+    return null;
+  }
+}
+
+function parseExplicitPaceSecPerMile(context: string): { low: number; high: number } | null {
+  const band = parseExplicitPaceBandSecPerMile(context);
+  if (band) return band;
+  const single = parseExplicitSinglePaceSecPerMile(context);
+  if (single == null) return null;
+  return { low: single, high: single };
+}
+
 export function effortTextToPaceOffsetSecPerMile(text: string): number | null {
   const t = text.toLowerCase();
-  if (/\b5\s*k\b|\b5k\b/.test(t)) return 0;
+  if (/\b5\s*k\s*(?:race\s*)?pace\b|\b5k\s*(?:race\s*)?pace\b|\b5\s*k\b|\b5k\b/.test(t)) return 0;
   if (/\b10\s*k\b|\b10k\b/.test(t)) return 15;
   if (/\btempo\b|\bthreshold\b/.test(t)) return 15;
   if (/\bmarathon\b|\bmp\b/.test(t)) return 45;
@@ -208,6 +255,73 @@ function scanPrescriptionMatches(text: string): ScanMatch[] {
   return matches;
 }
 
+function parseCommaNumber(raw: string): number | null {
+  const n = parseFloat(raw.replace(/,/g, "").trim());
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function distanceTokenToMiles(amount: number, unitRaw: string): number | null {
+  const unit = unitRaw.toLowerCase();
+  if (unit === "mi" || unit === "mile" || unit === "miles") return amount;
+  if (unit === "km") return Math.round((amount / 1.60934) * 1000) / 1000;
+  if (unit === "m" || unit === "meter" || unit === "meters") return metersToMiles(amount);
+  return null;
+}
+
+/** Coach block lists: "Block 1: Repeat 3 times:" with Run / Jog bullets. */
+function tryParseCoachBlockWorkout(text: string): ParsedPasteWorkout | null {
+  if (!/repeat\s+\d+\s+times/i.test(text)) return null;
+
+  const blockRe =
+    /Block\s+(\d+):\s*Repeat\s+(\d+)\s+times:?\s*([\s\S]*?)(?=Block\s+\d+\s*:|Cooldown:|$)/gi;
+  const segments: ParsedPasteSegment[] = [];
+  let m: RegExpExecArray | null;
+
+  while ((m = blockRe.exec(text)) !== null) {
+    const blockNum = m[1];
+    const repeatCount = parseInt(m[2], 10);
+    const body = m[3] ?? "";
+    if (!Number.isFinite(repeatCount) || repeatCount < 1) continue;
+
+    const runLine = body.match(/Run\s+([\d,][^\n]*)/i)?.[1];
+    if (!runLine) continue;
+
+    const distMatch = runLine.match(
+      /([\d,]+(?:\.\d+)?)\s*(meters|meter|m\b|mi\b|mile|miles|km\b)/i
+    );
+    if (!distMatch) continue;
+    const amount = parseCommaNumber(distMatch[1]);
+    if (amount == null) continue;
+    const miles = distanceTokenToMiles(amount, distMatch[2]);
+    if (miles == null) continue;
+
+    const effortContext = runLine.trim();
+    const offset = effortTextToPaceOffsetSecPerMile(effortContext);
+    const recovery =
+      repeatCount > 1 ? parseBetweenRepRecoveryFromText(body) : null;
+
+    segments.push({
+      title: `Block ${blockNum}`,
+      durationType: "DISTANCE",
+      durationValue: miles,
+      repeatCount: repeatCount > 1 ? repeatCount : undefined,
+      paceOffsetSecPerMile: offset,
+      recoveryDurationType: recovery?.recoveryDurationType ?? null,
+      recoveryDurationValue: recovery?.recoveryDurationValue ?? null,
+      effortContext,
+    });
+  }
+
+  if (segments.length === 0) return null;
+
+  const summary = text.replace(/\s+/g, " ").slice(0, 160);
+  return {
+    segments,
+    suggestedTitle: segments.length > 1 ? "Track workout — blocks" : "Track workout",
+    suggestedDescription: summary,
+  };
+}
+
 /**
  * Returns structured segments when prose contains at least one N×duration prescription.
  */
@@ -217,6 +331,9 @@ export function tryParsePastedWorkoutText(
 ): ParsedPasteWorkout | null {
   const text = sourceText.trim();
   if (!text) return null;
+
+  const blockParsed = tryParseCoachBlockWorkout(text);
+  if (blockParsed) return blockParsed;
 
   const raw = scanPrescriptionMatches(text);
   if (raw.length === 0) return null;
@@ -280,7 +397,7 @@ function materializeOnePasteSegment(
 ): WorkoutStep {
   let targets: WorkoutStep["targets"];
   const paceContext = effortContextForPace ?? "";
-  const explicit = parseExplicitPaceBandSecPerMile(paceContext);
+  const explicit = parseExplicitPaceSecPerMile(paceContext);
   if (explicit) {
     targets = [
       {

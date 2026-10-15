@@ -176,9 +176,8 @@ export async function POST(request: NextRequest) {
       totalMiles: totalMilesBody,
     } = body;
 
-    if (!workoutId?.trim()) {
-      return NextResponse.json({ error: "workoutId is required" }, { status: 400 });
-    }
+    const workoutIdTrimmed = workoutId?.trim() || null;
+
     if (!date?.trim()) {
       return NextResponse.json({ error: "date is required" }, { status: 400 });
     }
@@ -226,36 +225,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const workout = await resolveOwnedWorkoutForCityRunInvite(workoutId, athlete.id);
+    let workout: Awaited<ReturnType<typeof resolveOwnedWorkoutForCityRunInvite>> = null;
+    let resolvedPlannedWorkoutId: string | null = null;
 
-    if (!workout) {
-      return NextResponse.json(
-        { error: "Workout not found or you do not own this workout" },
-        { status: 404 }
+    if (workoutIdTrimmed) {
+      workout = await resolveOwnedWorkoutForCityRunInvite(
+        workoutIdTrimmed,
+        athlete.id
       );
-    }
 
-    const workoutTarget = await resolveWorkoutTargetForAthlete(workoutId.trim(), athlete.id);
-    const resolvedPlannedWorkoutId =
-      plannedWorkoutIdBody?.trim() ||
-      (workoutTarget?.kind === "planned" ? workoutTarget.plannedWorkoutId : null);
-
-    if (resolvedPlannedWorkoutId) {
-      const plannedRow = await prisma.planned_workouts.findFirst({
-        where: { id: resolvedPlannedWorkoutId, athleteId: athlete.id },
-        select: { id: true, cityRunId: true },
-      });
-      if (!plannedRow) {
+      if (!workout) {
         return NextResponse.json(
-          { error: "Planned workout not found for this athlete" },
+          { error: "Workout not found or you do not own this workout" },
           { status: 404 }
         );
       }
-      if (plannedRow.cityRunId) {
-        return NextResponse.json(
-          { error: "This plan day already has a meetup linked." },
-          { status: 400 }
-        );
+
+      const workoutTarget = await resolveWorkoutTargetForAthlete(
+        workoutIdTrimmed,
+        athlete.id
+      );
+      resolvedPlannedWorkoutId =
+        plannedWorkoutIdBody?.trim() ||
+        (workoutTarget?.kind === "planned" ? workoutTarget.plannedWorkoutId : null);
+
+      if (resolvedPlannedWorkoutId) {
+        const plannedRow = await prisma.planned_workouts.findFirst({
+          where: { id: resolvedPlannedWorkoutId, athleteId: athlete.id },
+          select: { id: true, cityRunId: true },
+        });
+        if (!plannedRow) {
+          return NextResponse.json(
+            { error: "Planned workout not found for this athlete" },
+            { status: 404 }
+          );
+        }
+        if (plannedRow.cityRunId) {
+          return NextResponse.json(
+            { error: "This plan day already has a meetup linked." },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -314,6 +324,7 @@ export async function POST(request: NextRequest) {
     }
 
     const totalMilesFromWorkout =
+      workout != null &&
       workout.estimatedDistanceInMeters != null &&
       workout.estimatedDistanceInMeters > 0
         ? workout.estimatedDistanceInMeters / 1609.34
@@ -347,7 +358,7 @@ export async function POST(request: NextRequest) {
       meetUpStreetAddress?.trim() || meetUpPoint.trim();
 
     const narrativeTrimmed = workoutNarrative?.trim() || null;
-    if (narrativeTrimmed) {
+    if (narrativeTrimmed && workout) {
       await prisma.workouts.update({
         where: { id: workout.id },
         data: {
@@ -409,7 +420,7 @@ export async function POST(request: NextRequest) {
       igPostText: null,
       igPostGraphic: null,
       routeId: null,
-      workoutId: null,
+      workoutId: workout?.id ?? null,
       updatedAt: new Date(),
     };
 
@@ -479,19 +490,25 @@ export async function POST(request: NextRequest) {
       "https://gofastapp.com";
     const baseNorm = baseApp.replace(/\/$/, "");
 
-    const workoutRow = await prisma.workouts.findUnique({
-      where: { id: workout.id },
-      select: { slug: true },
-    });
-    let workoutSlug = workoutRow?.slug ?? null;
-    if (!workoutSlug?.trim()) {
-      workoutSlug = await assignUniqueWorkoutShareSlug({
-        workoutId: workout.id,
-        gofastHandle: athlete.gofastHandle,
+    let workoutSlug: string | null = null;
+    let workoutPath: string | null = null;
+    let workoutShareUrl: string | null = null;
+
+    if (workout) {
+      const workoutRow = await prisma.workouts.findUnique({
+        where: { id: workout.id },
+        select: { slug: true },
       });
+      workoutSlug = workoutRow?.slug ?? null;
+      if (!workoutSlug?.trim()) {
+        workoutSlug = await assignUniqueWorkoutShareSlug({
+          workoutId: workout.id,
+          gofastHandle: athlete.gofastHandle,
+        });
+      }
+      workoutPath = `/mytrainingruns/${workoutSlug}`;
+      workoutShareUrl = `${baseNorm}${workoutPath}`;
     }
-    const workoutPath = `/mytrainingruns/${workoutSlug}`;
-    const workoutShareUrl = `${baseNorm}${workoutPath}`;
 
     if (resolvedPlannedWorkoutId) {
       const stamp = await stampPlannedWorkoutCityRun(

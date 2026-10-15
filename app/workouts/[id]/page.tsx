@@ -12,7 +12,6 @@ import {
   Trash2,
   ChevronUp,
   ChevronDown,
-  ListOrdered,
   CopyPlus,
   RefreshCw,
   Watch,
@@ -1137,19 +1136,6 @@ export default function WorkoutDetailPage() {
     setIsEditing(false);
     setEditError(null);
   }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const wantEdit = searchParams.get("edit") === "1";
-    if (!wantEdit || !workout) return;
-    startEdit();
-    const q = new URLSearchParams(searchParams.toString());
-    q.delete("edit");
-    const qs = q.toString();
-    router.replace(qs ? `/workouts/${workoutId}?${qs}` : `/workouts/${workoutId}`, {
-      scroll: false,
-    });
-  }, [workout, workoutId, searchParams, router, startEdit]);
 
   const saveEdits = async () => {
     if (!workout) return;
@@ -2357,7 +2343,16 @@ export default function WorkoutDetailPage() {
           className="bg-white rounded-lg border border-gray-200 p-6 mb-6 scroll-mt-24"
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-2">
-            <h2 className="text-xl font-semibold text-gray-900">Workout builder</h2>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {isEditing ? "Edit individual segments" : "Your workout"}
+              </h2>
+              {!isEditing && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Adjust repeats, pace, and recovery below. What syncs to Garmin uses these blocks.
+                </p>
+              )}
+            </div>
             {isEditing && (
               <div className="flex flex-wrap gap-2">
                 <button
@@ -2382,8 +2377,8 @@ export default function WorkoutDetailPage() {
           </div>
           {isEditing && (
             <p className="text-sm text-gray-600 mb-3">
-              Add workout parts, change repeats, reorder, save. Recovery between reps: its own part
-              (distance or time).
+              Last resort: add, remove, or reorder raw steps for your watch. Prefer the cards above
+              for repeats and pace. Recovery between reps can be its own step (distance or time).
             </p>
           )}
           {editError && (
@@ -2391,17 +2386,6 @@ export default function WorkoutDetailPage() {
               {editError}
             </p>
           )}
-          {!isEditing &&
-            workout.workout_catalogue &&
-            workout.workoutType !== "Intervals" &&
-            workout.workoutType !== "Tempo" && (
-              <p className="text-sm text-gray-500 mb-4">
-                Below is what syncs to your watch. Use{" "}
-                <span className="font-medium text-gray-700">Workout builder</span> to edit steps or
-                repeats.
-              </p>
-            )}
-
           {isEditing ? (
             <div className="space-y-4">
               <label className="block max-w-xs">
@@ -3321,15 +3305,18 @@ export default function WorkoutDetailPage() {
           ) : (
             <p className="text-gray-600">No workout parts defined</p>
           )}
-          {!isLogged && !isEditing && (
-            <div className="border-t border-gray-200 mt-6 pt-4 flex flex-wrap gap-2">
+          {!isLogged && !isEditing && workout.segments && workout.segments.length > 0 && (
+            <div className="border-t border-gray-200 mt-6 pt-4">
+              <p className="text-xs text-gray-500 mb-2">
+                Need to add, remove, or reorder a single step? Use this only when the cards above
+                are not enough.
+              </p>
               <button
                 type="button"
                 onClick={startEdit}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
+                className="text-sm text-gray-600 underline underline-offset-2 hover:text-gray-900"
               >
-                <ListOrdered className="w-4 h-4 shrink-0" aria-hidden />
-                Workout builder
+                Edit individual segments
               </button>
             </div>
           )}

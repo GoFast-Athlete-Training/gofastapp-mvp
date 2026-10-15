@@ -584,6 +584,71 @@ function CreateWorkoutPageInner() {
     setSelectedCatalogueId(null);
   };
 
+  const inferWorkoutTypeFromApiSegments = (segments: ApiSegment[]): string => {
+    if (segments.some((s) => (s.repeatCount ?? 0) > 1)) return "Intervals";
+    const titles = segments.map((s) => (s.title ?? "").toLowerCase()).join(" ");
+    if (/\btempo\b|\bthreshold\b/.test(titles)) return "Tempo";
+    if (/\blong\b/.test(titles)) return "LongRun";
+    return workoutType || "Easy";
+  };
+
+  const applyDerivedSegmentsToCreateForm = (params: {
+    segments: ApiSegment[];
+    suggestedTitle: string;
+    suggestedDescription: string;
+  }) => {
+    const slots = apiSegmentsToSlots(params.segments);
+    setWarmup(slots.warmup);
+    setMainSegments(slots.mainSegments);
+    setCooldown(slots.cooldown);
+    setName(params.suggestedTitle);
+    setDescription(params.suggestedDescription);
+  };
+
+  /** Paste / derive / catalogue → save once, open workout detail cards, not create-page segment builder. */
+  const createWorkoutFromDerivedSegments = async (params: {
+    segments: ApiSegment[];
+    suggestedTitle: string;
+    suggestedDescription: string;
+    workoutTypeOverride?: string;
+    catalogueWorkoutId?: string | null;
+  }) => {
+    const title = params.suggestedTitle?.trim() || "Workout";
+    const segments = params.segments.filter(
+      (s) =>
+        (typeof s.durationValue === "number" && s.durationValue > 0) ||
+        (s.repeatCount != null && s.repeatCount > 0)
+    );
+    if (segments.length === 0) {
+      setDeriveError("Could not build any workout segments from that paste.");
+      return;
+    }
+    const type =
+      params.workoutTypeOverride?.trim() ||
+      inferWorkoutTypeFromApiSegments(segments);
+    const response = await api.post<{ workout: { id: string } }>("workouts", {
+      title,
+      description: params.suggestedDescription?.trim() || "",
+      workoutType: type,
+      segments,
+      ...(scheduledDate.trim() ? { date: scheduledDate.trim() } : {}),
+      ...(params.catalogueWorkoutId?.trim()
+        ? { catalogueWorkoutId: params.catalogueWorkoutId.trim() }
+        : {}),
+    });
+    const id = response.data.workout?.id;
+    if (!id) {
+      setDeriveError("Workout saved but id was missing — check your workouts list.");
+      return;
+    }
+    const detailBase = workoutDetailPathWithBackHref(
+      id,
+      fromBuildARun ? "/build-a-run" : "/workouts"
+    );
+    const detailUrl = detailBase.includes("?") ? `${detailBase}&created=1` : `${detailBase}?created=1`;
+    router.push(detailUrl);
+  };
+
   const handleDerive = async () => {
     const text = sourceText.trim();
     if (!text) {
@@ -597,19 +662,20 @@ function CreateWorkoutPageInner() {
     try {
       const tabular = tryParseTabularMilePacePaste(text);
       if (tabular) {
-        const slots = apiSegmentsToSlots(tabular);
-        setWarmup(slots.warmup);
-        setMainSegments(slots.mainSegments);
-        setCooldown(slots.cooldown);
-        const totalMi =
-          (slots.warmup?.durationType === "DISTANCE" ? slots.warmup.durationValue : 0) +
-          slots.mainSegments.reduce(
-            (a, s) => a + (s.durationType === "DISTANCE" ? s.durationValue : 0),
-            0
-          ) +
-          (slots.cooldown?.durationType === "DISTANCE" ? slots.cooldown.durationValue : 0);
-        setName(`${workoutType} — ${totalMi.toFixed(1)} mi`);
-        setDescription(`Pasted splits (${slots.mainSegments.length} segments).`);
+        const totalMi = tabular.reduce(
+          (a, s) => a + (s.durationType === "DISTANCE" ? s.durationValue : 0),
+          0
+        );
+        const derived = {
+          segments: tabular,
+          suggestedTitle: `${workoutType} — ${totalMi.toFixed(1)} mi`,
+          suggestedDescription: `Pasted splits (${tabular.length} segments).`,
+        };
+        if (raceDayMode) {
+          applyDerivedSegmentsToCreateForm(derived);
+          return;
+        }
+        await createWorkoutFromDerivedSegments(derived);
         return;
       }
 
@@ -618,12 +684,19 @@ function CreateWorkoutPageInner() {
         suggestedTitle: string;
         suggestedDescription: string;
       }>("workouts/ai-generate", { workoutType, sourceText: text });
-      const slots = apiSegmentsToSlots(data.segments);
-      setWarmup(slots.warmup);
-      setMainSegments(slots.mainSegments);
-      setCooldown(slots.cooldown);
-      setName(data.suggestedTitle);
-      setDescription(data.suggestedDescription);
+      if (raceDayMode) {
+        applyDerivedSegmentsToCreateForm({
+          segments: data.segments,
+          suggestedTitle: data.suggestedTitle,
+          suggestedDescription: data.suggestedDescription,
+        });
+        return;
+      }
+      await createWorkoutFromDerivedSegments({
+        segments: data.segments,
+        suggestedTitle: data.suggestedTitle,
+        suggestedDescription: data.suggestedDescription,
+      });
     } catch (err: unknown) {
       let display = "Failed to derive workout";
       if (err && typeof err === "object" && "response" in err) {
@@ -646,7 +719,9 @@ function CreateWorkoutPageInner() {
     }
   };
 
-  const applyGoFastGenerateResult = (data: unknown): boolean => {
+  const parseGoFastGenerateResponse = (
+    data: unknown
+  ): { segments: ApiSegment[]; suggestedTitle: string; suggestedDescription: string } | null => {
     if (
       data &&
       typeof data === "object" &&
@@ -654,7 +729,7 @@ function CreateWorkoutPageInner() {
       (data as { needsPace?: boolean }).needsPace
     ) {
       setNeedsPaceHint(String((data as { message?: string }).message ?? ""));
-      return false;
+      return null;
     }
     if (
       !data ||
@@ -663,20 +738,13 @@ function CreateWorkoutPageInner() {
       !Array.isArray((data as { segments?: unknown }).segments)
     ) {
       setDeriveError("Unexpected response from workout builder.");
-      return false;
+      return null;
     }
-    const built = data as {
+    return data as {
       segments: ApiSegment[];
       suggestedTitle: string;
       suggestedDescription: string;
     };
-    const slots = apiSegmentsToSlots(built.segments);
-    setWarmup(slots.warmup);
-    setMainSegments(slots.mainSegments);
-    setCooldown(slots.cooldown);
-    setName(built.suggestedTitle);
-    setDescription(built.suggestedDescription);
-    return true;
   };
 
   const handleGoFastGenerate = async () => {
@@ -692,7 +760,15 @@ function CreateWorkoutPageInner() {
       }
 
       const { data } = await api.post<GoFastGenResponse>("workouts/gofast-generate", payload);
-      applyGoFastGenerateResult(data);
+      const built = parseGoFastGenerateResponse(data);
+      if (built) {
+        await createWorkoutFromDerivedSegments({
+          segments: built.segments,
+          suggestedTitle: built.suggestedTitle,
+          suggestedDescription: built.suggestedDescription,
+          workoutTypeOverride: workoutType,
+        });
+      }
     } catch (err: unknown) {
       let display = "Failed to build workout";
       if (err && typeof err === "object" && "response" in err) {
@@ -731,9 +807,16 @@ function CreateWorkoutPageInner() {
         payload.totalMiles = parsedMi;
       }
       const { data } = await api.post<GoFastGenResponse>("workouts/gofast-generate", payload);
-      if (applyGoFastGenerateResult(data)) {
+      const built = parseGoFastGenerateResponse(data);
+      if (built) {
         setWorkoutType(item.workoutType);
-        setSelectedCatalogueId(item.id);
+        await createWorkoutFromDerivedSegments({
+          segments: built.segments,
+          suggestedTitle: built.suggestedTitle,
+          suggestedDescription: built.suggestedDescription,
+          workoutTypeOverride: item.workoutType,
+          catalogueWorkoutId: item.id,
+        });
       }
     } catch (err: unknown) {
       let display = "Failed to load preset";
@@ -1067,7 +1150,7 @@ function CreateWorkoutPageInner() {
                 disabled={goFastGenerating}
                 className="px-4 py-2 bg-white border-2 border-orange-300 text-orange-800 rounded-lg font-medium hover:bg-orange-50 disabled:opacity-50"
               >
-                {goFastGenerating ? "Building…" : "Build template from goal / 5K pace"}
+                {goFastGenerating ? "Saving…" : "Build template from goal / 5K pace"}
               </button>
               {needsPaceHint != null && (
                 <div className="rounded-lg border border-orange-200 bg-white p-4 shadow-sm" role="status">
@@ -1107,10 +1190,10 @@ function CreateWorkoutPageInner() {
                   </>
                 ) : (
                   <>
-                    Paste prose from a coach, Runna, or Strava — or one line per split:{" "}
-                    <span className="font-mono text-gray-800">miles pace pace</span> (e.g.{" "}
-                    <span className="font-mono text-gray-800">5 7:00 7:20</span>) for a pace band per
-                    segment.
+                    Paste coach notes (blocks, repeats, recovery). We parse it, save the workout, and
+                    open your usual workout editor — not a segment-by-segment form here. Tabular splits:{" "}
+                    <span className="font-mono text-gray-800">miles pace pace</span> per line (e.g.{" "}
+                    <span className="font-mono text-gray-800">5 7:00 7:20</span>).
                   </>
                 )}
               </p>
@@ -1129,7 +1212,7 @@ function CreateWorkoutPageInner() {
                 className="mt-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 <FileText className="w-4 h-4" />
-                {deriving ? "Building…" : "Build workout"}
+                {deriving ? "Saving…" : "Build workout"}
               </button>
             </div>
           )}
@@ -1562,7 +1645,16 @@ function CreateWorkoutPageInner() {
               </div>
 
               <div className="flex gap-4 justify-end pt-6 border-t border-gray-200">
-                <Link href="/workouts" className="px-4 py-2 text-gray-700 hover:text-gray-900">
+                <Link
+                  href={
+                    raceDayMode
+                      ? raceDayBackHref
+                      : fromBuildARun
+                        ? "/build-a-run"
+                        : "/workouts"
+                  }
+                  className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                >
                   Cancel
                 </Link>
                 <button

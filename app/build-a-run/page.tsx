@@ -3,11 +3,13 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, ChevronDown, ChevronUp, Trash2, Users, MapPin, Dumbbell } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp, Trash2, Dumbbell } from "lucide-react";
+import CreateRunPickerSection from "@/components/runs/CreateRunPickerSection";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
+import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
 
 const PAGE_SIZE = 20;
 
@@ -56,76 +58,44 @@ export default function BuildARunPage() {
                 Go run with others
               </h1>
               <p className="text-gray-600">
-                Host a group run with a map meetup and invite link, build your own
-                workout, or jump into a RunCrew — not a city club calendar.
+                Build a workout, create a run invite, or jump into a RunCrew — not
+                a city club calendar.
               </p>
             </div>
 
             <div className="space-y-10">
-              <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-6 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-xl bg-orange-100 p-2.5 shrink-0">
-                    <Users className="h-6 w-6 text-orange-700" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-lg font-semibold text-gray-900">
-                      Create a run
-                    </h2>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Set the meetup on the map, pick date and time, and share a
-                      link so others can RSVP — same flow as hosting on mobile.
-                    </p>
-                    <Link
-                      href="/host-a-run"
-                      className="mt-4 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white hover:bg-orange-700"
-                    >
-                      <MapPin className="h-5 w-5" />
-                      Host a run &amp; set meetup
-                    </Link>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Already built a workout? Open it and choose &quot;Invite
-                      others&quot; to attach it to a meetup.
-                    </p>
-                  </div>
+              <section className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/30 p-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <Dumbbell className="h-5 w-5 text-orange-700" />
+                  <h2 className="text-lg font-semibold text-gray-900">Build a run</h2>
                 </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  Generate or define a session — Garmin, segments, and pace from your
+                  profile 5K.
+                </p>
+                <Link
+                  href="/workouts/create?from=build-a-run"
+                  className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                >
+                  <Plus className="h-5 w-5" />
+                  Build a workout
+                </Link>
               </section>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <section className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/30 p-6">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Dumbbell className="h-5 w-5 text-orange-700" />
-                    <h2 className="text-lg font-semibold text-gray-900">
-                      Build a workout
-                    </h2>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Generate or define a session for yourself — Garmin, segments,
-                    and pace from your profile 5K.
-                  </p>
-                  <Link
-                    href="/workouts/create?from=build-a-run"
-                    className="inline-flex items-center gap-2 rounded-xl border border-orange-300 bg-white px-5 py-2.5 text-sm font-semibold text-orange-900 hover:bg-orange-50"
-                  >
-                    <Plus className="h-5 w-5" />
-                    New workout
-                  </Link>
-                </section>
+              <CreateRunPickerSection />
 
-                <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-1">
-                    RunCrew
-                  </h2>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Create or join a crew for recurring group runs and chat.
-                  </p>
-                  <Link
-                    href="/runcrew"
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-sky-800 hover:text-sky-950"
-                  >
-                    Open RunCrew →
-                  </Link>
-                </section>
-              </div>
+              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">RunCrew</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Create or join a crew for recurring group runs and chat.
+                </p>
+                <Link
+                  href="/runcrew"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-sky-800 hover:text-sky-950"
+                >
+                  Open RunCrew →
+                </Link>
+              </section>
 
               <StandaloneRunsList />
             </div>
@@ -328,10 +298,15 @@ function StandaloneRunsList() {
                     onChange={() => toggleSelect(workout.id)}
                     aria-label={`Select ${workout.title ?? workout.id}`}
                   />
+                  <div className="min-w-0 flex-1">
                   <button
                     type="button"
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => router.push(`/workouts/${workout.id}`)}
+                    className="w-full text-left"
+                    onClick={() =>
+                      router.push(
+                        workoutDetailPathWithBackHref(workout.id, "/build-a-run")
+                      )
+                    }
                   >
                     <span className="font-medium text-gray-900 block">
                       {displayWorkoutListTitle({
@@ -353,6 +328,13 @@ function StandaloneRunsList() {
                       ) : null}
                     </span>
                   </button>
+                  <Link
+                    href={`/host-a-run?workoutId=${encodeURIComponent(workout.id)}`}
+                    className="mt-2 inline-block text-xs font-semibold text-orange-700 hover:text-orange-900"
+                  >
+                    Who wants to do this with me?
+                  </Link>
+                  </div>
                 </li>
               ))}
             </ul>
