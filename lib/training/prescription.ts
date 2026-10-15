@@ -43,6 +43,9 @@ export type WorkoutStep = {
   durationValue: number;
   targets?: Array<{ type: string; valueLow?: number; valueHigh?: number }>;
   repeatCount?: number;
+  /** Garmin between-rep recovery on repeat blocks (miles or minutes). */
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
 };
 
 /** Parses plan snapshot string (e.g. "7:30") to anchor sec/mile for zone math. */

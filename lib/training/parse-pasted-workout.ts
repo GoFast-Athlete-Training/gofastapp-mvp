@@ -7,6 +7,7 @@ import type { WorkoutStep } from "@/lib/training/prescription";
 import {
   parsePaceToSecondsPerMile,
   paceTargetFromSecondsPerMile,
+  secondsPerMileToSecondsPerKm,
 } from "@/lib/workout-generator/pace-calculator";
 
 const METERS_TO_MILES = 1 / 1609.34;
@@ -18,6 +19,10 @@ export type ParsedPasteSegment = {
   repeatCount?: number;
   /** Sec/mi vs athlete 5K anchor; omit targets when null or no anchor on materialize. */
   paceOffsetSecPerMile?: number | null;
+  recoveryDurationType?: "DISTANCE" | "TIME" | null;
+  recoveryDurationValue?: number | null;
+  /** Local clause after the rep match — used for pace/recovery parsing at materialize. */
+  effortContext?: string;
 };
 
 export type ParsedPasteWorkout = {
@@ -37,10 +42,68 @@ type ScanMatch = {
 
 /** Effort labels for this rep only — stop before the next prescription clause. */
 function localEffortContext(text: string, matchIndex: number, matchLength: number): string {
-  const after = text.slice(matchIndex + matchLength, matchIndex + matchLength + 72);
+  const after = text.slice(matchIndex + matchLength, matchIndex + matchLength + 140);
   const stop = after.search(/\bfollowed by\b|\bthen\b|\band then\b|;\s*|\(\s*\d+\s*[x×]/i);
   const tail = stop >= 0 ? after.slice(0, stop) : after;
   return `${text.slice(matchIndex, matchIndex + matchLength)} ${tail}`.trim();
+}
+
+export type ParsedBetweenRepRecovery = {
+  recoveryDurationType: "DISTANCE" | "TIME";
+  recoveryDurationValue: number;
+};
+
+/** Parse "with 400m jog", "400m easy recovery between repeats", etc. */
+export function parseBetweenRepRecoveryFromText(text: string): ParsedBetweenRepRecovery | null {
+  const normalized = text.trim().replace(/\s+/g, " ");
+  if (!normalized) return null;
+
+  const withPattern =
+    /(?:w\/|with)\s*(\d+(?:\.\d+)?)\s*(m\b|meter|meters|mi\b|mile|miles|km\b|min(?:ute)?s?)?\s*(?:easy\s*)?(?:jog\s*)?(?:recovery|rest)?(?:\s*between|\s*between\s*repeat)?/i;
+  let m = normalized.match(withPattern);
+
+  if (!m) {
+    m = normalized.match(
+      /(\d+(?:\.\d+)?)\s*(m\b|meter|meters|mi\b|mile|miles|km\b)\s*(?:easy\s*)?(?:jog\s*)?(?:recovery|rest)\s*(?:between|\bbetween\s*repeat)?/i
+    );
+  }
+
+  if (!m) return null;
+
+  const raw = parseFloat(m[1]);
+  const unit = (m[2] || "m").toLowerCase();
+  if (!Number.isFinite(raw) || raw <= 0) return null;
+
+  if (unit.startsWith("min")) {
+    return { recoveryDurationType: "TIME", recoveryDurationValue: raw };
+  }
+  if (unit === "mi" || unit === "mile" || unit === "miles") {
+    return { recoveryDurationType: "DISTANCE", recoveryDurationValue: raw };
+  }
+  if (unit === "km") {
+    return {
+      recoveryDurationType: "DISTANCE",
+      recoveryDurationValue: Math.round((raw / 1.60934) * 1000) / 1000,
+    };
+  }
+  return {
+    recoveryDurationType: "DISTANCE",
+    recoveryDurationValue: metersToMiles(raw),
+  };
+}
+
+function parseExplicitPaceBandSecPerMile(context: string): { low: number; high: number } | null {
+  const m = context.match(
+    /(\d{1,2}:\d{2})\s*[–\-—]\s*(\d{1,2}:\d{2})\s*(?:\/\s*)?(?:mi(?:le)?s?)?/i
+  );
+  if (!m) return null;
+  try {
+    const a = parsePaceToSecondsPerMile(m[1].trim());
+    const b = parsePaceToSecondsPerMile(m[2].trim());
+    return { low: Math.min(a, b), high: Math.max(a, b) };
+  } catch {
+    return null;
+  }
 }
 
 export function effortTextToPaceOffsetSecPerMile(text: string): number | null {
@@ -55,6 +118,35 @@ export function effortTextToPaceOffsetSecPerMile(text: string): number | null {
 
 function metersToMiles(meters: number): number {
   return Math.round(meters * METERS_TO_MILES * 1000) / 1000;
+}
+
+/** Rep distance when unit is omitted (e.g. "4 x 2000" → meters; "6 x 2 mile" → miles). */
+export function inferRepDistanceMiles(amount: number, unitRaw: string | undefined, effortContext: string): number | null {
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const unit = unitRaw?.toLowerCase();
+  if (unit === "k") {
+    return Math.round((amount / 1.60934) * 1000) / 1000;
+  }
+  if (unit === "km") {
+    return Math.round((amount / 1.60934) * 1000) / 1000;
+  }
+  if (unit === "mi" || unit === "mile" || unit === "miles") {
+    return amount;
+  }
+  if (unit === "m" || unit === "meter" || unit === "meters") {
+    return metersToMiles(amount);
+  }
+  const ctx = effortContext.toLowerCase();
+  if (/\b(?:mi|mile|miles)\b/.test(ctx)) {
+    return amount;
+  }
+  if (/\b(?:meter|meters|metres)\b/.test(ctx)) {
+    return metersToMiles(amount);
+  }
+  if (amount >= 200) {
+    return metersToMiles(amount);
+  }
+  return amount;
 }
 
 function titleForSegment(
@@ -91,28 +183,24 @@ function scanPrescriptionMatches(text: string): ScanMatch[] {
   }
 
   const distRe =
-    /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m\b|meter|meters|mi\b|mile|miles|km\b)/gi;
+    /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(k\b|m\b|meter|meters|mi\b|mile|miles|km\b)?(?!\s*(?:min(?:ute)?s?)\b)/gi;
   while ((m = distRe.exec(text)) !== null) {
     const repeatCount = parseInt(m[1], 10);
     const amount = parseFloat(m[2]);
-    const unit = (m[3] || "m").toLowerCase();
+    const unitRaw = m[3];
     if (!Number.isFinite(repeatCount) || repeatCount < 1 || !Number.isFinite(amount) || amount <= 0) {
       continue;
     }
-    let miles: number;
-    if (unit === "mi" || unit === "mile" || unit === "miles") {
-      miles = amount;
-    } else if (unit === "km") {
-      miles = Math.round((amount / 1.60934) * 1000) / 1000;
-    } else {
-      miles = metersToMiles(amount);
-    }
+    const effortContext = localEffortContext(text, m.index, m[0].length);
+    const miles = inferRepDistanceMiles(amount, unitRaw, effortContext);
+    if (miles == null) continue;
+    if (matches.some((hit) => hit.index === m!.index)) continue;
     matches.push({
       index: m.index,
       durationType: "DISTANCE",
       repeatCount,
       durationValue: miles,
-      effortContext: localEffortContext(text, m.index, m[0].length),
+      effortContext,
     });
   }
 
@@ -135,12 +223,17 @@ export function tryParsePastedWorkoutText(
 
   const segments: ParsedPasteSegment[] = raw.map((hit) => {
     const offset = effortTextToPaceOffsetSecPerMile(hit.effortContext);
+    const recovery =
+      hit.repeatCount > 1 ? parseBetweenRepRecoveryFromText(hit.effortContext) : null;
     return {
       title: titleForSegment(hit.durationType, hit.effortContext, offset),
       durationType: hit.durationType,
       durationValue: hit.durationValue,
       repeatCount: hit.repeatCount > 1 ? hit.repeatCount : undefined,
       paceOffsetSecPerMile: offset,
+      recoveryDurationType: recovery?.recoveryDurationType ?? null,
+      recoveryDurationValue: recovery?.recoveryDurationValue ?? null,
+      effortContext: hit.effortContext,
     };
   });
 
@@ -174,26 +267,53 @@ export function materializeParsedPasteWorkoutSteps(
     }
   }
 
-  return parsed.segments.map((seg, i) => {
-    let targets: WorkoutStep["targets"];
-    if (
-      seg.paceOffsetSecPerMile != null &&
-      Number.isFinite(seg.paceOffsetSecPerMile) &&
-      anchorSec != null
-    ) {
-      const centerSec = Math.max(1, anchorSec + seg.paceOffsetSecPerMile);
-      targets = [paceTargetFromSecondsPerMile(centerSec)];
-    }
+  return parsed.segments.map((seg, i) =>
+    materializeOnePasteSegment(seg, i + 1, anchorSec, seg.effortContext)
+  );
+}
 
-    return {
-      stepOrder: i + 1,
-      title: seg.title,
-      durationType: seg.durationType,
-      durationValue: seg.durationValue,
-      repeatCount: seg.repeatCount,
-      targets,
-    };
-  });
+function materializeOnePasteSegment(
+  seg: ParsedPasteSegment,
+  stepOrder: number,
+  anchorSec: number | null,
+  effortContextForPace?: string
+): WorkoutStep {
+  let targets: WorkoutStep["targets"];
+  const paceContext = effortContextForPace ?? "";
+  const explicit = parseExplicitPaceBandSecPerMile(paceContext);
+  if (explicit) {
+    targets = [
+      {
+        type: "PACE",
+        valueLow: secondsPerMileToSecondsPerKm(explicit.low),
+        valueHigh: secondsPerMileToSecondsPerKm(explicit.high),
+      },
+    ];
+  } else if (
+    seg.paceOffsetSecPerMile != null &&
+    Number.isFinite(seg.paceOffsetSecPerMile) &&
+    anchorSec != null
+  ) {
+    const centerSec = Math.max(1, anchorSec + seg.paceOffsetSecPerMile);
+    targets = [paceTargetFromSecondsPerMile(centerSec)];
+  }
+
+  return {
+    stepOrder,
+    title: seg.title,
+    durationType: seg.durationType,
+    durationValue: seg.durationValue,
+    repeatCount: seg.repeatCount,
+    targets,
+    recoveryDurationType:
+      seg.recoveryDurationType && seg.recoveryDurationValue != null
+        ? seg.recoveryDurationType
+        : null,
+    recoveryDurationValue:
+      seg.recoveryDurationType && seg.recoveryDurationValue != null
+        ? seg.recoveryDurationValue
+        : null,
+  };
 }
 
 export function parsedPasteToAiGenerateResponse(

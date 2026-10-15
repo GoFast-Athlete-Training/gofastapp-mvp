@@ -40,6 +40,8 @@ export interface SlotData {
   hrMin?: number;
   hrMax?: number;
   repeatCount?: number;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
 }
 
 function emptySlot(): SlotData {
@@ -63,6 +65,8 @@ type ApiSegment = {
     value?: number;
   }>;
   repeatCount?: number;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
 };
 
 /** One line = miles + two M:SS/mile paces (pace band); all lines must match for tabular paste. */
@@ -204,6 +208,8 @@ function apiSegmentsToSlots(segments: ApiSegment[]): {
       hrMin,
       hrMax,
       repeatCount: seg.repeatCount ?? undefined,
+      recoveryDurationType: seg.recoveryDurationType ?? undefined,
+      recoveryDurationValue: seg.recoveryDurationValue ?? undefined,
     };
 
     if (/warmup|warm.up|warm up/.test(title)) {
@@ -779,6 +785,8 @@ function CreateWorkoutPageInner() {
         durationValue: number;
         targets: ReturnType<typeof buildTargets>;
         repeatCount: number | undefined;
+        recoveryDurationType: string | null | undefined;
+        recoveryDurationValue: number | null | undefined;
       }> = [];
       let step = 1;
       const pushSlotSegment = (slot: SlotData, defaultTitle: string) => {
@@ -790,6 +798,8 @@ function CreateWorkoutPageInner() {
           durationValue: slot.durationValue,
           targets: buildTargets(slot),
           repeatCount: slot.repeatCount,
+          recoveryDurationType: slot.recoveryDurationType ?? null,
+          recoveryDurationValue: slot.recoveryDurationValue ?? null,
         });
       };
       if (warmup) pushSlotSegment(warmup, "Warmup");

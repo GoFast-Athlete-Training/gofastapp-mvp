@@ -131,6 +131,14 @@ function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGen
       }
       const repeatCount =
         typeof seg.repeatCount === "number" && seg.repeatCount >= 1 ? seg.repeatCount : undefined;
+      const recoveryDurationType =
+        typeof seg.recoveryDurationType === "string" && seg.recoveryDurationType.trim()
+          ? seg.recoveryDurationType.trim()
+          : null;
+      const recoveryDurationValue =
+        seg.recoveryDurationValue != null && Number.isFinite(Number(seg.recoveryDurationValue))
+          ? Number(seg.recoveryDurationValue)
+          : null;
       return {
         stepOrder,
         title,
@@ -138,6 +146,8 @@ function normalizeOpenAIBlobResponse(parsed: unknown, sourceText: string): AiGen
         durationValue,
         targets: targets.length ? targets : undefined,
         repeatCount,
+        recoveryDurationType,
+        recoveryDurationValue,
       } as WorkoutStep;
     })
     .filter((s): s is WorkoutStep => s !== null && s.durationValue > 0);
