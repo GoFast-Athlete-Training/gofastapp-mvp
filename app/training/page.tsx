@@ -1086,8 +1086,8 @@ export default function TrainingHubPage() {
         {showTrainingHub && planDetail && (
           <div className="space-y-4 mb-8">
             <p className="text-xs text-gray-500">
-              <Link href="/gofast-with-others" className="text-orange-600 font-semibold hover:underline">
-                GoFast With Me
+              <Link href="/community/hub" className="text-orange-600 font-semibold hover:underline">
+                Manage Community
               </Link>
               {" — share your training and train alongside others."}
             </p>

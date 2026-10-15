@@ -17,6 +17,7 @@ function toLinkRow(link: athlete_link_tree_links): AthleteLinkTreeLink {
     publicLabel: link.publicLabel,
     internalDescription: link.internalDescription,
     isSection: link.isSection,
+    kind: link.kind,
     description: link.description,
     linkLogoUrl: link.linkLogoUrl,
     emoji: link.emoji,

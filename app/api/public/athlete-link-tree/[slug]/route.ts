@@ -31,9 +31,10 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     }
 
     const detail = toAthleteLinkTreeDetail(row);
+    const tree = await toPublicAthleteLinkTreePayload(detail, row.athleteId);
     return NextResponse.json({
       success: true,
-      tree: toPublicAthleteLinkTreePayload(detail),
+      tree,
     });
   } catch (err) {
     console.error("public athlete-link-tree slug:", err);

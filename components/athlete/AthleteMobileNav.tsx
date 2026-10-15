@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, LayoutDashboard, MapPin, Trophy, Users, X } from 'lucide-react';
+import { Activity, LayoutDashboard, MapPin, PenLine, Trophy, Users, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import {
+  ATHLETE_CONTENT_SIDEBAR_NAV,
+  COMMUNITY_HUB_PATH,
+  MANAGE_COMMUNITY_LABEL,
+  isCommunityHubPath,
+  isContentStudioPath,
+} from '@/lib/athlete/community-nav';
 
 type NavItem = {
   id: string;
@@ -50,10 +57,6 @@ function activityHubMatch(p: string | null): boolean {
   );
 }
 
-function goFastWithOthersMatch(p: string | null): boolean {
-  return !!p && (p === '/gofast-with-others' || p.startsWith('/gofast-with-others/'));
-}
-
 const primaryTabs: NavItem[] = [
   { id: 'train', label: 'Train', href: '/training', icon: LayoutDashboard, match: planHubMatch },
   { id: 'run', label: 'Run', href: '/build-a-run', icon: MapPin, match: gorunMatch },
@@ -63,12 +66,19 @@ const primaryTabs: NavItem[] = [
 
 const moreItems: NavItem[] = [
   {
-    id: 'gwm',
-    label: 'GoFast With Me',
-    href: '/gofast-with-others',
+    id: 'community-hub',
+    label: MANAGE_COMMUNITY_LABEL,
+    href: COMMUNITY_HUB_PATH,
     icon: Users,
-    match: goFastWithOthersMatch,
+    match: isCommunityHubPath,
   },
+  ...ATHLETE_CONTENT_SIDEBAR_NAV.map((item, index) => ({
+    id: `content-${index}`,
+    label: item.label,
+    href: item.href,
+    icon: PenLine as LucideIcon,
+    match: (pathname: string | null) => isContentStudioPath(pathname),
+  })),
 ];
 
 /**
@@ -110,8 +120,8 @@ export default function AthleteMobileNav() {
             aria-label="Close menu"
             onClick={() => setMoreOpen(false)}
           />
-          <div className="absolute bottom-[calc(4.25rem+env(safe-area-inset-bottom))] left-3 right-3 rounded-2xl border border-gray-200 bg-white shadow-xl p-3 space-y-1">
-            <div className="flex items-center justify-between px-2 pb-2">
+          <div className="absolute bottom-[calc(4.25rem+env(safe-area-inset-bottom))] left-3 right-3 max-h-[min(70vh,28rem)] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-xl p-3 space-y-1">
+            <div className="flex items-center justify-between px-2 pb-2 sticky top-0 bg-white">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">More</p>
               <button
                 type="button"
@@ -125,6 +135,7 @@ export default function AthleteMobileNav() {
             {moreItems.map((item) => {
               const Icon = item.icon;
               const active = item.match(pathname);
+              const isHub = item.id === 'community-hub';
               return (
                 <button
                   key={item.id}
@@ -132,12 +143,10 @@ export default function AthleteMobileNav() {
                   onClick={() => go(item.href)}
                   className={`w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-colors ${
                     active
-                      ? item.id === 'gwm'
+                      ? isHub
                         ? 'bg-sky-100 text-sky-900 border border-sky-300'
                         : 'bg-orange-50 text-orange-700 border border-orange-200'
-                      : item.id === 'gwm'
-                        ? 'text-gray-800 hover:bg-gray-50 border border-transparent'
-                        : 'text-gray-800 hover:bg-gray-50 border border-transparent'
+                      : 'text-gray-800 hover:bg-gray-50 border border-transparent'
                   }`}
                 >
                   <Icon className="h-5 w-5 shrink-0" />

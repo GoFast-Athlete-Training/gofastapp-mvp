@@ -1,11 +1,20 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
+import { Suspense } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, LayoutDashboard, MapPin, Trophy, Users } from "lucide-react";
+import { Activity, LayoutDashboard, MapPin, PenLine, Trophy, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import AthleteMobileNav from "@/components/athlete/AthleteMobileNav";
+import {
+  ATHLETE_CONTENT_SIDEBAR_NAV,
+  COMMUNITY_HUB_PATH,
+  MANAGE_COMMUNITY_LABEL,
+  isCommunityHubPath,
+  isContentNavItemActive,
+  isContentStudioPath,
+} from "@/lib/athlete/community-nav";
 
 type NavItem = {
   label: string;
@@ -47,10 +56,6 @@ function gorunMatch(p: string | null): boolean {
   );
 }
 
-function goFastWithOthersMatch(p: string | null): boolean {
-  return !!p && (p === "/gofast-with-others" || p.startsWith("/gofast-with-others/"));
-}
-
 const primaryNavItems: NavItem[] = [
   {
     label: "Train",
@@ -80,16 +85,14 @@ const primaryNavItems: NavItem[] = [
   },
 ];
 
-const buildCommunityNav: NavItem = {
-  label: "GoFast With Me",
-  href: "/gofast-with-others",
-  icon: Users,
-  match: goFastWithOthersMatch,
-};
-
-export default function AthleteSidebar() {
+function AthleteSidebarInner() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const viewParam = searchParams.get("view");
+  const focusParam = searchParams.get("focus");
+  const contentStudioActive = isContentStudioPath(pathname);
+  const hubActive = isCommunityHubPath(pathname);
 
   return (
     <>
@@ -138,32 +141,68 @@ export default function AthleteSidebar() {
             })}
           </div>
 
-          <div className="mt-auto pt-3 border-t border-gray-200">
-            {(() => {
-              const { label, href, icon: Icon, match } = buildCommunityNav;
-              const active = match
-                ? match(pathname)
-                : pathname === href || !!pathname?.startsWith(`${href}/`);
+          <div className="pt-3 mt-2 border-t border-gray-200 space-y-1">
+            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              Landing & content
+            </p>
+            {ATHLETE_CONTENT_SIDEBAR_NAV.map((item) => {
+              const active = isContentNavItemActive(
+                pathname,
+                viewParam,
+                focusParam,
+                item.section,
+                item.focus
+              );
               return (
                 <button
+                  key={item.href}
                   type="button"
-                  onClick={() => router.push(href)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-semibold transition-colors ${
+                  onClick={() => router.push(item.href)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     active
-                      ? "bg-sky-100 text-sky-900 border border-sky-300 shadow-sm"
-                      : "text-gray-700 hover:bg-gray-100 border border-transparent"
+                      ? "bg-orange-50 text-orange-700 border border-orange-200"
+                      : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  <span className="text-left">{label}</span>
+                  <PenLine className="h-4 w-4 shrink-0 opacity-70" />
+                  <span className="text-left">{item.label}</span>
                 </button>
               );
-            })()}
+            })}
+          </div>
+
+          <div className="mt-auto pt-3 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => router.push(COMMUNITY_HUB_PATH)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-semibold transition-colors ${
+                hubActive
+                  ? "bg-sky-100 text-sky-900 border border-sky-300 shadow-sm"
+                  : "text-gray-700 hover:bg-gray-100 border border-transparent"
+              }`}
+            >
+              <Users className="h-5 w-5 shrink-0" />
+              <span className="text-left">{MANAGE_COMMUNITY_LABEL}</span>
+            </button>
+            {contentStudioActive && !hubActive ? (
+              <p className="px-3 pt-2 text-[11px] text-gray-500 leading-snug">
+                Host runs from <span className="font-medium">Run</span>; logged work under{" "}
+                <span className="font-medium">Activity</span>.
+              </p>
+            ) : null}
           </div>
         </nav>
       </aside>
 
       <AthleteMobileNav />
     </>
+  );
+}
+
+export default function AthleteSidebar() {
+  return (
+    <Suspense fallback={null}>
+      <AthleteSidebarInner />
+    </Suspense>
   );
 }

@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, Check, Copy, ExternalLink, Save, Trash2 } from "luc
 import api from "@/lib/api";
 import { athleteLinksPublicUrl } from "@/lib/content/athlete-links-public-url";
 import type { AthleteLinkTreeDetail, AthleteLinkTreeLink } from "@/lib/content/athlete-link-tree-types";
+import { AthleteLinkTreeLinkKind } from "@prisma/client";
 
 const EMOJI_PRESETS = ["🌐", "📱", "🏃", "👟", "🔗", "📍"] as const;
 
@@ -37,6 +38,14 @@ export function AthleteLinkTreeEditor({ embeddedInStudio = false }: EditorProps)
   const sortedLinks = useMemo(
     () => (tree ? tree.links.slice().sort((a, b) => a.sortOrder - b.sortOrder) : []),
     [tree],
+  );
+
+  const hasRacesCard = useMemo(
+    () =>
+      sortedLinks.some(
+        (link) => !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES,
+      ),
+    [sortedLinks],
   );
 
   const hydrate = useCallback(async () => {
@@ -288,6 +297,27 @@ export function AthleteLinkTreeEditor({ embeddedInStudio = false }: EditorProps)
           </div>
         </div>
 
+        <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 space-y-3">
+          <p className="text-sm font-medium text-gray-900">Add GoFast card</p>
+          <p className="text-xs text-gray-600">
+            Standard buttons that fill in from your GoFast profile — no URLs to paste.
+          </p>
+          <button
+            type="button"
+            disabled={adding || hasRacesCard}
+            onClick={() => {
+              void addLink({
+                name: "Races",
+                kind: "RACES",
+                publicLabel: "My races",
+              });
+            }}
+            className="rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-900 disabled:opacity-50"
+          >
+            {hasRacesCard ? "Races card added" : "Add Races card"}
+          </button>
+        </div>
+
         <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
           <p className="text-sm font-medium">Add custom link</p>
           <input
@@ -390,13 +420,19 @@ function LinkRow({
     }
   }
 
-  const header = name.trim() || (link.isSection ? "Section" : `Link ${index + 1}`);
+  const isRacesCard = !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES;
+  const header = name.trim() || (link.isSection ? "Section" : isRacesCard ? "Races card" : `Link ${index + 1}`);
 
   return (
     <li className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 truncate">
           {header}
+          {isRacesCard ? (
+            <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800 normal-case">
+              GoFast
+            </span>
+          ) : null}
         </span>
         <div className="flex gap-1">
           <button
@@ -438,39 +474,51 @@ function LinkRow({
 
       {!link.isSection ? (
         <>
+          {isRacesCard ? (
+            <p className="text-sm text-gray-600">
+              On your public page this becomes a section plus one button per upcoming race you&apos;ve
+              claimed in GoFast (race name, date, link to the public race page).
+            </p>
+          ) : null}
           <label className="block text-sm">
-            <span className="font-medium">Button title (public)</span>
+            <span className="font-medium">
+              {isRacesCard ? "Section title (public)" : "Button title (public)"}
+            </span>
             <input
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               value={publicLabel}
               onChange={(e) => setPublicLabel(e.target.value)}
-              placeholder={name.trim() || "What followers see on the button"}
+              placeholder={name.trim() || (isRacesCard ? "My races" : "What followers see on the button")}
             />
           </label>
-          <div>
-            <span className="text-sm font-medium">Emoji</span>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {EMOJI_PRESETS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setEmoji(e)}
-                  className={`rounded-lg px-2 py-1 text-lg ${emoji === e ? "ring-2 ring-orange-400" : "bg-gray-50"}`}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          </div>
-          <label className="block text-sm">
-            <span className="font-medium">URL</span>
-            <input
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://"
-            />
-          </label>
+          {!isRacesCard ? (
+            <>
+              <div>
+                <span className="text-sm font-medium">Emoji</span>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {EMOJI_PRESETS.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => setEmoji(e)}
+                      className={`rounded-lg px-2 py-1 text-lg ${emoji === e ? "ring-2 ring-orange-400" : "bg-gray-50"}`}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label className="block text-sm">
+                <span className="font-medium">URL</span>
+                <input
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://"
+                />
+              </label>
+            </>
+          ) : null}
           <details className="text-sm text-gray-600">
             <summary className="cursor-pointer font-medium text-gray-800">More fields</summary>
             <div className="mt-3 space-y-3">
@@ -482,36 +530,50 @@ function LinkRow({
                   onChange={(e) => setName(e.target.value)}
                 />
               </label>
-              <label className="block">
-                <span className="font-medium">Public description</span>
-                <textarea
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  rows={2}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </label>
-              <label className="block">
-                <span className="font-medium">Internal notes</span>
-                <textarea
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  rows={2}
-                  value={internalDescription}
-                  onChange={(e) => setInternalDescription(e.target.value)}
-                />
-              </label>
-              <label className="block">
-                <span className="font-medium">Photo</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="mt-1 block w-full text-sm"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void uploadPhoto(f);
-                  }}
-                />
-              </label>
+              {!isRacesCard ? (
+                <>
+                  <label className="block">
+                    <span className="font-medium">Public description</span>
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      rows={2}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="font-medium">Internal notes</span>
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      rows={2}
+                      value={internalDescription}
+                      onChange={(e) => setInternalDescription(e.target.value)}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="font-medium">Photo</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="mt-1 block w-full text-sm"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void uploadPhoto(f);
+                      }}
+                    />
+                  </label>
+                </>
+              ) : (
+                <label className="block">
+                  <span className="font-medium">Internal notes</span>
+                  <textarea
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    rows={2}
+                    value={internalDescription}
+                    onChange={(e) => setInternalDescription(e.target.value)}
+                  />
+                </label>
+              )}
             </div>
           </details>
         </>

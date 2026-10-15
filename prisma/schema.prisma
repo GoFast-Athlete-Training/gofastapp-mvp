@@ -488,6 +488,11 @@ model gofast_with_me {
 }
 
 /// Athlete custom link page (athletelinks) — prod mirror; edited from athlete app.
+enum AthleteLinkTreeLinkKind {
+  CUSTOM
+  RACES
+}
+
 model athlete_link_trees {
   id                  String   @id @default(cuid())
   athleteId           String   @unique
@@ -506,17 +511,19 @@ model athlete_link_trees {
 }
 
 model athlete_link_tree_links {
-  id                  String   @id @default(cuid())
+  id                  String                   @id @default(cuid())
   treeId              String
   name                String
   publicLabel         String?
-  internalDescription String?  @db.Text
-  description         String?  @db.Text
+  internalDescription String?                  @db.Text
+  description         String?                  @db.Text
   linkLogoUrl         String?
   emoji               String?
   url                 String?
-  isSection           Boolean  @default(false)
-  sortOrder           Int      @default(0)
+  /// CUSTOM = URL button; RACES = hydrates upcoming claimed races on public page.
+  kind                AthleteLinkTreeLinkKind  @default(CUSTOM)
+  isSection           Boolean                  @default(false)
+  sortOrder           Int                      @default(0)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   tree                athlete_link_trees @relation(fields: [treeId], references: [id], onDelete: Cascade)

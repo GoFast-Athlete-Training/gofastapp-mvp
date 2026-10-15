@@ -1,9 +1,12 @@
+import type { AthleteLinkTreeLinkKind } from "@prisma/client";
+
 export type AthleteLinkTreeLink = {
   id: string;
   name: string;
   publicLabel: string | null;
   internalDescription: string | null;
   isSection: boolean;
+  kind: AthleteLinkTreeLinkKind;
   description: string | null;
   linkLogoUrl: string | null;
   emoji: string | null;

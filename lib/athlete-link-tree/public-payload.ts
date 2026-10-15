@@ -1,3 +1,4 @@
+import { expandAthleteLinkTreeLinksForPublic } from "@/lib/athlete-link-tree/expand-public-links";
 import type { AthleteLinkTreeDetail } from "@/lib/content/athlete-link-tree-types";
 
 /** Public athletelinks shape (matches gofast-contentpublic fetch-bio-linktree). */
@@ -23,9 +24,15 @@ export type PublicAthleteLinkTreePayload = {
   }>;
 };
 
-export function toPublicAthleteLinkTreePayload(
+export async function toPublicAthleteLinkTreePayload(
   tree: AthleteLinkTreeDetail,
-): PublicAthleteLinkTreePayload {
+  athleteId: string,
+): Promise<PublicAthleteLinkTreePayload> {
+  const links = await expandAthleteLinkTreeLinksForPublic({
+    athleteId,
+    links: tree.links,
+  });
+
   return {
     id: tree.id,
     name: tree.name,
@@ -34,17 +41,6 @@ export function toPublicAthleteLinkTreePayload(
     publicLabel: tree.publicLabel?.trim() || null,
     publicDescription: tree.publicDescription?.trim() || null,
     isRoot: false,
-    links: tree.links.map((link) => ({
-      id: link.id,
-      name: link.name,
-      publicLabel: link.publicLabel?.trim() || null,
-      isSection: link.isSection,
-      description: link.description?.trim() || null,
-      linkLogoUrl: link.linkLogoUrl,
-      emoji: link.emoji,
-      url: link.url,
-      targetSlug: null,
-      sortOrder: link.sortOrder,
-    })),
+    links,
   };
 }

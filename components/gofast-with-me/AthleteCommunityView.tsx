@@ -16,6 +16,8 @@ import {
 } from '@/lib/gofast-with-me/athlete-community-routes';
 import { applyFollowerPreviewMode } from '@/lib/gofast-with-me/athlete-community-access';
 import TopNav from '@/components/shared/TopNav';
+import AthleteAppShell from '@/components/athlete/AthleteAppShell';
+import { studioContentPath } from '@/lib/athlete/community-nav';
 import AthleteCommunitySections from '@/components/gofast-with-me/AthleteCommunitySections';
 import AthleteCommunityProfilePanel from '@/components/gofast-with-me/AthleteCommunityProfilePanel';
 import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
@@ -203,10 +205,10 @@ export default function AthleteCommunityView({ handle }: Props) {
     </button>
   );
 
-  return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden flex flex-col">
-      <TopNav showBack backUrl={publicLandingUrl} backLabel="Public page" />
+  const ownerManagingHub = displayAsOwner && !previewFollower;
 
+  const hubPage = (
+    <>
       <header className="bg-white shadow-sm border-b shrink-0">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -230,10 +232,10 @@ export default function AthleteCommunityView({ handle }: Props) {
                     See what followers see
                   </Link>
                   <Link
-                    href="/gofast-with-others"
+                    href={studioContentPath('page')}
                     className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
                   >
-                    Studio
+                    Landing & content
                   </Link>
                 </>
               ) : null}
@@ -396,6 +398,21 @@ export default function AthleteCommunityView({ handle }: Props) {
           </div>
         </div>
       ) : null}
+    </>
+  );
+
+  if (ownerManagingHub) {
+    return (
+      <AthleteAppShell>
+        <div className="flex flex-col min-h-0 flex-1 overflow-x-hidden bg-gray-50">{hubPage}</div>
+      </AthleteAppShell>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden flex flex-col">
+      <TopNav showBack backUrl={publicLandingUrl} backLabel="Public page" />
+      {hubPage}
     </div>
   );
 }

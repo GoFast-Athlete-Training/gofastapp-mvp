@@ -2,7 +2,9 @@ import {
   loadEditableAthleteTree,
   reloadAthleteLinkTreeDetail,
 } from "@/lib/athlete-link-tree/athlete-link-tree-service";
-import { normalizeLinkDestination } from "@/lib/athlete-link-tree/link-validation";
+import { isHydratedLinkKind, parseLinkKindInput } from "@/lib/athlete-link-tree/link-kinds";
+import { assertSingleRacesCard, normalizeLinkDestination } from "@/lib/athlete-link-tree/link-validation";
+import { AthleteLinkTreeLinkKind } from "@prisma/client";
 import { requireAthleteWithHandleForLinks } from "@/lib/content/require-athlete-link-tree";
 import prisma from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -25,6 +27,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as {
     name?: string;
     isSection?: boolean;
+    kind?: string;
     publicLabel?: string | null;
     internalDescription?: string | null;
     description?: string | null;
@@ -33,16 +36,35 @@ export async function POST(request: NextRequest) {
     insertAfterId?: string;
   };
 
+  const parsedKind = parseLinkKindInput(body.kind);
+  if (!parsedKind) {
+    return NextResponse.json({ success: false, error: "Invalid link kind" }, { status: 400 });
+  }
+
   const name = body.name?.trim();
   if (!name) {
     return NextResponse.json({ success: false, error: "name is required" }, { status: 400 });
   }
 
   const isSection = body.isSection === true;
+  if (isSection && isHydratedLinkKind(parsedKind)) {
+    return NextResponse.json(
+      { success: false, error: "GoFast cards cannot be section rows" },
+      { status: 400 },
+    );
+  }
+
+  if (parsedKind === AthleteLinkTreeLinkKind.RACES) {
+    const racesGate = await assertSingleRacesCard(treeId);
+    if (!racesGate.ok) {
+      return NextResponse.json({ success: false, error: racesGate.error }, { status: 400 });
+    }
+  }
+
   let url: string | null = null;
 
   if (!isSection) {
-    const dest = normalizeLinkDestination({ url: body.url });
+    const dest = normalizeLinkDestination({ url: body.url, kind: parsedKind });
     if (dest.error) {
       return NextResponse.json({ success: false, error: dest.error }, { status: 400 });
     }
@@ -81,12 +103,13 @@ export async function POST(request: NextRequest) {
     data: {
       treeId,
       name,
+      kind: parsedKind,
       isSection,
       publicLabel: isSection ? null : body.publicLabel?.trim() || null,
       internalDescription: isSection ? null : body.internalDescription?.trim() || null,
       description: isSection ? null : body.description?.trim() || null,
       linkLogoUrl: null,
-      emoji: isSection ? null : body.emoji?.trim() || null,
+      emoji: isSection || isHydratedLinkKind(parsedKind) ? null : body.emoji?.trim() || null,
       url,
       sortOrder,
     },

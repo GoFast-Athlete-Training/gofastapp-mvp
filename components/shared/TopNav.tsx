@@ -137,7 +137,9 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
 function TopNavLinksLink() {
   const pathname = usePathname();
   const active =
-    pathname === '/gofast-with-others' || !!pathname?.startsWith('/gofast-with-others/');
+    pathname === '/gofast-with-others' ||
+    !!pathname?.startsWith('/gofast-with-others/') ||
+    pathname === '/community/hub';
 
   return (
     <Link

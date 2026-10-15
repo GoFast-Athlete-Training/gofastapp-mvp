@@ -3,6 +3,7 @@ import {
   loadEditableAthleteTree,
   reloadAthleteLinkTreeDetail,
 } from "@/lib/athlete-link-tree/athlete-link-tree-service";
+import { isHydratedLinkKind } from "@/lib/athlete-link-tree/link-kinds";
 import { requireAthleteWithHandleForLinks } from "@/lib/content/require-athlete-link-tree";
 import prisma from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -44,6 +45,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
   });
   if (!link) {
     return NextResponse.json({ success: false, error: "Link not found" }, { status: 404 });
+  }
+  if (isHydratedLinkKind(link.kind)) {
+    return NextResponse.json(
+      { success: false, error: "GoFast cards use auto-filled images" },
+      { status: 400 },
+    );
   }
 
   const formData = await request.formData();
