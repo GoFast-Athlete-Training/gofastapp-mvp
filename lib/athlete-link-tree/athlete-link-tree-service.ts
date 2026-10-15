@@ -56,12 +56,14 @@ export async function createAthleteLinkTree(input: {
   athleteId: string;
   slug: string;
   name: string;
+  publicLabel?: string | null;
 }): Promise<TreeWithLinks> {
   return prisma.athlete_link_trees.create({
     data: {
       athleteId: input.athleteId,
       slug: input.slug,
       name: input.name,
+      publicLabel: input.publicLabel?.trim() || input.name,
     },
     include: treeInclude,
   });

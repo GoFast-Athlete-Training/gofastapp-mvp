@@ -51,12 +51,6 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
       instruction: 'Essays followers revisit on your public page.',
       sortOrder: 4,
     },
-    {
-      id: 'linkTree',
-      title: 'Custom Link Tree',
-      instruction: 'Public buttons on athletelinks — title, emoji, and URL on each link.',
-      sortOrder: 5,
-    },
   ],
 };
 

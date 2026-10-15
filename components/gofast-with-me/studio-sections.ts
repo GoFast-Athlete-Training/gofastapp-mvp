@@ -127,7 +127,6 @@ export const STUDIO_CONTENT_NAV_ORDER: Array<{
   { section: 'content', label: STUDIO_ROUTES_NAV_LABEL, focus: 'route' },
   { section: 'reflections', label: 'Training Reflections' },
   { section: 'content', label: 'Think Pieces', focus: 'tip' },
-  { section: 'linkTree', label: STUDIO_LINK_PAGE_LABEL },
 ];
 
 export const STUDIO_ROUTES_DESCRIPTION =
@@ -140,7 +139,6 @@ export const STUDIO_BIN_ORDER: StudioSection[] = [
   'content',
   'reflections',
   'content',
-  'linkTree',
 ];
 
 export function isStudioChromeView(view: StudioView): view is StudioChromeView {

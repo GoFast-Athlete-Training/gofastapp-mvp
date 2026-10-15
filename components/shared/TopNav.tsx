@@ -136,14 +136,11 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
 
 function TopNavLinksLink() {
   const pathname = usePathname();
-  const active =
-    pathname === '/gofast-with-others' ||
-    !!pathname?.startsWith('/gofast-with-others/') ||
-    pathname === '/community/hub';
+  const active = pathname === '/links' || !!pathname?.startsWith('/links/');
 
   return (
     <Link
-      href="/gofast-with-others?studio=content&view=linkTree"
+      href="/links"
       className={`p-2 rounded-lg transition ${
         active
           ? 'bg-gray-100 text-gray-900'

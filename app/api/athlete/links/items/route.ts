@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       name,
       kind: parsedKind,
       isSection,
-      publicLabel: isSection ? null : body.publicLabel?.trim() || null,
+      publicLabel: isSection ? null : body.publicLabel?.trim() || name,
       internalDescription: isSection ? null : body.internalDescription?.trim() || null,
       description: isSection ? null : body.description?.trim() || null,
       linkLogoUrl: null,

@@ -17,7 +17,6 @@ import GoFastWithMeTrainingReflectionsPanel from "@/components/gofast-with-me/Go
 import GoFastWithMePayoutsPanel from "@/components/gofast-with-me/GoFastWithMePayoutsPanel";
 import GoFastWithMeTipsPanel from "@/components/gofast-with-me/GoFastWithMeTipsPanel";
 import GoFastWithMeRoutesPanel from "@/components/gofast-with-me/GoFastWithMeRoutesPanel";
-import { AthleteLinkTreeEditor } from "@/components/profile/AthleteLinkTreeEditor";
 import GoFastWithMeStudioAppShell from "@/components/gofast-with-me/GoFastWithMeStudioAppShell";
 import GoFastWithMeStudioExplainer from "@/components/gofast-with-me/GoFastWithMeStudioExplainer";
 import GoFastWithMeProgramGate from "@/components/gofast-with-me/GoFastWithMeProgramGate";
@@ -51,7 +50,6 @@ function viewFromSearchParam(raw: string | null): StudioSection | null {
     "runnerStory",
     "reflections",
     "content",
-    "linkTree",
   ];
   return allowed.includes(raw as StudioSection) ? (raw as StudioSection) : null;
 }
@@ -190,6 +188,10 @@ export default function GoFastWithOthersDashboard() {
 
         const landing = ownerRowToLanding(gwm);
         if (!cancelled) {
+          if (searchParams.get("view") === "linkTree") {
+            router.replace("/links");
+            return;
+          }
           const openPayouts = searchParams.get("view") === "payouts";
           const openContentStudio = searchParams.get("studio") === "content";
           const viewParam = viewFromSearchParam(searchParams.get("view"));
@@ -419,8 +421,6 @@ export default function GoFastWithOthersDashboard() {
         );
       case "reflections":
         return <GoFastWithMeTrainingReflectionsPanel publicSlug={publicSlug} />;
-      case "linkTree":
-        return <AthleteLinkTreeEditor embeddedInStudio />;
       case "content":
         return contentFocus === 'route' ? (
           <GoFastWithMeRoutesPanel athleteId={athleteId} />

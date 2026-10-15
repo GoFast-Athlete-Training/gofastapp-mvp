@@ -7,30 +7,24 @@ import api from "@/lib/api";
 import { athleteLinksPublicUrl } from "@/lib/content/athlete-links-public-url";
 import type { AthleteLinkTreeDetail, AthleteLinkTreeLink } from "@/lib/content/athlete-link-tree-types";
 import { AthleteLinkTreeLinkKind } from "@prisma/client";
+import { AthleteLinkTreeLinkSources } from "@/components/profile/AthleteLinkTreeLinkSources";
 
 const EMOJI_PRESETS = ["🌐", "📱", "🏃", "👟", "🔗", "📍"] as const;
 
-type EditorProps = {
-  /** Render inside GoFast With Me content studio (no profile hub chrome). */
-  embeddedInStudio?: boolean;
-};
-
-export function AthleteLinkTreeEditor({ embeddedInStudio = false }: EditorProps) {
+export function AthleteLinkTreeEditor() {
   const [tree, setTree] = useState<AthleteLinkTreeDetail | null>(null);
   const [handle, setHandle] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [publicSlug, setPublicSlug] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [treeBusy, setTreeBusy] = useState(false);
   const [reorderBusy, setReorderBusy] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
 
-  const [publicLabel, setPublicLabel] = useState("");
-  const [publicDescription, setPublicDescription] = useState("");
-  const [internalDescription, setInternalDescription] = useState("");
+  const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
 
-  const [customName, setCustomName] = useState("");
-  const [customUrl, setCustomUrl] = useState("https://");
-  const [sectionTitle, setSectionTitle] = useState("");
   const [adding, setAdding] = useState(false);
 
   const shareUrl = handle ? athleteLinksPublicUrl(handle) : "";
@@ -57,11 +51,22 @@ export function AthleteLinkTreeEditor({ embeddedInStudio = false }: EditorProps)
         throw new Error(res.data?.error || "Failed to load");
       }
       const next = res.data.tree as AthleteLinkTreeDetail;
+      const dn =
+        typeof res.data.displayName === "string" && res.data.displayName.trim()
+          ? res.data.displayName.trim()
+          : next.name;
       setTree(next);
       setHandle(typeof res.data.handle === "string" ? res.data.handle : null);
-      setPublicLabel(next.publicLabel ?? "");
-      setPublicDescription(next.publicDescription ?? "");
-      setInternalDescription(next.internalDescription ?? "");
+      setDisplayName(dn);
+      setPublicSlug(
+        typeof res.data.publicSlug === "string" && res.data.publicSlug.trim()
+          ? res.data.publicSlug.trim()
+          : typeof res.data.handle === "string"
+            ? res.data.handle
+            : "",
+      );
+      setTitle(next.publicLabel?.trim() || dn);
+      setSubtitle(next.publicDescription ?? "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load link page");
     } finally {
@@ -77,16 +82,17 @@ export function AthleteLinkTreeEditor({ embeddedInStudio = false }: EditorProps)
     if (!tree) return;
     setTreeBusy(true);
     setError(null);
+    const trimmedTitle = title.trim() || displayName;
     try {
       const res = await api.patch("/athlete/links", {
-        publicLabel: publicLabel.trim() || null,
-        publicDescription: publicDescription.trim() || null,
-        internalDescription: internalDescription.trim() || null,
+        publicLabel: trimmedTitle,
+        publicDescription: subtitle.trim() || null,
       });
       if (!res.data?.success || !res.data?.tree) {
         throw new Error(res.data?.error || "Failed to save");
       }
       setTree(res.data.tree);
+      setTitle(res.data.tree.publicLabel?.trim() || trimmedTitle);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -174,23 +180,16 @@ export function AthleteLinkTreeEditor({ embeddedInStudio = false }: EditorProps)
   return (
     <div className="mx-auto max-w-2xl space-y-8 pb-8">
       <div>
-        {!embeddedInStudio ? (
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            <Link href="/gofast-with-others?studio=content&view=linkTree" className="text-sky-700 hover:underline">
-              ← Content studio
-            </Link>
-          </div>
-        ) : null}
-        <div className={`flex flex-wrap items-center gap-2 ${embeddedInStudio ? "" : "mt-2"}`}>
-          <h1 className="text-2xl font-bold text-gray-900">Custom Link Tree</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">GoFast Links</h1>
           {handleSlug ? (
             <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-900">
-              Athlete · athletelinks /{handleSlug}
+              athletelinks /{handleSlug}
             </span>
           ) : null}
         </div>
         <p className="mt-1 text-sm text-gray-600">
-          Public link buttons on athletelinks — header, emoji, and URL on each button.
+          Your personal link page — title, subtitle, and buttons people tap.
         </p>
         {shareUrl ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -218,138 +217,65 @@ export function AthleteLinkTreeEditor({ embeddedInStudio = false }: EditorProps)
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
       <section className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
-        <h2 className="font-semibold text-gray-900">Page title &amp; subtitle</h2>
+        <h2 className="font-semibold text-gray-900">Your page</h2>
         <label className="block text-sm">
-          <span className="font-medium">Public title</span>
+          <span className="font-medium">Title</span>
           <input
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            value={publicLabel}
-            onChange={(e) => setPublicLabel(e.target.value)}
-            placeholder={tree.name}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
           />
         </label>
         <label className="block text-sm">
-          <span className="font-medium">Public description</span>
+          <span className="font-medium">Subtitle</span>
           <textarea
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             rows={2}
-            value={publicDescription}
-            onChange={(e) => setPublicDescription(e.target.value)}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium">Internal notes</span>
-          <textarea
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            rows={2}
-            value={internalDescription}
-            onChange={(e) => setInternalDescription(e.target.value)}
+            value={subtitle}
+            onChange={(e) => setSubtitle(e.target.value)}
+            placeholder="Short line under your name"
           />
         </label>
         <button
           type="button"
-          disabled={treeBusy}
+          disabled={treeBusy || !title.trim()}
           onClick={() => void saveTreeMeta()}
           className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
-          {treeBusy ? "Saving…" : "Save page"}
+          {treeBusy ? "Saving…" : "Save"}
         </button>
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-semibold text-gray-900">Links</h2>
-        <ul className="space-y-4">
-          {sortedLinks.map((link, index) => (
-            <LinkRow
-              key={link.id}
-              link={link}
-              index={index}
-              count={sortedLinks.length}
-              reorderBusy={reorderBusy}
-              onMove={moveLink}
-              onUpdated={(next) => setTree(next)}
-            />
-          ))}
-        </ul>
+        <h2 className="font-semibold text-gray-900">Links on your page</h2>
+        {sortedLinks.length === 0 ? (
+          <p className="text-sm text-gray-500">Nothing here yet — add something below.</p>
+        ) : (
+          <ul className="space-y-4">
+            {sortedLinks.map((link, index) => (
+              <LinkRow
+                key={link.id}
+                link={link}
+                index={index}
+                count={sortedLinks.length}
+                reorderBusy={reorderBusy}
+                onMove={moveLink}
+                onUpdated={(next) => setTree(next)}
+              />
+            ))}
+          </ul>
+        )}
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-          <p className="text-sm font-medium">Add section title</p>
-          <div className="flex gap-2">
-            <input
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              value={sectionTitle}
-              onChange={(e) => setSectionTitle(e.target.value)}
-              placeholder="e.g. My training"
-            />
-            <button
-              type="button"
-              disabled={adding || !sectionTitle.trim()}
-              onClick={() => {
-                void addLink({ name: sectionTitle.trim(), isSection: true }).then(() =>
-                  setSectionTitle(""),
-                );
-              }}
-              className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold disabled:opacity-50"
-            >
-              Add
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 space-y-3">
-          <p className="text-sm font-medium text-gray-900">Add GoFast card</p>
-          <p className="text-xs text-gray-600">
-            Standard buttons that fill in from your GoFast profile — no URLs to paste.
-          </p>
-          <button
-            type="button"
-            disabled={adding || hasRacesCard}
-            onClick={() => {
-              void addLink({
-                name: "Races",
-                kind: "RACES",
-                publicLabel: "My races",
-              });
-            }}
-            className="rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-900 disabled:opacity-50"
-          >
-            {hasRacesCard ? "Races card added" : "Add Races card"}
-          </button>
-        </div>
-
-        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-          <p className="text-sm font-medium">Add custom link</p>
-          <input
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            value={customName}
-            onChange={(e) => setCustomName(e.target.value)}
-            placeholder="Internal title"
+        {publicSlug ? (
+          <AthleteLinkTreeLinkSources
+            publicSlug={publicSlug}
+            sortedLinks={sortedLinks}
+            hasRacesCard={hasRacesCard}
+            adding={adding}
+            onAddLink={addLink}
           />
-          <input
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            value={customUrl}
-            onChange={(e) => setCustomUrl(e.target.value)}
-            placeholder="https://"
-          />
-          <button
-            type="button"
-            disabled={adding || !customName.trim() || !customUrl.trim()}
-            onClick={() => {
-              void addLink({
-                name: customName.trim(),
-                url: customUrl.trim(),
-                emoji: "🌐",
-              }).then(() => {
-                setCustomName("");
-                setCustomUrl("https://");
-              });
-            }}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {adding ? "Adding…" : "Add link"}
-          </button>
-        </div>
+        ) : null}
       </section>
     </div>
   );
@@ -370,10 +296,12 @@ function LinkRow({
   onMove: (id: string, dir: -1 | 1) => void;
   onUpdated: (tree: AthleteLinkTreeDetail) => void;
 }) {
-  const [name, setName] = useState(link.name);
-  const [publicLabel, setPublicLabel] = useState(link.publicLabel ?? "");
-  const [internalDescription, setInternalDescription] = useState(link.internalDescription ?? "");
-  const [description, setDescription] = useState(link.description ?? "");
+  const isRacesCard = !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES;
+  const initialTitle =
+    link.publicLabel?.trim() || link.name.trim() || (isRacesCard ? "My races" : "");
+
+  const [buttonTitle, setButtonTitle] = useState(initialTitle);
+  const [sectionTitle, setSectionTitle] = useState(link.name);
   const [url, setUrl] = useState(link.url ?? "");
   const [emoji, setEmoji] = useState(link.emoji ?? "");
   const [busy, setBusy] = useState(false);
@@ -381,14 +309,33 @@ function LinkRow({
   async function save() {
     setBusy(true);
     try {
-      const res = await api.patch(`/athlete/links/items/${link.id}`, {
-        name: name.trim(),
-        publicLabel: publicLabel.trim() || null,
-        internalDescription: internalDescription.trim() || null,
-        description: description.trim() || null,
-        url: link.isSection ? undefined : url.trim(),
+      if (link.isSection) {
+        const title = sectionTitle.trim();
+        if (!title) return;
+        const res = await api.patch(`/athlete/links/items/${link.id}`, {
+          name: title,
+          publicLabel: title,
+        });
+        if (res.data?.success && res.data?.tree) onUpdated(res.data.tree);
+        return;
+      }
+
+      const title = buttonTitle.trim();
+      if (!title) return;
+
+      const payload: Record<string, unknown> = {
+        name: title,
+        publicLabel: title,
         emoji: emoji.trim() || null,
-      });
+      };
+
+      if (isRacesCard) {
+        payload.publicLabel = title;
+      } else {
+        payload.url = url.trim();
+      }
+
+      const res = await api.patch(`/athlete/links/items/${link.id}`, payload);
       if (res.data?.success && res.data?.tree) onUpdated(res.data.tree);
     } finally {
       setBusy(false);
@@ -396,7 +343,7 @@ function LinkRow({
   }
 
   async function remove() {
-    if (!window.confirm("Delete this row?")) return;
+    if (!window.confirm("Remove this from your page?")) return;
     setBusy(true);
     try {
       const res = await api.delete(`/athlete/links/items/${link.id}`);
@@ -406,28 +353,15 @@ function LinkRow({
     }
   }
 
-  async function uploadPhoto(file: File) {
-    setBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await api.post(`/athlete/links/items/${link.id}/image`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      if (res.data?.success && res.data?.tree) onUpdated(res.data.tree);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const isRacesCard = !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES;
-  const header = name.trim() || (link.isSection ? "Section" : isRacesCard ? "Races card" : `Link ${index + 1}`);
+  const rowLabel = link.isSection
+    ? sectionTitle.trim() || "Section"
+    : buttonTitle.trim() || (isRacesCard ? "Races" : `Link ${index + 1}`);
 
   return (
     <li className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 truncate">
-          {header}
+          {rowLabel}
           {isRacesCard ? (
             <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800 normal-case">
               GoFast
@@ -457,38 +391,28 @@ function LinkRow({
         </div>
       </div>
 
-      {!link.isSection && link.linkLogoUrl ? (
-        <img src={link.linkLogoUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
-      ) : null}
-
       {link.isSection ? (
         <label className="block text-sm">
-          <span className="font-medium">Section title</span>
+          <span className="font-medium">Section heading</span>
           <input
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={sectionTitle}
+            onChange={(e) => setSectionTitle(e.target.value)}
           />
         </label>
-      ) : null}
-
-      {!link.isSection ? (
+      ) : (
         <>
           {isRacesCard ? (
             <p className="text-sm text-gray-600">
-              On your public page this becomes a section plus one button per upcoming race you&apos;ve
-              claimed in GoFast (race name, date, link to the public race page).
+              Shows your upcoming claimed races — each gets its own button on your public page.
             </p>
           ) : null}
           <label className="block text-sm">
-            <span className="font-medium">
-              {isRacesCard ? "Section title (public)" : "Button title (public)"}
-            </span>
+            <span className="font-medium">{isRacesCard ? "Section heading" : "Button title"}</span>
             <input
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              value={publicLabel}
-              onChange={(e) => setPublicLabel(e.target.value)}
-              placeholder={name.trim() || (isRacesCard ? "My races" : "What followers see on the button")}
+              value={buttonTitle}
+              onChange={(e) => setButtonTitle(e.target.value)}
             />
           </label>
           {!isRacesCard ? (
@@ -519,69 +443,12 @@ function LinkRow({
               </label>
             </>
           ) : null}
-          <details className="text-sm text-gray-600">
-            <summary className="cursor-pointer font-medium text-gray-800">More fields</summary>
-            <div className="mt-3 space-y-3">
-              <label className="block">
-                <span className="font-medium">Internal title</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </label>
-              {!isRacesCard ? (
-                <>
-                  <label className="block">
-                    <span className="font-medium">Public description</span>
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                      rows={2}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="font-medium">Internal notes</span>
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                      rows={2}
-                      value={internalDescription}
-                      onChange={(e) => setInternalDescription(e.target.value)}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="font-medium">Photo</span>
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="mt-1 block w-full text-sm"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) void uploadPhoto(f);
-                      }}
-                    />
-                  </label>
-                </>
-              ) : (
-                <label className="block">
-                  <span className="font-medium">Internal notes</span>
-                  <textarea
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                    rows={2}
-                    value={internalDescription}
-                    onChange={(e) => setInternalDescription(e.target.value)}
-                  />
-                </label>
-              )}
-            </div>
-          </details>
         </>
-      ) : null}
+      )}
 
       <button
         type="button"
-        disabled={busy || !name.trim()}
+        disabled={busy || (link.isSection ? !sectionTitle.trim() : !buttonTitle.trim())}
         onClick={() => void save()}
         className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
       >

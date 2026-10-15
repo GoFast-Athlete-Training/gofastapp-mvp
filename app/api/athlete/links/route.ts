@@ -39,8 +39,16 @@ export async function GET(request: NextRequest) {
       athleteId: gate.athlete.id,
       slug: gate.slug,
       name: gate.displayName,
+      publicLabel: gate.displayName,
     });
   }
+
+  const gwm = await prisma.gofast_with_me.findFirst({
+    where: { athleteId: gate.athlete.id },
+    select: { gofastSlugSnapshot: true },
+  });
+  const publicSlug =
+    gwm?.gofastSlugSnapshot?.trim() || gate.handle.trim();
 
   const detail: AthleteLinkTreeDetail = toAthleteLinkTreeDetail(tree);
 
@@ -48,6 +56,8 @@ export async function GET(request: NextRequest) {
     success: true,
     tree: detail,
     handle: gate.handle,
+    displayName: gate.displayName,
+    publicSlug,
     shareUrl: athleteLinksPublicUrl(gate.handle),
   });
 }
