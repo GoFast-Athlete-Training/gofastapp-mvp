@@ -7,6 +7,10 @@ import {
 
 export const COMMUNITY_HUB_PATH = '/community/hub';
 
+export const BUILD_CONTENT_PATH = '/gofast-with-others';
+
+export const BUILD_CONTENT_LABEL = 'Build content';
+
 export const MANAGE_COMMUNITY_LABEL = 'Manage Community';
 
 /** Deep-link into the content studio (no entry “doors”). */

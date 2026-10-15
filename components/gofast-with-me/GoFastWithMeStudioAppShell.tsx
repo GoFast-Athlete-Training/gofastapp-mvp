@@ -2,13 +2,8 @@
 
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { MANAGE_COMMUNITY_LABEL } from '@/lib/athlete/community-nav';
-import {
-  STUDIO_CONTENT_NAV_ORDER,
-  type ContentEditorFocus,
-  type StudioSection,
-  type StudioView,
-} from '@/components/gofast-with-me/studio-sections';
+import { BUILD_CONTENT_PATH, MANAGE_COMMUNITY_LABEL } from '@/lib/athlete/community-nav';
+import { STUDIO_NAV_LABELS, type StudioSection } from '@/components/gofast-with-me/studio-sections';
 
 export type StudioChromeActions = {
   landingUrl: string;
@@ -20,45 +15,36 @@ export type StudioChromeActions = {
 };
 
 type Props = {
-  activeView: StudioView;
-  contentFocus?: ContentEditorFocus | null;
-  onViewChange: (view: StudioView, options?: { contentFocus?: ContentEditorFocus }) => void;
-  landingNeedsAction?: boolean;
+  editorSection: StudioSection;
+  editorFocus?: 'tip' | 'route' | null;
   chromeActions?: StudioChromeActions;
   children: React.ReactNode;
 };
 
-function isNavItemActive(
-  activeView: StudioView,
-  contentFocus: ContentEditorFocus | null | undefined,
-  section: StudioSection,
-  focus?: ContentEditorFocus
-): boolean {
-  if (activeView !== section) return false;
-  if (section === 'content') {
-    return (contentFocus ?? 'tip') === (focus ?? 'tip');
-  }
-  return true;
-}
-
 export default function GoFastWithMeStudioAppShell({
-  activeView,
-  contentFocus,
-  onViewChange,
-  landingNeedsAction,
+  editorSection,
+  editorFocus,
   chromeActions,
   children,
 }: Props) {
+  const title =
+    editorSection === 'content'
+      ? editorFocus === 'route'
+        ? 'Routes'
+        : 'Think Pieces'
+      : STUDIO_NAV_LABELS[editorSection];
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="border-b border-gray-200 bg-white shrink-0">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-lg font-bold text-gray-900">Landing & content</p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Public landing, athletelinks, and writeups. Host runs from Run; manage followers in
-              the hub.
-            </p>
+            <Link
+              href={BUILD_CONTENT_PATH}
+              className="text-sm font-medium text-sky-700 hover:underline"
+            >
+              ← Build content
+            </Link>
+            <p className="text-lg font-bold text-gray-900 mt-1">{title}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
             {chromeActions ? (
@@ -107,56 +93,7 @@ export default function GoFastWithMeStudioAppShell({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col min-w-0">
-        <div className="border-b border-gray-200 bg-white lg:hidden shrink-0">
-          <nav
-            className="flex gap-1 overflow-x-auto px-4 py-2 scrollbar-hide"
-            aria-label="Content navigation"
-          >
-            {STUDIO_CONTENT_NAV_ORDER.map((item) => (
-              <MobileNavPill
-                key={`m-${item.section}-${item.focus ?? 'default'}`}
-                label={item.label}
-                active={isNavItemActive(activeView, contentFocus, item.section, item.focus)}
-                onClick={() =>
-                  onViewChange(
-                    item.section,
-                    item.focus ? { contentFocus: item.focus } : undefined
-                  )
-                }
-                badge={item.section === 'page' ? landingNeedsAction : undefined}
-              />
-            ))}
-          </nav>
-        </div>
-
-        <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
-      </div>
+      <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
     </div>
-  );
-}
-
-function MobileNavPill({
-  label,
-  active,
-  onClick,
-  badge,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  badge?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-        active ? 'bg-orange-100 text-orange-900' : 'bg-gray-100 text-gray-700'
-      }`}
-    >
-      {label}
-      {badge ? <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden /> : null}
-    </button>
   );
 }

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ slug: string }> };
 
-/** GET — public athletelinks page by slug (prod mirror, no auth). */
+/** GET — public gofastlinks athlete page by slug (prod mirror, no auth). */
 export async function GET(_request: NextRequest, context: RouteContext) {
   try {
     const { slug: raw } = await context.params;
@@ -30,8 +30,13 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ success: false, error: "Link tree not found" }, { status: 404 });
     }
 
+    const athlete = await prisma.athlete.findUnique({
+      where: { id: row.athleteId },
+      select: { firstName: true, lastName: true, photoURL: true },
+    });
+
     const detail = toAthleteLinkTreeDetail(row);
-    const tree = await toPublicAthleteLinkTreePayload(detail, row.athleteId);
+    const tree = await toPublicAthleteLinkTreePayload(detail, row.athleteId, athlete);
     return NextResponse.json({
       success: true,
       tree,

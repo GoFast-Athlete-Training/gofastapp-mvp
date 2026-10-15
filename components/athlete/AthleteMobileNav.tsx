@@ -5,7 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Activity, LayoutDashboard, MapPin, PenLine, Trophy, Users, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
-  ATHLETE_CONTENT_SIDEBAR_NAV,
+  BUILD_CONTENT_LABEL,
+  BUILD_CONTENT_PATH,
   COMMUNITY_HUB_PATH,
   MANAGE_COMMUNITY_LABEL,
   isCommunityHubPath,
@@ -66,19 +67,19 @@ const primaryTabs: NavItem[] = [
 
 const moreItems: NavItem[] = [
   {
+    id: 'build-content',
+    label: BUILD_CONTENT_LABEL,
+    href: BUILD_CONTENT_PATH,
+    icon: PenLine,
+    match: isContentStudioPath,
+  },
+  {
     id: 'community-hub',
     label: MANAGE_COMMUNITY_LABEL,
     href: COMMUNITY_HUB_PATH,
     icon: Users,
     match: isCommunityHubPath,
   },
-  ...ATHLETE_CONTENT_SIDEBAR_NAV.map((item, index) => ({
-    id: `content-${index}`,
-    label: item.label,
-    href: item.href,
-    icon: PenLine as LucideIcon,
-    match: (pathname: string | null) => isContentStudioPath(pathname),
-  })),
 ];
 
 /**

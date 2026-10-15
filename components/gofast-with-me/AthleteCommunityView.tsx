@@ -17,7 +17,6 @@ import {
 import { applyFollowerPreviewMode } from '@/lib/gofast-with-me/athlete-community-access';
 import TopNav from '@/components/shared/TopNav';
 import AthleteAppShell from '@/components/athlete/AthleteAppShell';
-import { studioContentPath } from '@/lib/athlete/community-nav';
 import AthleteCommunitySections from '@/components/gofast-with-me/AthleteCommunitySections';
 import AthleteCommunityProfilePanel from '@/components/gofast-with-me/AthleteCommunityProfilePanel';
 import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
@@ -232,10 +231,10 @@ export default function AthleteCommunityView({ handle }: Props) {
                     See what followers see
                   </Link>
                   <Link
-                    href={studioContentPath('page')}
+                    href="/gofast-with-others"
                     className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-100"
                   >
-                    Landing & content
+                    Build content
                   </Link>
                 </>
               ) : null}

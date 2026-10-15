@@ -18,7 +18,7 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'Use Landing & content in the left nav for your public page, athletelinks, and writeups. Manage Community opens your follower hub. Plan sharing lives on Training. Host runs from Run; logged work under Activity.',
+    'Build content opens the page where you pick My Story, runner story, routes, reflections, and think pieces. Manage Community opens your follower hub. Plan sharing lives on Training. Host runs from Run; logged work under Activity.',
   steps: [
     {
       id: 'page',

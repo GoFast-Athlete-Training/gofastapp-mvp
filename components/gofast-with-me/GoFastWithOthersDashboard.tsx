@@ -17,6 +17,7 @@ import GoFastWithMeTrainingReflectionsPanel from "@/components/gofast-with-me/Go
 import GoFastWithMePayoutsPanel from "@/components/gofast-with-me/GoFastWithMePayoutsPanel";
 import GoFastWithMeTipsPanel from "@/components/gofast-with-me/GoFastWithMeTipsPanel";
 import GoFastWithMeRoutesPanel from "@/components/gofast-with-me/GoFastWithMeRoutesPanel";
+import GoFastWithMeBuildContentHub from "@/components/gofast-with-me/GoFastWithMeBuildContentHub";
 import GoFastWithMeStudioAppShell from "@/components/gofast-with-me/GoFastWithMeStudioAppShell";
 import GoFastWithMeStudioExplainer from "@/components/gofast-with-me/GoFastWithMeStudioExplainer";
 import GoFastWithMeProgramGate from "@/components/gofast-with-me/GoFastWithMeProgramGate";
@@ -52,6 +53,13 @@ function viewFromSearchParam(raw: string | null): StudioSection | null {
     "content",
   ];
   return allowed.includes(raw as StudioSection) ? (raw as StudioSection) : null;
+}
+
+function isContentEditorFromParams(
+  params: Pick<URLSearchParams, "get">,
+): boolean {
+  if (params.get("studio") !== "content") return false;
+  return viewFromSearchParam(params.get("view")) !== null;
 }
 
 type OwnerGwmRow = {
@@ -139,9 +147,25 @@ export default function GoFastWithOthersDashboard() {
   }, []);
 
   useEffect(() => {
-    const view = searchParams.get('view');
-    if (view === 'payouts') {
-      setActiveView('payouts');
+    const view = searchParams.get("view");
+    if (view === "payouts") {
+      setActiveView("payouts");
+      return;
+    }
+    if (!isContentEditorFromParams(searchParams)) {
+      return;
+    }
+    const section = viewFromSearchParam(view)!;
+    setActiveView(section);
+    if (section === "content") {
+      const focus = searchParams.get("focus");
+      if (focus === "route" || focus === "tip") {
+        setContentFocus(focus);
+      } else {
+        setContentFocus("tip");
+      }
+    } else {
+      setContentFocus(null);
     }
   }, [searchParams]);
 
@@ -192,13 +216,10 @@ export default function GoFastWithOthersDashboard() {
             router.replace("/links");
             return;
           }
-          const openPayouts = searchParams.get("view") === "payouts";
-          const openContentStudio = searchParams.get("studio") === "content";
-          const viewParam = viewFromSearchParam(searchParams.get("view"));
-          if (openPayouts) {
+          if (searchParams.get("view") === "payouts") {
             setActiveView("payouts");
-          } else if (openContentStudio) {
-            const view = viewParam ?? "page";
+          } else if (isContentEditorFromParams(searchParams)) {
+            const view = viewFromSearchParam(searchParams.get("view"))!;
             setActiveView(view);
             if (view === "content") {
               const focus = searchParams.get("focus");
@@ -210,9 +231,6 @@ export default function GoFastWithOthersDashboard() {
             } else {
               setContentFocus(null);
             }
-          } else if (!cancelled) {
-            router.replace(studioContentPath("page"));
-            return;
           }
           setLoading(false);
         }
@@ -317,13 +335,21 @@ export default function GoFastWithOthersDashboard() {
 
   const communityHubUrl = shellSlug ? athleteCommunityAppPath(shellSlug) : "/athlete-home";
 
+  const inContentEditor = isContentEditorFromParams(searchParams);
+  const editorSection =
+    activeView === "payouts" ? "page" : (activeView as StudioSection);
+
   const studioShell = (content: React.ReactNode) => (
     <AthleteAppShell>
       <GoFastWithMeStudioAppShell
-        activeView={activeView}
-        contentFocus={contentFocus}
-        onViewChange={handleViewChange}
-        landingNeedsAction={!isWelcomeComplete}
+        editorSection={editorSection}
+        editorFocus={
+          editorSection === "content"
+            ? contentFocus === "route"
+              ? "route"
+              : "tip"
+            : null
+        }
         chromeActions={
           shellSlug
             ? {
@@ -343,8 +369,9 @@ export default function GoFastWithOthersDashboard() {
   );
 
   if (showOnboarding) {
-    return studioShell(
-      <div className="max-w-3xl mx-auto">
+    return (
+      <AthleteAppShell>
+        <main className="px-4 sm:px-6 py-6 max-w-3xl mx-auto">
         <GoFastWithMeHubOnboarding
           onComplete={({ creatorType, coachSpecialty }) => {
             setOwnerGwm((prev) =>
@@ -369,19 +396,52 @@ export default function GoFastWithOthersDashboard() {
             setShowOnboarding(false);
           }}
         />
-      </div>
+        </main>
+      </AthleteAppShell>
     );
   }
 
   if (!gofastHandle || !publicSlug || !athleteId) {
-    return studioShell(
-      <div className="max-w-lg space-y-4">
-        <p className="text-gray-700">{error || "Dashboard unavailable."}</p>
-      </div>
+    return (
+      <AthleteAppShell>
+        <main className="px-4 sm:px-6 py-6 max-w-lg">
+          <p className="text-gray-700">{error || "Dashboard unavailable."}</p>
+        </main>
+      </AthleteAppShell>
     );
   }
 
   const liveUrl = shellLiveUrl;
+
+  if (!inContentEditor) {
+    return (
+      <AthleteAppShell>
+        <main className="px-4 sm:px-6 py-6 max-w-6xl mx-auto space-y-6">
+          {error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {error}
+            </div>
+          ) : null}
+          {showStudioExplainer ? (
+            <GoFastWithMeStudioExplainer onDismiss={handleDismissStudioIntro} />
+          ) : null}
+          {followerCount != null ? (
+            <p className="text-sm text-gray-600">
+              {followerCount} follower{followerCount === 1 ? "" : "s"} on your hub — open{" "}
+              <Link href={communityHubUrl} className="font-semibold text-sky-700 hover:underline">
+                Manage Community
+              </Link>
+              .
+            </p>
+          ) : null}
+          <GoFastWithMeBuildContentHub
+            landingNeedsAction={!isWelcomeComplete}
+            onOpen={(section, focus) => handleViewChange(section, focus ? { contentFocus: focus } : undefined)}
+          />
+        </main>
+      </AthleteAppShell>
+    );
+  }
 
   const renderStudioContent = () => {
     if (activeView === "payouts") {

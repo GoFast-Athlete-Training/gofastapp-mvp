@@ -184,7 +184,7 @@ export function AthleteLinkTreeEditor() {
           <h1 className="text-2xl font-bold text-gray-900">GoFast Links</h1>
           {handleSlug ? (
             <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-900">
-              athletelinks /{handleSlug}
+              gofastlinks /{handleSlug}
             </span>
           ) : null}
         </div>

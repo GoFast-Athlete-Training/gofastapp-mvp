@@ -1,6 +1,6 @@
 export const ATHLETE_LINKS_PUBLIC_BASE =
   process.env.NEXT_PUBLIC_ATHLETE_LINKS_URL?.trim() ||
-  "https://athletelinks.gofastcrushgoals.com";
+  "https://gofastlinks.gofastcrushgoals.com";
 
 export function athleteLinksPublicUrl(handle: string): string {
   const slug = handle.trim().replace(/^@+/, "").toLowerCase();

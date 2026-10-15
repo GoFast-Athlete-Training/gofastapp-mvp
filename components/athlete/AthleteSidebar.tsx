@@ -1,18 +1,18 @@
 "use client";
 
 import { Suspense } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Activity, LayoutDashboard, MapPin, PenLine, Trophy, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import AthleteMobileNav from "@/components/athlete/AthleteMobileNav";
 import {
-  ATHLETE_CONTENT_SIDEBAR_NAV,
+  BUILD_CONTENT_LABEL,
+  BUILD_CONTENT_PATH,
   COMMUNITY_HUB_PATH,
   MANAGE_COMMUNITY_LABEL,
   isCommunityHubPath,
-  isContentNavItemActive,
   isContentStudioPath,
 } from "@/lib/athlete/community-nav";
 
@@ -88,9 +88,6 @@ const primaryNavItems: NavItem[] = [
 function AthleteSidebarInner() {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const viewParam = searchParams.get("view");
-  const focusParam = searchParams.get("focus");
   const contentStudioActive = isContentStudioPath(pathname);
   const hubActive = isCommunityHubPath(pathname);
 
@@ -142,33 +139,18 @@ function AthleteSidebarInner() {
           </div>
 
           <div className="pt-3 mt-2 border-t border-gray-200 space-y-1">
-            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-              Landing & content
-            </p>
-            {ATHLETE_CONTENT_SIDEBAR_NAV.map((item) => {
-              const active = isContentNavItemActive(
-                pathname,
-                viewParam,
-                focusParam,
-                item.section,
-                item.focus
-              );
-              return (
-                <button
-                  key={item.href}
-                  type="button"
-                  onClick={() => router.push(item.href)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    active
-                      ? "bg-orange-50 text-orange-700 border border-orange-200"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <PenLine className="h-4 w-4 shrink-0 opacity-70" />
-                  <span className="text-left">{item.label}</span>
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              onClick={() => router.push(BUILD_CONTENT_PATH)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                contentStudioActive
+                  ? "bg-orange-50 text-orange-700 border border-orange-200"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              <PenLine className="h-5 w-5 shrink-0" />
+              <span className="text-left">{BUILD_CONTENT_LABEL}</span>
+            </button>
           </div>
 
           <div className="mt-auto pt-3 border-t border-gray-200">
