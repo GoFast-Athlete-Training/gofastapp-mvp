@@ -13,6 +13,21 @@ type AthleteRacePublicSnap = {
   distanceLabel: string | null;
 };
 
+function formatAthleteRaceLinkDate(date: Date): string {
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function athleteRaceLinkSubtitle(snap: AthleteRacePublicSnap): string {
+  const datePart = formatAthleteRaceLinkDate(snap.raceDate);
+  const dist = snap.distanceLabel?.trim();
+  return dist ? `${datePart} · ${dist}` : datePart;
+}
+
 function toPublicCustomLink(
   link: AthleteLinkTreeLink,
   raceSnapsByLinkId: Map<string, AthleteRacePublicSnap>,
@@ -22,8 +37,12 @@ function toPublicCustomLink(
   const linkLogoUrl = storedLogo || raceSnap?.logoUrl?.trim() || null;
 
   let description = link.description?.trim() || null;
-  if (!description && raceSnap?.distanceLabel?.trim()) {
-    description = raceSnap.distanceLabel.trim();
+  if (link.kind === AthleteLinkTreeLinkKind.ATHLETE_RACE && raceSnap) {
+    const auto = athleteRaceLinkSubtitle(raceSnap);
+    const distOnly = raceSnap.distanceLabel?.trim();
+    if (!description || (distOnly && description === distOnly)) {
+      description = auto;
+    }
   }
 
   return {

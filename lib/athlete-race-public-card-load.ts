@@ -7,6 +7,7 @@ export type PublicAthleteRaceCardPayload = {
   raceName: string;
   raceDate: string;
   distanceLabel: string | null;
+  raceLogoUrl: string | null;
   goalTime: string | null;
   tagline: string | null;
   catalogUrl: string | null;
@@ -49,11 +50,12 @@ export async function loadPublicAthleteRaceCard(
       name: true,
       raceDate: true,
       distanceLabel: true,
+      logoUrl: true,
       goalTime: true,
       slug: true,
       myCheers: true,
       race_registry: {
-        select: { summaryPhrase: true, slug: true },
+        select: { summaryPhrase: true, slug: true, logoUrl: true },
       },
     },
   });
@@ -65,11 +67,15 @@ export async function loadPublicAthleteRaceCard(
     athlete.gofastHandle?.trim() ||
     handle;
 
+  const raceLogoUrl =
+    claim.logoUrl?.trim() || claim.race_registry?.logoUrl?.trim() || null;
+
   return {
     athleteRaceId: claim.id,
     raceName: claim.name,
     raceDate: formatRaceDate(claim.raceDate),
     distanceLabel: claim.distanceLabel?.trim() || null,
+    raceLogoUrl,
     goalTime: claim.goalTime?.trim() || null,
     tagline: claim.race_registry?.summaryPhrase?.trim() || null,
     catalogUrl: getPublicRacePageUrl(slug),
