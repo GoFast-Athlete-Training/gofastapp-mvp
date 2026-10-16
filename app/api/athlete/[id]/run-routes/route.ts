@@ -122,6 +122,8 @@ export async function POST(
                 mapImageUrl: true,
                 distanceMiles: true,
                 routeNeighborhood: true,
+                runType: true,
+                routePhotos: true,
                 citySlug: true,
                 createdByAthleteId: true,
                 createdBy: {
@@ -151,6 +153,8 @@ export async function POST(
                 mapImageUrl: true,
                 distanceMiles: true,
                 routeNeighborhood: true,
+                runType: true,
+                routePhotos: true,
                 citySlug: true,
                 createdByAthleteId: true,
                 createdBy: {

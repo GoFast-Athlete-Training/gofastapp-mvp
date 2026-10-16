@@ -1,13 +1,25 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
+import {
+  chromeSnapToProfileState,
+  clearAthleteChrome,
+  readAthleteChrome,
+  rememberAthleteChrome,
+  resolveChromePhotoSrc,
+} from '@/lib/athlete-chrome-cache';
 import { Settings, Wallet, Footprints, Link2 } from 'lucide-react';
+
+type TopNavAthleteChrome = {
+  firstName?: string;
+  photoURL?: string;
+};
 
 interface TopNavProps {
   showBack?: boolean;
@@ -17,7 +29,56 @@ interface TopNavProps {
 
 export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }: TopNavProps) {
   const router = useRouter();
-  const [athleteProfile, setAthleteProfile] = useState<any>(null);
+  const [athleteProfile, setAthleteProfile] = useState<TopNavAthleteChrome | null>(null);
+  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
+  const blobPhotoSrcRef = useRef<string | null>(null);
+
+  useLayoutEffect(() => {
+    const id = LocalStorageAPI.getAthleteId();
+    if (!id) return;
+    const snap = readAthleteChrome(id);
+    const fromCache = chromeSnapToProfileState(snap);
+    if (fromCache) {
+      setAthleteProfile((prev) => ({ ...prev, ...fromCache }));
+      if (fromCache.photoURL) {
+        setPhotoSrc(fromCache.photoURL);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = LocalStorageAPI.getAthleteId();
+    if (!id) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      const snap = readAthleteChrome(id);
+      const url = snap?.photoURL ?? athleteProfile?.photoURL ?? null;
+      const resolved = await resolveChromePhotoSrc(id, url);
+      if (cancelled || !resolved) return;
+      if (resolved.startsWith('blob:')) {
+        if (blobPhotoSrcRef.current) {
+          URL.revokeObjectURL(blobPhotoSrcRef.current);
+        }
+        blobPhotoSrcRef.current = resolved;
+      }
+      setPhotoSrc(resolved);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [athleteProfile?.photoURL]);
+
+  useEffect(() => {
+    return () => {
+      if (blobPhotoSrcRef.current) {
+        URL.revokeObjectURL(blobPhotoSrcRef.current);
+        blobPhotoSrcRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -25,7 +86,13 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
     api
       .get(`/athlete/${id}`)
       .then((res) => {
-        if (res.data?.athlete) setAthleteProfile(res.data.athlete);
+        const athlete = res.data?.athlete;
+        if (!athlete) return;
+        rememberAthleteChrome(athlete);
+        setAthleteProfile({
+          firstName: athlete.firstName ?? undefined,
+          photoURL: athlete.photoURL?.trim() || undefined,
+        });
       })
       .catch(() => {});
   }, []);
@@ -33,6 +100,7 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
   const handleSignOut = async () => {
     try {
       await signOut(auth);
+      await clearAthleteChrome();
       LocalStorageAPI.clearAll();
       router.push('/');
     } catch (error) {
@@ -103,9 +171,9 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
               className="flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-gray-600 hover:text-gray-900 rounded-lg font-medium hover:bg-gray-100 transition"
               title="Edit Profile"
             >
-              {athleteProfile?.photoURL ? (
+              {photoSrc ? (
                 <img
-                  src={athleteProfile.photoURL}
+                  src={photoSrc}
                   alt="Profile"
                   className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
                 />

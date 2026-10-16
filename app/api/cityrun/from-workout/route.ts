@@ -15,6 +15,10 @@ import { stampPlannedWorkoutCityRun } from "@/lib/city-run/stamp-planned-city-ru
 import { resolveSpawnedWorkoutForPlanned } from '@/lib/training/match-planned-workout';
 import { resolveWorkoutTargetForAthlete } from '@/lib/training/workout-or-planned-resolve';
 import { inferRegionSlugFromCitySlug } from '@/lib/region-slug';
+import {
+  cityRunMediaFromSavedRoute,
+  resolveSavedRouteForAthlete,
+} from '@/lib/city-run/saved-route-for-athlete';
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +135,8 @@ type FromWorkoutBody = {
   description?: string | null;
   /** Override total miles on city run (defaults from workout distance). */
   totalMiles?: number | null;
+  /** Saved route from My Routes — copies map media onto the city run. */
+  routeId?: string | null;
 };
 
 /**
@@ -174,6 +180,7 @@ export async function POST(request: NextRequest) {
       pace: paceBody,
       description: descriptionBody,
       totalMiles: totalMilesBody,
+      routeId: routeIdBody,
     } = body;
 
     const workoutIdTrimmed = workoutId?.trim() || null;
@@ -330,10 +337,27 @@ export async function POST(request: NextRequest) {
         ? workout.estimatedDistanceInMeters / 1609.34
         : null;
 
-    const totalMilesParsed =
+    let totalMilesParsed =
       totalMilesBody != null && Number.isFinite(Number(totalMilesBody)) && Number(totalMilesBody) > 0
         ? Number(totalMilesBody)
         : totalMilesFromWorkout;
+
+    const routeIdTrimmed =
+      typeof routeIdBody === 'string' ? routeIdBody.trim() : '';
+    let savedRouteMedia: ReturnType<typeof cityRunMediaFromSavedRoute> | null = null;
+    if (routeIdTrimmed) {
+      const savedRoute = await resolveSavedRouteForAthlete(athlete.id, routeIdTrimmed);
+      if (!savedRoute) {
+        return NextResponse.json(
+          { error: 'Route not found or not in your My Routes' },
+          { status: 404 }
+        );
+      }
+      savedRouteMedia = cityRunMediaFromSavedRoute(savedRoute);
+      if (savedRouteMedia.totalMiles != null) {
+        totalMilesParsed = savedRouteMedia.totalMiles;
+      }
+    }
 
     const paceLabel = typeof paceBody === 'string' && paceBody.trim() ? paceBody.trim() : null;
     const descriptionLabel =
@@ -392,8 +416,10 @@ export async function POST(request: NextRequest) {
       meetUpState: meetUpState?.trim() || state?.trim() || null,
       meetUpZip: meetUpZip?.trim() || null,
       meetUpNote: meetUpNote?.trim() || null,
-      routeNeighborhood: routeNeighborhood?.trim() || null,
-      runType: null,
+      routeNeighborhood: savedRouteMedia
+        ? savedRouteMedia.routeNeighborhood
+        : routeNeighborhood?.trim() || null,
+      runType: savedRouteMedia ? savedRouteMedia.runType : null,
       workoutDescription: null,
       meetUpPlaceId: meetUpPlaceId?.trim() || null,
       meetUpLat: meetUpLatFinal,
@@ -404,14 +430,19 @@ export async function POST(request: NextRequest) {
       endState: null,
       totalMiles: totalMilesParsed,
       pace: paceLabel,
-      stravaMapUrl: stravaMapUrlBody?.trim() || null,
+      stravaMapUrl: savedRouteMedia
+        ? savedRouteMedia.stravaMapUrl
+        : stravaMapUrlBody?.trim() || null,
       description: descriptionLabel,
       postRunActivity: null,
-      routePhotos:
-        Array.isArray(routePhotos) && routePhotos.length > 0
+      routePhotos: savedRouteMedia
+        ? savedRouteMedia.routePhotos
+        : Array.isArray(routePhotos) && routePhotos.length > 0
           ? routePhotos.filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
           : Prisma.JsonNull,
-      mapImageUrl: mapImageUrl?.trim() || null,
+      mapImageUrl: savedRouteMedia
+        ? savedRouteMedia.mapImageUrl
+        : mapImageUrl?.trim() || null,
       staffNotes: null,
       stravaEventUrl: null,
       stravaText: null,
@@ -419,7 +450,7 @@ export async function POST(request: NextRequest) {
       webText: null,
       igPostText: null,
       igPostGraphic: null,
-      routeId: null,
+      routeId: savedRouteMedia?.routeId ?? null,
       workoutId: workout?.id ?? null,
       updatedAt: new Date(),
     };

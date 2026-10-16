@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { CheckCircle2, ImagePlus, Loader2, User } from 'lucide-react';
 import api from '@/lib/api';
+import { rememberAthleteChrome } from '@/lib/athlete-chrome-cache';
 import {
   DEFAULT_PHOTO_FOCUS,
   DEFAULT_PHOTO_ZOOM,
@@ -228,6 +229,7 @@ export default function GoFastWithMeLandingForm({
         nextAvatarUrl = await uploadFile(pendingAvatar);
         if (!athleteId) throw new Error('Missing athlete id for profile photo');
         await api.put(`/athlete/${athleteId}/profile`, { photoURL: nextAvatarUrl });
+        rememberAthleteChrome({ athleteId, photoURL: nextAvatarUrl });
         setAvatarPreview(nextAvatarUrl);
         setPendingAvatarFile(null);
         onAvatarSaved?.(nextAvatarUrl);

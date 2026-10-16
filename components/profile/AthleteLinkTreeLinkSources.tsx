@@ -1,15 +1,12 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import type { AthleteLinkTreeLink } from "@/lib/content/athlete-link-tree-types";
-import {
-  insertAfterIdForSection,
-  linkIdForAthleteRace,
-  sectionOptions,
-} from "@/lib/athlete-link-tree/link-tree-race-section";
+import { linkIdForAthleteRace } from "@/lib/athlete-link-tree/link-tree-race-section";
+import { isUpcomingAthleteRace } from "@/lib/athlete-races-service";
 import type { SerializedAthleteRace } from "@/lib/athlete-races-service";
 import {
   ATHLETE_LINK_SOURCE_CARDS,
@@ -19,10 +16,24 @@ import {
   type AthleteLinkSourceCardId,
 } from "@/lib/athlete-link-tree/athlete-runner-public-links";
 import type { AthleteRunRoutePayload } from "@/lib/gofast-with-me/athlete-run-routes";
+
+function formatRacePickerDate(raceDate: string | Date): string {
+  const d = typeof raceDate === "string" ? new Date(raceDate) : raceDate;
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 type Props = {
   publicSlug: string;
   sortedLinks: AthleteLinkTreeLink[];
   adding: boolean;
+  sections: Array<{ id: string; label: string }>;
+  activeSectionId: string | null;
+  onActiveSectionIdChange: (id: string | null) => void;
   onAddLink: (payload: Record<string, unknown>) => Promise<void>;
   onRemoveLink: (linkId: string) => Promise<void>;
 };
@@ -31,6 +42,9 @@ export function AthleteLinkTreeLinkSources({
   publicSlug,
   sortedLinks,
   adding,
+  sections,
+  activeSectionId,
+  onActiveSectionIdChange,
   onAddLink,
   onRemoveLink,
 }: Props) {
@@ -43,8 +57,11 @@ export function AthleteLinkTreeLinkSources({
   const [claimedRaces, setClaimedRaces] = useState<SerializedAthleteRace[]>([]);
   const [racesLoading, setRacesLoading] = useState(false);
   const [racesError, setRacesError] = useState<string | null>(null);
-  const [raceSectionId, setRaceSectionId] = useState("");
-  const sections = sectionOptions(sortedLinks);
+
+  const upcomingRaces = useMemo(
+    () => claimedRaces.filter((r) => isUpcomingAthleteRace(new Date(r.raceDate))),
+    [claimedRaces],
+  );
 
   const existingUrls = useCallback(() => {
     return new Set(
@@ -86,24 +103,8 @@ export function AthleteLinkTreeLinkSources({
     };
   }, [source]);
 
-  async function addPreset(id: AthleteContentLinkPresetId) {
-    const preset = presetLinkForId(id, publicSlug);
-    if (urlAlreadyOnPage(preset.url)) return;
-    const title = preset.title;
-    await onAddLink({
-      name: title,
-      publicLabel: title,
-      url: preset.url,
-      emoji: preset.emoji,
-    });
-    setSource(null);
-  }
-
   useEffect(() => {
     if (source !== "races") return;
-    if (sections.length > 0 && !raceSectionId) {
-      setRaceSectionId(sections[0]!.id);
-    }
     let cancelled = false;
     void (async () => {
       setRacesLoading(true);
@@ -129,19 +130,29 @@ export function AthleteLinkTreeLinkSources({
     return () => {
       cancelled = true;
     };
-  }, [source, raceSectionId, sections.length]);
+  }, [source]);
+
+  async function addPreset(id: AthleteContentLinkPresetId) {
+    const preset = presetLinkForId(id, publicSlug);
+    if (urlAlreadyOnPage(preset.url)) return;
+    const title = preset.title;
+    await onAddLink({
+      name: title,
+      publicLabel: title,
+      url: preset.url,
+      emoji: preset.emoji,
+    });
+    setSource(null);
+  }
 
   async function toggleRaceOnPage(race: SerializedAthleteRace, checked: boolean) {
     const existingId = linkIdForAthleteRace(sortedLinks, race.id);
     if (checked) {
       if (existingId) return;
-      if (!raceSectionId) return;
-      const insertAfterId = insertAfterIdForSection(sortedLinks, raceSectionId);
-      if (!insertAfterId) return;
+      if (!activeSectionId) return;
       await onAddLink({
         kind: "ATHLETE_RACE",
         athleteRaceId: race.id,
-        insertAfterId,
       });
       return;
     }
@@ -179,28 +190,39 @@ export function AthleteLinkTreeLinkSources({
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-gray-900">Add a link</h3>
-          <p className="mt-1 text-sm text-gray-600">
-            Pick a public URL to show as a button — we add the real link, not an editor.
-          </p>
-        </div>
+    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="font-semibold text-gray-900">Add to page</h3>
         {source ? (
           <button
             type="button"
             onClick={() => setSource(null)}
-            className="inline-flex items-center gap-1 text-sm font-medium text-sky-700 hover:underline"
+            className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:underline"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5" />
             Back
           </button>
         ) : null}
       </div>
 
+      <label className="block text-sm">
+        <span className="font-medium text-gray-800">Under section</span>
+        <select
+          className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+          value={activeSectionId ?? ""}
+          onChange={(e) => onActiveSectionIdChange(e.target.value.trim() || null)}
+        >
+          <option value="">Top of page</option>
+          {sections.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
       {!source ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-2">
           {ATHLETE_LINK_SOURCE_CARDS.map((card) => {
             const disabled = cardDisabled(card.id);
             return (
@@ -209,10 +231,10 @@ export function AthleteLinkTreeLinkSources({
                 type="button"
                 disabled={disabled}
                 onClick={() => setSource(card.id)}
-                className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left hover:border-orange-300 hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left hover:border-orange-300 hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span className="block font-semibold text-gray-900">{card.title}</span>
-                <span className="mt-0.5 block text-sm text-gray-500">
+                <span className="block text-sm font-semibold text-gray-900">{card.title}</span>
+                <span className="block text-xs text-gray-500">
                   {card.hint}
                   {disabled && card.id !== "custom" && card.id !== "routes" && card.id !== "races"
                     ? " · Already added"
@@ -229,16 +251,13 @@ export function AthleteLinkTreeLinkSources({
       source === "reflections" ||
       source === "thoughts" ||
       source === "runs" ? (
-        <div className="space-y-3">
-          <p className="text-sm text-gray-700">
-            Adds one button to{" "}
-            <span className="font-medium">{presetLinkForId(source, publicSlug).url}</span>
-          </p>
+        <div className="space-y-2">
+          <p className="text-xs text-gray-600 break-all">{presetLinkForId(source, publicSlug).url}</p>
           <button
             type="button"
             disabled={adding || cardDisabled(source)}
             onClick={() => void addPreset(source)}
-            className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             {adding ? "Adding…" : "Add link"}
           </button>
@@ -246,52 +265,41 @@ export function AthleteLinkTreeLinkSources({
       ) : null}
 
       {source === "races" ? (
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Add a section heading first (for example &ldquo;My Races&rdquo;), then check which
-            claimed races appear under it. Links are generated automatically.
-          </p>
+        <div className="space-y-2">
           {sections.length === 0 ? (
-            <p className="text-sm text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-              Add a section heading above before choosing races.
+            <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+              Add a section on the right first, then pick it above.
             </p>
-          ) : (
-            <label className="block text-sm">
-              <span className="font-medium text-gray-800">Under section</span>
-              <select
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                value={raceSectionId}
-                onChange={(e) => setRaceSectionId(e.target.value)}
-              >
-                {sections.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {racesLoading ? <p className="text-sm text-gray-500">Loading your races…</p> : null}
-          {racesError ? <p className="text-sm text-red-700">{racesError}</p> : null}
-          {!racesLoading && !racesError && claimedRaces.length === 0 ? (
-            <p className="text-sm text-gray-500">No claimed races yet — claim a race in the app first.</p>
+          ) : !activeSectionId ? (
+            <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+              Choose a section above — races show under that heading.
+            </p>
           ) : null}
-          <ul className="max-h-72 space-y-2 overflow-y-auto">
-            {claimedRaces.map((race) => {
+          {racesLoading ? <p className="text-xs text-gray-500">Loading races…</p> : null}
+          {racesError ? <p className="text-xs text-red-700">{racesError}</p> : null}
+          {!racesLoading && !racesError && upcomingRaces.length === 0 ? (
+            <p className="text-xs text-gray-500">No upcoming races on your profile.</p>
+          ) : null}
+          <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+            {upcomingRaces.map((race) => {
               const onPage = Boolean(linkIdForAthleteRace(sortedLinks, race.id));
-              const disabled = adding || !raceSectionId || !race.slug?.trim();
+              const disabled = adding || !activeSectionId || !race.slug?.trim();
+              const meta = [formatRacePickerDate(race.raceDate), race.distanceLabel?.trim()]
+                .filter(Boolean)
+                .join(" · ");
               return (
                 <li key={race.id}>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm hover:bg-gray-50">
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-2 py-2 text-sm hover:bg-gray-50">
                     <input
                       type="checkbox"
-                      className="mt-1"
+                      className="mt-0.5"
                       checked={onPage}
                       disabled={disabled}
                       onChange={(e) => void toggleRaceOnPage(race, e.target.checked)}
                     />
                     <span className="min-w-0 flex-1">
                       <span className="font-medium text-gray-900">{race.name}</span>
+                      {meta ? <span className="mt-0.5 block text-xs text-gray-500">{meta}</span> : null}
                       {!race.slug?.trim() ? (
                         <span className="mt-0.5 block text-xs text-gray-500">Missing public slug</span>
                       ) : null}
@@ -306,14 +314,12 @@ export function AthleteLinkTreeLinkSources({
 
       {source === "routes" ? (
         <div className="space-y-2">
-          {routesLoading ? <p className="text-sm text-gray-500">Loading your routes…</p> : null}
-          {routesError ? <p className="text-sm text-red-700">{routesError}</p> : null}
+          {routesLoading ? <p className="text-xs text-gray-500">Loading routes…</p> : null}
+          {routesError ? <p className="text-xs text-red-700">{routesError}</p> : null}
           {!routesLoading && !routesError && routes.length === 0 ? (
-            <p className="text-sm text-gray-500">
-              No saved routes yet — add routes from Build content.
-            </p>
+            <p className="text-xs text-gray-500">No saved routes yet.</p>
           ) : null}
-          <ul className="max-h-64 space-y-2 overflow-y-auto">
+          <ul className="max-h-56 space-y-1 overflow-y-auto">
             {routes.map((row) => {
               const url = row.route.stravaUrl?.trim() || row.route.stravaMapUrl?.trim();
               const disabled = !url || urlAlreadyOnPage(url);
@@ -323,16 +329,9 @@ export function AthleteLinkTreeLinkSources({
                     type="button"
                     disabled={adding || disabled}
                     onClick={() => void addRoute(row)}
-                    className="w-full rounded-lg bg-white px-3 py-2 text-left text-sm ring-1 ring-gray-200 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-lg px-2 py-1.5 text-left text-sm ring-1 ring-gray-200 hover:bg-sky-50 disabled:opacity-50"
                   >
                     <span className="font-medium">{row.route.name}</span>
-                    {!url ? (
-                      <span className="mt-0.5 block text-xs text-gray-500">No Strava URL</span>
-                    ) : urlAlreadyOnPage(url) ? (
-                      <span className="mt-0.5 block text-xs text-gray-500">Already on your page</span>
-                    ) : (
-                      <span className="mt-0.5 block truncate text-xs text-gray-500">{url}</span>
-                    )}
                   </button>
                 </li>
               );
@@ -343,7 +342,7 @@ export function AthleteLinkTreeLinkSources({
 
       {source === "custom" ? (
         <form
-          className="space-y-3"
+          className="space-y-2"
           onSubmit={(e) => {
             e.preventDefault();
             const title = customTitle.trim();
@@ -361,29 +360,24 @@ export function AthleteLinkTreeLinkSources({
             });
           }}
         >
-          <label className="block text-sm">
-            <span className="font-medium text-gray-800">Button title</span>
-            <input
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              value={customTitle}
-              onChange={(e) => setCustomTitle(e.target.value)}
-              required
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-gray-800">URL</span>
-            <input
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              value={customUrl}
-              onChange={(e) => setCustomUrl(e.target.value)}
-              placeholder="https://"
-              required
-            />
-          </label>
+          <input
+            className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+            value={customTitle}
+            onChange={(e) => setCustomTitle(e.target.value)}
+            placeholder="Button title"
+            required
+          />
+          <input
+            className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+            value={customUrl}
+            onChange={(e) => setCustomUrl(e.target.value)}
+            placeholder="https://"
+            required
+          />
           <button
             type="submit"
             disabled={adding || !customTitle.trim() || !customUrl.trim()}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             {adding ? "Adding…" : "Add link"}
           </button>

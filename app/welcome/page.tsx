@@ -7,6 +7,7 @@ import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { rememberAthleteChrome } from '@/lib/athlete-chrome-cache';
 import { clubManagerHubPath } from '@/lib/club-manager-paths';
 import { athleteHasManagerMemberships } from '@/lib/club-manager-home-route';
 import { runManageSignInPath, runManageWelcomePath } from '@/lib/runmanage/door';
@@ -190,6 +191,9 @@ export default function WelcomePage() {
             const profRes = await api.get(`/athlete/${storedAthleteId}`, {
               headers: { Authorization: `Bearer ${token}` },
             });
+            if (profRes.data?.athlete) {
+              rememberAthleteChrome(profRes.data.athlete);
+            }
             const clubs = (profRes.data?.athlete?.leaderContext?.clubs ?? []) as LeaderContextClub[];
             setIsClubManager(athleteHasManagerMemberships(clubs));
           } catch {
@@ -229,6 +233,9 @@ export default function WelcomePage() {
               headers: { Authorization: `Bearer ${token}` },
             });
             athlete = profRes.data?.athlete;
+            if (athlete) {
+              rememberAthleteChrome(athlete);
+            }
           } else {
             throw new Error('Invalid response from /athlete/me');
           }
@@ -254,6 +261,9 @@ export default function WelcomePage() {
           athleteId = createdAthleteId;
           LocalStorageAPI.setAthleteId(athleteId);
           athlete = createRes.data.data;
+          if (athlete) {
+            rememberAthleteChrome({ ...athlete, id: athleteId });
+          }
         }
 
         if (!athleteId) {

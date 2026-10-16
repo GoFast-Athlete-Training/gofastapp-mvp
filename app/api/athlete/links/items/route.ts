@@ -40,7 +40,12 @@ export async function POST(request: NextRequest) {
     url?: string | null;
     insertAfterId?: string;
     athleteRaceId?: string;
+    sectionId?: string;
+    parentSectionId?: string;
   };
+
+  const parentSectionRaw =
+    body.parentSectionId?.trim() || body.sectionId?.trim() || null;
 
   const athleteRaceIdInput = body.athleteRaceId?.trim();
   let parsedKind = parseLinkKindInput(body.kind);
@@ -124,6 +129,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "name is required" }, { status: 400 });
   }
 
+  let parentSectionId: string | null = null;
+  if (isSection) {
+    if (parentSectionRaw) {
+      return NextResponse.json(
+        { success: false, error: "Section headings cannot belong to another section" },
+        { status: 400 },
+      );
+    }
+  } else if (parentSectionRaw) {
+    const sectionRow = await prisma.athlete_link_tree_links.findFirst({
+      where: { id: parentSectionRaw, treeId, isSection: true },
+      select: { id: true },
+    });
+    if (!sectionRow) {
+      return NextResponse.json({ success: false, error: "Section not found on this page" }, { status: 400 });
+    }
+    parentSectionId = sectionRow.id;
+  }
+
   let sortOrder: number;
   const insertAfterId = body.insertAfterId?.trim();
   if (insertAfterId) {
@@ -167,6 +191,7 @@ export async function POST(request: NextRequest) {
       emoji: isSection || isHydratedLinkKind(parsedKind) ? null : body.emoji?.trim() || null,
       url,
       sortOrder,
+      parentSectionId,
     },
   });
 

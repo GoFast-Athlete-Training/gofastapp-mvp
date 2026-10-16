@@ -10,6 +10,8 @@ export type AthleteRunRouteCatalogPayload = {
   mapImageUrl: string | null;
   distanceMiles: number | null;
   routeNeighborhood: string | null;
+  runType: string | null;
+  routePhotos: string[] | null;
   citySlug: string | null;
   createdByAthleteId: string;
   contributorFirstName: string | null;
@@ -41,6 +43,8 @@ const routeInclude = {
       mapImageUrl: true,
       distanceMiles: true,
       routeNeighborhood: true,
+      runType: true,
+      routePhotos: true,
       citySlug: true,
       createdByAthleteId: true,
       createdBy: {
@@ -71,6 +75,8 @@ type AthleteRunRouteRow = {
     mapImageUrl: string | null;
     distanceMiles: number | null;
     routeNeighborhood: string | null;
+    runType: string | null;
+    routePhotos: unknown;
     citySlug: string | null;
     createdByAthleteId: string;
     createdBy: {
@@ -79,6 +85,12 @@ type AthleteRunRouteRow = {
     };
   };
 };
+
+function normalizeRoutePhotosJson(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const urls = value.filter((u): u is string => typeof u === 'string' && u.trim().length > 0);
+  return urls.length > 0 ? urls : null;
+}
 
 export function mapAthleteRunRoute(row: AthleteRunRouteRow): AthleteRunRoutePayload {
   const whyFavorite = row.caption?.trim() || null;
@@ -101,6 +113,8 @@ export function mapAthleteRunRoute(row: AthleteRunRouteRow): AthleteRunRoutePayl
       mapImageUrl: row.route.mapImageUrl?.trim() || null,
       distanceMiles: row.route.distanceMiles,
       routeNeighborhood: row.route.routeNeighborhood?.trim() || null,
+      runType: row.route.runType?.trim() || null,
+      routePhotos: normalizeRoutePhotosJson(row.route.routePhotos),
       citySlug: row.route.citySlug?.trim() || null,
       createdByAthleteId: row.route.createdByAthleteId,
       contributorFirstName: row.route.createdBy.firstName?.trim() || null,

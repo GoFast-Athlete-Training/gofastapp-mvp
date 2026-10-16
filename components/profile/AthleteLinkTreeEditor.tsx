@@ -2,32 +2,60 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Check, Copy, ExternalLink, Save, Trash2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Check, Copy, ExternalLink } from "lucide-react";
 import api from "@/lib/api";
 import { athleteLinksPublicUrl } from "@/lib/content/athlete-links-public-url";
-import type { AthleteLinkTreeDetail, AthleteLinkTreeLink } from "@/lib/content/athlete-link-tree-types";
-import { AthleteLinkTreeLinkKind } from "@prisma/client";
+import type { AthleteLinkTreeDetail } from "@/lib/content/athlete-link-tree-types";
+import { linkInsertPayload, sectionOptions } from "@/lib/athlete-link-tree/link-tree-race-section";
+import { useDebouncedSave, type SaveStatus } from "@/lib/athlete-link-tree/use-debounced-save";
 import { AthleteLinkTreeLinkSources } from "@/components/profile/AthleteLinkTreeLinkSources";
+import { AthleteLinkTreePageStructure } from "@/components/profile/AthleteLinkTreePageStructure";
 
-const EMOJI_PRESETS = ["🌐", "📱", "🏃", "👟", "🔗", "📍"] as const;
+type EditorTab = "header" | "links";
+
+function SaveStatusLine({ headerStatus, rowStatus }: { headerStatus: SaveStatus; rowStatus: SaveStatus }) {
+  const status =
+    headerStatus === "error" || rowStatus === "error"
+      ? "error"
+      : headerStatus === "saving" || rowStatus === "saving"
+        ? "saving"
+        : headerStatus === "pending" || rowStatus === "pending"
+          ? "pending"
+          : headerStatus === "saved" || rowStatus === "saved"
+            ? "saved"
+            : "idle";
+
+  if (status === "idle") return null;
+  if (status === "error") {
+    return <p className="text-xs text-red-600">Couldn&apos;t save — fix fields or retry from the row.</p>;
+  }
+  if (status === "saving" || status === "pending") {
+    return <p className="text-xs text-gray-500">Saving…</p>;
+  }
+  return <p className="text-xs text-green-700">Saved</p>;
+}
 
 export function AthleteLinkTreeEditor() {
+  const searchParams = useSearchParams();
+  const initialTab: EditorTab = searchParams.get("tab") === "links" ? "links" : "header";
+
+  const [tab, setTab] = useState<EditorTab>(initialTab);
   const [tree, setTree] = useState<AthleteLinkTreeDetail | null>(null);
   const [handle, setHandle] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [publicSlug, setPublicSlug] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [treeBusy, setTreeBusy] = useState(false);
   const [reorderBusy, setReorderBusy] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addingSection, setAddingSection] = useState(false);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const [rowSaveStatus, setRowSaveStatus] = useState<SaveStatus>("idle");
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
-
-  const [adding, setAdding] = useState(false);
-  const [sectionHeading, setSectionHeading] = useState("");
-  const [addingSection, setAddingSection] = useState(false);
 
   const shareUrl = handle ? athleteLinksPublicUrl(handle) : "";
 
@@ -35,6 +63,18 @@ export function AthleteLinkTreeEditor() {
     () => (tree ? tree.links.slice().sort((a, b) => a.sortOrder - b.sortOrder) : []),
     [tree],
   );
+
+  const sections = useMemo(() => sectionOptions(sortedLinks), [sortedLinks]);
+
+  useEffect(() => {
+    if (sections.length === 0) {
+      setActiveSectionId(null);
+      return;
+    }
+    if (!activeSectionId || !sections.some((s) => s.id === activeSectionId)) {
+      setActiveSectionId(sections[0]!.id);
+    }
+  }, [sections, activeSectionId]);
 
   const hydrate = useCallback(async () => {
     setLoading(true);
@@ -72,29 +112,24 @@ export function AthleteLinkTreeEditor() {
     void hydrate();
   }, [hydrate]);
 
-  async function saveTreeMeta() {
+  const {
+    status: headerSaveStatus,
+    schedule: scheduleHeaderSave,
+    saveOnBlur: saveHeaderOnBlur,
+    retry: retryHeaderSave,
+  } = useDebouncedSave(async () => {
     if (!tree) return;
-    setTreeBusy(true);
-    setError(null);
     const trimmedTitle = title.trim() || displayName;
-    try {
-      const res = await api.patch("/athlete/links", {
-        publicLabel: trimmedTitle,
-        publicDescription: subtitle.trim() || null,
-      });
-      if (!res.data?.success || !res.data?.tree) {
-        throw new Error(res.data?.error || "Failed to save");
-      }
-      setTree(res.data.tree);
-      setTitle(res.data.tree.publicLabel?.trim() || trimmedTitle);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
-    } finally {
-      setTreeBusy(false);
-    }
-  }
+    const res = await api.patch("/athlete/links", {
+      publicLabel: trimmedTitle,
+      publicDescription: subtitle.trim() || null,
+    });
+    if (!res.data?.success || !res.data?.tree) throw new Error("fail");
+    setTree(res.data.tree);
+    setTitle(res.data.tree.publicLabel?.trim() || trimmedTitle);
+  });
 
-  async function addLink(payload: Record<string, unknown>) {
+  async function addLinkRaw(payload: Record<string, unknown>) {
     setAdding(true);
     setError(null);
     try {
@@ -108,6 +143,10 @@ export function AthleteLinkTreeEditor() {
     } finally {
       setAdding(false);
     }
+  }
+
+  function addLinkWithPlacement(base: Record<string, unknown>) {
+    return addLinkRaw(linkInsertPayload(sortedLinks, activeSectionId, base));
   }
 
   async function removeLink(linkId: string) {
@@ -137,6 +176,16 @@ export function AthleteLinkTreeEditor() {
       setError(err instanceof Error ? err.message : "Failed to reorder");
     } finally {
       setReorderBusy(false);
+    }
+  }
+
+  async function addSection(name: string) {
+    setAddingSection(true);
+    setError(null);
+    try {
+      await addLinkRaw({ name, isSection: true });
+    } finally {
+      setAddingSection(false);
     }
   }
 
@@ -185,355 +234,141 @@ export function AthleteLinkTreeEditor() {
   const handleSlug = handle?.trim().replace(/^@+/, "").toLowerCase() ?? "";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 pb-8">
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold text-gray-900">GoFast Links</h1>
-          {handleSlug ? (
-            <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-900">
-              gofastlinks /{handleSlug}
-            </span>
+    <div className="space-y-4 pb-8">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">GoFast Links</h1>
+            {handleSlug ? (
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900">
+                /{handleSlug}
+              </span>
+            ) : null}
+          </div>
+          {shareUrl ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <a
+                href={shareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline break-all"
+              >
+                {shareUrl}
+                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+              </a>
+              <button
+                type="button"
+                onClick={() => void copyShare()}
+                className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs font-medium text-gray-800 hover:bg-gray-50"
+              >
+                {shareCopied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+                {shareCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
           ) : null}
         </div>
-        <p className="mt-1 text-sm text-gray-600">
-          Your personal link page — title, subtitle, and buttons people tap.
-        </p>
-        {shareUrl ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <a
-              href={shareUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline break-all"
-            >
-              {shareUrl}
-              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-            </a>
-            <button
-              type="button"
-              onClick={() => void copyShare()}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-800 hover:bg-gray-50"
-            >
-              {shareCopied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-              {shareCopied ? "Copied" : "Copy link"}
-            </button>
-          </div>
-        ) : null}
+
+        <div
+          className="inline-flex rounded-lg border border-gray-200 bg-gray-100 p-0.5 text-sm"
+          role="tablist"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "header"}
+            onClick={() => setTab("header")}
+            className={`rounded-md px-3 py-1.5 font-medium ${tab === "header" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"}`}
+          >
+            Header
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "links"}
+            onClick={() => setTab("links")}
+            className={`rounded-md px-3 py-1.5 font-medium ${tab === "links" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"}`}
+          >
+            Links
+          </button>
+        </div>
       </div>
+
+      <SaveStatusLine headerStatus={tab === "header" ? headerSaveStatus : "idle"} rowStatus={tab === "links" ? rowSaveStatus : "idle"} />
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
-      <section className="rounded-xl border border-sky-100 bg-sky-50/40 p-5 space-y-4 ring-1 ring-sky-100">
-        <div>
-          <h2 className="font-semibold text-gray-900">Page header</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            What people see at the top of gofastlinks — your photo comes from profile; set the title
-            and subtitle here.
+      {tab === "header" ? (
+        <section className="max-w-lg space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+          <label className="block text-sm">
+            <span className="font-medium">Title</span>
+            <input
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                scheduleHeaderSave();
+              }}
+              onBlur={saveHeaderOnBlur}
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium">Subtitle</span>
+            <textarea
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              rows={2}
+              value={subtitle}
+              onChange={(e) => {
+                setSubtitle(e.target.value);
+                scheduleHeaderSave();
+              }}
+              onBlur={saveHeaderOnBlur}
+              placeholder="Short line under your name"
+            />
+          </label>
+          {headerSaveStatus === "error" ? (
+            <button
+              type="button"
+              onClick={() => void retryHeaderSave()}
+              className="text-xs text-red-600 hover:underline"
+            >
+              Couldn&apos;t save header — retry
+            </button>
+          ) : null}
+        </section>
+      ) : (
+        <>
+          <p className="text-sm text-gray-600">
+            Pick links on the left under a section; order them on the right.
           </p>
-        </div>
-        <label className="block text-sm">
-          <span className="font-medium">Title</span>
-          <input
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium">Subtitle</span>
-          <textarea
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-            rows={2}
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="Short line under your name"
-          />
-        </label>
-        <button
-          type="button"
-          disabled={treeBusy || !title.trim()}
-          onClick={() => void saveTreeMeta()}
-          className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          <Save className="h-4 w-4" />
-          {treeBusy ? "Saving…" : "Save header"}
-        </button>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="font-semibold text-gray-900">Links on your page</h2>
-        <p className="text-sm text-gray-600 -mt-2">
-          Reorder buttons and section headings below. Headings like &ldquo;About me&rdquo; are yours
-          to name — add them separately from link cards.
-        </p>
-        {sortedLinks.length === 0 ? (
-          <p className="text-sm text-gray-500">Nothing here yet — add something below.</p>
-        ) : (
-          <ul className="space-y-4">
-            {sortedLinks.map((link, index) => (
-              <LinkRow
-                key={link.id}
-                link={link}
-                index={index}
-                count={sortedLinks.length}
+          <div className="grid gap-6 lg:grid-cols-5">
+            <div className="lg:col-span-2">
+              {publicSlug ? (
+                <AthleteLinkTreeLinkSources
+                  publicSlug={publicSlug}
+                  sortedLinks={sortedLinks}
+                  adding={adding}
+                  sections={sections}
+                  activeSectionId={activeSectionId}
+                  onActiveSectionIdChange={setActiveSectionId}
+                  onAddLink={addLinkWithPlacement}
+                  onRemoveLink={removeLink}
+                />
+              ) : null}
+            </div>
+            <div className="lg:col-span-3">
+              <AthleteLinkTreePageStructure
+                sortedLinks={sortedLinks}
                 reorderBusy={reorderBusy}
                 onMove={moveLink}
                 onUpdated={(next) => setTree(next)}
+                onRowSaveStatus={setRowSaveStatus}
+                onAddSection={addSection}
+                addingSection={addingSection}
               />
-            ))}
-          </ul>
-        )}
-
-        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-          <div>
-            <h3 className="font-semibold text-gray-900">Section heading</h3>
-            <p className="mt-1 text-xs text-gray-500">
-              Labels that group your buttons on the public page — not links themselves.
-            </p>
+            </div>
           </div>
-          <form
-            className="flex flex-col gap-2 sm:flex-row sm:items-end"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const heading = sectionHeading.trim();
-              if (!heading) return;
-              setAddingSection(true);
-              void addLink({ name: heading, isSection: true })
-                .then(() => setSectionHeading(""))
-                .finally(() => setAddingSection(false));
-            }}
-          >
-            <label className="block flex-1 text-sm">
-              <span className="sr-only">Section heading</span>
-              <input
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                value={sectionHeading}
-                onChange={(e) => setSectionHeading(e.target.value)}
-                placeholder="e.g. About me"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={addingSection || adding || !sectionHeading.trim()}
-              className="shrink-0 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-            >
-              {addingSection ? "Adding…" : "Add heading"}
-            </button>
-          </form>
-        </div>
-
-        {publicSlug ? (
-          <AthleteLinkTreeLinkSources
-            publicSlug={publicSlug}
-            sortedLinks={sortedLinks}
-            adding={adding}
-            onAddLink={addLink}
-            onRemoveLink={removeLink}
-          />
-        ) : null}
-      </section>
-    </div>
-  );
-}
-
-function LinkRow({
-  link,
-  index,
-  count,
-  reorderBusy,
-  onMove,
-  onUpdated,
-}: {
-  link: AthleteLinkTreeLink;
-  index: number;
-  count: number;
-  reorderBusy: boolean;
-  onMove: (id: string, dir: -1 | 1) => void;
-  onUpdated: (tree: AthleteLinkTreeDetail) => void;
-}) {
-  const isLegacyRacesCard = !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES;
-  const isGeneratedRace =
-    !link.isSection && link.kind === AthleteLinkTreeLinkKind.ATHLETE_RACE;
-  const initialTitle =
-    link.publicLabel?.trim() || link.name.trim() || (isLegacyRacesCard ? "My races" : "");
-
-  const [buttonTitle, setButtonTitle] = useState(initialTitle);
-  const [sectionTitle, setSectionTitle] = useState(link.name);
-  const [url, setUrl] = useState(link.url ?? "");
-  const [emoji, setEmoji] = useState(link.emoji ?? "");
-  const [busy, setBusy] = useState(false);
-
-  async function save() {
-    setBusy(true);
-    try {
-      if (link.isSection) {
-        const title = sectionTitle.trim();
-        if (!title) return;
-        const res = await api.patch(`/athlete/links/items/${link.id}`, {
-          name: title,
-          publicLabel: title,
-        });
-        if (res.data?.success && res.data?.tree) onUpdated(res.data.tree);
-        return;
-      }
-
-      const title = buttonTitle.trim();
-      if (!title) return;
-
-      const payload: Record<string, unknown> = {
-        name: title,
-        publicLabel: title,
-        emoji: emoji.trim() || null,
-      };
-
-      if (isLegacyRacesCard) {
-        payload.publicLabel = title;
-      } else if (!isGeneratedRace) {
-        payload.url = url.trim();
-      }
-
-      const res = await api.patch(`/athlete/links/items/${link.id}`, payload);
-      if (res.data?.success && res.data?.tree) onUpdated(res.data.tree);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function remove() {
-    if (!window.confirm("Remove this from your page?")) return;
-    setBusy(true);
-    try {
-      const res = await api.delete(`/athlete/links/items/${link.id}`);
-      if (res.data?.success && res.data?.tree) onUpdated(res.data.tree);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const rowLabel = link.isSection
-    ? sectionTitle.trim() || "Section"
-    : buttonTitle.trim() || (isLegacyRacesCard ? "Races" : `Link ${index + 1}`);
-
-  return (
-    <li className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 truncate">
-          {link.isSection ? "Section heading" : "Link"}
-          {" · "}
-          {rowLabel}
-          {isGeneratedRace ? (
-            <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800 normal-case">
-              Race
-            </span>
-          ) : null}
-          {isLegacyRacesCard ? (
-            <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 normal-case">
-              Legacy
-            </span>
-          ) : null}
-        </span>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            disabled={index === 0 || busy || reorderBusy}
-            onClick={() => onMove(link.id, -1)}
-            className="rounded p-1 hover:bg-gray-100 disabled:opacity-40"
-          >
-            <ArrowUp className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            disabled={index >= count - 1 || busy || reorderBusy}
-            onClick={() => onMove(link.id, 1)}
-            className="rounded p-1 hover:bg-gray-100 disabled:opacity-40"
-          >
-            <ArrowDown className="h-4 w-4" />
-          </button>
-          <button type="button" disabled={busy} onClick={() => void remove()} className="rounded p-1 text-red-600">
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {link.isSection ? (
-        <label className="block text-sm">
-          <span className="font-medium">Section heading</span>
-          <input
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            value={sectionTitle}
-            onChange={(e) => setSectionTitle(e.target.value)}
-          />
-        </label>
-      ) : (
-        <>
-          {isGeneratedRace ? (
-            <p className="text-sm text-gray-600">
-              Generated from your claimed race — opens your public race card. Uncheck in Add a link →
-              Races to remove.
-            </p>
-          ) : null}
-          {isLegacyRacesCard ? (
-            <p className="text-sm text-amber-800">
-              Old auto-races slot — remove and use Races checkboxes under a section heading instead.
-            </p>
-          ) : null}
-          {!isGeneratedRace ? (
-            <label className="block text-sm">
-              <span className="font-medium">{isLegacyRacesCard ? "Section heading" : "Button title"}</span>
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                value={buttonTitle}
-                onChange={(e) => setButtonTitle(e.target.value)}
-              />
-            </label>
-          ) : (
-            <p className="text-sm font-medium text-gray-900">{link.name}</p>
-          )}
-          {isGeneratedRace && link.url ? (
-            <p className="text-xs text-gray-500 break-all">{link.url}</p>
-          ) : null}
-          {!isLegacyRacesCard && !isGeneratedRace ? (
-            <>
-              <div>
-                <span className="text-sm font-medium">Emoji</span>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {EMOJI_PRESETS.map((e) => (
-                    <button
-                      key={e}
-                      type="button"
-                      onClick={() => setEmoji(e)}
-                      className={`rounded-lg px-2 py-1 text-lg ${emoji === e ? "ring-2 ring-orange-400" : "bg-gray-50"}`}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <label className="block text-sm">
-                <span className="font-medium">URL</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://"
-                />
-              </label>
-            </>
-          ) : null}
         </>
       )}
-
-      {!isGeneratedRace ? (
-        <button
-          type="button"
-          disabled={busy || (link.isSection ? !sectionTitle.trim() : !buttonTitle.trim())}
-          onClick={() => void save()}
-          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          <Save className="h-4 w-4" />
-          Save
-        </button>
-      ) : null}
-    </li>
+    </div>
   );
 }

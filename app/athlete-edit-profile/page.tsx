@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import { rememberAthleteChrome } from '@/lib/athlete-chrome-cache';
 import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
 
@@ -110,6 +111,7 @@ function AthleteEditProfileInner() {
           profilePhoto: null,
           profilePhotoPreview: stored.photoURL || null,
         });
+        rememberAthleteChrome(stored);
       })
       .catch(() => {
         setError('Error loading profile. Please try again.');
@@ -239,6 +241,13 @@ function AthleteEditProfileInner() {
         profilePayload.photoURL = preview;
       }
       await api.put(`/athlete/${athleteId}/profile`, profilePayload);
+      rememberAthleteChrome({
+        athleteId,
+        firstName: formData.firstName,
+        ...(profilePayload.photoURL !== undefined
+          ? { photoURL: profilePayload.photoURL as string | null }
+          : {}),
+      });
       setSuccess('Profile Info — saved.');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { field?: string; message?: string; error?: string } } };

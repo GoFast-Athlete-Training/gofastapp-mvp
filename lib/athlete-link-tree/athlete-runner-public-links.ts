@@ -25,7 +25,7 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
   title: string;
   hint: string;
 }> = [
-  { id: "landing", title: "My Story", hint: "Your public landing page" },
+  { id: "landing", title: "My GoFast Hub", hint: "Your public hub page" },
   { id: "story", title: "Runner story", hint: "Long-form story" },
   { id: "reflections", title: "Training reflections", hint: "Published reflections" },
   { id: "thoughts", title: "Think pieces", hint: "Essays on your page" },
@@ -50,7 +50,7 @@ export function presetLinkForId(
   switch (id) {
     case "landing":
       return {
-        title: "My Story",
+        title: "My GoFast Hub",
         url: athleteRunnerPublicUrl(publicSlug),
         emoji: PRESET_EMOJI.landing,
       };

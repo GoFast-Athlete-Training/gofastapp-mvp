@@ -27,9 +27,42 @@ export function insertAfterIdForSection(
   sortedLinks: AthleteLinkTreeLink[],
   sectionId: string,
 ): string | null {
+  const byParent = sortedLinks
+    .filter((l) => l.parentSectionId === sectionId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+  if (byParent.length > 0) return byParent[byParent.length - 1]!.id;
+
   const under = linksUnderSection(sortedLinks, sectionId);
   if (under.length > 0) return under[under.length - 1]!.id;
   return sectionId;
+}
+
+/** insertAfterId for appending at top level (no section parent). */
+export function insertAfterIdForTopLevel(sortedLinks: AthleteLinkTreeLink[]): string | null {
+  const top = sortedLinks
+    .filter((l) => !l.parentSectionId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+  if (top.length === 0) return null;
+  return top[top.length - 1]!.id;
+}
+
+/** POST body placement for adds from the link picker. */
+export function linkInsertPayload(
+  sortedLinks: AthleteLinkTreeLink[],
+  activeSectionId: string | null,
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  if (activeSectionId) {
+    const insertAfterId = insertAfterIdForSection(sortedLinks, activeSectionId);
+    return {
+      ...base,
+      parentSectionId: activeSectionId,
+      sectionId: activeSectionId,
+      insertAfterId: insertAfterId ?? undefined,
+    };
+  }
+  const insertAfterId = insertAfterIdForTopLevel(sortedLinks);
+  return insertAfterId ? { ...base, insertAfterId } : base;
 }
 
 export function linkIdForAthleteRace(

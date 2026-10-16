@@ -31,6 +31,12 @@ import {
   generateCitySlugFromParts,
 } from "@/lib/parse-google-address";
 import { formatCalendarDate } from "@/lib/calendar-date";
+import CityRunMyRoutesPicker from "@/components/cityruns/CityRunMyRoutesPicker";
+import {
+  applySavedRouteToFormFields,
+  clearSavedRouteFormFields,
+  type SavedRouteSnapshot,
+} from "@/lib/city-run/saved-route-snapshot";
 import {
   applyPaceOffsetDeltaToSegments,
   metersToMiles,
@@ -169,6 +175,8 @@ export default function CreateCityRunForm({
 
   const [meetUpNote, setMeetUpNote] = useState("");
   const [workoutNarrative, setWorkoutNarrative] = useState("");
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [selectedRoutePhotos, setSelectedRoutePhotos] = useState<string[]>([]);
   const [stravaMapUrl, setStravaMapUrl] = useState("");
   const [routeNeighborhood, setRouteNeighborhood] = useState("");
   const [mapImageUrl, setMapImageUrl] = useState("");
@@ -184,6 +192,28 @@ export default function CreateCityRunForm({
   const [editMiles, setEditMiles] = useState(
     () => metersToMiles(workout.estimatedDistanceInMeters ?? null)?.toString() ?? ""
   );
+
+  const handlePickSavedRoute = (snap: SavedRouteSnapshot) => {
+    setSelectedRouteId(snap.routeId);
+    setSelectedRoutePhotos(snap.routePhotos);
+    applySavedRouteToFormFields(snap, {
+      setStravaMapUrl,
+      setRouteNeighborhood,
+      setMapImageUrl,
+      setTotalMiles: setEditMiles,
+    });
+  };
+
+  const handleClearSavedRoute = () => {
+    setSelectedRouteId(null);
+    setSelectedRoutePhotos([]);
+    clearSavedRouteFormFields({
+      setStravaMapUrl,
+      setRouteNeighborhood,
+      setMapImageUrl,
+    });
+  };
+
   const [paceOffsetSecPerMile, setPaceOffsetSecPerMile] = useState(0);
   const [workoutSaving, setWorkoutSaving] = useState(false);
   const [workoutSaveError, setWorkoutSaveError] = useState<string | null>(null);
@@ -408,10 +438,16 @@ export default function CreateCityRunForm({
         meetUpLng: meetUpLng ?? undefined,
         meetUpNote: meetUpNote.trim() || undefined,
         workoutNarrative: workoutNarrative.trim() || undefined,
+        ...(selectedRouteId ? { routeId: selectedRouteId } : {}),
         stravaMapUrl: stravaMapUrl.trim() || undefined,
         routeNeighborhood: routeNeighborhood.trim() || undefined,
         mapImageUrl: mapImageUrl.trim() || undefined,
-        routePhotos: mapImageUrl.trim() ? [mapImageUrl.trim()] : undefined,
+        routePhotos:
+          selectedRoutePhotos.length > 0
+            ? selectedRoutePhotos
+            : mapImageUrl.trim()
+              ? [mapImageUrl.trim()]
+              : undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
@@ -799,6 +835,11 @@ export default function CreateCityRunForm({
       </div>
 
       <div className="space-y-3">
+        <CityRunMyRoutesPicker
+          selectedRouteId={selectedRouteId}
+          onSelect={handlePickSavedRoute}
+          onClear={handleClearSavedRoute}
+        />
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
             Strava route <span className="font-normal text-gray-400">(optional)</span>

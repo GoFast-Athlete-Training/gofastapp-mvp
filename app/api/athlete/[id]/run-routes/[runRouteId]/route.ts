@@ -91,6 +91,8 @@ export async function PUT(
             mapImageUrl: true,
             distanceMiles: true,
             routeNeighborhood: true,
+            runType: true,
+            routePhotos: true,
             citySlug: true,
             createdByAthleteId: true,
             createdBy: {

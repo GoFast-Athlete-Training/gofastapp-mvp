@@ -12,7 +12,13 @@ import {
   generateCitySlugFromParts,
   parseGoogleAddressFromComponents,
 } from "@/lib/parse-google-address";
+import CityRunMyRoutesPicker from "@/components/cityruns/CityRunMyRoutesPicker";
 import type { CityRunFromWorkoutSuccess } from "@/components/cityruns/CreateCityRunForm";
+import {
+  applySavedRouteToFormFields,
+  clearSavedRouteFormFields,
+  type SavedRouteSnapshot,
+} from "@/lib/city-run/saved-route-snapshot";
 
 function formatMeetupConfirmation(city: string, state: string): string {
   const c = city.trim();
@@ -58,8 +64,32 @@ export default function CityRunMeetupOnlyForm() {
 
   const [totalMiles, setTotalMiles] = useState("");
   const [description, setDescription] = useState("");
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [selectedRoutePhotos, setSelectedRoutePhotos] = useState<string[]>([]);
+  const [mapImageUrl, setMapImageUrl] = useState("");
   const [stravaMapUrl, setStravaMapUrl] = useState("");
   const [routeNeighborhood, setRouteNeighborhood] = useState("");
+
+  const handlePickSavedRoute = (snap: SavedRouteSnapshot) => {
+    setSelectedRouteId(snap.routeId);
+    setSelectedRoutePhotos(snap.routePhotos);
+    applySavedRouteToFormFields(snap, {
+      setStravaMapUrl,
+      setRouteNeighborhood,
+      setMapImageUrl,
+      setTotalMiles,
+    });
+  };
+
+  const handleClearSavedRoute = () => {
+    setSelectedRouteId(null);
+    setSelectedRoutePhotos([]);
+    clearSavedRouteFormFields({
+      setStravaMapUrl,
+      setRouteNeighborhood,
+      setMapImageUrl,
+    });
+  };
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,8 +170,16 @@ export default function CityRunMeetupOnlyForm() {
         description: description.trim() || undefined,
         totalMiles:
           Number.isFinite(milesNum) && milesNum > 0 ? milesNum : undefined,
+        ...(selectedRouteId ? { routeId: selectedRouteId } : {}),
         stravaMapUrl: stravaMapUrl.trim() || undefined,
         routeNeighborhood: routeNeighborhood.trim() || undefined,
+        mapImageUrl: mapImageUrl.trim() || undefined,
+        routePhotos:
+          selectedRoutePhotos.length > 0
+            ? selectedRoutePhotos
+            : mapImageUrl.trim()
+              ? [mapImageUrl.trim()]
+              : undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
@@ -303,6 +341,11 @@ export default function CityRunMeetupOnlyForm() {
           <Route className="w-4 h-4 text-orange-500" />
           Route (optional)
         </p>
+        <CityRunMyRoutesPicker
+          selectedRouteId={selectedRouteId}
+          onSelect={handlePickSavedRoute}
+          onClear={handleClearSavedRoute}
+        />
         <input
           type="url"
           placeholder="Strava route URL"
