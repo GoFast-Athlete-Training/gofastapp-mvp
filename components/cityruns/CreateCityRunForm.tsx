@@ -23,7 +23,7 @@ import GooglePlacesAutocomplete, {
 } from "@/components/RunCrew/GooglePlacesAutocomplete";
 import WorkoutStructurePreview from "@/components/training/WorkoutStructurePreview";
 import api from "@/lib/api";
-import { LocalStorageAPI } from "@/lib/localstorage";
+import { ensureAthleteIdInStorage } from "@/lib/ensure-athlete-session";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import type { WorkoutPreviewSegment } from "@/lib/training/workout-segment-preview";
 import {
@@ -354,8 +354,9 @@ export default function CreateCityRunForm({
     hasValidStartTime(startHour, startMinute, startPeriod);
 
   const handleSubmit = async () => {
-    if (!LocalStorageAPI.getAthleteId()) {
-      setError("Sign in so we can verify it’s your workout.");
+    const athleteId = await ensureAthleteIdInStorage();
+    if (!athleteId) {
+      setError("Sign in so we can verify it’s your workout (athlete session missing).");
       return;
     }
     if (!meetUpPoint.trim() || !meetUpPlaceSet) {

@@ -4,7 +4,7 @@ import axios from 'axios';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { LocalStorageAPI } from './localstorage';
-import { ATHLETE_ID_HEADER } from './gofast-request-headers';
+import { ATHLETE_ID_HEADER, SKIP_ATHLETE_BOOTSTRAP_HEADER } from './gofast-request-headers';
 import { STAFF_ID_HEADER } from './staff-forward-auth';
 
 const STAFF_PREVIEW_STORAGE_KEY = 'gofast_staff_preview_id';
@@ -24,10 +24,6 @@ function waitForAuthUser(timeoutMs = 5000): Promise<import('firebase/auth').User
     return Promise.resolve(null);
   }
   return new Promise((resolve) => {
-    // NOTE: auth.currentUser starts as null (not undefined) while Firebase is
-    // still rehydrating the session — DO NOT early-return on null here.
-    // onAuthStateChanged fires synchronously if auth is already resolved,
-    // so this is safe and fast for both fresh loads and navigations.
     const timer = setTimeout(() => {
       unsubscribe();
       resolve(null);
@@ -41,31 +37,41 @@ function waitForAuthUser(timeoutMs = 5000): Promise<import('firebase/auth').User
   });
 }
 
+function shouldSkipAthleteBootstrap(config: { headers?: Record<string, unknown> }): boolean {
+  return config.headers?.[SKIP_ATHLETE_BOOTSTRAP_HEADER] === '1';
+}
+
 // ── Request interceptor ────────────────────────────────────────────────────────
 api.interceptors.request.use(async (config) => {
-  const aid = LocalStorageAPI.getAthleteId();
-  if (aid && config.headers[ATHLETE_ID_HEADER] == null) {
-    config.headers[ATHLETE_ID_HEADER] = aid;
-  }
+  const hadAuthorization = Boolean(config.headers?.['Authorization']);
 
-  // If a caller already set Authorization (e.g. explicit token pass), still return after athlete header
-  if (config.headers['Authorization']) {
-    return config;
-  }
-
-  // Get current user — wait for Firebase to restore session (refresh token persists in localStorage)
   let user = auth.currentUser;
-  if (!user) {
+  if (!user && !hadAuthorization) {
     user = await waitForAuthUser(5000);
   }
 
-  if (user) {
+  if (!hadAuthorization && user) {
     try {
       const token = await user.getIdToken();
       config.headers['Authorization'] = `Bearer ${token}`;
     } catch (err) {
       console.error('❌ API: Failed to get Firebase token:', err);
     }
+  }
+
+  const signedIn = Boolean(user || hadAuthorization);
+  if (
+    signedIn &&
+    !LocalStorageAPI.getAthleteId() &&
+    !shouldSkipAthleteBootstrap(config)
+  ) {
+    const { ensureAthleteIdInStorage } = await import('./ensure-athlete-session');
+    await ensureAthleteIdInStorage();
+  }
+
+  const aid = LocalStorageAPI.getAthleteId();
+  if (aid && config.headers[ATHLETE_ID_HEADER] == null) {
+    config.headers[ATHLETE_ID_HEADER] = aid;
   }
 
   if (typeof window !== 'undefined') {
@@ -79,9 +85,6 @@ api.interceptors.request.use(async (config) => {
 });
 
 // ── Response interceptor ───────────────────────────────────────────────────────
-// DO NOT redirect on 401. On 401, retry the request once with a force-refreshed
-// token (Firebase uses the refresh token to get a new ID token). Handles "I'm
-// logged in but my token expired" without asking the user to sign in again.
 const RETRY_KEY = '__authRetry';
 
 api.interceptors.response.use(
@@ -92,12 +95,16 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
     if (error?.response?.status === 401 && config && !config[RETRY_KEY]) {
-      const user = auth.currentUser;
+      const user = auth.currentUser ?? (await waitForAuthUser(3000));
       if (user) {
         try {
           const token = await user.getIdToken(true);
           config[RETRY_KEY] = true;
           config.headers['Authorization'] = `Bearer ${token}`;
+          if (!LocalStorageAPI.getAthleteId()) {
+            const { ensureAthleteIdInStorage } = await import('./ensure-athlete-session');
+            await ensureAthleteIdInStorage();
+          }
           const retryAid = LocalStorageAPI.getAthleteId();
           if (retryAid) {
             config.headers[ATHLETE_ID_HEADER] = retryAid;

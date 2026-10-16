@@ -12,6 +12,7 @@ import CreateCityRunForm, {
 import CityRunMeetupOnlyForm from "@/components/cityruns/CityRunMeetupOnlyForm";
 import HostRunWorkoutSlot from "@/components/runs/HostRunWorkoutSlot";
 import api from "@/lib/api";
+import { ensureAthleteIdInStorage } from "@/lib/ensure-athlete-session";
 
 function todayYmd(): string {
   const d = new Date();
@@ -78,6 +79,10 @@ function HostARunPageInner() {
       setLoading(false);
     }
   }, [workoutIdParam]);
+
+  useEffect(() => {
+    void ensureAthleteIdInStorage();
+  }, []);
 
   useEffect(() => {
     void ensureHostWorkout();

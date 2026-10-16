@@ -8,7 +8,7 @@ import GooglePlacesAutocomplete, {
   type GooglePlaceSelectedData,
 } from "@/components/RunCrew/GooglePlacesAutocomplete";
 import api from "@/lib/api";
-import { LocalStorageAPI } from "@/lib/localstorage";
+import { ensureAthleteIdInStorage } from "@/lib/ensure-athlete-session";
 import {
   generateCitySlugFromParts,
   parseGoogleAddressFromComponents,
@@ -96,8 +96,9 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
       : null;
 
   const handleSubmit = async () => {
-    if (!LocalStorageAPI.getAthleteId()) {
-      setError("Sign in to create a run invite.");
+    const athleteId = await ensureAthleteIdInStorage();
+    if (!athleteId) {
+      setError("Sign in to create a run invite (we could not load your athlete session).");
       return;
     }
     const socialTitle = meetupTitle.trim();
