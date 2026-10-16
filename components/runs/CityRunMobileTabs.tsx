@@ -148,13 +148,14 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
 
   if (props.mode === 'going') {
     const hasWorkout = runShouldShowWorkoutPrescribe(props.run);
-    const isHost = isHostRsvpRole(props.run.currentRSVPRole);
+    const viewerRsvpRole = props.viewerRsvpRole ?? props.run.currentRSVPRole;
+    const isHost = isHostRsvpRole(viewerRsvpRole);
 
     return (
       <MobileHubTabs tabs={[...GOING_TABS]} activeTab={activeTab} onTabChange={setActiveTab}>
         {activeTab === 'chatter' ? (
           <div className="flex min-h-[calc(100dvh-11rem)] flex-col space-y-3">
-            <CityRunGoingBanner rsvpRole={props.run.currentRSVPRole} />
+            <CityRunGoingBanner rsvpRole={viewerRsvpRole} />
             {isHost ? <CityRunHostActions cityRunId={props.run.id} /> : null}
             <CityRunChatSection runId={props.run.id} variant="mobile-hub" showHeading={false} />
           </div>

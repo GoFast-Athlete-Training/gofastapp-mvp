@@ -16,6 +16,7 @@ import {
 } from '@/lib/club-run-club-review';
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
+import { RSVP_ROLE_HOST, isHostRsvpRole } from '@/lib/city-run/rsvp-role';
 import {
   cityRunTypeFromRelationshipPatch,
   cityRunTypeFromSnapshot,
@@ -516,7 +517,17 @@ export async function GET(
         role: membership?.role ?? null,
       };
     }
-    
+
+    let currentRSVPRole = userRSVP?.role ?? null;
+    if (
+      athlete &&
+      run.cityRunType === 'INDIVIDUAL' &&
+      run.athleteGeneratedId === athlete.id &&
+      !isHostRsvpRole(currentRSVPRole)
+    ) {
+      currentRSVPRole = RSVP_ROLE_HOST;
+    }
+
     // Format response (exclude sensitive fields)
     return NextResponse.json({
       success: true,
@@ -532,6 +543,7 @@ export async function GET(
         date: run.date.toISOString(),
         runClubId: run.runClubId,
         cityRunType: run.cityRunType,
+        athleteGeneratedId: run.athleteGeneratedId ?? null,
         runClubSlug: run.runClub?.slug || null, // For backward compatibility
         runCrewId: run.runCrewId,
         meetUpPoint: run.meetUpPoint,
@@ -596,7 +608,7 @@ export async function GET(
           Athlete: rsvp.Athlete,
         })),
         currentRSVP: userRSVP?.status || null,
-        currentRSVPRole: userRSVP?.role ?? null,
+        currentRSVPRole,
       },
     });
   } catch (error: any) {

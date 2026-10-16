@@ -102,6 +102,7 @@ export interface CityRunDetails {
   date: string;
   runSeriesId?: string | null;
   cityRunType?: string | null;
+  athleteGeneratedId?: string | null;
   runSeries?: RunSeries | null;
   meetUpPoint: string;
   meetUpStreetAddress: string | null;
