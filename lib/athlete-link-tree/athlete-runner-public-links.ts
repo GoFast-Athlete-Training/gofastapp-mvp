@@ -27,14 +27,18 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
   hint: string;
 }> = [
   { id: "landing", title: "My GoFast Hub", hint: "Your public hub page" },
-  { id: "story", title: "Runner story", hint: "Long-form story" },
-  { id: "reflections", title: "Training reflections", hint: "Published reflections" },
-  { id: "thoughts", title: "Think pieces", hint: "Essays on your page" },
+  { id: "story", title: "Runner story", hint: "Add your published story under a section" },
+  {
+    id: "reflections",
+    title: "Training reflections",
+    hint: "Pick published reflections under a section heading",
+  },
+  { id: "thoughts", title: "Think pieces", hint: "Pick published think pieces under a section heading" },
   { id: "runs", title: "Upcoming runs", hint: "Single link to your hosted runs list" },
   {
     id: "hostedRuns",
-    title: "My runs",
-    hint: "Pick run invites you created (newest first)",
+    title: "Runs I created",
+    hint: "Hosted run invites — not plan workouts (newest first)",
   },
   { id: "races", title: "Races", hint: "Check claimed races under a section heading" },
   { id: "routes", title: "Route", hint: "Pick a saved Strava route" },

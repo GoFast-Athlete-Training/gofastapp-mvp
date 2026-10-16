@@ -71,8 +71,8 @@ export function AthleteLinkTreeEditor() {
       setActiveSectionId(null);
       return;
     }
-    if (!activeSectionId || !sections.some((s) => s.id === activeSectionId)) {
-      setActiveSectionId(sections[0]!.id);
+    if (activeSectionId && !sections.some((s) => s.id === activeSectionId)) {
+      setActiveSectionId(null);
     }
   }, [sections, activeSectionId]);
 
@@ -338,7 +338,8 @@ export function AthleteLinkTreeEditor() {
       ) : (
         <>
           <p className="text-sm text-gray-600">
-            Pick links on the left under a section; order them on the right.
+            Links add under the section selected on the left (or click a section on the right).
+            Reorder with ↑↓ on the right.
           </p>
           <div className="grid gap-6 lg:grid-cols-5">
             <div className="lg:col-span-2">
@@ -358,6 +359,8 @@ export function AthleteLinkTreeEditor() {
             <div className="lg:col-span-3">
               <AthleteLinkTreePageStructure
                 sortedLinks={sortedLinks}
+                activeSectionId={activeSectionId}
+                onActiveSectionIdChange={setActiveSectionId}
                 reorderBusy={reorderBusy}
                 onMove={moveLink}
                 onUpdated={(next) => setTree(next)}

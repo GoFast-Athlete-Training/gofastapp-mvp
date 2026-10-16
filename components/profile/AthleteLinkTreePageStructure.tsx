@@ -12,6 +12,8 @@ const EMOJI_PRESETS = ["🌐", "📱", "🏃", "👟", "🔗", "📍"] as const;
 
 type Props = {
   sortedLinks: AthleteLinkTreeLink[];
+  activeSectionId: string | null;
+  onActiveSectionIdChange: (id: string | null) => void;
   reorderBusy: boolean;
   onMove: (id: string, dir: -1 | 1) => void;
   onUpdated: (tree: AthleteLinkTreeDetail) => void;
@@ -207,6 +209,8 @@ function CompactLinkRow({
 
 export function AthleteLinkTreePageStructure({
   sortedLinks,
+  activeSectionId,
+  onActiveSectionIdChange,
   reorderBusy,
   onMove,
   onUpdated,
@@ -230,17 +234,33 @@ export function AthleteLinkTreePageStructure({
           {blocks.map((block) => {
             if (block.type === "section") {
               const sectionIndex = sortedLinks.findIndex((l) => l.id === block.section.id);
+              const isTarget = activeSectionId === block.section.id;
               return (
                 <li key={block.section.id} className="space-y-1">
-                  <CompactLinkRow
-                    link={block.section}
-                    index={sectionIndex}
-                    count={sortedLinks.length}
-                    reorderBusy={reorderBusy}
-                    onMove={onMove}
-                    onUpdated={onUpdated}
-                    onRowSaveStatus={onRowSaveStatus}
-                  />
+                  <div
+                    className={
+                      isTarget
+                        ? "rounded-lg ring-2 ring-sky-400 ring-offset-1"
+                        : "rounded-lg"
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onActiveSectionIdChange(block.section.id)}
+                      className="mb-0.5 w-full rounded-md px-1 py-0.5 text-left text-[11px] font-medium text-sky-700 hover:bg-sky-50"
+                    >
+                      {isTarget ? "Adding links here" : "Add links under this section"}
+                    </button>
+                    <CompactLinkRow
+                      link={block.section}
+                      index={sectionIndex}
+                      count={sortedLinks.length}
+                      reorderBusy={reorderBusy}
+                      onMove={onMove}
+                      onUpdated={onUpdated}
+                      onRowSaveStatus={onRowSaveStatus}
+                    />
+                  </div>
                   {block.children.length > 0 ? (
                     <ul className="space-y-1">
                       {block.children.map((child) => {

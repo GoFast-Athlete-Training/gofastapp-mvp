@@ -8,7 +8,13 @@ import type { AthleteLinkTreeLink } from "@/lib/content/athlete-link-tree-types"
 import {
   linkIdForAthleteRace,
   linkIdForCityRun,
+  linkIdForUrl,
 } from "@/lib/athlete-link-tree/link-tree-race-section";
+import {
+  athletePublicReflectionUrl,
+  athletePublicStoryUrl,
+  athletePublicTipUrl,
+} from "@/lib/athlete-link-tree/runner-content-public-urls";
 import type { AthleteHostedRunInvite } from "@/lib/city-run/list-athlete-hosted-invites";
 import { isUpcomingAthleteRace } from "@/lib/athlete-races-service";
 import type { SerializedAthleteRace } from "@/lib/athlete-races-service";
@@ -64,6 +70,20 @@ export function AthleteLinkTreeLinkSources({
   const [hostedRuns, setHostedRuns] = useState<AthleteHostedRunInvite[]>([]);
   const [hostedRunsLoading, setHostedRunsLoading] = useState(false);
   const [hostedRunsError, setHostedRunsError] = useState<string | null>(null);
+  const [publishedTips, setPublishedTips] = useState<
+    Array<{ id: string; title: string; publishedAt: string | null }>
+  >([]);
+  const [tipsLoading, setTipsLoading] = useState(false);
+  const [tipsError, setTipsError] = useState<string | null>(null);
+  const [publishedReflections, setPublishedReflections] = useState<
+    Array<{ id: string; caption: string | null; publishedAt: string; activityName: string | null }>
+  >([]);
+  const [reflectionsLoading, setReflectionsLoading] = useState(false);
+  const [reflectionsError, setReflectionsError] = useState<string | null>(null);
+  const [storyPreview, setStoryPreview] = useState<string | null>(null);
+  const [storyHasContent, setStoryHasContent] = useState(false);
+  const [storyLoading, setStoryLoading] = useState(false);
+  const [storyError, setStoryError] = useState<string | null>(null);
 
   const upcomingRaces = useMemo(
     () => claimedRaces.filter((r) => isUpcomingAthleteRace(new Date(r.raceDate))),
@@ -164,6 +184,102 @@ export function AthleteLinkTreeLinkSources({
     };
   }, [source]);
 
+  useEffect(() => {
+    if (source !== "thoughts") return;
+    let cancelled = false;
+    void (async () => {
+      setTipsLoading(true);
+      setTipsError(null);
+      try {
+        const res = await api.get("/athlete/links/published-tips");
+        if (!res.data?.success) throw new Error(res.data?.error || "Failed to load think pieces");
+        if (!cancelled) setPublishedTips(res.data.tips ?? []);
+      } catch (err) {
+        if (!cancelled) {
+          setPublishedTips([]);
+          setTipsError(err instanceof Error ? err.message : "Failed to load think pieces");
+        }
+      } finally {
+        if (!cancelled) setTipsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
+
+  useEffect(() => {
+    if (source !== "reflections") return;
+    let cancelled = false;
+    void (async () => {
+      setReflectionsLoading(true);
+      setReflectionsError(null);
+      try {
+        const res = await api.get("/athlete/links/published-reflections");
+        if (!res.data?.success) {
+          throw new Error(res.data?.error || "Failed to load reflections");
+        }
+        if (!cancelled) setPublishedReflections(res.data.reflections ?? []);
+      } catch (err) {
+        if (!cancelled) {
+          setPublishedReflections([]);
+          setReflectionsError(err instanceof Error ? err.message : "Failed to load reflections");
+        }
+      } finally {
+        if (!cancelled) setReflectionsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
+
+  useEffect(() => {
+    if (source !== "story") return;
+    let cancelled = false;
+    void (async () => {
+      setStoryLoading(true);
+      setStoryError(null);
+      try {
+        const res = await api.get("/athlete/links/runner-story");
+        if (!res.data?.success) throw new Error(res.data?.error || "Failed to load story");
+        if (!cancelled) {
+          setStoryHasContent(Boolean(res.data.hasStory));
+          setStoryPreview(typeof res.data.preview === "string" ? res.data.preview : null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setStoryHasContent(false);
+          setStoryPreview(null);
+          setStoryError(err instanceof Error ? err.message : "Failed to load story");
+        }
+      } finally {
+        if (!cancelled) setStoryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
+
+  function sectionRequiredBanner() {
+    if (sections.length === 0) {
+      return (
+        <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+          Add a section on the right first, then pick it above or click the section heading.
+        </p>
+      );
+    }
+    if (!activeSectionId) {
+      return (
+        <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+          Choose a section above or click a section on the right before adding links.
+        </p>
+      );
+    }
+    return null;
+  }
+
   function formatRunPickerDate(iso: string): string {
     return new Date(iso).toLocaleDateString("en-US", {
       month: "short",
@@ -207,6 +323,60 @@ export function AthleteLinkTreeLinkSources({
     }
   }
 
+  async function toggleTipOnPage(
+    tip: { id: string; title: string },
+    checked: boolean,
+  ) {
+    const url = athletePublicTipUrl(publicSlug, tip.id);
+    const existingId = linkIdForUrl(sortedLinks, url);
+    if (checked) {
+      if (existingId || !activeSectionId) return;
+      await onAddLink({
+        name: tip.title.trim() || "Think piece",
+        publicLabel: tip.title.trim() || "Think piece",
+        url,
+        emoji: "💭",
+      });
+      return;
+    }
+    if (existingId) await onRemoveLink(existingId);
+  }
+
+  async function toggleReflectionOnPage(
+    post: { id: string; caption: string | null; activityName: string | null; publishedAt: string },
+    checked: boolean,
+  ) {
+    const url = athletePublicReflectionUrl(publicSlug, post.id);
+    const existingId = linkIdForUrl(sortedLinks, url);
+    const title =
+      post.caption?.trim().slice(0, 80) ||
+      post.activityName?.trim() ||
+      "Training reflection";
+    if (checked) {
+      if (existingId || !activeSectionId) return;
+      await onAddLink({
+        name: title,
+        publicLabel: title,
+        url,
+        emoji: "📝",
+      });
+      return;
+    }
+    if (existingId) await onRemoveLink(existingId);
+  }
+
+  async function addStoryLink() {
+    const url = athletePublicStoryUrl(publicSlug);
+    if (urlAlreadyOnPage(url) || !activeSectionId) return;
+    await onAddLink({
+      name: "Runner story",
+      publicLabel: "Runner story",
+      url,
+      emoji: "📖",
+    });
+    setSource(null);
+  }
+
   async function toggleRaceOnPage(race: SerializedAthleteRace, checked: boolean) {
     const existingId = linkIdForAthleteRace(sortedLinks, race.id);
     if (checked) {
@@ -238,15 +408,12 @@ export function AthleteLinkTreeLinkSources({
 
   function cardDisabled(id: AthleteLinkSourceCardId): boolean {
     if (adding) return true;
-    if (
-      id === "landing" ||
-      id === "story" ||
-      id === "reflections" ||
-      id === "thoughts" ||
-      id === "runs"
-    ) {
+    if (id === "landing" || id === "runs") {
       const preset = presetLinkForId(id, publicSlug);
       return urlAlreadyOnPage(preset.url);
+    }
+    if (id === "story") {
+      return urlAlreadyOnPage(athletePublicStoryUrl(publicSlug));
     }
     return false;
   }
@@ -302,7 +469,9 @@ export function AthleteLinkTreeLinkSources({
                   card.id !== "custom" &&
                   card.id !== "routes" &&
                   card.id !== "races" &&
-                  card.id !== "hostedRuns"
+                  card.id !== "hostedRuns" &&
+                  card.id !== "thoughts" &&
+                  card.id !== "reflections"
                     ? " · Already added"
                     : null}
                 </span>
@@ -312,11 +481,7 @@ export function AthleteLinkTreeLinkSources({
         </div>
       ) : null}
 
-      {source === "landing" ||
-      source === "story" ||
-      source === "reflections" ||
-      source === "thoughts" ||
-      source === "runs" ? (
+      {source === "landing" || source === "runs" ? (
         <div className="space-y-2">
           <p className="text-xs text-gray-600 break-all">{presetLinkForId(source, publicSlug).url}</p>
           <button
@@ -330,17 +495,110 @@ export function AthleteLinkTreeLinkSources({
         </div>
       ) : null}
 
+      {source === "story" ? (
+        <div className="space-y-2">
+          {sectionRequiredBanner()}
+          {storyLoading ? <p className="text-xs text-gray-500">Loading story…</p> : null}
+          {storyError ? <p className="text-xs text-red-700">{storyError}</p> : null}
+          {!storyLoading && !storyError && !storyHasContent ? (
+            <p className="text-xs text-gray-500">No runner story published yet.</p>
+          ) : null}
+          {storyPreview ? (
+            <p className="text-xs text-gray-600 whitespace-pre-wrap line-clamp-4">{storyPreview}</p>
+          ) : null}
+          <p className="text-xs text-gray-500 break-all">{athletePublicStoryUrl(publicSlug)}</p>
+          <button
+            type="button"
+            disabled={adding || !activeSectionId || !storyHasContent || cardDisabled("story")}
+            onClick={() => void addStoryLink()}
+            className="rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {adding ? "Adding…" : "Add link"}
+          </button>
+        </div>
+      ) : null}
+
+      {source === "thoughts" ? (
+        <div className="space-y-2">
+          {sectionRequiredBanner()}
+          {tipsLoading ? <p className="text-xs text-gray-500">Loading think pieces…</p> : null}
+          {tipsError ? <p className="text-xs text-red-700">{tipsError}</p> : null}
+          {!tipsLoading && !tipsError && publishedTips.length === 0 ? (
+            <p className="text-xs text-gray-500">No published think pieces yet.</p>
+          ) : null}
+          <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+            {publishedTips.map((tip) => {
+              const url = athletePublicTipUrl(publicSlug, tip.id);
+              const onPage = Boolean(linkIdForUrl(sortedLinks, url));
+              const disabled = adding || !activeSectionId;
+              return (
+                <li key={tip.id}>
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-2 py-2 text-sm hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={onPage}
+                      disabled={disabled}
+                      onChange={(e) => void toggleTipOnPage(tip, e.target.checked)}
+                    />
+                    <span className="font-medium text-gray-900">{tip.title}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
+      {source === "reflections" ? (
+        <div className="space-y-2">
+          {sectionRequiredBanner()}
+          {reflectionsLoading ? <p className="text-xs text-gray-500">Loading reflections…</p> : null}
+          {reflectionsError ? <p className="text-xs text-red-700">{reflectionsError}</p> : null}
+          {!reflectionsLoading && !reflectionsError && publishedReflections.length === 0 ? (
+            <p className="text-xs text-gray-500">No published reflections yet.</p>
+          ) : null}
+          <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+            {publishedReflections.map((post) => {
+              const url = athletePublicReflectionUrl(publicSlug, post.id);
+              const onPage = Boolean(linkIdForUrl(sortedLinks, url));
+              const disabled = adding || !activeSectionId;
+              const label =
+                post.caption?.trim().slice(0, 80) ||
+                post.activityName?.trim() ||
+                "Training reflection";
+              const meta = post.publishedAt
+                ? new Date(post.publishedAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "";
+              return (
+                <li key={post.id}>
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-2 py-2 text-sm hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={onPage}
+                      disabled={disabled}
+                      onChange={(e) => void toggleReflectionOnPage(post, e.target.checked)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium text-gray-900">{label}</span>
+                      {meta ? <span className="mt-0.5 block text-xs text-gray-500">{meta}</span> : null}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
       {source === "hostedRuns" ? (
         <div className="space-y-2">
-          {sections.length === 0 ? (
-            <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-              Add a section on the right first, then pick it above.
-            </p>
-          ) : !activeSectionId ? (
-            <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-              Choose a section above — runs show under that heading.
-            </p>
-          ) : null}
+          {sectionRequiredBanner()}
           {hostedRunsLoading ? <p className="text-xs text-gray-500">Loading runs…</p> : null}
           {hostedRunsError ? <p className="text-xs text-red-700">{hostedRunsError}</p> : null}
           {!hostedRunsLoading && !hostedRunsError && hostedRuns.length === 0 ? (
@@ -386,15 +644,7 @@ export function AthleteLinkTreeLinkSources({
 
       {source === "races" ? (
         <div className="space-y-2">
-          {sections.length === 0 ? (
-            <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-              Add a section on the right first, then pick it above.
-            </p>
-          ) : !activeSectionId ? (
-            <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-              Choose a section above — races show under that heading.
-            </p>
-          ) : null}
+          {sectionRequiredBanner()}
           {racesLoading ? <p className="text-xs text-gray-500">Loading races…</p> : null}
           {racesError ? <p className="text-xs text-red-700">{racesError}</p> : null}
           {!racesLoading && !racesError && upcomingRaces.length === 0 ? (

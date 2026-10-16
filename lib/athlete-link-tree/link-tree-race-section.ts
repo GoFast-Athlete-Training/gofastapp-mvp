@@ -1,4 +1,5 @@
 import type { AthleteLinkTreeLink } from "@/lib/content/athlete-link-tree-types";
+import { normalizeLinkUrlForCompare } from "@/lib/athlete-link-tree/athlete-runner-public-links";
 
 /** Links immediately after a section row until the next section. */
 export function linksUnderSection(
@@ -78,5 +79,13 @@ export function linkIdForCityRun(
   cityRunId: string,
 ): string | null {
   const hit = sortedLinks.find((l) => l.cityRunId === cityRunId);
+  return hit?.id ?? null;
+}
+
+export function linkIdForUrl(sortedLinks: AthleteLinkTreeLink[], url: string): string | null {
+  const norm = normalizeLinkUrlForCompare(url);
+  const hit = sortedLinks.find(
+    (l) => !l.isSection && l.url?.trim() && normalizeLinkUrlForCompare(l.url) === norm,
+  );
   return hit?.id ?? null;
 }
