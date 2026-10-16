@@ -338,8 +338,9 @@ export function AthleteLinkTreeEditor() {
       ) : (
         <>
           <p className="text-sm text-gray-600">
-            Links add under the section selected on the left (or click a section on the right).
-            Reorder with ↑↓ on the right.
+            My GoFast Hub belongs at <strong>Top</strong> — it opens your full GoFast With Me page on
+            mobile and desktop, not an About Me block. Use section headings when you add several
+            race, run, or writing links. Reorder with ↑↓ on the right.
           </p>
           <div className="grid gap-6 lg:grid-cols-5">
             <div className="lg:col-span-2">

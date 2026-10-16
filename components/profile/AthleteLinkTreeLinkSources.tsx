@@ -434,14 +434,18 @@ export function AthleteLinkTreeLinkSources({
         ) : null}
       </div>
 
+      <p className="text-xs text-gray-500">
+        <strong className="font-medium text-gray-700">Top</strong> = no heading (use for My GoFast Hub).
+        Sections group multiple links (races, runs you created, writing).
+      </p>
       <label className="block text-sm">
-        <span className="font-medium text-gray-800">Under section</span>
+        <span className="font-medium text-gray-800">Placement</span>
         <select
           className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
           value={activeSectionId ?? ""}
           onChange={(e) => onActiveSectionIdChange(e.target.value.trim() || null)}
         >
-          <option value="">Top of page</option>
+          <option value="">Top</option>
           {sections.map((s) => (
             <option key={s.id} value={s.id}>
               {s.label}
@@ -483,6 +487,12 @@ export function AthleteLinkTreeLinkSources({
 
       {source === "landing" || source === "runs" ? (
         <div className="space-y-2">
+          {source === "landing" && activeSectionId ? (
+            <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+              Set placement to <strong>Top</strong> — the hub is the whole GoFast With Me page, not
+              under a section heading.
+            </p>
+          ) : null}
           <p className="text-xs text-gray-600 break-all">{presetLinkForId(source, publicSlug).url}</p>
           <button
             type="button"

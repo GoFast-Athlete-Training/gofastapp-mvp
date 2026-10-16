@@ -26,7 +26,11 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
   title: string;
   hint: string;
 }> = [
-  { id: "landing", title: "My GoFast Hub", hint: "Your public hub page" },
+  {
+    id: "landing",
+    title: "My GoFast Hub",
+    hint: "GoFast With Me door — add at Top (no section heading)",
+  },
   { id: "story", title: "Runner story", hint: "Add your published story under a section" },
   {
     id: "reflections",
@@ -34,7 +38,11 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
     hint: "Pick published reflections under a section heading",
   },
   { id: "thoughts", title: "Think pieces", hint: "Pick published think pieces under a section heading" },
-  { id: "runs", title: "Upcoming runs", hint: "Single link to your hosted runs list" },
+  {
+    id: "runs",
+    title: "Upcoming runs",
+    hint: "Hosted runs list — add at Top or under a section",
+  },
   {
     id: "hostedRuns",
     title: "Runs I created",
