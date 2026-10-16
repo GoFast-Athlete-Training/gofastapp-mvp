@@ -468,9 +468,11 @@ export async function GET(
       });
     }
 
-    // Athlete plan stamp (planned_workouts.cityRunId) — not city_runs.workoutId.
+    // Series/club template on city_runs.plannedWorkoutId only — not silent activity-match stamps.
     let displayPlannedWorkout = run.plannedWorkout;
-    if (!displayPlannedWorkout && athlete) {
+    const isMeetupInvite =
+      run.cityRunType === 'INDIVIDUAL' || (!run.runClubId && !run.runCrewId);
+    if (!displayPlannedWorkout && athlete && !isMeetupInvite) {
       displayPlannedWorkout = await prisma.planned_workouts.findFirst({
         where: { cityRunId: run.id, athleteId: athlete.id },
         select: {

@@ -175,7 +175,7 @@ export async function POST(
           stampMode: normalizedStampMode,
           sourceWorkoutId: normalizedSourceWorkoutId,
         });
-      } else if (run.cityRunType === 'INDIVIDUAL') {
+      } else if (run.cityRunType === 'INDIVIDUAL' && existingRsvp?.role !== RSVP_ROLE_HOST) {
         await upsertIndividualCityRunStampForAthlete(athlete.id, resolvedId);
       }
     }

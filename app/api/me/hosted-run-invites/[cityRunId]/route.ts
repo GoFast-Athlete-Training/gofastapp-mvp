@@ -9,6 +9,7 @@ import { deleteAthleteHostedRunInvite } from "@/lib/city-run/delete-athlete-host
 import { parseRunTotalMiles } from "@/lib/parse-run-total-miles";
 import { generateCitySlugFromParts } from "@/lib/parse-google-address";
 import prisma from "@/lib/prisma";
+import { upsertIndividualCityRunStampForAthlete } from "@/lib/city-run/individual-city-run-stamp";
 
 type PatchBody = {
   title?: string;
@@ -135,6 +136,8 @@ export async function PATCH(
       updatedAt: new Date(),
     },
   });
+
+  await upsertIndividualCityRunStampForAthlete(auth.athlete.id, cityRunId.trim());
 
   const invite = await getAthleteHostedRunInviteForHost(auth.athlete.id, cityRunId.trim());
   return NextResponse.json({ success: true, invite });

@@ -37,6 +37,7 @@ function joined(overrides: Partial<RunnerJoinedRun> & Pick<RunnerJoinedRun, 'id'
     runClubId: 'club1',
     plannedWorkoutId: null,
     plannedWorkoutPreview: null,
+    rsvpRole: null,
     hasCheckin: false,
     checkedInAt: null,
     isPast: false,

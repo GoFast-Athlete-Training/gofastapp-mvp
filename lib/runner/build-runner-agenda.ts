@@ -48,6 +48,7 @@ export type RunnerJoinedRun = {
   runClubId: string | null;
   plannedWorkoutId: string | null;
   plannedWorkoutPreview: RunnerPlannedWorkoutPreview | null;
+  rsvpRole: string | null;
   hasCheckin: boolean;
   checkedInAt: string | null;
   isPast: boolean;

@@ -9,25 +9,15 @@ function generateId(): string {
   return `c${timestamp}${random}`;
 }
 
-async function ensureMinimalSegments(plannedWorkoutId: string, miles: number | null) {
-  const count = await prisma.planned_workout_segments.count({
+function distanceMetersFromMiles(miles: number | null): number | null {
+  if (miles == null || miles <= 0) return null;
+  return Math.round(miles * 1609.34);
+}
+
+/** Silent activity-match rows must not carry prescribe segments. */
+async function clearStampSegments(plannedWorkoutId: string) {
+  await prisma.planned_workout_segments.deleteMany({
     where: { plannedWorkoutId },
-  });
-  if (count > 0) return;
-
-  const distanceMeters =
-    miles != null && miles > 0 ? Math.round(miles * 1609.34) : 5000;
-
-  await prisma.planned_workout_segments.create({
-    data: {
-      plannedWorkoutId,
-      stepOrder: 1,
-      title: 'Run',
-      durationType: 'DISTANCE',
-      durationValue: distanceMeters,
-      paceTargetEncodingVersion: 2,
-      updatedAt: new Date(),
-    },
   });
 }
 
@@ -64,16 +54,22 @@ export async function upsertIndividualCityRunStampForAthlete(
       })
     : run.title.trim() || 'Run';
 
+  const title = run.title.trim() || 'Run';
+  const estimatedDistanceInMeters = distanceMetersFromMiles(run.totalMiles);
+
   const existing = await prisma.planned_workouts.findFirst({
     where: { athleteId, cityRunId },
     select: { id: true },
   });
 
   if (existing) {
+    await clearStampSegments(existing.id);
     await prisma.planned_workouts.update({
       where: { id: existing.id },
       data: {
+        title,
         date: run.date,
+        estimatedDistanceInMeters,
         courseSnapJson: courseJson,
         cityRunMatchLabel: matchLabel,
         updatedAt: new Date(),
@@ -85,21 +81,18 @@ export async function upsertIndividualCityRunStampForAthlete(
   const created = await prisma.planned_workouts.create({
     data: {
       id: generateId(),
-      title: run.title.trim() || 'Run',
+      title,
       workoutType: WorkoutType.Easy,
       athleteId,
       planId: null,
       cityRunId,
       date: run.date,
-      estimatedDistanceInMeters:
-        run.totalMiles != null ? Math.round(run.totalMiles * 1609.34) : null,
+      estimatedDistanceInMeters,
       courseSnapJson: courseJson,
       cityRunMatchLabel: matchLabel,
       updatedAt: new Date(),
     },
   });
-
-  await ensureMinimalSegments(created.id, run.totalMiles);
 
   return { ok: true, plannedWorkoutId: created.id, action: 'created' };
 }

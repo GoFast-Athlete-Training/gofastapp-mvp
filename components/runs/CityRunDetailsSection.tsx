@@ -398,10 +398,25 @@ export function CityRunRsvpPanel({
   );
 }
 
-export function CityRunGoingBanner() {
+export function CityRunGoingBanner({ rsvpRole }: { rsvpRole?: string | null }) {
+  const hosting = rsvpRole === 'host';
   return (
-    <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-      <span className="text-green-800 font-semibold text-sm">You&apos;re going</span>
+    <div
+      className={
+        hosting
+          ? 'bg-sky-50 border border-sky-200 rounded-xl px-4 py-3'
+          : 'bg-green-50 border border-green-200 rounded-xl px-4 py-3'
+      }
+    >
+      <span
+        className={
+          hosting
+            ? 'text-sky-900 font-semibold text-sm'
+            : 'text-green-800 font-semibold text-sm'
+        }
+      >
+        {hosting ? "You're hosting" : "You're going"}
+      </span>
     </div>
   );
 }

@@ -175,10 +175,13 @@ export function runShouldShowWorkoutPrescribe(run: {
   workoutId?: string | null;
   workout?: CityRunWorkoutSummary | null;
 }): boolean {
+  const meetupOnly =
+    run.cityRunType === 'INDIVIDUAL' || (!run.runClubId && !run.runCrewId);
+  if (meetupOnly) {
+    return Boolean(run.workoutId && (run.workout || run.plannedWorkoutId));
+  }
   if (run.plannedWorkoutId || run.plannedWorkout?.segments?.length) return true;
   if (run.workout?.workoutNarrative?.trim()) return true;
-  // Athlete host-a-run keeps a linked Easy workout for backend — not a public prescribe.
-  if (run.cityRunType === 'INDIVIDUAL' || (!run.runClubId && !run.runCrewId)) return false;
   return Boolean(run.workoutId || run.workout);
 }
 

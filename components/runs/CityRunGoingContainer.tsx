@@ -14,6 +14,8 @@ import {
   type CityRunRsvp,
 } from '@/components/runs/city-run-types';
 import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
+import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
+import CityRunHostActions from '@/components/runs/CityRunHostActions';
 
 interface Props {
   run: CityRunDetails;
@@ -56,6 +58,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
   };
 
   const showWorkoutPrescribe = runShouldShowWorkoutPrescribe(run);
+  const isHost = isHostRsvpRole(run.currentRSVPRole);
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -70,7 +73,8 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
         />
 
         <div className="hidden lg:block space-y-4">
-          <CityRunGoingBanner />
+          <CityRunGoingBanner rsvpRole={run.currentRSVPRole} />
+          {isHost ? <CityRunHostActions cityRunId={run.id} /> : null}
 
           {showWorkoutPrescribe ? (
             <CityRunWorkoutCard
