@@ -3,6 +3,7 @@ import {
   reloadAthleteLinkTreeDetail,
 } from "@/lib/athlete-link-tree/athlete-link-tree-service";
 import { isHydratedLinkKind, parseLinkKindInput } from "@/lib/athlete-link-tree/link-kinds";
+import { inferCityRunLinkVisual } from "@/lib/athlete-link-tree/infer-city-run-link-visual";
 import { assertSingleRacesCard, normalizeLinkDestination } from "@/lib/athlete-link-tree/link-validation";
 import { athleteRacePublicCardUrl } from "@/lib/athlete-race-public-card-url";
 import { cityRunPublicCardUrl } from "@/lib/city-run-public-card-url";
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
   let athleteRaceId: string | null = null;
   let cityRunId: string | null = null;
   let athleteRaceLogoUrl: string | null = null;
+  let cityRunVisual: ReturnType<typeof inferCityRunLinkVisual> | null = null;
 
   if (parsedKind === AthleteLinkTreeLinkKind.ATHLETE_RACE) {
     if (!athleteRaceIdInput) {
@@ -128,7 +130,16 @@ export async function POST(request: NextRequest) {
     }
     const run = await prisma.city_runs.findFirst({
       where: { id: cityRunIdInput, athleteGeneratedId: gate.athlete.id, published: true },
-      select: { id: true, title: true, slug: true, citySlug: true },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        citySlug: true,
+        mapImageUrl: true,
+        routePhotos: true,
+        runPhotos: true,
+        igPostGraphic: true,
+      },
     });
     if (!run) {
       return NextResponse.json({ success: false, error: "Run not found on your profile" }, { status: 404 });
@@ -144,6 +155,7 @@ export async function POST(request: NextRequest) {
     name = run.title;
     const publicKey = run.slug?.trim() || run.id;
     url = cityRunPublicCardUrl(publicKey, run.citySlug, run.id);
+    cityRunVisual = inferCityRunLinkVisual(run);
   } else if (!isSection) {
     const dest = normalizeLinkDestination({ url: body.url, kind: parsedKind });
     if (dest.error) {
@@ -216,8 +228,17 @@ export async function POST(request: NextRequest) {
       internalDescription: isSection ? null : body.internalDescription?.trim() || null,
       description: isSection ? null : body.description?.trim() || null,
       linkLogoUrl:
-        parsedKind === AthleteLinkTreeLinkKind.ATHLETE_RACE ? athleteRaceLogoUrl : null,
-      emoji: isSection || isHydratedLinkKind(parsedKind) ? null : body.emoji?.trim() || null,
+        parsedKind === AthleteLinkTreeLinkKind.ATHLETE_RACE
+          ? athleteRaceLogoUrl
+          : parsedKind === AthleteLinkTreeLinkKind.CITY_RUN
+            ? cityRunVisual?.linkLogoUrl ?? null
+            : null,
+      emoji:
+        isSection || isHydratedLinkKind(parsedKind)
+          ? null
+          : parsedKind === AthleteLinkTreeLinkKind.CITY_RUN
+            ? cityRunVisual?.emoji ?? null
+            : body.emoji?.trim() || null,
       url,
       sortOrder,
       parentSectionId,

@@ -9,6 +9,7 @@ import { useDebouncedSave, type SaveStatus } from "@/lib/athlete-link-tree/use-d
 import { AthleteLinkTreeLinkKind } from "@prisma/client";
 
 const EMOJI_PRESETS = ["🌐", "📱", "🏃", "👟", "🔗", "📍"] as const;
+const RUN_LINK_EMOJI_PRESETS = ["🏃", "📍", "🏛️", "🌉", "☕", "👟"] as const;
 
 type Props = {
   sortedLinks: AthleteLinkTreeLink[];
@@ -44,23 +45,27 @@ function CompactLinkRow({
   const isLegacyRaces = !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES;
   const isGeneratedRace = !link.isSection && link.kind === AthleteLinkTreeLinkKind.ATHLETE_RACE;
   const isGeneratedCityRun = !link.isSection && link.kind === AthleteLinkTreeLinkKind.CITY_RUN;
-  const readOnly = isGeneratedRace || isGeneratedCityRun;
+  const readOnly = isGeneratedRace;
 
   const [buttonTitle, setButtonTitle] = useState(link.publicLabel?.trim() || link.name.trim());
   const [sectionTitle, setSectionTitle] = useState(link.name);
   const [url, setUrl] = useState(link.url ?? "");
   const [emoji, setEmoji] = useState(link.emoji ?? "");
+  const [linkLogoUrl, setLinkLogoUrl] = useState(link.linkLogoUrl ?? "");
   const [busy, setBusy] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     setButtonTitle(link.publicLabel?.trim() || link.name.trim());
     setSectionTitle(link.name);
     setUrl(link.url ?? "");
     setEmoji(link.emoji ?? "");
-  }, [link.id, link.name, link.publicLabel, link.url, link.emoji]);
+    setLinkLogoUrl(link.linkLogoUrl ?? "");
+  }, [link.id, link.name, link.publicLabel, link.url, link.emoji, link.linkLogoUrl]);
 
   const { status, schedule, saveOnBlur, retry } = useDebouncedSave(async () => {
-    if (readOnly) return;
+    if (readOnly || isGeneratedCityRun) return;
     if (link.isSection) {
       const title = sectionTitle.trim();
       if (!title) throw new Error("empty");
@@ -85,9 +90,42 @@ function CompactLinkRow({
     onUpdated(res.data.tree);
   });
 
+  const {
+    status: visualStatus,
+    schedule: scheduleVisual,
+    saveOnBlur: saveVisualOnBlur,
+    retry: retryVisual,
+  } = useDebouncedSave(async () => {
+    if (!isGeneratedCityRun) return;
+    const res = await api.patch(`/athlete/links/items/${link.id}`, {
+      emoji: emoji.trim() || null,
+    });
+    if (!res.data?.success || !res.data?.tree) throw new Error("fail");
+    onUpdated(res.data.tree);
+  });
+
   useEffect(() => {
-    onRowSaveStatus(status);
-  }, [status, onRowSaveStatus]);
+    onRowSaveStatus(status === "error" || visualStatus === "error" ? "error" : status);
+  }, [status, visualStatus, onRowSaveStatus]);
+
+  async function uploadRunPhoto(file: File) {
+    if (!isGeneratedCityRun) return;
+    setUploadBusy(true);
+    setUploadError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await api.post(`/athlete/links/items/${link.id}/image`, form);
+      if (!res.data?.success || !res.data?.tree) {
+        throw new Error(res.data?.error || "Upload failed");
+      }
+      onUpdated(res.data.tree);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadBusy(false);
+    }
+  }
 
   async function remove() {
     if (!window.confirm("Remove this from your page?")) return;
@@ -137,12 +175,68 @@ function CompactLinkRow({
             onBlur={saveOnBlur}
             placeholder="Section heading"
           />
+        ) : isGeneratedCityRun ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              {linkLogoUrl.trim() ? (
+                <span className="flex h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-200">
+                  <img src={linkLogoUrl.trim()} alt="" className="h-full w-full object-cover" />
+                </span>
+              ) : emoji.trim() ? (
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center text-xl" aria-hidden>
+                  {emoji.trim()}
+                </span>
+              ) : null}
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900">{link.name}</p>
+                <p className="text-[11px] text-gray-400">Button art on athletelinks</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-0.5">
+              {RUN_LINK_EMOJI_PRESETS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => {
+                    setEmoji(e);
+                    setLinkLogoUrl("");
+                    scheduleVisual();
+                  }}
+                  onBlur={saveVisualOnBlur}
+                  className={`rounded px-1 py-0.5 text-base ${emoji === e && !linkLogoUrl.trim() ? "ring-1 ring-orange-400" : ""}`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+            <label className="block text-xs text-gray-600">
+              <span className="font-medium text-gray-800">Photo</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={uploadBusy}
+                className="mt-1 block w-full text-xs file:mr-2 file:rounded-md file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-xs file:font-medium"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void uploadRunPhoto(file);
+                }}
+              />
+              <span className="mt-0.5 block text-[11px] text-gray-400">
+                Map or monument shot — JPG/PNG/WebP up to 5MB. Replaces emoji.
+              </span>
+            </label>
+            {uploadError ? <p className="text-xs text-red-600">{uploadError}</p> : null}
+            {visualStatus === "error" ? (
+              <button type="button" onClick={() => void retryVisual()} className="text-xs text-red-600 hover:underline">
+                Couldn&apos;t save emoji — retry
+              </button>
+            ) : null}
+          </div>
         ) : readOnly ? (
           <div>
             <p className="text-sm font-medium text-gray-900">{link.name}</p>
-            <p className="text-[11px] text-gray-400">
-              {isGeneratedCityRun ? "Toggle in Add → My runs" : "Toggle in Add → Races"}
-            </p>
+            <p className="text-[11px] text-gray-400">Toggle in Add → Races</p>
           </div>
         ) : (
           <>

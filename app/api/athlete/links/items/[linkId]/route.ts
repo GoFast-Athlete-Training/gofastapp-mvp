@@ -4,6 +4,7 @@ import {
 } from "@/lib/athlete-link-tree/athlete-link-tree-service";
 import { normalizeLinkEmoji } from "@/lib/athlete-link-tree/link-emoji";
 import {
+  isGeneratedCityRunLinkKind,
   isGeneratedContentLinkKind,
   isHydratedLinkKind,
 } from "@/lib/athlete-link-tree/link-kinds";
@@ -71,22 +72,34 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (body.description !== undefined) data.description = body.description?.trim() || null;
   const hydratedCard = isHydratedLinkKind(link.kind);
   const generatedContent = isGeneratedContentLinkKind(link.kind);
+  const generatedCityRun = isGeneratedCityRunLinkKind(link.kind);
 
   if (
     generatedContent &&
+    !generatedCityRun &&
     (body.url !== undefined || body.emoji !== undefined || body.linkLogoUrl !== undefined)
   ) {
     return NextResponse.json(
-      { success: false, error: "Generated links cannot change URL or emoji here" },
+      { success: false, error: "Generated race links cannot change URL or button art here" },
       { status: 400 },
     );
   }
 
-  if (!hydratedCard && !generatedContent && body.linkLogoUrl !== undefined) {
+  if (generatedCityRun && body.url !== undefined) {
+    return NextResponse.json(
+      { success: false, error: "Run links keep their GoFast run URL — change emoji or photo only" },
+      { status: 400 },
+    );
+  }
+
+  const canEditVisual =
+    !hydratedCard && (!generatedContent || generatedCityRun);
+
+  if (canEditVisual && body.linkLogoUrl !== undefined) {
     data.linkLogoUrl = body.linkLogoUrl?.trim() || null;
     if (data.linkLogoUrl) data.emoji = null;
   }
-  if (!hydratedCard && !generatedContent && body.emoji !== undefined) {
+  if (canEditVisual && body.emoji !== undefined) {
     const emoji = body.emoji === null ? null : normalizeLinkEmoji(body.emoji);
     if (body.emoji !== null && body.emoji.trim() && !emoji) {
       return NextResponse.json({ success: false, error: "Invalid emoji" }, { status: 400 });
