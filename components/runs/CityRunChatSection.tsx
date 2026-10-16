@@ -32,9 +32,12 @@ function Avatar({
   );
 }
 
+const CHAT_HINT =
+  "Let others know you're coming, or use this for questions.";
+
 type CityRunChatSectionProps = {
   runId: string;
-  variant?: 'default' | 'mobile-hub';
+  variant?: 'default' | 'mobile-hub' | 'sidebar-square';
   showHeading?: boolean;
 };
 
@@ -50,6 +53,7 @@ export default function CityRunChatSection({
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isMobileHub = variant === 'mobile-hub';
+  const isSidebarSquare = variant === 'sidebar-square';
 
   useEffect(() => {
     void fetchMessages();
@@ -92,44 +96,58 @@ export default function CityRunChatSection({
 
   const listClassName = isMobileHub
     ? 'min-h-[min(18rem,42dvh)] max-h-[min(32rem,calc(100dvh-18rem))]'
-    : 'min-h-[200px] max-h-[400px]';
+    : isSidebarSquare
+      ? 'min-h-0 flex-1'
+      : 'min-h-[200px] max-h-[400px]';
+
+  const shellClass = isMobileHub
+    ? 'flex min-h-0 flex-1 flex-col min-w-0'
+    : isSidebarSquare
+      ? 'bg-white rounded-xl shadow-sm flex flex-col aspect-square w-full max-w-md'
+      : 'bg-white rounded-xl shadow-sm flex flex-col';
 
   return (
-    <section
-      className={
-        isMobileHub
-          ? 'flex min-h-0 flex-1 flex-col min-w-0'
-          : 'bg-white rounded-xl shadow-sm flex flex-col'
-      }
-    >
+    <section className={shellClass}>
       {showHeading ? (
-        <div className={`${isMobileHub ? 'mb-3 px-0.5' : 'px-6 py-4 border-b border-gray-100'}`}>
-          <h2 className="font-semibold text-gray-900">Run chat</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Only people going can see this</p>
+        <div
+          className={
+            isMobileHub
+              ? 'mb-3 px-0.5'
+              : isSidebarSquare
+                ? 'px-4 py-3 border-b border-gray-100'
+                : 'px-6 py-4 border-b border-gray-100'
+          }
+        >
+          <h2 className="font-semibold text-gray-900 text-sm">Messages</h2>
+          <p className="text-xs text-gray-500 mt-1 leading-snug">{CHAT_HINT}</p>
         </div>
       ) : null}
 
       <div
-        className={`flex-1 overflow-y-auto space-y-4 ${listClassName} ${
-          isMobileHub ? 'border border-gray-200 rounded-lg bg-gray-50 p-4' : 'px-6 py-4'
-        } ${isMobileHub ? 'min-h-0' : ''}`}
+        className={`flex-1 overflow-y-auto space-y-3 ${listClassName} ${
+          isMobileHub
+            ? 'border border-gray-200 rounded-lg bg-gray-50 p-4'
+            : isSidebarSquare
+              ? 'px-3 py-3'
+              : 'px-6 py-4'
+        } ${isMobileHub || isSidebarSquare ? 'min-h-0' : ''}`}
       >
         {messages.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No messages yet. Say something!</p>
+          <p className="text-sm text-gray-400 text-center py-6">{CHAT_HINT}</p>
         ) : (
           messages.map((msg) => {
             const isMe = msg.athleteId === athleteId;
             return (
-              <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                <Avatar athlete={msg.Athlete} />
-                <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+              <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
+                <Avatar athlete={msg.Athlete} sizeClass="w-7 h-7" />
+                <div className={`max-w-[85%] ${isMe ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
                   {!isMe ? (
-                    <span className="text-xs text-gray-400">
+                    <span className="text-[10px] text-gray-400">
                       {msg.Athlete?.firstName} {msg.Athlete?.lastName}
                     </span>
                   ) : null}
                   <div
-                    className={`px-4 py-2 rounded-2xl text-sm ${
+                    className={`px-3 py-1.5 rounded-2xl text-xs ${
                       isMe
                         ? 'bg-orange-500 text-white rounded-tr-sm'
                         : 'bg-gray-100 text-gray-900 rounded-tl-sm'
@@ -137,7 +155,7 @@ export default function CityRunChatSection({
                   >
                     {msg.content}
                   </div>
-                  <span className="text-xs text-gray-300">{formatMessageTime(msg.createdAt)}</span>
+                  <span className="text-[10px] text-gray-300">{formatMessageTime(msg.createdAt)}</span>
                 </div>
               </div>
             );
@@ -147,10 +165,12 @@ export default function CityRunChatSection({
       </div>
 
       <div
-        className={`flex gap-2 ${
+        className={`flex gap-2 shrink-0 ${
           isMobileHub
             ? 'sticky bottom-20 z-30 mt-3 border-t border-gray-200 bg-gray-50 pt-3'
-            : 'px-4 py-3 border-t border-gray-100'
+            : isSidebarSquare
+              ? 'px-3 py-3 border-t border-gray-100'
+              : 'px-4 py-3 border-t border-gray-100'
         }`}
       >
         <input
@@ -158,9 +178,11 @@ export default function CityRunChatSection({
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && void handleSendMessage()}
-          placeholder="Message the crew..."
-          className={`flex-1 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 ${
-            isMobileHub ? 'border border-gray-300 rounded-lg bg-white' : 'bg-gray-100 rounded-full'
+          placeholder="Write a message…"
+          className={`flex-1 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 ${
+            isMobileHub || isSidebarSquare
+              ? 'border border-gray-300 rounded-lg bg-white'
+              : 'bg-gray-100 rounded-full'
           }`}
         />
         <button
@@ -168,10 +190,16 @@ export default function CityRunChatSection({
           onClick={() => void handleSendMessage()}
           disabled={!newMessage.trim() || sendingMessage}
           className={`bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40 transition shrink-0 ${
-            isMobileHub ? 'px-4 py-2 rounded-lg text-sm font-semibold' : 'p-2 rounded-full'
+            isMobileHub || isSidebarSquare
+              ? 'px-3 py-2 rounded-lg text-sm font-semibold'
+              : 'p-2 rounded-full'
           }`}
         >
-          {isMobileHub ? (sendingMessage ? 'Sending…' : 'Send') : <Send className="h-4 w-4" />}
+          {isMobileHub || isSidebarSquare ? (
+            sendingMessage ? '…' : 'Send'
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
         </button>
       </div>
     </section>

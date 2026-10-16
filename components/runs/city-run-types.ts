@@ -33,6 +33,7 @@ export interface RunSeries {
 export interface CityRunRsvp {
   id: string;
   status: string;
+  role?: string | null;
   athleteId: string;
   Athlete?: {
     id: string;

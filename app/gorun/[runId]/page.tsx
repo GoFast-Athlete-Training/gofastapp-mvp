@@ -24,6 +24,7 @@ import {
 } from '@/components/runs/city-run-types';
 import { isCityRunToday } from '@/lib/city-run-clock';
 import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
+import { attendingCountFromRsvps, isAthleteOnCityRun } from '@/lib/city-run/rsvp-attendance';
 import {
   mapPublicRunToCityRunDetails,
   type PublicCityRunPayload,
@@ -247,7 +248,7 @@ export default function GoRunPage() {
     );
   }
 
-  if (run.currentRSVP === 'going') {
+  if (isAthleteOnCityRun(run)) {
     return (
       <>
         <TopNav />
@@ -285,7 +286,7 @@ function CityRunPreRSVP({
   onBack: () => void;
   allowCheckin: boolean;
 }) {
-  const going = (run.rsvps || []).filter((r) => r.status === 'going');
+  const onRunCount = attendingCountFromRsvps(run.rsvps || []);
   const [runIsPast, setRunIsPast] = useState(false);
 
   useEffect(() => {
@@ -329,7 +330,7 @@ function CityRunPreRSVP({
             ) : null}
             {isSeries ? (
               <>
-                <CityRunGoingSummary count={going.length} />
+                <CityRunGoingSummary count={onRunCount} />
                 <CityRunRsvpPanel
                   runIsPast={runIsPast}
                   rsvpLoading={rsvpLoading}
@@ -356,7 +357,7 @@ function CityRunPreRSVP({
               />
             ) : (
               <>
-                <CityRunGoingSummary count={going.length} />
+                <CityRunGoingSummary count={onRunCount} />
                 <CityRunRsvpPanel
                   runIsPast={runIsPast}
                   rsvpLoading={rsvpLoading}

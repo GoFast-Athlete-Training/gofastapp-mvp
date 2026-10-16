@@ -70,6 +70,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
           runIsPast={runIsPast}
           checkingIn={checkingIn}
           onCheckin={() => void handleCheckin()}
+          allowCheckin={!isHost && socialRun}
         />
 
         <div className="hidden lg:block space-y-4">
@@ -89,10 +90,11 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
             <div className="col-span-2 space-y-4">
               <CityRunDetailsSection run={run} />
             </div>
-            <CityRunPeopleSection rsvps={rsvps} sticky />
+            <div className="space-y-4">
+              <CityRunPeopleSection rsvps={rsvps} sticky />
+              <CityRunChatSection runId={run.id} variant="sidebar-square" />
+            </div>
           </div>
-
-          <CityRunChatSection runId={run.id} />
         </div>
       </div>
     </div>

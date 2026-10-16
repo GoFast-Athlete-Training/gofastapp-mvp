@@ -2,6 +2,7 @@
 
 import { Users } from 'lucide-react';
 import type { CityRunRsvp } from '@/components/runs/city-run-types';
+import { splitCityRunRsvpsByRole } from '@/lib/city-run/rsvp-attendance';
 
 function Avatar({
   athlete,
@@ -29,6 +30,17 @@ function Avatar({
   );
 }
 
+function PersonRow({ rsvp }: { rsvp: CityRunRsvp }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2">
+      <Avatar athlete={rsvp.Athlete} />
+      <span className="text-sm text-gray-700">
+        {rsvp.Athlete?.firstName} {rsvp.Athlete?.lastName}
+      </span>
+    </div>
+  );
+}
+
 type CityRunPeopleSectionProps = {
   rsvps: CityRunRsvp[];
   locked?: boolean;
@@ -42,17 +54,18 @@ export default function CityRunPeopleSection({
   expanded = false,
   sticky = false,
 }: CityRunPeopleSectionProps) {
-  const going = rsvps.filter((r) => r.status === 'going');
+  const { host, members } = splitCityRunRsvpsByRole(rsvps);
+  const attendingCount = (host ? 1 : 0) + members.length;
 
   if (locked) {
     return (
       <section className="space-y-4">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Who&apos;s going</h2>
+          <h2 className="text-lg font-bold text-gray-900">Who&apos;s on this run</h2>
           <p className="text-sm text-gray-500 mt-1">
-            {going.length > 0
-              ? `${going.length} ${going.length === 1 ? 'person' : 'people'} going · RSVP to see who`
-              : 'No RSVPs yet — be the first to join'}
+            {attendingCount > 0
+              ? `${attendingCount} ${attendingCount === 1 ? 'person' : 'people'} · RSVP to see who`
+              : 'No one yet — be the first to join'}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-sm px-6 py-8 text-center text-sm text-gray-500 border border-dashed border-gray-200">
@@ -64,39 +77,56 @@ export default function CityRunPeopleSection({
 
   return (
     <section
-      className={`bg-white rounded-xl shadow-sm p-6 ${sticky ? 'lg:sticky lg:top-4' : ''}`}
+      className={`bg-white rounded-xl shadow-sm p-6 space-y-4 ${sticky ? 'lg:sticky lg:top-4' : ''}`}
     >
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2">
         <Users className="h-5 w-5 text-gray-400" />
-        <h2 className="font-semibold text-gray-900">Going ({going.length})</h2>
+        <h2 className="font-semibold text-gray-900">On this run</h2>
       </div>
-      {going.length === 0 ? (
-        <p className="text-sm text-gray-400">
-          {expanded ? 'No one yet — be the first!' : "No one yet — you're the first!"}
+
+      {host ? (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-2">Host</p>
+          {expanded ? (
+            <PersonRow rsvp={host} />
+          ) : (
+            <div className="flex items-center gap-2">
+              <Avatar athlete={host.Athlete} />
+              <span className="text-sm text-gray-700">
+                {host.Athlete?.firstName} {host.Athlete?.lastName}
+              </span>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+          Members{members.length ? ` (${members.length})` : ''}
         </p>
-      ) : expanded ? (
-        <div className="space-y-3">
-          {going.map((r) => (
-            <div key={r.id} className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2">
-              <Avatar athlete={r.Athlete} />
-              <span className="text-sm text-gray-700">
-                {r.Athlete?.firstName} {r.Athlete?.lastName}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-3">
-          {going.map((r) => (
-            <div key={r.id} className="flex items-center gap-2">
-              <Avatar athlete={r.Athlete} />
-              <span className="text-sm text-gray-700">
-                {r.Athlete?.firstName} {r.Athlete?.lastName}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+        {members.length === 0 ? (
+          <p className="text-sm text-gray-400">
+            {expanded ? 'No members yet.' : host ? 'No members yet.' : 'No one yet — be the first!'}
+          </p>
+        ) : expanded ? (
+          <div className="space-y-3">
+            {members.map((r) => (
+              <PersonRow key={r.id} rsvp={r} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-3">
+            {members.map((r) => (
+              <div key={r.id} className="flex items-center gap-2">
+                <Avatar athlete={r.Athlete} />
+                <span className="text-sm text-gray-700">
+                  {r.Athlete?.firstName} {r.Athlete?.lastName}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -106,7 +136,7 @@ export function CityRunGoingSummary({ count }: { count: number }) {
   return (
     <div className="bg-white rounded-xl shadow-sm px-6 py-4 text-sm text-gray-600">
       <span className="font-semibold text-gray-900">
-        {count} {count === 1 ? 'person' : 'people'} going
+        {count} {count === 1 ? 'person' : 'people'} on this run
       </span>{' '}
       · RSVP to see who
     </div>

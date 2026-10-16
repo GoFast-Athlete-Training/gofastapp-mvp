@@ -8,6 +8,12 @@ export function isHostRsvpRole(role: string | null | undefined): boolean {
   return role === RSVP_ROLE_HOST;
 }
 
+/** Member (joined) role on the junction — not the legacy status column. */
+export function isMemberRsvpRole(role: string | null | undefined): boolean {
+  return role === RSVP_ROLE_GOING;
+}
+
+/** @deprecated Use isMemberRsvpRole — "going" on role means member, not status. */
 export function isGoingRsvpRole(role: string | null | undefined): boolean {
-  return role === RSVP_ROLE_GOING || role == null;
+  return isMemberRsvpRole(role);
 }

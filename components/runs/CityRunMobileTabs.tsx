@@ -43,6 +43,7 @@ type GoingMobileProps = {
   runIsPast: boolean;
   checkingIn: boolean;
   onCheckin: () => void;
+  allowCheckin?: boolean;
 };
 
 type PostRunMobileProps = {

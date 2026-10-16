@@ -7,8 +7,11 @@ import {
 import { hasSocialRunLifecycle } from '@/lib/city-run-type';
 import { localTodayKey, ymdFromDate } from '@/lib/training/plan-utils';
 import { prisma } from '@/lib/prisma';
+import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
+import { isAttendingCityRunRsvp } from '@/lib/city-run/rsvp-attendance';
 import {
   buildRunnerAgenda,
+  type RunnerAgendaItem,
   type RunnerAgendaPayload,
   type RunnerJoinedRun,
 } from '@/lib/runner/build-runner-agenda';
@@ -49,7 +52,10 @@ export async function fetchRunnerAgendaForAthlete(
   const nowMs = opts?.nowMs ?? Date.now();
 
   const rsvps = await prisma.city_run_rsvps.findMany({
-    where: { athleteId, status: 'going' },
+    where: {
+      athleteId,
+      status: { not: 'not-going' },
+    },
     include: {
       city_runs: {
         select: {
@@ -85,7 +91,9 @@ export async function fetchRunnerAgendaForAthlete(
     take: 40,
   });
 
-  const joinedRuns: RunnerJoinedRun[] = rsvps.map((r) => {
+  const attending = rsvps.filter((r) => isAttendingCityRunRsvp(r));
+
+  const joinedRuns: RunnerJoinedRun[] = attending.map((r) => {
     const run = r.city_runs;
     const clock = mapRunClock(run);
     const checkin = run.city_run_checkins[0] ?? null;
@@ -119,6 +127,7 @@ export async function fetchRunnerAgendaForAthlete(
       isToday: isCityRunToday(clock, new Date(nowMs)),
       isLive: isCityRunLiveForCheckin(clock, nowMs),
       needsWereYouThere:
+        !isHostRsvpRole(r.role) &&
         !checkin &&
         isCityRunPast(clock, nowMs) &&
         isCityRunWithinPostRunCheckinWindow(clock, nowMs),
@@ -126,15 +135,27 @@ export async function fetchRunnerAgendaForAthlete(
     };
   });
 
-  const items = buildRunnerAgenda({
+  const allItems = buildRunnerAgenda({
     todayKey,
     planSessions: [],
     joinedRuns,
   });
 
+  const hostedItems: RunnerAgendaItem[] = [];
+  const memberItems: RunnerAgendaItem[] = [];
+  for (const item of allItems) {
+    if (isHostRsvpRole(item.joinedRun?.rsvpRole)) {
+      hostedItems.push(item);
+    } else {
+      memberItems.push(item);
+    }
+  }
+
   return {
     todayKey,
     hasActivePlan: false,
-    items,
+    hostedItems,
+    memberItems,
+    items: allItems,
   };
 }

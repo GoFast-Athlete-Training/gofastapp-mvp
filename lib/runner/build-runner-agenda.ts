@@ -73,6 +73,11 @@ export type RunnerAgendaItem = {
 export type RunnerAgendaPayload = {
   todayKey: string;
   hasActivePlan: boolean;
+  /** Runs you host (RSVP role host). */
+  hostedItems: RunnerAgendaItem[];
+  /** Runs you joined as a member. */
+  memberItems: RunnerAgendaItem[];
+  /** @deprecated Prefer hostedItems + memberItems */
   items: RunnerAgendaItem[];
 };
 

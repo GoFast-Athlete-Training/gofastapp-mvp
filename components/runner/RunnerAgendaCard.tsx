@@ -90,7 +90,7 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {run.supportsCheckin && run.isLive && !run.hasCheckin ? (
+        {!isHost && run.supportsCheckin && run.isLive && !run.hasCheckin ? (
           <button
             type="button"
             disabled={checkingInId !== null}
@@ -100,7 +100,7 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
             {checkingInId === run.id ? 'Checking in…' : 'Check in'}
           </button>
         ) : null}
-        {run.supportsCheckin && run.needsWereYouThere && !run.hasCheckin ? (
+        {!isHost && run.supportsCheckin && run.needsWereYouThere && !run.hasCheckin ? (
           <button
             type="button"
             disabled={checkingInId !== null}
