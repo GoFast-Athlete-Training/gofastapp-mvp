@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Calendar, Clock, Map, MapPin, Repeat } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Repeat } from 'lucide-react';
 import CityRunRouteMedia from '@/components/runs/CityRunRouteMedia';
 import {
   formatRunDate,
@@ -208,26 +208,7 @@ export default function CityRunDetailsSection({
               ) : null}
             </div>
           )}
-          {run.stravaMapUrl ? (
-            <a
-              href={run.stravaMapUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-orange-500 hover:text-orange-600 pt-1"
-            >
-              <Map className="h-4 w-4" /> View Route
-            </a>
-          ) : null}
         </div>
-
-        {run.workoutDescription?.trim() ? (
-          <div className="mt-4 sm:mt-5 border-t border-gray-100 pt-4 sm:pt-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-              Route description
-            </p>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{run.workoutDescription.trim()}</p>
-          </div>
-        ) : null}
 
         {run.description?.trim() ? (
           <div className="mt-4 sm:mt-5 border-t border-gray-100 pt-4 sm:pt-5">
@@ -244,6 +225,10 @@ export default function CityRunDetailsSection({
           routePhotos={run.routePhotos}
           runPhotos={run.runPhotos}
           mapImageUrl={run.mapImageUrl}
+          stravaMapUrl={run.stravaMapUrl}
+          workoutDescription={run.workoutDescription}
+          directionsText={run.directionsText}
+          route={run.route}
         />
       ) : null}
     </div>

@@ -88,10 +88,6 @@ export async function attachSavedRouteToCityRun(
     neighborhood.updateCityRunNeighborhood ?? neighborhood.canonical ?? media.routeNeighborhood;
 
   const routeDescription = saved.routeDescription?.trim() || null;
-  const workoutDescription =
-    routeDescription && !run.workoutDescription?.trim()
-      ? routeDescription
-      : run.workoutDescription?.trim() || routeDescription;
 
   await prisma.city_runs.update({
     where: { id },
@@ -102,7 +98,7 @@ export async function attachSavedRouteToCityRun(
       routePhotos: media.routePhotos,
       routeNeighborhood: cityRunNeighborhoodFinal,
       runType: media.runType,
-      ...(workoutDescription ? { workoutDescription } : {}),
+      ...(routeDescription ? { workoutDescription: routeDescription } : {}),
       ...(run.totalMiles == null && media.totalMiles != null
         ? { totalMiles: media.totalMiles }
         : {}),

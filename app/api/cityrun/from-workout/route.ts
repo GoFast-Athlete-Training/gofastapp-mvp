@@ -343,15 +343,16 @@ export async function POST(request: NextRequest) {
     const routeIdTrimmed =
       typeof routeIdBody === 'string' ? routeIdBody.trim() : '';
     let savedRouteMedia: ReturnType<typeof cityRunMediaFromSavedRoute> | null = null;
+    let savedRouteRow: Awaited<ReturnType<typeof resolveSavedRouteForAthlete>> = null;
     if (routeIdTrimmed) {
-      const savedRoute = await resolveSavedRouteForAthlete(athlete.id, routeIdTrimmed);
-      if (!savedRoute) {
+      savedRouteRow = await resolveSavedRouteForAthlete(athlete.id, routeIdTrimmed);
+      if (!savedRouteRow) {
         return NextResponse.json(
           { error: 'Route not found or not in your My Routes' },
           { status: 404 }
         );
       }
-      savedRouteMedia = cityRunMediaFromSavedRoute(savedRoute);
+      savedRouteMedia = cityRunMediaFromSavedRoute(savedRouteRow);
     }
 
     const totalMilesParsed = mergeTotalMiles(
@@ -436,7 +437,7 @@ export async function POST(request: NextRequest) {
       meetUpNote: meetUpNote?.trim() || null,
       routeNeighborhood: mergedRoute.routeNeighborhood,
       runType: mergedRoute.runType,
-      workoutDescription: null,
+      workoutDescription: savedRouteRow?.routeDescription?.trim() || null,
       meetUpPlaceId: meetUpPlaceId?.trim() || null,
       meetUpLat: meetUpLatFinal,
       meetUpLng: meetUpLngFinal,

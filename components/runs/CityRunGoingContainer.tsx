@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
+import { LocalStorageAPI } from '@/lib/localstorage';
 import CityRunChatSection from '@/components/runs/CityRunChatSection';
 import CityRunDetailsSection, { CityRunGoingBanner } from '@/components/runs/CityRunDetailsSection';
 import CityRunMobileTabs from '@/components/runs/CityRunMobileTabs';
@@ -17,6 +18,7 @@ import {
 } from '@/components/runs/city-run-types';
 import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
+import { resolveViewerRsvpRole } from '@/lib/city-run/viewer-run-role';
 import CityRunHostActions from '@/components/runs/CityRunHostActions';
 
 interface Props {
@@ -28,6 +30,11 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
   const [rsvps, setRsvps] = useState<CityRunRsvp[]>(run.rsvps || []);
   const [checkingIn, setCheckingIn] = useState(false);
   const [runIsPast, setRunIsPast] = useState(false);
+  const [athleteId, setAthleteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAthleteId(LocalStorageAPI.getAthleteId());
+  }, []);
 
   useEffect(() => {
     setRsvps(run.rsvps || []);
@@ -44,11 +51,15 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
     );
   }, [run.date, run.startTimeHour, run.startTimeMinute, run.startTimePeriod, run.timezone]);
 
-  const viewerRsvpRole = run.currentRSVPRole;
+  const viewerRsvpRole = useMemo(
+    () => resolveViewerRsvpRole(run, athleteId),
+    [run, athleteId]
+  );
   const isHost = isHostRsvpRole(viewerRsvpRole);
-  const socialRun = hasSocialRunLifecycle(run);
+  const isIndividual = run.cityRunType === 'INDIVIDUAL';
   const backHref = isHost ? '/build-a-run' : '/runner';
   const backLabel = isHost ? 'Runs I created' : 'Runner';
+  const socialRun = hasSocialRunLifecycle(run);
 
   const handleCheckin = async () => {
     if (!socialRun || isHost) return;
@@ -64,13 +75,14 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
   };
 
   const showWorkoutPrescribe = runShouldShowWorkoutPrescribe(run);
+  const shellMax = isIndividual ? 'max-w-4xl' : 'max-w-6xl';
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
-      <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6">
+    <div className="min-h-screen bg-gray-100 overflow-x-hidden">
+      <div className={`${shellMax} mx-auto px-4 py-3 sm:py-4`}>
         <Link
           href={backHref}
-          className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
+          className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
           {backLabel}
@@ -87,7 +99,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
           allowCheckin={!isHost && socialRun}
         />
 
-        <div className="hidden lg:block space-y-4">
+        <div className="hidden lg:block space-y-3">
           <CityRunGoingBanner rsvpRole={viewerRsvpRole} />
           {isHost ? <CityRunHostActions cityRunId={run.id} /> : null}
 
@@ -100,15 +112,25 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
             />
           ) : null}
 
-          <div className="grid grid-cols-3 items-start gap-6">
-            <div className="col-span-2 space-y-4">
+          <div
+            className={
+              isIndividual
+                ? 'grid grid-cols-1 xl:grid-cols-[1fr_17rem] items-start gap-4'
+                : 'grid grid-cols-3 items-start gap-4'
+            }
+          >
+            <div className={isIndividual ? 'space-y-3 min-w-0' : 'col-span-2 space-y-3'}>
               <CityRunDetailsSection run={run} />
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <CityRunPeopleSection rsvps={rsvps} sticky />
-              <CityRunChatSection runId={run.id} variant="sidebar-square" />
+              {isIndividual ? null : (
+                <CityRunChatSection runId={run.id} variant="sidebar-square" />
+              )}
             </div>
           </div>
+
+          {isIndividual ? <CityRunChatSection runId={run.id} /> : null}
         </div>
       </div>
     </div>

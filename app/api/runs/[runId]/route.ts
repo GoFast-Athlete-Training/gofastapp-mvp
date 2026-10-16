@@ -303,6 +303,16 @@ export async function GET(
             citySlug: true,
           },
         },
+        route: {
+          select: {
+            id: true,
+            name: true,
+            routeDescription: true,
+            stravaUrl: true,
+            stravaMapUrl: true,
+            mapImageUrl: true,
+          },
+        },
       },
     });
     } catch (error: any) {
@@ -595,6 +605,16 @@ export async function GET(
         description: run.description,
         postRunActivity: run.postRunActivity ?? null,
         stravaMapUrl: run.stravaMapUrl,
+        route: run.route
+          ? {
+              id: run.route.id,
+              name: run.route.name,
+              routeDescription: run.route.routeDescription ?? null,
+              stravaUrl: run.route.stravaUrl ?? null,
+              stravaMapUrl: run.route.stravaMapUrl ?? null,
+              mapImageUrl: run.route.mapImageUrl ?? null,
+            }
+          : null,
         routePhotos: normalizeRoutePhotosForResponse(run.routePhotos),
         mapImageUrl: run.mapImageUrl ?? null,
         staffNotes: run.staffNotes ?? null,

@@ -125,6 +125,15 @@ export interface CityRunDetails {
   routeNeighborhood?: string | null;
   runType?: string | null;
   workoutDescription?: string | null;
+  directionsText?: string | null;
+  route?: {
+    id: string;
+    name: string;
+    routeDescription?: string | null;
+    stravaUrl?: string | null;
+    stravaMapUrl?: string | null;
+    mapImageUrl?: string | null;
+  } | null;
   meetUpNote?: string | null;
   workoutId?: string | null;
   plannedWorkoutId?: string | null;
