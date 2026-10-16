@@ -3,7 +3,10 @@ import {
   reloadAthleteLinkTreeDetail,
 } from "@/lib/athlete-link-tree/athlete-link-tree-service";
 import { normalizeLinkEmoji } from "@/lib/athlete-link-tree/link-emoji";
-import { isGeneratedRaceLinkKind, isHydratedLinkKind } from "@/lib/athlete-link-tree/link-kinds";
+import {
+  isGeneratedContentLinkKind,
+  isHydratedLinkKind,
+} from "@/lib/athlete-link-tree/link-kinds";
 import { normalizeLinkDestination } from "@/lib/athlete-link-tree/link-validation";
 import { requireAthleteWithHandleForLinks } from "@/lib/content/require-athlete-link-tree";
 import prisma from "@/lib/prisma";
@@ -67,20 +70,23 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
   if (body.description !== undefined) data.description = body.description?.trim() || null;
   const hydratedCard = isHydratedLinkKind(link.kind);
-  const generatedRace = isGeneratedRaceLinkKind(link.kind);
+  const generatedContent = isGeneratedContentLinkKind(link.kind);
 
-  if (generatedRace && (body.url !== undefined || body.emoji !== undefined || body.linkLogoUrl !== undefined)) {
+  if (
+    generatedContent &&
+    (body.url !== undefined || body.emoji !== undefined || body.linkLogoUrl !== undefined)
+  ) {
     return NextResponse.json(
-      { success: false, error: "Generated race links cannot change URL or emoji here" },
+      { success: false, error: "Generated links cannot change URL or emoji here" },
       { status: 400 },
     );
   }
 
-  if (!hydratedCard && !generatedRace && body.linkLogoUrl !== undefined) {
+  if (!hydratedCard && !generatedContent && body.linkLogoUrl !== undefined) {
     data.linkLogoUrl = body.linkLogoUrl?.trim() || null;
     if (data.linkLogoUrl) data.emoji = null;
   }
-  if (!hydratedCard && !generatedRace && body.emoji !== undefined) {
+  if (!hydratedCard && !generatedContent && body.emoji !== undefined) {
     const emoji = body.emoji === null ? null : normalizeLinkEmoji(body.emoji);
     if (body.emoji !== null && body.emoji.trim() && !emoji) {
       return NextResponse.json({ success: false, error: "Invalid emoji" }, { status: 400 });
@@ -89,7 +95,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (emoji) data.linkLogoUrl = null;
   }
 
-  if (!link.isSection && !hydratedCard && !generatedRace && body.url !== undefined) {
+  if (!link.isSection && !hydratedCard && !generatedContent && body.url !== undefined) {
     const dest = normalizeLinkDestination({ url: body.url, kind: link.kind });
     if (dest.error) {
       return NextResponse.json({ success: false, error: dest.error }, { status: 400 });

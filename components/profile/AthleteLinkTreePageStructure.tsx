@@ -41,7 +41,8 @@ function CompactLinkRow({
 }) {
   const isLegacyRaces = !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES;
   const isGeneratedRace = !link.isSection && link.kind === AthleteLinkTreeLinkKind.ATHLETE_RACE;
-  const readOnly = isGeneratedRace;
+  const isGeneratedCityRun = !link.isSection && link.kind === AthleteLinkTreeLinkKind.CITY_RUN;
+  const readOnly = isGeneratedRace || isGeneratedCityRun;
 
   const [buttonTitle, setButtonTitle] = useState(link.publicLabel?.trim() || link.name.trim());
   const [sectionTitle, setSectionTitle] = useState(link.name);
@@ -137,8 +138,9 @@ function CompactLinkRow({
         ) : readOnly ? (
           <div>
             <p className="text-sm font-medium text-gray-900">{link.name}</p>
-            {link.url ? <p className="truncate text-xs text-gray-500">{link.url}</p> : null}
-            <p className="text-[11px] text-gray-400">Toggle in Add → Races</p>
+            <p className="text-[11px] text-gray-400">
+              {isGeneratedCityRun ? "Toggle in Add → My runs" : "Toggle in Add → Races"}
+            </p>
           </div>
         ) : (
           <>

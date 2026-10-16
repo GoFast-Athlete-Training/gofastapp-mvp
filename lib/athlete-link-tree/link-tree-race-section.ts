@@ -72,3 +72,11 @@ export function linkIdForAthleteRace(
   const hit = sortedLinks.find((l) => l.athleteRaceId === athleteRaceId);
   return hit?.id ?? null;
 }
+
+export function linkIdForCityRun(
+  sortedLinks: AthleteLinkTreeLink[],
+  cityRunId: string,
+): string | null {
+  const hit = sortedLinks.find((l) => l.cityRunId === cityRunId);
+  return hit?.id ?? null;
+}

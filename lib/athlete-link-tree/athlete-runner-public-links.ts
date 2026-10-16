@@ -17,6 +17,7 @@ export type AthleteContentLinkPresetId =
 export type AthleteLinkSourceCardId =
   | AthleteContentLinkPresetId
   | "races"
+  | "hostedRuns"
   | "routes"
   | "custom";
 
@@ -29,7 +30,12 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
   { id: "story", title: "Runner story", hint: "Long-form story" },
   { id: "reflections", title: "Training reflections", hint: "Published reflections" },
   { id: "thoughts", title: "Think pieces", hint: "Essays on your page" },
-  { id: "runs", title: "Upcoming runs", hint: "Runs you're hosting" },
+  { id: "runs", title: "Upcoming runs", hint: "Single link to your hosted runs list" },
+  {
+    id: "hostedRuns",
+    title: "My runs",
+    hint: "Pick run invites you created (newest first)",
+  },
   { id: "races", title: "Races", hint: "Check claimed races under a section heading" },
   { id: "routes", title: "Route", hint: "Pick a saved Strava route" },
   { id: "custom", title: "Custom link", hint: "Any URL" },

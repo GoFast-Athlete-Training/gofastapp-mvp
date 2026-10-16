@@ -2,13 +2,10 @@ import {
   loadEditableAthleteTree,
   reloadAthleteLinkTreeDetail,
 } from "@/lib/athlete-link-tree/athlete-link-tree-service";
-import {
-  isGeneratedRaceLinkKind,
-  isHydratedLinkKind,
-  parseLinkKindInput,
-} from "@/lib/athlete-link-tree/link-kinds";
+import { isHydratedLinkKind, parseLinkKindInput } from "@/lib/athlete-link-tree/link-kinds";
 import { assertSingleRacesCard, normalizeLinkDestination } from "@/lib/athlete-link-tree/link-validation";
 import { athleteRacePublicCardUrl } from "@/lib/athlete-race-public-card-url";
+import { cityRunPublicCardUrl } from "@/lib/city-run-public-card-url";
 import { AthleteLinkTreeLinkKind } from "@prisma/client";
 import { requireAthleteWithHandleForLinks } from "@/lib/content/require-athlete-link-tree";
 import prisma from "@/lib/prisma";
@@ -40,6 +37,7 @@ export async function POST(request: NextRequest) {
     url?: string | null;
     insertAfterId?: string;
     athleteRaceId?: string;
+    cityRunId?: string;
     sectionId?: string;
     parentSectionId?: string;
   };
@@ -48,16 +46,23 @@ export async function POST(request: NextRequest) {
     body.parentSectionId?.trim() || body.sectionId?.trim() || null;
 
   const athleteRaceIdInput = body.athleteRaceId?.trim();
+  const cityRunIdInput = body.cityRunId?.trim();
   let parsedKind = parseLinkKindInput(body.kind);
   if (athleteRaceIdInput) {
     parsedKind = AthleteLinkTreeLinkKind.ATHLETE_RACE;
+  } else if (cityRunIdInput) {
+    parsedKind = AthleteLinkTreeLinkKind.CITY_RUN;
   }
   if (!parsedKind) {
     return NextResponse.json({ success: false, error: "Invalid link kind" }, { status: 400 });
   }
 
   let name = body.name?.trim();
-  if (!name && parsedKind !== AthleteLinkTreeLinkKind.ATHLETE_RACE) {
+  if (
+    !name &&
+    parsedKind !== AthleteLinkTreeLinkKind.ATHLETE_RACE &&
+    parsedKind !== AthleteLinkTreeLinkKind.CITY_RUN
+  ) {
     return NextResponse.json({ success: false, error: "name is required" }, { status: 400 });
   }
 
@@ -78,6 +83,7 @@ export async function POST(request: NextRequest) {
 
   let url: string | null = null;
   let athleteRaceId: string | null = null;
+  let cityRunId: string | null = null;
   let athleteRaceLogoUrl: string | null = null;
 
   if (parsedKind === AthleteLinkTreeLinkKind.ATHLETE_RACE) {
@@ -116,6 +122,28 @@ export async function POST(request: NextRequest) {
       claim.logoUrl?.trim() || claim.race_registry?.logoUrl?.trim() || null;
     name = claim.name;
     url = athleteRacePublicCardUrl(raceSlug, gate.handle);
+  } else if (parsedKind === AthleteLinkTreeLinkKind.CITY_RUN) {
+    if (!cityRunIdInput) {
+      return NextResponse.json({ success: false, error: "cityRunId is required" }, { status: 400 });
+    }
+    const run = await prisma.city_runs.findFirst({
+      where: { id: cityRunIdInput, athleteGeneratedId: gate.athlete.id, published: true },
+      select: { id: true, title: true, slug: true },
+    });
+    if (!run) {
+      return NextResponse.json({ success: false, error: "Run not found on your profile" }, { status: 404 });
+    }
+    const duplicate = await prisma.athlete_link_tree_links.findFirst({
+      where: { treeId, cityRunId: run.id },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return NextResponse.json({ success: false, error: "That run is already on your link page" }, { status: 400 });
+    }
+    cityRunId = run.id;
+    name = run.title;
+    const publicKey = run.slug?.trim() || run.id;
+    url = cityRunPublicCardUrl(publicKey);
   } else if (!isSection) {
     const dest = normalizeLinkDestination({ url: body.url, kind: parsedKind });
     if (dest.error) {
@@ -182,6 +210,7 @@ export async function POST(request: NextRequest) {
       name: linkName,
       kind: parsedKind,
       athleteRaceId,
+      cityRunId,
       isSection,
       publicLabel: isSection ? null : body.publicLabel?.trim() || linkName,
       internalDescription: isSection ? null : body.internalDescription?.trim() || null,

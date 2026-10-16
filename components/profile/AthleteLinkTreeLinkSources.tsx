@@ -5,7 +5,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import type { AthleteLinkTreeLink } from "@/lib/content/athlete-link-tree-types";
-import { linkIdForAthleteRace } from "@/lib/athlete-link-tree/link-tree-race-section";
+import {
+  linkIdForAthleteRace,
+  linkIdForCityRun,
+} from "@/lib/athlete-link-tree/link-tree-race-section";
+import type { AthleteHostedRunInvite } from "@/lib/city-run/list-athlete-hosted-invites";
 import { isUpcomingAthleteRace } from "@/lib/athlete-races-service";
 import type { SerializedAthleteRace } from "@/lib/athlete-races-service";
 import {
@@ -57,6 +61,9 @@ export function AthleteLinkTreeLinkSources({
   const [claimedRaces, setClaimedRaces] = useState<SerializedAthleteRace[]>([]);
   const [racesLoading, setRacesLoading] = useState(false);
   const [racesError, setRacesError] = useState<string | null>(null);
+  const [hostedRuns, setHostedRuns] = useState<AthleteHostedRunInvite[]>([]);
+  const [hostedRunsLoading, setHostedRunsLoading] = useState(false);
+  const [hostedRunsError, setHostedRunsError] = useState<string | null>(null);
 
   const upcomingRaces = useMemo(
     () => claimedRaces.filter((r) => isUpcomingAthleteRace(new Date(r.raceDate))),
@@ -132,6 +139,45 @@ export function AthleteLinkTreeLinkSources({
     };
   }, [source]);
 
+  useEffect(() => {
+    if (source !== "hostedRuns") return;
+    let cancelled = false;
+    void (async () => {
+      setHostedRunsLoading(true);
+      setHostedRunsError(null);
+      try {
+        const res = await api.get("/me/hosted-run-invites?limit=50");
+        if (!cancelled) {
+          setHostedRuns((res.data.invites as AthleteHostedRunInvite[]) ?? []);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setHostedRuns([]);
+          setHostedRunsError(err instanceof Error ? err.message : "Failed to load runs");
+        }
+      } finally {
+        if (!cancelled) setHostedRunsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
+
+  function formatRunPickerDate(iso: string): string {
+    return new Date(iso).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  function formatRunPickerTime(run: AthleteHostedRunInvite): string {
+    if (run.startTimeHour == null || run.startTimeMinute == null) return "";
+    const min = run.startTimeMinute.toString().padStart(2, "0");
+    return `${run.startTimeHour}:${min} ${run.startTimePeriod || "AM"}`;
+  }
+
   async function addPreset(id: AthleteContentLinkPresetId) {
     const preset = presetLinkForId(id, publicSlug);
     if (urlAlreadyOnPage(preset.url)) return;
@@ -143,6 +189,22 @@ export function AthleteLinkTreeLinkSources({
       emoji: preset.emoji,
     });
     setSource(null);
+  }
+
+  async function toggleHostedRunOnPage(run: AthleteHostedRunInvite, checked: boolean) {
+    const existingId = linkIdForCityRun(sortedLinks, run.id);
+    if (checked) {
+      if (existingId) return;
+      if (!activeSectionId) return;
+      await onAddLink({
+        kind: "CITY_RUN",
+        cityRunId: run.id,
+      });
+      return;
+    }
+    if (existingId) {
+      await onRemoveLink(existingId);
+    }
   }
 
   async function toggleRaceOnPage(race: SerializedAthleteRace, checked: boolean) {
@@ -236,7 +298,11 @@ export function AthleteLinkTreeLinkSources({
                 <span className="block text-sm font-semibold text-gray-900">{card.title}</span>
                 <span className="block text-xs text-gray-500">
                   {card.hint}
-                  {disabled && card.id !== "custom" && card.id !== "routes" && card.id !== "races"
+                  {disabled &&
+                  card.id !== "custom" &&
+                  card.id !== "routes" &&
+                  card.id !== "races" &&
+                  card.id !== "hostedRuns"
                     ? " · Already added"
                     : null}
                 </span>
@@ -261,6 +327,60 @@ export function AthleteLinkTreeLinkSources({
           >
             {adding ? "Adding…" : "Add link"}
           </button>
+        </div>
+      ) : null}
+
+      {source === "hostedRuns" ? (
+        <div className="space-y-2">
+          {sections.length === 0 ? (
+            <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+              Add a section on the right first, then pick it above.
+            </p>
+          ) : !activeSectionId ? (
+            <p className="text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+              Choose a section above — runs show under that heading.
+            </p>
+          ) : null}
+          {hostedRunsLoading ? <p className="text-xs text-gray-500">Loading runs…</p> : null}
+          {hostedRunsError ? <p className="text-xs text-red-700">{hostedRunsError}</p> : null}
+          {!hostedRunsLoading && !hostedRunsError && hostedRuns.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              No run invites yet. Create one from Run → Create a run; it will show here newest
+              first.
+            </p>
+          ) : null}
+          <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+            {hostedRuns.map((run) => {
+              const onPage = Boolean(linkIdForCityRun(sortedLinks, run.id));
+              const disabled = adding || !activeSectionId;
+              const meta = [
+                formatRunPickerDate(run.date),
+                formatRunPickerTime(run),
+                run.totalMiles != null ? `${run.totalMiles} mi` : null,
+                run.pace?.trim(),
+                run.isUpcoming ? "Upcoming" : "Past",
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              return (
+                <li key={run.id}>
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-2 py-2 text-sm hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={onPage}
+                      disabled={disabled}
+                      onChange={(e) => void toggleHostedRunOnPage(run, e.target.checked)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium text-gray-900">{run.title}</span>
+                      {meta ? <span className="mt-0.5 block text-xs text-gray-500">{meta}</span> : null}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       ) : null}
 

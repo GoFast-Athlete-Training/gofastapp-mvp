@@ -492,6 +492,7 @@ enum AthleteLinkTreeLinkKind {
   CUSTOM
   RACES
   ATHLETE_RACE
+  CITY_RUN
 }
 
 model athlete_link_trees {
@@ -521,9 +522,10 @@ model athlete_link_tree_links {
   linkLogoUrl         String?
   emoji               String?
   url                 String?
-  /// CUSTOM = URL button; RACES = legacy; ATHLETE_RACE = generated link to athlete race card.
+  /// CUSTOM = URL button; RACES = legacy; ATHLETE_RACE / CITY_RUN = generated content card links.
   kind                AthleteLinkTreeLinkKind  @default(CUSTOM)
   athleteRaceId       String?
+  cityRunId           String?
   /// When set, row renders under that section on public page (section row id).
   parentSectionId     String?
   isSection           Boolean                  @default(false)
@@ -532,12 +534,14 @@ model athlete_link_tree_links {
   updatedAt           DateTime @updatedAt
   tree                athlete_link_trees @relation(fields: [treeId], references: [id], onDelete: Cascade)
   athlete_race        athlete_races?           @relation(fields: [athleteRaceId], references: [id], onDelete: Cascade)
+  city_run            city_runs?               @relation(fields: [cityRunId], references: [id], onDelete: Cascade)
   parentSection       athlete_link_tree_links? @relation("LinkTreeSectionChildren", fields: [parentSectionId], references: [id], onDelete: SetNull)
   sectionChildren     athlete_link_tree_links[] @relation("LinkTreeSectionChildren")
 
   @@index([treeId])
   @@index([treeId, sortOrder])
   @@index([parentSectionId])
+  @@index([cityRunId])
   @@map("athlete_link_tree_links")
 }
 
@@ -1842,6 +1846,7 @@ model city_runs {
   workout             workouts?            @relation(fields: [workoutId], references: [id], onDelete: SetNull)
   plannedWorkout      planned_workouts?    @relation("CityRunPlannedTemplate", fields: [plannedWorkoutId], references: [id], onDelete: SetNull)
   planned_workouts    planned_workouts[]   @relation("CityRunPlannedRows")
+  athlete_link_tree_links athlete_link_tree_links[]
 
   @@index([athleteGeneratedId])
   @@index([citySlug])

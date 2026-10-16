@@ -12,6 +12,7 @@ export type AthleteLinkTreeLink = {
   emoji: string | null;
   url: string | null;
   athleteRaceId: string | null;
+  cityRunId: string | null;
   parentSectionId: string | null;
   sortOrder: number;
 };
