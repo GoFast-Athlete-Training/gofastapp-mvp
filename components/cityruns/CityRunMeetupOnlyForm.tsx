@@ -14,14 +14,8 @@ import {
   parseGoogleAddressFromComponents,
 } from "@/lib/parse-google-address";
 import CityRunIntake, { applyIntakePatch } from "@/components/cityruns/CityRunIntake";
-import CityRunInviteRouteFields from "@/components/cityruns/CityRunInviteRouteFields";
-import { useApplyInitialRoute } from "@/lib/city-run/use-apply-initial-route";
+import CityRunPostInviteRouteStep from "@/components/cityruns/CityRunPostInviteRouteStep";
 import type { CityRunFromWorkoutSuccess } from "@/components/cityruns/CreateCityRunForm";
-import {
-  applySavedRouteToFormFields,
-  clearSavedRouteFormFields,
-  type SavedRouteSnapshot,
-} from "@/lib/city-run/saved-route-snapshot";
 import { PACE_OPTIONS } from "@/lib/runTypes";
 
 function formatMeetupConfirmation(city: string, state: string): string {
@@ -73,59 +67,12 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
   const [totalMiles, setTotalMiles] = useState("");
   const [pace, setPace] = useState("Various");
   const [description, setDescription] = useState("");
-  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
-  const [routePhotos, setRoutePhotos] = useState<string[]>([]);
-  const [runPhotos, setRunPhotos] = useState<string[]>([]);
-  const [mapImageUrl, setMapImageUrl] = useState("");
-  const [stravaMapUrl, setStravaMapUrl] = useState("");
-  const [routeNeighborhood, setRouteNeighborhood] = useState("");
-
-  const handlePickSavedRoute = (snap: SavedRouteSnapshot) => {
-    setSelectedRouteId(snap.routeId);
-    applySavedRouteToFormFields(
-      snap,
-      {
-        setStravaMapUrl,
-        setRouteNeighborhood,
-        setMapImageUrl,
-        setTotalMiles,
-        setRoutePhotos,
-      },
-      {
-        stravaMapUrl,
-        routeNeighborhood,
-        mapImageUrl,
-        totalMiles,
-        routePhotos,
-      }
-    );
-  };
-
-  const handleClearSavedRoute = () => {
-    setSelectedRouteId(null);
-    clearSavedRouteFormFields({
-      setStravaMapUrl,
-      setRouteNeighborhood,
-      setMapImageUrl,
-    });
-  };
-
-  useApplyInitialRoute({
-    initialRouteId,
-    onRouteId: setSelectedRouteId,
-    onRoutePhotos: setRoutePhotos,
-    fieldSetters: {
-      setStravaMapUrl,
-      setRouteNeighborhood,
-      setMapImageUrl,
-      setTotalMiles,
-    },
-  });
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<CityRunFromWorkoutSuccess | null>(null);
   const [copiedField, setCopiedField] = useState<"rsvp" | "share" | null>(null);
+  const [routeStepDismissed, setRouteStepDismissed] = useState(false);
 
   const handleStartPlaceSelected = useCallback((placeData: GooglePlaceSelectedData) => {
     const parsed = parseGoogleAddressFromComponents(
@@ -202,18 +149,13 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
         pace: pace.trim() && pace !== "Various" ? pace : undefined,
         totalMiles:
           Number.isFinite(milesNum) && milesNum > 0 ? milesNum : undefined,
-        ...(selectedRouteId ? { routeId: selectedRouteId } : {}),
-        stravaMapUrl: stravaMapUrl.trim() || undefined,
-        routeNeighborhood: routeNeighborhood.trim() || undefined,
-        mapImageUrl: mapImageUrl.trim() || undefined,
-        routePhotos: routePhotos.length > 0 ? routePhotos : undefined,
-        runPhotos: runPhotos.length > 0 ? runPhotos : undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
       });
       if (data?.cityRunId && data?.path) {
         setSuccess(data);
+        setRouteStepDismissed(false);
       } else {
         setError("Unexpected response from server.");
       }
@@ -238,25 +180,34 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
   if (success) {
     const joinUrl = success.joinSignupUrl || success.shareUrl;
     return (
-      <div className="rounded-xl border border-green-200 bg-green-50 p-6 space-y-4">
-        <p className="font-semibold text-green-900">Invite created</p>
-        <p className="text-sm text-green-800">Share the link so others can RSVP.</p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void copyToClipboard(joinUrl, "rsvp")}
-            className="inline-flex items-center gap-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white"
-          >
-            {copiedField === "rsvp" ? "Copied" : "Copy invite link"}
-          </button>
-          <Link
-            href={success.path}
-            className="inline-flex items-center gap-2 rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-semibold text-green-900"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Open run page
-          </Link>
+      <div className="space-y-5">
+        <div className="rounded-xl border border-green-200 bg-green-50 p-6 space-y-4">
+          <p className="font-semibold text-green-900">Invite created</p>
+          <p className="text-sm text-green-800">Share the link so others can RSVP.</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void copyToClipboard(joinUrl, "rsvp")}
+              className="inline-flex items-center gap-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white"
+            >
+              {copiedField === "rsvp" ? "Copied" : "Copy invite link"}
+            </button>
+            <Link
+              href={success.path}
+              className="inline-flex items-center gap-2 rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-semibold text-green-900"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open run page
+            </Link>
+          </div>
         </div>
+        {!routeStepDismissed ? (
+          <CityRunPostInviteRouteStep
+            cityRunId={success.cityRunId}
+            suggestedRouteId={initialRouteId}
+            onSkip={() => setRouteStepDismissed(true)}
+          />
+        ) : null}
       </div>
     );
   }
@@ -280,8 +231,6 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
             },
             setTotalMiles,
             setPace,
-            setStravaMapUrl,
-            setRouteNeighborhood,
             setDescription,
           });
         }}
@@ -415,24 +364,18 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
             </div>
           </div>
 
-          <CityRunInviteRouteFields
-            selectedRouteId={selectedRouteId}
-            onSelectSavedRoute={handlePickSavedRoute}
-            onClearSavedRoute={handleClearSavedRoute}
-            stravaMapUrl={stravaMapUrl}
-            onStravaMapUrlChange={setStravaMapUrl}
-            mapImageUrl={mapImageUrl}
-            onMapImageUrlChange={setMapImageUrl}
-            routeNeighborhood={routeNeighborhood}
-            onRouteNeighborhoodChange={setRouteNeighborhood}
-            routePhotos={routePhotos}
-            onRoutePhotosChange={setRoutePhotos}
-            runPhotos={runPhotos}
-            onRunPhotosChange={setRunPhotos}
-            onError={setError}
-            groupNotes={description}
-            onGroupNotesChange={setDescription}
-          />
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Note <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Anything runners should know before they show up."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
 
           {error ? (
             <p className="text-sm text-red-600" role="alert">

@@ -10,9 +10,11 @@ import CityRunRouteMapUploadField from '@/components/cityruns/CityRunRouteMapUpl
 type Props = {
   onSaved?: (routeId: string) => void;
   className?: string;
+  /** When set, hide post-save navigation (parent handles attach). */
+  embedded?: boolean;
 };
 
-export default function BuildRouteForm({ onSaved, className = '' }: Props) {
+export default function BuildRouteForm({ onSaved, className = '', embedded = false }: Props) {
   const [name, setName] = useState('');
   const [stravaUrl, setStravaUrl] = useState('');
   const [distanceMiles, setDistanceMiles] = useState('');
@@ -49,6 +51,14 @@ export default function BuildRouteForm({ onSaved, className = '' }: Props) {
       setBusy(false);
     }
   };
+
+  if (savedId && embedded) {
+    return (
+      <p className="text-sm text-emerald-800 flex items-center gap-2">
+        Route saved — attaching to your invite…
+      </p>
+    );
+  }
 
   if (savedId) {
     return (

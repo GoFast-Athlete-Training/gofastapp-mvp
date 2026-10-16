@@ -115,8 +115,8 @@ function HostARunPageInner() {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Create a run</h1>
                 <p className="mt-1 text-gray-600 max-w-xl">
-                  Set meetup time and place, optionally attach a workout, then share an
-                  invite — run chat and check-in on run day.
+                  Save the meetup first, share the invite, then optionally attach or create a
+                  route — run chat and check-in on run day.
                 </p>
                 <p className="mt-2 text-sm text-gray-600">
                   Need a new saved path?{" "}

@@ -10,6 +10,10 @@ import {
   patchFromScratchCsv,
   type CityRunIntakePatch,
 } from "@/lib/city-run/apply-intake-patch";
+import {
+  mergeIntakePatches,
+  parseRunInvitePasteText,
+} from "@/lib/city-run/parse-run-invite-paste";
 import { scratchRunCsvTemplate } from "@/lib/runmanage/scratch-intake-csv";
 
 type Props = {
@@ -46,21 +50,33 @@ export default function CityRunIntake({
     }
     setParsing(true);
     onError(null);
+    const localPatch = parseRunInvitePasteText(text);
+    let applied = false;
     try {
       const res = await api.post("/runs/ai-generate", {
         stravaText: text,
         igPostText: text,
       });
-      if (!res.data?.success || !res.data?.runData) {
-        throw new Error(res.data?.error || "Parse failed");
+      if (res.data?.success && res.data?.runData) {
+        dispatchPatch(
+          mergeIntakePatches(localPatch, patchFromAiRunData(res.data.runData as Record<string, unknown>))
+        );
+        applied = true;
       }
-      dispatchPatch(patchFromAiRunData(res.data.runData as Record<string, unknown>));
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } }; message?: string };
-      onError(err.response?.data?.error || err.message || "Could not parse pasted text.");
+    } catch {
+      /* fall back to local parse when signed out or API unavailable */
     } finally {
       setParsing(false);
     }
+
+    if (applied) return;
+
+    const merged = mergeIntakePatches(localPatch);
+    if (Object.keys(merged).length === 0) {
+      onError("Could not read date, time, or meetup from that paste — try manual fields.");
+      return;
+    }
+    dispatchPatch(merged);
   };
 
   const handleCsvFile = async (file: File) => {
@@ -92,8 +108,8 @@ export default function CityRunIntake({
           setCsvApplied(false);
         }}
         descriptions={{
-          manual: "Empty fields — type meetup, time, and optional route.",
-          paste: "Paste IG, Strava, or email text — we pre-fill title, when, where, miles, and route hints.",
+          manual: "Empty fields — type meetup, time, miles, and pace.",
+          paste: "Paste IG, Strava, or email text — we pre-fill title, when, where, and miles.",
           csv: "One row from the template — good for repeating weekly runs.",
         }}
       />
@@ -157,7 +173,7 @@ export default function CityRunIntake({
       ) : null}
 
       {mode === "manual" ? (
-        <p className="text-sm text-gray-600">Fill meetup and optional route below.</p>
+        <p className="text-sm text-gray-600">Fill meetup details below. Add a route after the invite is saved.</p>
       ) : null}
     </div>
   );

@@ -33,14 +33,8 @@ import {
 import { formatCalendarDate } from "@/lib/calendar-date";
 import type { IntakeMode } from "@/components/runmanage/intake/IntakeModePicker";
 import CityRunIntake, { applyIntakePatch } from "@/components/cityruns/CityRunIntake";
-import CityRunInviteRouteFields from "@/components/cityruns/CityRunInviteRouteFields";
+import CityRunPostInviteRouteStep from "@/components/cityruns/CityRunPostInviteRouteStep";
 import { PACE_OPTIONS } from "@/lib/runTypes";
-import {
-  applySavedRouteToFormFields,
-  clearSavedRouteFormFields,
-  type SavedRouteSnapshot,
-} from "@/lib/city-run/saved-route-snapshot";
-import { useApplyInitialRoute } from "@/lib/city-run/use-apply-initial-route";
 import {
   applyPaceOffsetDeltaToSegments,
   metersToMiles,
@@ -182,13 +176,7 @@ export default function CreateCityRunForm({
   const [meetUpNote, setMeetUpNote] = useState("");
   const [workoutNarrative, setWorkoutNarrative] = useState("");
   const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
-  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
-  const [selectedRoutePhotos, setSelectedRoutePhotos] = useState<string[]>([]);
-  const [runPhotos, setRunPhotos] = useState<string[]>([]);
   const [invitePace, setInvitePace] = useState("Various");
-  const [stravaMapUrl, setStravaMapUrl] = useState("");
-  const [routeNeighborhood, setRouteNeighborhood] = useState("");
-  const [mapImageUrl, setMapImageUrl] = useState("");
 
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
 
@@ -196,54 +184,12 @@ export default function CreateCityRunForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<CityRunFromWorkoutSuccess | null>(null);
   const [copiedField, setCopiedField] = useState<"rsvp" | "share" | "join" | null>(null);
+  const [routeStepDismissed, setRouteStepDismissed] = useState(false);
 
   const [editTitle, setEditTitle] = useState(workout.title);
   const [editMiles, setEditMiles] = useState(
     () => metersToMiles(workout.estimatedDistanceInMeters ?? null)?.toString() ?? ""
   );
-
-  const handlePickSavedRoute = (snap: SavedRouteSnapshot) => {
-    setSelectedRouteId(snap.routeId);
-    applySavedRouteToFormFields(
-      snap,
-      {
-        setStravaMapUrl,
-        setRouteNeighborhood,
-        setMapImageUrl,
-        setTotalMiles: setEditMiles,
-        setRoutePhotos: setSelectedRoutePhotos,
-      },
-      {
-        stravaMapUrl,
-        routeNeighborhood,
-        mapImageUrl,
-        totalMiles: editMiles,
-        routePhotos: selectedRoutePhotos,
-      }
-    );
-  };
-
-  const handleClearSavedRoute = () => {
-    setSelectedRouteId(null);
-    setSelectedRoutePhotos([]);
-    clearSavedRouteFormFields({
-      setStravaMapUrl,
-      setRouteNeighborhood,
-      setMapImageUrl,
-    });
-  };
-
-  useApplyInitialRoute({
-    initialRouteId,
-    onRouteId: setSelectedRouteId,
-    onRoutePhotos: setSelectedRoutePhotos,
-    fieldSetters: {
-      setStravaMapUrl,
-      setRouteNeighborhood,
-      setMapImageUrl,
-      setTotalMiles: setEditMiles,
-    },
-  });
 
   const [paceOffsetSecPerMile, setPaceOffsetSecPerMile] = useState(0);
   const [workoutSaving, setWorkoutSaving] = useState(false);
@@ -469,12 +415,6 @@ export default function CreateCityRunForm({
         meetUpLng: meetUpLng ?? undefined,
         meetUpNote: meetUpNote.trim() || undefined,
         workoutNarrative: workoutNarrative.trim() || undefined,
-        ...(selectedRouteId ? { routeId: selectedRouteId } : {}),
-        stravaMapUrl: stravaMapUrl.trim() || undefined,
-        routeNeighborhood: routeNeighborhood.trim() || undefined,
-        mapImageUrl: mapImageUrl.trim() || undefined,
-        routePhotos: selectedRoutePhotos.length > 0 ? selectedRoutePhotos : undefined,
-        runPhotos: runPhotos.length > 0 ? runPhotos : undefined,
         pace: invitePace.trim() && invitePace !== "Various" ? invitePace : undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
@@ -482,6 +422,7 @@ export default function CreateCityRunForm({
       });
       if (data?.cityRunId && data?.path) {
         setSuccess(data);
+        setRouteStepDismissed(false);
       } else {
         setError("Unexpected response from server.");
       }
@@ -617,6 +558,13 @@ export default function CreateCityRunForm({
               </Link>
             </div>
           </div>
+        ) : null}
+        {!routeStepDismissed ? (
+          <CityRunPostInviteRouteStep
+            cityRunId={success.cityRunId}
+            suggestedRouteId={initialRouteId}
+            onSkip={() => setRouteStepDismissed(true)}
+          />
         ) : null}
         <button
           type="button"
@@ -788,8 +736,6 @@ export default function CreateCityRunForm({
             },
             setTotalMiles: setEditMiles,
             setPace: setInvitePace,
-            setStravaMapUrl,
-            setRouteNeighborhood,
           });
         }}
       />
@@ -903,23 +849,6 @@ export default function CreateCityRunForm({
           ))}
         </select>
       </div>
-
-      <CityRunInviteRouteFields
-        selectedRouteId={selectedRouteId}
-        onSelectSavedRoute={handlePickSavedRoute}
-        onClearSavedRoute={handleClearSavedRoute}
-        stravaMapUrl={stravaMapUrl}
-        onStravaMapUrlChange={setStravaMapUrl}
-        mapImageUrl={mapImageUrl}
-        onMapImageUrlChange={setMapImageUrl}
-        routeNeighborhood={routeNeighborhood}
-        onRouteNeighborhoodChange={setRouteNeighborhood}
-        routePhotos={selectedRoutePhotos}
-        onRoutePhotosChange={setSelectedRoutePhotos}
-        runPhotos={runPhotos}
-        onRunPhotosChange={setRunPhotos}
-        onError={setError}
-      />
 
       <div className="border-t border-gray-100 pt-2">
         <button
