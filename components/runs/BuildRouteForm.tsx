@@ -55,7 +55,7 @@ export default function BuildRouteForm({ onSaved, className = '' }: Props) {
       <div className={`rounded-2xl border border-emerald-200 bg-emerald-50 p-6 ${className}`}>
         <p className="text-sm font-semibold text-emerald-900">Route saved.</p>
         <p className="text-sm text-emerald-800 mt-2">
-          Use it when you create a run, or find it under Discover routes.
+          Use it when you create a run, or search for it from Find a route.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <Link
@@ -68,7 +68,7 @@ export default function BuildRouteForm({ onSaved, className = '' }: Props) {
             href="/build-a-run/discover"
             className="inline-flex rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
           >
-            Discover routes
+            Find a route
           </Link>
         </div>
       </div>

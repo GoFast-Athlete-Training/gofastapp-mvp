@@ -109,7 +109,7 @@ export default function RoutesDiscoverPicker({
           href="/build-a-run/discover"
           className="text-xs font-semibold text-orange-700 hover:underline shrink-0"
         >
-          Discover routes
+          Find a route
         </Link>
       </div>
       <div className="relative">

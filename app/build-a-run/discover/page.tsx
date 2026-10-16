@@ -53,10 +53,10 @@ export default function DiscoverRoutesPage() {
               className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Run hub
+              Back to Run
             </Link>
 
-            <h1 className="text-2xl font-bold text-gray-900">Discover routes</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Find a route</h1>
             <p className="text-sm text-gray-600 mt-2 mb-6">
               Routes you saved by name — pick one, then create a run with it attached.
             </p>

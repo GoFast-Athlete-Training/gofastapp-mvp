@@ -118,6 +118,15 @@ function HostARunPageInner() {
                   Set meetup time and place, optionally attach a workout, then share an
                   invite — run chat and check-in on run day.
                 </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  Need a new saved path?{" "}
+                  <Link
+                    href="/build-a-run/routes/new"
+                    className="font-semibold text-orange-700 hover:underline"
+                  >
+                    Build a route
+                  </Link>
+                </p>
               </div>
             </div>
 
