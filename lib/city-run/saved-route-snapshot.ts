@@ -74,17 +74,45 @@ export type CityRunRouteFieldSetters = {
   setRouteNeighborhood: (v: string) => void;
   setMapImageUrl?: (v: string) => void;
   setTotalMiles?: (v: string) => void;
+  setRoutePhotos?: (v: string[]) => void;
+};
+
+export type CityRunRouteFieldCurrent = {
+  stravaMapUrl?: string;
+  routeNeighborhood?: string;
+  mapImageUrl?: string;
+  totalMiles?: string;
+  routePhotos?: string[];
 };
 
 export function applySavedRouteToFormFields(
   snap: SavedRouteSnapshot,
-  setters: CityRunRouteFieldSetters
+  setters: CityRunRouteFieldSetters,
+  current?: CityRunRouteFieldCurrent
 ): void {
-  setters.setStravaMapUrl(snap.stravaMapUrl ?? '');
-  setters.setRouteNeighborhood(snap.routeNeighborhood ?? '');
-  setters.setMapImageUrl?.(snap.mapImageUrl ?? snap.routePhotos[0] ?? '');
+  const onlyEmpty = Boolean(current);
+  const stravaEmpty = !current?.stravaMapUrl?.trim();
+  const neighborhoodEmpty = !current?.routeNeighborhood?.trim();
+  const mapEmpty = !current?.mapImageUrl?.trim();
+  const milesEmpty = !current?.totalMiles?.trim();
+  const photosEmpty = !current?.routePhotos?.length;
+
+  if (!onlyEmpty || stravaEmpty) {
+    setters.setStravaMapUrl(snap.stravaMapUrl ?? '');
+  }
+  if (!onlyEmpty || neighborhoodEmpty) {
+    setters.setRouteNeighborhood(snap.routeNeighborhood ?? '');
+  }
+  if (setters.setMapImageUrl && (!onlyEmpty || mapEmpty)) {
+    setters.setMapImageUrl(snap.mapImageUrl ?? snap.routePhotos[0] ?? '');
+  }
   const miles = formatMilesForInput(snap.distanceMiles);
-  if (miles && setters.setTotalMiles) setters.setTotalMiles(miles);
+  if (miles && setters.setTotalMiles && (!onlyEmpty || milesEmpty)) {
+    setters.setTotalMiles(miles);
+  }
+  if (setters.setRoutePhotos && (!onlyEmpty || photosEmpty)) {
+    setters.setRoutePhotos(snap.routePhotos);
+  }
 }
 
 export function clearSavedRouteFormFields(setters: CityRunRouteFieldSetters): void {

@@ -19,6 +19,7 @@ import {
   cityRunMediaFromSavedRoute,
   resolveSavedRouteForAthlete,
 } from '@/lib/city-run/saved-route-for-athlete';
+import { mergeCityRunRouteMedia, mergeTotalMiles } from '@/lib/city-run/merge-route-media';
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +128,7 @@ type FromWorkoutBody = {
   routeNeighborhood?: string | null;
   mapImageUrl?: string | null;
   routePhotos?: string[] | null;
+  runPhotos?: string[] | null;
   /** Social meetup title — required; never defaults to plan workout title. */
   title?: string;
   /** Optional pace band label for city run listing (e.g. 7:00-7:30). */
@@ -176,6 +178,7 @@ export async function POST(request: NextRequest) {
       routeNeighborhood,
       mapImageUrl,
       routePhotos,
+      runPhotos,
       title: socialTitleBody,
       pace: paceBody,
       description: descriptionBody,
@@ -337,11 +340,6 @@ export async function POST(request: NextRequest) {
         ? workout.estimatedDistanceInMeters / 1609.34
         : null;
 
-    let totalMilesParsed =
-      totalMilesBody != null && Number.isFinite(Number(totalMilesBody)) && Number(totalMilesBody) > 0
-        ? Number(totalMilesBody)
-        : totalMilesFromWorkout;
-
     const routeIdTrimmed =
       typeof routeIdBody === 'string' ? routeIdBody.trim() : '';
     let savedRouteMedia: ReturnType<typeof cityRunMediaFromSavedRoute> | null = null;
@@ -354,10 +352,15 @@ export async function POST(request: NextRequest) {
         );
       }
       savedRouteMedia = cityRunMediaFromSavedRoute(savedRoute);
-      if (savedRouteMedia.totalMiles != null) {
-        totalMilesParsed = savedRouteMedia.totalMiles;
-      }
     }
+
+    const totalMilesParsed = mergeTotalMiles(
+      totalMilesBody != null && Number.isFinite(Number(totalMilesBody)) && Number(totalMilesBody) > 0
+        ? Number(totalMilesBody)
+        : null,
+      savedRouteMedia?.totalMiles ?? null,
+      totalMilesFromWorkout
+    );
 
     const paceLabel = typeof paceBody === 'string' && paceBody.trim() ? paceBody.trim() : null;
     const descriptionLabel =
@@ -380,6 +383,21 @@ export async function POST(request: NextRequest) {
 
     const streetFallback =
       meetUpStreetAddress?.trim() || meetUpPoint.trim();
+
+    const mergedRoute = mergeCityRunRouteMedia(
+      {
+        stravaMapUrl: stravaMapUrlBody,
+        mapImageUrl,
+        routeNeighborhood,
+        routePhotos,
+      },
+      savedRouteMedia
+    );
+
+    const runPhotoUrls =
+      Array.isArray(runPhotos) && runPhotos.length > 0
+        ? runPhotos.filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+        : [];
 
     const narrativeTrimmed = workoutNarrative?.trim() || null;
     if (narrativeTrimmed && workout) {
@@ -416,10 +434,8 @@ export async function POST(request: NextRequest) {
       meetUpState: meetUpState?.trim() || state?.trim() || null,
       meetUpZip: meetUpZip?.trim() || null,
       meetUpNote: meetUpNote?.trim() || null,
-      routeNeighborhood: savedRouteMedia
-        ? savedRouteMedia.routeNeighborhood
-        : routeNeighborhood?.trim() || null,
-      runType: savedRouteMedia ? savedRouteMedia.runType : null,
+      routeNeighborhood: mergedRoute.routeNeighborhood,
+      runType: mergedRoute.runType,
       workoutDescription: null,
       meetUpPlaceId: meetUpPlaceId?.trim() || null,
       meetUpLat: meetUpLatFinal,
@@ -430,19 +446,12 @@ export async function POST(request: NextRequest) {
       endState: null,
       totalMiles: totalMilesParsed,
       pace: paceLabel,
-      stravaMapUrl: savedRouteMedia
-        ? savedRouteMedia.stravaMapUrl
-        : stravaMapUrlBody?.trim() || null,
+      stravaMapUrl: mergedRoute.stravaMapUrl,
       description: descriptionLabel,
       postRunActivity: null,
-      routePhotos: savedRouteMedia
-        ? savedRouteMedia.routePhotos
-        : Array.isArray(routePhotos) && routePhotos.length > 0
-          ? routePhotos.filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
-          : Prisma.JsonNull,
-      mapImageUrl: savedRouteMedia
-        ? savedRouteMedia.mapImageUrl
-        : mapImageUrl?.trim() || null,
+      routePhotos: mergedRoute.routePhotos,
+      runPhotos: runPhotoUrls.length > 0 ? runPhotoUrls : Prisma.JsonNull,
+      mapImageUrl: mergedRoute.mapImageUrl,
       staffNotes: null,
       stravaEventUrl: null,
       stravaText: null,
@@ -450,7 +459,7 @@ export async function POST(request: NextRequest) {
       webText: null,
       igPostText: null,
       igPostGraphic: null,
-      routeId: savedRouteMedia?.routeId ?? null,
+      routeId: mergedRoute.routeId,
       workoutId: workout?.id ?? null,
       updatedAt: new Date(),
     };
@@ -473,6 +482,7 @@ export async function POST(request: NextRequest) {
       for (const field of UNSUPPORTED_CITY_RUN_FIELDS) {
         delete createData[field];
       }
+      delete createData.runPhotos;
       run = await prisma.city_runs.create({
         data: createData as Parameters<typeof prisma.city_runs.create>[0]["data"],
         select: {

@@ -13,6 +13,9 @@ type Props = {
   onChange: (photos: string[]) => void;
   onError?: (message: string | null) => void;
   className?: string;
+  heading?: string;
+  hint?: string;
+  addPhotosLabel?: string;
 };
 
 export default function CityRunRoutePhotosField({
@@ -20,6 +23,9 @@ export default function CityRunRoutePhotosField({
   onChange,
   onError,
   className = '',
+  heading = 'Route photos',
+  hint = 'Up to {max} extra images.',
+  addPhotosLabel = 'Add photos',
 }: Props) {
   const [uploading, setUploading] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
@@ -42,9 +48,11 @@ export default function CityRunRoutePhotosField({
   return (
     <div className={className}>
       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-        Route photos <span className="font-normal text-gray-400">(optional)</span>
+        {heading} <span className="font-normal text-gray-400">(optional)</span>
       </label>
-      <p className="text-xs text-gray-500 mb-2">Up to {MAX_ROUTE_PHOTOS} extra images.</p>
+      <p className="text-xs text-gray-500 mb-2">
+        {hint.replace("{max}", String(MAX_ROUTE_PHOTOS))}
+      </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {photos.map((photo, index) => (
           <div key={`${photo}-${index}`} className="group relative">
@@ -68,7 +76,7 @@ export default function CityRunRoutePhotosField({
           <label className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-gray-300 hover:border-orange-400 hover:bg-orange-50/50">
             <ImageIcon className="h-6 w-6 text-gray-400" />
             <span className="text-xs text-gray-600 px-2 text-center">
-              {uploading ? 'Uploading…' : 'Add photos'}
+              {uploading ? 'Uploading…' : addPhotosLabel}
             </span>
             <input
               type="file"

@@ -2,6 +2,7 @@
 
 interface CityRunRouteMediaProps {
   routePhotos?: string[] | null;
+  runPhotos?: string[] | null;
   mapImageUrl?: string | null;
   stravaMapUrl?: string | null;
 }
@@ -19,18 +20,35 @@ function normalizeRoutePhotoUrls(routePhotos?: string[] | null): string[] {
  */
 export default function CityRunRouteMedia({
   routePhotos,
+  runPhotos,
   mapImageUrl,
 }: CityRunRouteMediaProps) {
-  const photos = normalizeRoutePhotoUrls(routePhotos);
+  const routePhotoUrls = normalizeRoutePhotoUrls(routePhotos);
+  const runPhotoUrls = normalizeRoutePhotoUrls(runPhotos);
 
   return (
     <>
-      {photos.length > 0 && (
+      {runPhotoUrls.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="p-5">
+            <h2 className="text-base font-semibold text-gray-900 mb-3">Photos of the run</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {runPhotoUrls.map((photoUrl, idx) => (
+                <div key={`run-${photoUrl}-${idx}`} className="aspect-video rounded-lg overflow-hidden bg-gray-100">
+                  <img src={photoUrl} alt={`Run photo ${idx + 1}`} className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {routePhotoUrls.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="p-5">
             <h2 className="text-base font-semibold text-gray-900 mb-3">Route Photos</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {photos.map((photoUrl, idx) => (
+              {routePhotoUrls.map((photoUrl, idx) => (
                 <div key={`${photoUrl}-${idx}`} className="aspect-video rounded-lg overflow-hidden bg-gray-100">
                   <img src={photoUrl} alt={`Route photo ${idx + 1}`} className="w-full h-full object-cover" />
                 </div>

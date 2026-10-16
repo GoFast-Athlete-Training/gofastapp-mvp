@@ -117,6 +117,7 @@ export interface CityRunDetails {
   description: string | null;
   stravaMapUrl: string | null;
   routePhotos?: string[] | null;
+  runPhotos?: string[] | null;
   mapImageUrl?: string | null;
   routeNeighborhood?: string | null;
   runType?: string | null;

@@ -110,6 +110,7 @@ export async function GET(
         postRunActivity: run.postRunActivity ?? null,
         stravaMapUrl: run.stravaMapUrl,
         routePhotos: run.routePhotos as string[] | null ?? null,
+        runPhotos: run.runPhotos as string[] | null ?? null,
         mapImageUrl: run.mapImageUrl ?? null,
         routeNeighborhood: run.routeNeighborhood ?? null,
         runType: run.runType ?? null,

@@ -31,9 +31,10 @@ import {
   generateCitySlugFromParts,
 } from "@/lib/parse-google-address";
 import { formatCalendarDate } from "@/lib/calendar-date";
-import RoutesDiscoverPicker from "@/components/runs/RoutesDiscoverPicker";
-import CityRunRouteMapUploadField from "@/components/cityruns/CityRunRouteMapUploadField";
-import CityRunRoutePhotosField from "@/components/cityruns/CityRunRoutePhotosField";
+import type { IntakeMode } from "@/components/runmanage/intake/IntakeModePicker";
+import CityRunIntake, { applyIntakePatch } from "@/components/cityruns/CityRunIntake";
+import CityRunInviteRouteFields from "@/components/cityruns/CityRunInviteRouteFields";
+import { PACE_OPTIONS } from "@/lib/runTypes";
 import {
   applySavedRouteToFormFields,
   clearSavedRouteFormFields,
@@ -180,8 +181,11 @@ export default function CreateCityRunForm({
 
   const [meetUpNote, setMeetUpNote] = useState("");
   const [workoutNarrative, setWorkoutNarrative] = useState("");
+  const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [selectedRoutePhotos, setSelectedRoutePhotos] = useState<string[]>([]);
+  const [runPhotos, setRunPhotos] = useState<string[]>([]);
+  const [invitePace, setInvitePace] = useState("Various");
   const [stravaMapUrl, setStravaMapUrl] = useState("");
   const [routeNeighborhood, setRouteNeighborhood] = useState("");
   const [mapImageUrl, setMapImageUrl] = useState("");
@@ -200,13 +204,23 @@ export default function CreateCityRunForm({
 
   const handlePickSavedRoute = (snap: SavedRouteSnapshot) => {
     setSelectedRouteId(snap.routeId);
-    setSelectedRoutePhotos(snap.routePhotos);
-    applySavedRouteToFormFields(snap, {
-      setStravaMapUrl,
-      setRouteNeighborhood,
-      setMapImageUrl,
-      setTotalMiles: setEditMiles,
-    });
+    applySavedRouteToFormFields(
+      snap,
+      {
+        setStravaMapUrl,
+        setRouteNeighborhood,
+        setMapImageUrl,
+        setTotalMiles: setEditMiles,
+        setRoutePhotos: setSelectedRoutePhotos,
+      },
+      {
+        stravaMapUrl,
+        routeNeighborhood,
+        mapImageUrl,
+        totalMiles: editMiles,
+        routePhotos: selectedRoutePhotos,
+      }
+    );
   };
 
   const handleClearSavedRoute = () => {
@@ -460,6 +474,8 @@ export default function CreateCityRunForm({
         routeNeighborhood: routeNeighborhood.trim() || undefined,
         mapImageUrl: mapImageUrl.trim() || undefined,
         routePhotos: selectedRoutePhotos.length > 0 ? selectedRoutePhotos : undefined,
+        runPhotos: runPhotos.length > 0 ? runPhotos : undefined,
+        pace: invitePace.trim() && invitePace !== "Various" ? invitePace : undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
@@ -754,14 +770,39 @@ export default function CreateCityRunForm({
   ) : null;
 
   const primaryForm = (
+    <div className="space-y-5">
+      <CityRunIntake
+        mode={intakeMode}
+        onModeChange={setIntakeMode}
+        onError={setError}
+        onApply={(patch) => {
+          applyIntakePatch(patch, {
+            setTitle: editableWorkout ? setEditTitle : undefined,
+            setDate: setMeetupDate,
+            setStartHour,
+            setStartMinute,
+            setStartPeriod,
+            setMeetUpPoint: (v) => {
+              setMeetUpPoint(v);
+              setMeetUpPlaceSet(false);
+            },
+            setTotalMiles: setEditMiles,
+            setPace: setInvitePace,
+            setStravaMapUrl,
+            setRouteNeighborhood,
+          });
+        }}
+      />
+
+      {intakeMode === null ? null : (
     <div className="space-y-5 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-2">
           <Route className="w-4 h-4 text-orange-500" />
-          You add
+          Meetup for this invite
         </p>
         <p className="text-xs text-gray-500">
-          Pick a meetup and a start time. A route is optional.
+          Pick meetup and start time. Confirm location from search after paste.
         </p>
       </div>
 
@@ -846,48 +887,39 @@ export default function CreateCityRunForm({
         </div>
       </div>
 
-      <div className="space-y-3">
-        <RoutesDiscoverPicker
-          selectedRouteId={selectedRouteId}
-          onSelect={handlePickSavedRoute}
-          onClear={handleClearSavedRoute}
-        />
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Strava route <span className="font-normal text-gray-400">(optional)</span>
-          </label>
-          <input
-            type="url"
-            value={stravaMapUrl}
-            onChange={(e) => setStravaMapUrl(e.target.value)}
-            placeholder="https://www.strava.com/routes/…"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Route description <span className="font-normal text-gray-400">(optional)</span>
-          </label>
-          <textarea
-            value={routeNeighborhood}
-            onChange={(e) => setRouteNeighborhood(e.target.value)}
-            rows={2}
-            placeholder="Down George Mason and through the woods"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-        <CityRunRouteMapUploadField
-          mapImageUrl={mapImageUrl}
-          onChange={setMapImageUrl}
-          onError={setError}
-        />
-        <CityRunRoutePhotosField
-          photos={selectedRoutePhotos}
-          onChange={setSelectedRoutePhotos}
-          onError={setError}
-        />
-        <p className="text-xs text-gray-500">Skip route fields if you&apos;re looping the meetup.</p>
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Pace for the invite <span className="font-normal text-gray-400">(optional)</span>
+        </label>
+        <select
+          value={invitePace}
+          onChange={(e) => setInvitePace(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        >
+          {PACE_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt === "Various" ? "All paces welcome" : opt}
+            </option>
+          ))}
+        </select>
       </div>
+
+      <CityRunInviteRouteFields
+        selectedRouteId={selectedRouteId}
+        onSelectSavedRoute={handlePickSavedRoute}
+        onClearSavedRoute={handleClearSavedRoute}
+        stravaMapUrl={stravaMapUrl}
+        onStravaMapUrlChange={setStravaMapUrl}
+        mapImageUrl={mapImageUrl}
+        onMapImageUrlChange={setMapImageUrl}
+        routeNeighborhood={routeNeighborhood}
+        onRouteNeighborhoodChange={setRouteNeighborhood}
+        routePhotos={selectedRoutePhotos}
+        onRoutePhotosChange={setSelectedRoutePhotos}
+        runPhotos={runPhotos}
+        onRunPhotosChange={setRunPhotos}
+        onError={setError}
+      />
 
       <div className="border-t border-gray-100 pt-2">
         <button
@@ -958,6 +990,8 @@ export default function CreateCityRunForm({
           {busy ? "Creating…" : "Create invite"}
         </button>
       </div>
+    </div>
+      )}
     </div>
   );
 

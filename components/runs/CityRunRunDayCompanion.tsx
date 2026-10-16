@@ -85,7 +85,11 @@ export default function CityRunRunDayCompanion({
         </a>
       ) : null}
 
-      <CityRunRouteMedia routePhotos={run.routePhotos} mapImageUrl={run.mapImageUrl} />
+      <CityRunRouteMedia
+        routePhotos={run.routePhotos}
+        runPhotos={run.runPhotos}
+        mapImageUrl={run.mapImageUrl}
+      />
     </div>
   );
 }

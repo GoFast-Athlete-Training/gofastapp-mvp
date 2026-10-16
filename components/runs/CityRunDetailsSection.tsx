@@ -213,7 +213,11 @@ export default function CityRunDetailsSection({
       </div>
 
       {showRouteMedia ? (
-        <CityRunRouteMedia routePhotos={run.routePhotos} mapImageUrl={run.mapImageUrl} />
+        <CityRunRouteMedia
+          routePhotos={run.routePhotos}
+          runPhotos={run.runPhotos}
+          mapImageUrl={run.mapImageUrl}
+        />
       ) : null}
     </div>
   );

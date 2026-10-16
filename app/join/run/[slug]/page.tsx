@@ -187,7 +187,11 @@ export default function JoinRunPage() {
           )}
         </div>
 
-        <CityRunRouteMedia routePhotos={run.routePhotos} mapImageUrl={run.mapImageUrl} />
+        <CityRunRouteMedia
+          routePhotos={run.routePhotos}
+          runPhotos={run.runPhotos}
+          mapImageUrl={run.mapImageUrl}
+        />
 
         {/* CTA — skeleton while auth resolves, then fork */}
         <div className="bg-white rounded-xl shadow-sm p-6">
