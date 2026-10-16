@@ -110,6 +110,11 @@ export async function POST(request: NextRequest) {
     url = dest.url;
   }
 
+  const linkName = name?.trim();
+  if (!linkName) {
+    return NextResponse.json({ success: false, error: "name is required" }, { status: 400 });
+  }
+
   let sortOrder: number;
   const insertAfterId = body.insertAfterId?.trim();
   if (insertAfterId) {
@@ -141,11 +146,11 @@ export async function POST(request: NextRequest) {
   const created = await prisma.athlete_link_tree_links.create({
     data: {
       treeId,
-      name,
+      name: linkName,
       kind: parsedKind,
       athleteRaceId,
       isSection,
-      publicLabel: isSection ? null : body.publicLabel?.trim() || name,
+      publicLabel: isSection ? null : body.publicLabel?.trim() || linkName,
       internalDescription: isSection ? null : body.internalDescription?.trim() || null,
       description: isSection ? null : body.description?.trim() || null,
       linkLogoUrl: null,
