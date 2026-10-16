@@ -94,7 +94,7 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
         ) : null}
       </div>
 
-      {plan ? (
+      {plan && !(run?.cityRunType === 'INDIVIDUAL' && run.id === plan.cityRunId) ? (
         <div className="rounded-xl border border-orange-200 bg-orange-50/50 px-4 py-3 space-y-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-orange-800">Training plan</p>
           <p className="font-semibold text-gray-900">{plan.title}</p>
@@ -138,7 +138,8 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
         </div>
       ) : null}
 
-      {workoutPreview || run?.workoutDescription ? (
+      {(workoutPreview || run?.workoutDescription) &&
+      run?.cityRunType !== 'INDIVIDUAL' ? (
         <CityRunWorkoutCard
           plannedWorkout={workoutPreview}
           workoutDescription={run?.workoutDescription ?? null}

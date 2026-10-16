@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Copy, ExternalLink, Share2 } from "lucide-react";
+import { Copy, ExternalLink, Pencil, Share2, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 
 const LAST_HOSTED_RUN_KEY = "gofast_last_hosted_run_id";
@@ -13,6 +13,7 @@ type HostedInvite = {
   slug: string | null;
   date: string;
   createdAt: string;
+  totalMiles: number | null;
   gorunPath: string;
   shareUrl: string;
   joinSignupUrl: string | null;
@@ -29,6 +30,11 @@ function formatRunDate(iso: string): string {
   });
 }
 
+function formatMiles(miles: number | null | undefined): string {
+  if (miles == null || !Number.isFinite(miles)) return "";
+  return `${Number(miles).toFixed(1)} mi`;
+}
+
 export function markLastHostedRunForBuildPage(cityRunId: string): void {
   try {
     sessionStorage.setItem(LAST_HOSTED_RUN_KEY, cityRunId);
@@ -43,6 +49,7 @@ export default function HostedRunInvitesPanel() {
   const [error, setError] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,7 +61,7 @@ export default function HostedRunInvitesPanel() {
       setInvites(res.data.invites ?? []);
     } catch (e) {
       console.error(e);
-      setError("Could not load your run invites.");
+      setError("Could not load runs you created.");
     } finally {
       setLoading(false);
     }
@@ -84,6 +91,27 @@ export default function HostedRunInvitesPanel() {
     }
   }
 
+  async function deleteInvite(invite: HostedInvite) {
+    if (
+      !window.confirm(
+        `Delete "${invite.title}"? This removes the invite and cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingId(invite.id);
+    setError(null);
+    try {
+      await api.delete(`/me/hosted-run-invites/${encodeURIComponent(invite.id)}`);
+      await load();
+    } catch (e) {
+      console.error(e);
+      setError("Could not delete that run invite.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-white p-6 shadow-sm">
       <div className="flex items-start gap-3 mb-4">
@@ -91,12 +119,10 @@ export default function HostedRunInvitesPanel() {
           <Share2 className="h-6 w-6 text-orange-700" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">
-            Run invites you created
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-900">Runs I created</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Copy a share link or open the run page — newest first. This is your
-            hosted invites, not every workout in your library.
+            Hosted invites you can share, edit, or delete. Plan workouts live under
+            Your workouts below — not here.
           </p>
         </div>
       </div>
@@ -119,7 +145,7 @@ export default function HostedRunInvitesPanel() {
           <Link href="/host-a-run" className="font-semibold text-orange-700 hover:underline">
             Create a run
           </Link>{" "}
-          — your invite will show up here with a link to share.
+          — it will show up here newest first.
         </p>
       ) : null}
 
@@ -144,6 +170,9 @@ export default function HostedRunInvitesPanel() {
                 <p className="font-medium text-gray-900">{invite.title}</p>
                 <p className="text-sm text-gray-500 mt-0.5">
                   {formatRunDate(invite.date)}
+                  {formatMiles(invite.totalMiles)
+                    ? ` · ${formatMiles(invite.totalMiles)}`
+                    : ""}
                   {invite.isUpcoming ? (
                     <span className="ml-2 text-emerald-700 font-medium">Upcoming</span>
                   ) : (
@@ -160,12 +189,28 @@ export default function HostedRunInvitesPanel() {
                     {copiedId === invite.id ? "Copied" : "Copy invite link"}
                   </button>
                   <Link
+                    href={`/host-a-run/${encodeURIComponent(invite.id)}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Edit
+                  </Link>
+                  <Link
                     href={invite.gorunPath}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                   >
                     <ExternalLink className="h-4 w-4" />
                     Open run page
                   </Link>
+                  <button
+                    type="button"
+                    disabled={deletingId === invite.id}
+                    onClick={() => void deleteInvite(invite)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {deletingId === invite.id ? "Deleting…" : "Delete"}
+                  </button>
                 </div>
               </li>
             );

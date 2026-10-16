@@ -6,6 +6,7 @@ import {
 import { athleteLinksPublicUrl } from "@/lib/content/athlete-links-public-url";
 import type { AthleteLinkTreeDetail } from "@/lib/content/athlete-link-tree-types";
 import { requireAthleteWithHandleForLinks } from "@/lib/content/require-athlete-link-tree";
+import { rewriteCityRunLinkTreeUrls } from "@/lib/athlete-link-tree/rewrite-city-run-link-urls";
 import prisma from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -50,7 +51,9 @@ export async function GET(request: NextRequest) {
   const publicSlug =
     gwm?.gofastSlugSnapshot?.trim() || gate.handle.trim();
 
-  const detail: AthleteLinkTreeDetail = toAthleteLinkTreeDetail(tree);
+  await rewriteCityRunLinkTreeUrls(gate.athlete.id);
+  const refreshed = await findAthleteLinkTreeByAthleteId(gate.athlete.id);
+  const detail: AthleteLinkTreeDetail = toAthleteLinkTreeDetail(refreshed ?? tree);
 
   return NextResponse.json({
     success: true,

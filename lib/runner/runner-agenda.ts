@@ -152,6 +152,7 @@ export async function fetchRunnerAgendaForAthlete(
       select: {
         id: true,
         cityRunId: true,
+        planId: true,
         title: true,
         workoutType: true,
         date: true,
@@ -326,6 +327,7 @@ export async function fetchRunnerAgendaForAthlete(
 
   for (const stamp of stampRows) {
     if (!stamp.cityRunId) continue;
+    if (stamp.planId == null) continue;
     const dateKey = ymdFromDate(stamp.date);
     if (planSessions.some((p) => p.plannedWorkoutId === stamp.id || p.cityRunId === stamp.cityRunId)) {
       continue;
@@ -353,7 +355,7 @@ export async function fetchRunnerAgendaForAthlete(
   for (const run of joinedRuns) {
     if (run.plannedWorkoutPreview) continue;
     const stamp = stampByCityRunId.get(run.id);
-    if (!stamp) continue;
+    if (!stamp || stamp.planId == null) continue;
     run.plannedWorkoutPreview = {
       id: stamp.id,
       title: stamp.title,

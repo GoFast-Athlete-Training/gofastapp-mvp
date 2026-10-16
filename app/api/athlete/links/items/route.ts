@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
     const run = await prisma.city_runs.findFirst({
       where: { id: cityRunIdInput, athleteGeneratedId: gate.athlete.id, published: true },
-      select: { id: true, title: true, slug: true },
+      select: { id: true, title: true, slug: true, citySlug: true },
     });
     if (!run) {
       return NextResponse.json({ success: false, error: "Run not found on your profile" }, { status: 404 });
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     cityRunId = run.id;
     name = run.title;
     const publicKey = run.slug?.trim() || run.id;
-    url = cityRunPublicCardUrl(publicKey);
+    url = cityRunPublicCardUrl(publicKey, run.citySlug, run.id);
   } else if (!isSection) {
     const dest = normalizeLinkDestination({ url: body.url, kind: parsedKind });
     if (dest.error) {
