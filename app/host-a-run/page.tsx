@@ -2,13 +2,15 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Users } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import CreateCityRunForm, {
   type CreateCityRunFormWorkout,
 } from "@/components/cityruns/CreateCityRunForm";
+import CityRunMeetupOnlyForm from "@/components/cityruns/CityRunMeetupOnlyForm";
+import HostRunWorkoutSlot from "@/components/runs/HostRunWorkoutSlot";
 import api from "@/lib/api";
 
 function todayYmd(): string {
@@ -39,24 +41,24 @@ function mapTrainingWorkoutToHostForm(w: {
 }
 
 function HostARunPageInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const workoutIdParam = searchParams.get("workoutId")?.trim() || null;
   const [workout, setWorkout] = useState<CreateCityRunFormWorkout | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(workoutIdParam));
 
   const ensureHostWorkout = useCallback(async () => {
+    if (!workoutIdParam) {
+      setWorkout(null);
+      setLoadError(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setLoadError(null);
     try {
-      if (!workoutIdParam) {
-        setLoadError(
-          "Pick how you want to create this run — build a workout, use your plan, or meet up with no workout."
-        );
-        setWorkout(null);
-        return;
-      }
-
       const { data } = await api.get<{ workout: CreateCityRunFormWorkout }>(
         `/training/workout/${workoutIdParam}`
       );
@@ -80,6 +82,16 @@ function HostARunPageInner() {
     void ensureHostWorkout();
   }, [ensureHostWorkout]);
 
+  function onChooseMeetupOnly() {
+    if (workoutIdParam) {
+      router.replace("/host-a-run");
+    }
+  }
+
+  function onWorkoutReady(w: CreateCityRunFormWorkout) {
+    router.replace(`/host-a-run?workoutId=${encodeURIComponent(w.id)}`);
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopNav />
@@ -100,40 +112,40 @@ function HostARunPageInner() {
                 <Users className="w-6 h-6 text-orange-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Host a run</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Create a run</h1>
                 <p className="mt-1 text-gray-600 max-w-xl">
-                  Create a one-off run, invite friends with a link, and use run chat and check-in
-                  on run day — same flow as club runs.
+                  Set meetup time and place, optionally attach a workout, then share an
+                  invite — run chat and check-in on run day.
                 </p>
               </div>
             </div>
+
+            <HostRunWorkoutSlot
+              hasWorkout={Boolean(workoutIdParam && workout)}
+              workoutTitle={workout?.title}
+              onChooseMeetupOnly={onChooseMeetupOnly}
+              onWorkoutReady={onWorkoutReady}
+            />
 
             {loading ? (
               <div className="py-16 text-center">
                 <div className="animate-spin rounded-full h-10 w-10 border-2 border-orange-500 border-t-transparent mx-auto" />
               </div>
-            ) : loadError || !workout ? (
+            ) : workoutIdParam && (loadError || !workout) ? (
               <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
                 <p>{loadError || "Something went wrong"}</p>
-                {!workoutIdParam ? (
-                  <Link
-                    href="/build-a-run"
-                    className="mt-3 inline-block text-sm font-semibold text-red-800 underline"
-                  >
-                    Back to Create a run choices
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void ensureHostWorkout()}
-                    className="mt-3 text-sm font-semibold text-red-700 underline"
-                  >
-                    Try again
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => void ensureHostWorkout()}
+                  className="mt-3 text-sm font-semibold text-red-700 underline"
+                >
+                  Try again
+                </button>
               </div>
-            ) : (
+            ) : workout ? (
               <CreateCityRunForm workout={workout} />
+            ) : (
+              <CityRunMeetupOnlyForm />
             )}
           </div>
         </main>

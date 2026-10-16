@@ -3,8 +3,7 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, ChevronDown, ChevronUp, Trash2, Dumbbell } from "lucide-react";
-import CreateRunPickerSection from "@/components/runs/CreateRunPickerSection";
+import { Plus, ChevronDown, ChevronUp, Trash2, Users } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
@@ -58,31 +57,33 @@ export default function BuildARunPage() {
                 Go run with others
               </h1>
               <p className="text-gray-600">
-                Build a workout, create a run invite, or jump into a RunCrew — not
-                a city club calendar.
+                Create a run invite, reuse a workout from your plan, or jump into a
+                RunCrew — not a city club calendar.
               </p>
             </div>
 
             <div className="space-y-10">
-              <section className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/30 p-6">
-                <div className="flex items-center gap-2 mb-1">
-                  <Dumbbell className="h-5 w-5 text-orange-700" />
-                  <h2 className="text-lg font-semibold text-gray-900">Build a run</h2>
+              <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-6 shadow-sm">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="rounded-xl bg-orange-100 p-2.5 shrink-0">
+                    <Users className="h-6 w-6 text-orange-700" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Create a run</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Set time and place, optionally attach a workout, then share an
+                      invite.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-600 mb-4">
-                  Generate or define a session — Garmin, segments, and pace from your
-                  profile 5K.
-                </p>
                 <Link
-                  href="/workouts/create?from=build-a-run"
+                  href="/host-a-run"
                   className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
                 >
                   <Plus className="h-5 w-5" />
-                  Build a workout
+                  Create a run
                 </Link>
               </section>
-
-              <CreateRunPickerSection />
 
               <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-gray-900 mb-1">RunCrew</h2>
@@ -281,7 +282,8 @@ function StandaloneRunsList() {
           )}
           {!loading && workouts.length === 0 && (
             <p className="text-sm text-gray-600 py-4">
-              No standalone workouts yet. Create one above.
+              No standalone workouts yet. Create a run or build a workout from the
+              create-run flow.
             </p>
           )}
           {!loading && workouts.length > 0 && (

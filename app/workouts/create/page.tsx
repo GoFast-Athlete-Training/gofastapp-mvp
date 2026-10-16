@@ -306,7 +306,10 @@ type GoFastGenResponse =
 function CreateWorkoutPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const fromBuildARun = searchParams.get("from") === "build-a-run";
+  const fromParam = searchParams.get("from");
+  const fromHostRun =
+    fromParam === "build-a-run" || fromParam === "host-a-run";
+  const hostRunBackHref = "/host-a-run";
   const raceDayMode = searchParams.get("raceDay") === "1";
   const racePlanId = searchParams.get("planId")?.trim() ?? "";
   const raceDateKey = searchParams.get("date")?.trim() ?? "";
@@ -641,10 +644,11 @@ function CreateWorkoutPageInner() {
       setDeriveError("Workout saved but id was missing — check your workouts list.");
       return;
     }
-    const detailBase = workoutDetailPathWithBackHref(
-      id,
-      fromBuildARun ? "/build-a-run" : "/workouts"
-    );
+    if (fromHostRun) {
+      router.push(`/host-a-run?workoutId=${encodeURIComponent(id)}`);
+      return;
+    }
+    const detailBase = workoutDetailPathWithBackHref(id, "/workouts");
     const detailUrl = detailBase.includes("?") ? `${detailBase}&created=1` : `${detailBase}?created=1`;
     router.push(detailUrl);
   };
@@ -931,10 +935,13 @@ function CreateWorkoutPageInner() {
 
       const response = await api.post("workouts", workoutData);
       const { workout } = response.data;
-      const detailBase = workoutDetailPathWithBackHref(
-        workout.id,
-        fromBuildARun ? "/build-a-run" : "/workouts"
-      );
+      if (fromHostRun) {
+        router.push(
+          `/host-a-run?workoutId=${encodeURIComponent(workout.id)}`
+        );
+        return;
+      }
+      const detailBase = workoutDetailPathWithBackHref(workout.id, "/workouts");
       const detailUrl = detailBase.includes("?")
         ? `${detailBase}&created=1`
         : `${detailBase}?created=1`;
@@ -955,14 +962,14 @@ function CreateWorkoutPageInner() {
         <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <Link
-          href={raceDayMode ? raceDayBackHref : fromBuildARun ? "/build-a-run" : "/workouts"}
+          href={raceDayMode ? raceDayBackHref : fromHostRun ? hostRunBackHref : "/workouts"}
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
           {raceDayMode
             ? "Back to race day"
-            : fromBuildARun
-              ? "Back to Build a Run"
+            : fromHostRun
+              ? "Back to Create a run"
               : "Back to Workouts"}
         </Link>
 
@@ -1649,8 +1656,8 @@ function CreateWorkoutPageInner() {
                   href={
                     raceDayMode
                       ? raceDayBackHref
-                      : fromBuildARun
-                        ? "/build-a-run"
+                      : fromHostRun
+                        ? hostRunBackHref
                         : "/workouts"
                   }
                   className="px-4 py-2 text-gray-700 hover:text-gray-900"
