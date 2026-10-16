@@ -239,7 +239,7 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
             },
             setTotalMiles,
             setPace,
-            setDescription,
+            setDescription: setAboutThisRun,
             setRouteNeighborhood,
           });
         }}
