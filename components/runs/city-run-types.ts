@@ -98,6 +98,7 @@ export interface CityRunDetails {
   slug?: string | null;
   title: string;
   citySlug?: string;
+  metroBadge?: string | null;
   dayOfWeek: string | null;
   date: string;
   runSeriesId?: string | null;

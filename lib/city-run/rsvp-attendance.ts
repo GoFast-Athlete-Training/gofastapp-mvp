@@ -1,4 +1,4 @@
-import { RSVP_ROLE_GOING, isHostRsvpRole, isMemberRsvpRole } from '@/lib/city-run/rsvp-role';
+import { RSVP_ROLE_GOING, isHostRsvpRole, isMemberRsvpRole } from './rsvp-role';
 
 export type RsvpRoleSplitRow = {
   id: string;

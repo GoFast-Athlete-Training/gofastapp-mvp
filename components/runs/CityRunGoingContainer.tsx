@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
-import { LocalStorageAPI } from '@/lib/localstorage';
 import CityRunChatSection from '@/components/runs/CityRunChatSection';
 import CityRunDetailsSection, { CityRunGoingBanner } from '@/components/runs/CityRunDetailsSection';
 import CityRunMobileTabs from '@/components/runs/CityRunMobileTabs';
@@ -18,7 +17,6 @@ import {
 } from '@/components/runs/city-run-types';
 import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
-import { resolveViewerRsvpRole } from '@/lib/city-run/viewer-run-role';
 import CityRunHostActions from '@/components/runs/CityRunHostActions';
 
 interface Props {
@@ -30,11 +28,6 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
   const [rsvps, setRsvps] = useState<CityRunRsvp[]>(run.rsvps || []);
   const [checkingIn, setCheckingIn] = useState(false);
   const [runIsPast, setRunIsPast] = useState(false);
-  const [athleteId, setAthleteId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setAthleteId(LocalStorageAPI.getAthleteId());
-  }, []);
 
   useEffect(() => {
     setRsvps(run.rsvps || []);
@@ -51,18 +44,14 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
     );
   }, [run.date, run.startTimeHour, run.startTimeMinute, run.startTimePeriod, run.timezone]);
 
-  const viewerRsvpRole = useMemo(
-    () => resolveViewerRsvpRole(run, athleteId),
-    [run, athleteId]
-  );
+  const viewerRsvpRole = run.currentRSVPRole;
   const isHost = isHostRsvpRole(viewerRsvpRole);
+  const socialRun = hasSocialRunLifecycle(run);
   const backHref = isHost ? '/build-a-run' : '/runner';
   const backLabel = isHost ? 'Runs I created' : 'Runner';
 
-  const socialRun = hasSocialRunLifecycle(run);
-
   const handleCheckin = async () => {
-    if (!socialRun) return;
+    if (!socialRun || isHost) return;
     setCheckingIn(true);
     try {
       await api.post(`/runs/${run.id}/checkin`, {});
@@ -95,6 +84,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
           checkingIn={checkingIn}
           onCheckin={() => void handleCheckin()}
           viewerRsvpRole={viewerRsvpRole}
+          allowCheckin={!isHost && socialRun}
         />
 
         <div className="hidden lg:block space-y-4">
@@ -114,10 +104,11 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
             <div className="col-span-2 space-y-4">
               <CityRunDetailsSection run={run} />
             </div>
-            <CityRunPeopleSection rsvps={rsvps} sticky />
+            <div className="space-y-4">
+              <CityRunPeopleSection rsvps={rsvps} sticky />
+              <CityRunChatSection runId={run.id} variant="sidebar-square" />
+            </div>
           </div>
-
-          <CityRunChatSection runId={run.id} />
         </div>
       </div>
     </div>

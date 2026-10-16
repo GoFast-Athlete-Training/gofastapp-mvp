@@ -17,6 +17,7 @@ import {
 import { toCanonicalDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 import { RSVP_ROLE_HOST, isHostRsvpRole } from '@/lib/city-run/rsvp-role';
+import { formatCityRunMetroBadge } from '@/lib/city-run/city-run-metro-badge';
 import {
   cityRunTypeFromRelationshipPatch,
   cityRunTypeFromSnapshot,
@@ -544,6 +545,12 @@ export async function GET(
         runClubId: run.runClubId,
         cityRunType: run.cityRunType,
         athleteGeneratedId: run.athleteGeneratedId ?? null,
+        metroBadge: formatCityRunMetroBadge({
+          routeNeighborhood: run.routeNeighborhood,
+          citySlug: run.citySlug,
+          meetUpCity: run.meetUpCity,
+          meetUpState: run.meetUpState,
+        }),
         runClubSlug: run.runClub?.slug || null, // For backward compatibility
         runCrewId: run.runCrewId,
         meetUpPoint: run.meetUpPoint,

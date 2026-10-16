@@ -44,6 +44,7 @@ type GoingMobileProps = {
   checkingIn: boolean;
   onCheckin: () => void;
   allowCheckin?: boolean;
+  viewerRsvpRole?: string | null;
 };
 
 type PostRunMobileProps = {

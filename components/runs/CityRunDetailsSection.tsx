@@ -11,6 +11,7 @@ import {
 } from '@/components/runs/city-run-types';
 import { buildClubPastCheckinCopy, resolveRunRsvpCopy, resolveRunPastCheckinCopy } from '@/lib/city-run-copy';
 import { resolveSeriesOccurrenceFields } from '@/lib/city-run/resolve-series-occurrence-fields';
+import { formatCityRunMetroBadge } from '@/lib/city-run/city-run-metro-badge';
 
 type CityRunDetailsSectionProps = {
   run: CityRunDetails;
@@ -33,6 +34,14 @@ export default function CityRunDetailsSection({
 }: CityRunDetailsSectionProps) {
   const timeLabel = formatRunTime(run.startTimeHour, run.startTimeMinute, run.startTimePeriod);
   const dateLabel = formatRunDate(run.date, includeYear);
+  const metroBadge =
+    run.metroBadge?.trim() ||
+    formatCityRunMetroBadge({
+      routeNeighborhood: run.routeNeighborhood,
+      citySlug: run.citySlug,
+      meetUpCity: run.meetUpCity,
+      meetUpState: run.meetUpState,
+    });
 
   return (
     <div className="space-y-4">
@@ -133,11 +142,18 @@ export default function CityRunDetailsSection({
           </div>
         ) : null}
 
-        <h1 className={`font-bold text-gray-900 mb-4 ${compact ? 'text-xl' : 'text-2xl'}`}>
-          {run.cityRunType === 'INDIVIDUAL'
-            ? run.title
-            : run.workout?.title?.trim() || run.title}
-        </h1>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <h1 className={`font-bold text-gray-900 min-w-0 ${compact ? 'text-xl' : 'text-2xl'}`}>
+            {run.cityRunType === 'INDIVIDUAL'
+              ? run.title
+              : run.workout?.title?.trim() || run.title}
+          </h1>
+          {metroBadge ? (
+            <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-sky-900 ring-1 ring-sky-200/80">
+              {metroBadge}
+            </span>
+          ) : null}
+        </div>
 
         <div className="space-y-2 sm:space-y-3 text-gray-700">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -201,9 +217,6 @@ export default function CityRunDetailsSection({
             >
               <Map className="h-4 w-4" /> View Route
             </a>
-          ) : null}
-          {run.routeNeighborhood?.trim() ? (
-            <p className="text-sm text-gray-600 pt-1 whitespace-pre-wrap">{run.routeNeighborhood.trim()}</p>
           ) : null}
         </div>
 
