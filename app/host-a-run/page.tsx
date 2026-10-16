@@ -44,6 +44,7 @@ function HostARunPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const workoutIdParam = searchParams.get("workoutId")?.trim() || null;
+  const routeIdParam = searchParams.get("routeId")?.trim() || null;
   const [workout, setWorkout] = useState<CreateCityRunFormWorkout | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(workoutIdParam));
@@ -143,9 +144,9 @@ function HostARunPageInner() {
                 </button>
               </div>
             ) : workout ? (
-              <CreateCityRunForm workout={workout} />
+              <CreateCityRunForm workout={workout} initialRouteId={routeIdParam} />
             ) : (
-              <CityRunMeetupOnlyForm />
+              <CityRunMeetupOnlyForm initialRouteId={routeIdParam} />
             )}
           </div>
         </main>

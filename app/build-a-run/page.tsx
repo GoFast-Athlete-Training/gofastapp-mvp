@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, ChevronDown, ChevronUp, Trash2, Users } from "lucide-react";
+import { ChevronDown, ChevronUp, Compass, MapPinned, Plus, Trash2, Users } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
@@ -53,35 +53,54 @@ export default function BuildARunPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">
                 Run
               </p>
-              <h1 className="text-3xl font-bold text-gray-900 mt-1 mb-2">
-                Go run with others
-              </h1>
+              <h1 className="text-3xl font-bold text-gray-900 mt-1 mb-2">Run</h1>
               <p className="text-gray-600">
-                Create a run invite, reuse a workout from your plan, or jump into a
-                RunCrew — not a city club calendar.
+                Discover or build a route, then create a run invite — or reuse a workout
+                below.
               </p>
             </div>
 
             <div className="space-y-10">
-              <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-6 shadow-sm">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="rounded-xl bg-orange-100 p-2.5 shrink-0">
-                    <Users className="h-6 w-6 text-orange-700" />
+              <section className="grid gap-4 sm:grid-cols-3">
+                <Link
+                  href="/build-a-run/discover"
+                  className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:border-orange-300 transition group"
+                >
+                  <div className="rounded-xl bg-sky-100 p-2.5 w-fit mb-3 group-hover:bg-sky-200/80">
+                    <Compass className="h-6 w-6 text-sky-800" />
                   </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Create a run</h2>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Set time and place, optionally attach a workout, then share an
-                      invite.
-                    </p>
+                  <h2 className="text-base font-semibold text-gray-900">Discover routes</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Find a route you saved by name, then attach it to a run.
+                  </p>
+                </Link>
+                <Link
+                  href="/build-a-run/routes/new"
+                  className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:border-orange-300 transition group"
+                >
+                  <div className="rounded-xl bg-violet-100 p-2.5 w-fit mb-3 group-hover:bg-violet-200/80">
+                    <MapPinned className="h-6 w-6 text-violet-800" />
                   </div>
-                </div>
+                  <h2 className="text-base font-semibold text-gray-900">Build routes</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Save a path with a name and Strava link for later runs.
+                  </p>
+                </Link>
                 <Link
                   href="/host-a-run"
-                  className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                  className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 shadow-sm hover:border-orange-400 transition group"
                 >
-                  <Plus className="h-5 w-5" />
-                  Create a run
+                  <div className="rounded-xl bg-orange-100 p-2.5 w-fit mb-3">
+                    <Users className="h-6 w-6 text-orange-700" />
+                  </div>
+                  <h2 className="text-base font-semibold text-gray-900">Create a run</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Meetup, time, optional workout — attach a route if you want.
+                  </p>
+                  <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-orange-700">
+                    <Plus className="h-4 w-4" />
+                    Start invite
+                  </span>
                 </Link>
               </section>
 

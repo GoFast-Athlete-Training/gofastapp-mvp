@@ -28,7 +28,7 @@ function normalizeRoutePhotos(value: unknown): string[] {
   return value.filter((u): u is string => typeof u === 'string' && u.trim().length > 0);
 }
 
-/** Route the athlete may attach to a city run (owner or My Routes curation). */
+/** Route the athlete may attach to a city run (catalog owner only — not My Routes curation). */
 export async function resolveSavedRouteForAthlete(
   athleteId: string,
   routeId: string
@@ -44,13 +44,7 @@ export async function resolveSavedRouteForAthlete(
 
   if (route.createdByAthleteId === athleteId) return route;
 
-  const curated = await prisma.athlete_run_routes.findUnique({
-    where: { athleteId_routeId: { athleteId, routeId: id } },
-    select: { id: true },
-  });
-  if (!curated) return null;
-
-  return route;
+  return null;
 }
 
 export type CityRunRouteMediaFromSavedRoute = {

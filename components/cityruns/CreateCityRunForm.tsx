@@ -31,12 +31,15 @@ import {
   generateCitySlugFromParts,
 } from "@/lib/parse-google-address";
 import { formatCalendarDate } from "@/lib/calendar-date";
-import CityRunMyRoutesPicker from "@/components/cityruns/CityRunMyRoutesPicker";
+import RoutesDiscoverPicker from "@/components/runs/RoutesDiscoverPicker";
+import CityRunRouteMapUploadField from "@/components/cityruns/CityRunRouteMapUploadField";
+import CityRunRoutePhotosField from "@/components/cityruns/CityRunRoutePhotosField";
 import {
   applySavedRouteToFormFields,
   clearSavedRouteFormFields,
   type SavedRouteSnapshot,
 } from "@/lib/city-run/saved-route-snapshot";
+import { useApplyInitialRoute } from "@/lib/city-run/use-apply-initial-route";
 import {
   applyPaceOffsetDeltaToSegments,
   metersToMiles,
@@ -146,6 +149,7 @@ export interface CreateCityRunFormProps {
   onWorkoutChange?: (workout: CreateCityRunFormWorkout) => void;
   /** When set, stamps planned_workouts.cityRunId for this plan day. */
   plannedWorkoutId?: string | null;
+  initialRouteId?: string | null;
 }
 
 export default function CreateCityRunForm({
@@ -157,6 +161,7 @@ export default function CreateCityRunForm({
   editableWorkout = false,
   onWorkoutChange,
   plannedWorkoutId = null,
+  initialRouteId = null,
 }: CreateCityRunFormProps) {
   const [meetupDate, setMeetupDate] = useState("");
   const [startHour, setStartHour] = useState("");
@@ -213,6 +218,18 @@ export default function CreateCityRunForm({
       setMapImageUrl,
     });
   };
+
+  useApplyInitialRoute({
+    initialRouteId,
+    onRouteId: setSelectedRouteId,
+    onRoutePhotos: setSelectedRoutePhotos,
+    fieldSetters: {
+      setStravaMapUrl,
+      setRouteNeighborhood,
+      setMapImageUrl,
+      setTotalMiles: setEditMiles,
+    },
+  });
 
   const [paceOffsetSecPerMile, setPaceOffsetSecPerMile] = useState(0);
   const [workoutSaving, setWorkoutSaving] = useState(false);
@@ -442,12 +459,7 @@ export default function CreateCityRunForm({
         stravaMapUrl: stravaMapUrl.trim() || undefined,
         routeNeighborhood: routeNeighborhood.trim() || undefined,
         mapImageUrl: mapImageUrl.trim() || undefined,
-        routePhotos:
-          selectedRoutePhotos.length > 0
-            ? selectedRoutePhotos
-            : mapImageUrl.trim()
-              ? [mapImageUrl.trim()]
-              : undefined,
+        routePhotos: selectedRoutePhotos.length > 0 ? selectedRoutePhotos : undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
@@ -835,7 +847,7 @@ export default function CreateCityRunForm({
       </div>
 
       <div className="space-y-3">
-        <CityRunMyRoutesPicker
+        <RoutesDiscoverPicker
           selectedRouteId={selectedRouteId}
           onSelect={handlePickSavedRoute}
           onClear={handleClearSavedRoute}
@@ -864,25 +876,16 @@ export default function CreateCityRunForm({
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Route photo <span className="font-normal text-gray-400">(optional)</span>
-          </label>
-          <input
-            type="url"
-            value={mapImageUrl}
-            onChange={(e) => setMapImageUrl(e.target.value)}
-            placeholder="https://… route preview image"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          {mapImageUrl.trim() ? (
-            <img
-              src={mapImageUrl.trim()}
-              alt="Route preview"
-              className="mt-2 max-h-40 w-full rounded-lg object-cover border border-gray-200"
-            />
-          ) : null}
-        </div>
+        <CityRunRouteMapUploadField
+          mapImageUrl={mapImageUrl}
+          onChange={setMapImageUrl}
+          onError={setError}
+        />
+        <CityRunRoutePhotosField
+          photos={selectedRoutePhotos}
+          onChange={setSelectedRoutePhotos}
+          onError={setError}
+        />
         <p className="text-xs text-gray-500">Skip route fields if you&apos;re looping the meetup.</p>
       </div>
 

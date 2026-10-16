@@ -12,7 +12,10 @@ import {
   generateCitySlugFromParts,
   parseGoogleAddressFromComponents,
 } from "@/lib/parse-google-address";
-import CityRunMyRoutesPicker from "@/components/cityruns/CityRunMyRoutesPicker";
+import RoutesDiscoverPicker from "@/components/runs/RoutesDiscoverPicker";
+import CityRunRouteMapUploadField from "@/components/cityruns/CityRunRouteMapUploadField";
+import CityRunRoutePhotosField from "@/components/cityruns/CityRunRoutePhotosField";
+import { useApplyInitialRoute } from "@/lib/city-run/use-apply-initial-route";
 import type { CityRunFromWorkoutSuccess } from "@/components/cityruns/CreateCityRunForm";
 import {
   applySavedRouteToFormFields,
@@ -45,7 +48,9 @@ function hasValidStartTime(hour: string, minute: string, period: "AM" | "PM"): b
   );
 }
 
-export default function CityRunMeetupOnlyForm() {
+type Props = { initialRouteId?: string | null };
+
+export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) {
   const [meetupTitle, setMeetupTitle] = useState("");
   const [meetupDate, setMeetupDate] = useState("");
   const [startHour, setStartHour] = useState("");
@@ -90,6 +95,18 @@ export default function CityRunMeetupOnlyForm() {
       setMapImageUrl,
     });
   };
+
+  useApplyInitialRoute({
+    initialRouteId,
+    onRouteId: setSelectedRouteId,
+    onRoutePhotos: setSelectedRoutePhotos,
+    fieldSetters: {
+      setStravaMapUrl,
+      setRouteNeighborhood,
+      setMapImageUrl,
+      setTotalMiles,
+    },
+  });
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -174,12 +191,7 @@ export default function CityRunMeetupOnlyForm() {
         stravaMapUrl: stravaMapUrl.trim() || undefined,
         routeNeighborhood: routeNeighborhood.trim() || undefined,
         mapImageUrl: mapImageUrl.trim() || undefined,
-        routePhotos:
-          selectedRoutePhotos.length > 0
-            ? selectedRoutePhotos
-            : mapImageUrl.trim()
-              ? [mapImageUrl.trim()]
-              : undefined,
+        routePhotos: selectedRoutePhotos.length > 0 ? selectedRoutePhotos : undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
@@ -341,17 +353,27 @@ export default function CityRunMeetupOnlyForm() {
           <Route className="w-4 h-4 text-orange-500" />
           Route (optional)
         </p>
-        <CityRunMyRoutesPicker
+        <RoutesDiscoverPicker
           selectedRouteId={selectedRouteId}
           onSelect={handlePickSavedRoute}
           onClear={handleClearSavedRoute}
         />
-        <input
-          type="url"
-          placeholder="Strava route URL"
-          value={stravaMapUrl}
-          onChange={(e) => setStravaMapUrl(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            Strava route URL <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          <input
+            type="url"
+            placeholder="https://www.strava.com/routes/…"
+            value={stravaMapUrl}
+            onChange={(e) => setStravaMapUrl(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <CityRunRouteMapUploadField
+          mapImageUrl={mapImageUrl}
+          onChange={setMapImageUrl}
+          onError={setError}
         />
         <textarea
           placeholder="Route description"
@@ -359,6 +381,11 @@ export default function CityRunMeetupOnlyForm() {
           onChange={(e) => setRouteNeighborhood(e.target.value)}
           rows={2}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        />
+        <CityRunRoutePhotosField
+          photos={selectedRoutePhotos}
+          onChange={setSelectedRoutePhotos}
+          onError={setError}
         />
         <textarea
           placeholder="Notes for your group"

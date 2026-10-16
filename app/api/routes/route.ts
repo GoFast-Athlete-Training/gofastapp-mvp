@@ -6,28 +6,59 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/routes?q=&citySlug=
- * Search saved routes: authenticated user's routes OR routes in citySlug (when city filter set).
+ * GET /api/routes?q=&scope=mine|explore&citySlug=
+ * scope=mine (auth): athlete's saved routes only — Discover Routes hub.
+ * Default/explore: name search plus optional citySlug (later Explore product).
  */
 export async function GET(request: NextRequest) {
   try {
     const q = (request.nextUrl.searchParams.get("q") || "").trim();
     const citySlug = (request.nextUrl.searchParams.get("citySlug") || "").trim();
+    const scope = (request.nextUrl.searchParams.get("scope") || "").trim().toLowerCase();
+
+    const authHeader = request.headers.get("authorization");
+    let athleteId: string | null = null;
+    if (authHeader?.startsWith("Bearer ")) {
+      const auth = await requireAthleteFromBearer(request);
+      if ("error" in auth) {
+        return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+      }
+      athleteId = auth.athlete.id;
+    }
+
+    if (scope === "mine") {
+      if (!athleteId) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      }
+      const where: Prisma.routesWhereInput = {
+        createdByAthleteId: athleteId,
+        ...(q.length > 0 ? { name: { contains: q, mode: "insensitive" } } : {}),
+      };
+      const routes = await prisma.routes.findMany({
+        where,
+        take: q.length > 0 ? 20 : 50,
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          stravaUrl: true,
+          distanceMiles: true,
+          stravaMapUrl: true,
+          mapImageUrl: true,
+          routePhotos: true,
+          routeNeighborhood: true,
+          runType: true,
+          citySlug: true,
+        },
+      });
+      return NextResponse.json({ success: true, routes });
+    }
 
     if (!q || q.length < 1) {
       return NextResponse.json(
         { success: false, error: "Query q is required" },
         { status: 400 }
       );
-    }
-
-    const authHeader = request.headers.get("authorization");
-    let athleteId: string | null = null;
-    if (authHeader?.startsWith("Bearer ")) {
-      const auth = await requireAthleteFromBearer(request);
-      if (!("error" in auth)) {
-        athleteId = auth.athlete.id;
-      }
     }
 
     const nameFilter = { contains: q, mode: "insensitive" as const };

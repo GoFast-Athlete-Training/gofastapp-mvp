@@ -170,7 +170,6 @@ export async function syncCityRunRouteFromFields(
 }
 
 export async function loadCityRunWithRoute(cityRunId: string) {
-  await ensureCityRunRoute(cityRunId);
   return prisma.city_runs.findUnique({
     where: { id: cityRunId },
     include: {

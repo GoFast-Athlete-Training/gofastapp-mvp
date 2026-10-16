@@ -12,7 +12,6 @@ import {
   isClubReviewStatus,
 } from '@/lib/club-run-club-review';
 import type { ClubReviewStatus } from '@prisma/client';
-import { ensureCityRunRoute } from '@/lib/city-run/ensure-city-run-route';
 import { attachRunBrandSnap } from '@/lib/runmanage/run-brand-stamp';
 
 const RUNTIME_COMMIT_SHA =
@@ -245,34 +244,6 @@ export async function GET(
 
     if (!run) {
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
-    }
-
-    await ensureCityRunRoute(runId);
-    if (!run.routeId) {
-      const refreshed = await prisma.city_runs.findUnique({
-        where: { id: runId },
-        select: {
-          routeId: true,
-          route: {
-            select: {
-              id: true,
-              name: true,
-              stravaUrl: true,
-              stravaMapUrl: true,
-              mapImageUrl: true,
-              routePhotos: true,
-              routeNeighborhood: true,
-              runType: true,
-              distanceMiles: true,
-              citySlug: true,
-            },
-          },
-        },
-      });
-      if (refreshed?.routeId) {
-        run.routeId = refreshed.routeId;
-        run.route = refreshed.route;
-      }
     }
 
     return NextResponse.json({

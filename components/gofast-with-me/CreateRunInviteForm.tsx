@@ -13,7 +13,10 @@ import {
 import GooglePlacesAutocomplete, {
   type GooglePlaceSelectedData,
 } from '@/components/RunCrew/GooglePlacesAutocomplete';
-import CityRunMyRoutesPicker from '@/components/cityruns/CityRunMyRoutesPicker';
+import RoutesDiscoverPicker from '@/components/runs/RoutesDiscoverPicker';
+import CityRunRouteMapUploadField from '@/components/cityruns/CityRunRouteMapUploadField';
+import CityRunRoutePhotosField from '@/components/cityruns/CityRunRoutePhotosField';
+import { useApplyInitialRoute } from '@/lib/city-run/use-apply-initial-route';
 import type { CityRunFromWorkoutSuccess } from '@/components/cityruns/CreateCityRunForm';
 import {
   applySavedRouteToFormFields,
@@ -52,6 +55,7 @@ type Props = {
   onCancel?: () => void;
   onDone?: () => void;
   className?: string;
+  initialRouteId?: string | null;
 };
 
 function todayYmd(): string {
@@ -80,6 +84,7 @@ export default function CreateRunInviteForm({
   onCancel,
   onDone,
   className = '',
+  initialRouteId = null,
 }: Props) {
   const [title, setTitle] = useState(prefill?.title ?? '');
   const [totalMiles, setTotalMiles] = useState(prefill?.totalMiles ?? '');
@@ -125,6 +130,18 @@ export default function CreateRunInviteForm({
       setMapImageUrl,
     });
   };
+
+  useApplyInitialRoute({
+    initialRouteId,
+    onRouteId: setSelectedRouteId,
+    onRoutePhotos: setSelectedRoutePhotos,
+    fieldSetters: {
+      setStravaMapUrl,
+      setRouteNeighborhood,
+      setMapImageUrl,
+      setTotalMiles,
+    },
+  });
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -246,12 +263,7 @@ export default function CreateRunInviteForm({
         stravaMapUrl: stravaMapUrl.trim() || undefined,
         routeNeighborhood: routeNeighborhood.trim() || undefined,
         mapImageUrl: mapImageUrl.trim() || undefined,
-        routePhotos:
-          selectedRoutePhotos.length > 0
-            ? selectedRoutePhotos
-            : mapImageUrl.trim()
-              ? [mapImageUrl.trim()]
-              : undefined,
+        routePhotos: selectedRoutePhotos.length > 0 ? selectedRoutePhotos : undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
@@ -476,7 +488,7 @@ export default function CreateRunInviteForm({
           </div>
         </div>
 
-        <CityRunMyRoutesPicker
+        <RoutesDiscoverPicker
           selectedRouteId={selectedRouteId}
           onSelect={handlePickSavedRoute}
           onClear={handleClearSavedRoute}
@@ -494,6 +506,12 @@ export default function CreateRunInviteForm({
           />
         </div>
 
+        <CityRunRouteMapUploadField
+          mapImageUrl={mapImageUrl}
+          onChange={setMapImageUrl}
+          onError={setError}
+        />
+
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
             Route description <span className="font-normal text-gray-400">(optional)</span>
@@ -505,6 +523,12 @@ export default function CreateRunInviteForm({
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
+
+        <CityRunRoutePhotosField
+          photos={selectedRoutePhotos}
+          onChange={setSelectedRoutePhotos}
+          onError={setError}
+        />
 
         {error ? (
           <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">

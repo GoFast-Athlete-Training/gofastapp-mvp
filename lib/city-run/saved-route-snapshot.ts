@@ -1,6 +1,37 @@
 import type { AthleteRunRoutePayload } from '@/lib/gofast-with-me/athlete-run-routes';
 
-/** Client-side snapshot when picking a My Routes row for a city run. */
+export type RouteCatalogRow = {
+  id: string;
+  name: string;
+  stravaUrl?: string | null;
+  stravaMapUrl?: string | null;
+  mapImageUrl?: string | null;
+  routePhotos?: unknown;
+  routeNeighborhood?: string | null;
+  distanceMiles?: number | null;
+  runType?: string | null;
+};
+
+export function snapshotFromRouteCatalogRow(row: RouteCatalogRow): SavedRouteSnapshot {
+  const stravaMapUrl =
+    row.stravaMapUrl?.trim() || row.stravaUrl?.trim() || null;
+  const photos = Array.isArray(row.routePhotos)
+    ? row.routePhotos.filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+    : [];
+
+  return {
+    routeId: row.id,
+    name: row.name,
+    stravaMapUrl,
+    mapImageUrl: row.mapImageUrl?.trim() || null,
+    routePhotos: photos,
+    routeNeighborhood: row.routeNeighborhood?.trim() || null,
+    distanceMiles: row.distanceMiles ?? null,
+    runType: row.runType?.trim() || null,
+  };
+}
+
+/** Client-side snapshot when picking a saved routes catalog row for a city run. */
 export type SavedRouteSnapshot = {
   routeId: string;
   name: string;
