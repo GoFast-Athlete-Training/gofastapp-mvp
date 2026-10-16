@@ -56,6 +56,17 @@ export type SerializedAthleteRace = AthleteRaceRow & {
   } | null;
 };
 
+/** Start of local calendar day for upcoming-race filters. */
+export function startOfLocalDay(d: Date = new Date()): Date {
+  const out = new Date(d);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
+export function isUpcomingAthleteRace(raceDate: Date, now: Date = new Date()): boolean {
+  return raceDate >= startOfLocalDay(now);
+}
+
 export function snapshotDataFromRegistry(race: {
   name: string;
   raceDate: Date;

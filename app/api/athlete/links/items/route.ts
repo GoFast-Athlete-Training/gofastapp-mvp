@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
 
   let url: string | null = null;
   let athleteRaceId: string | null = null;
+  let athleteRaceLogoUrl: string | null = null;
 
   if (parsedKind === AthleteLinkTreeLinkKind.ATHLETE_RACE) {
     if (!athleteRaceIdInput) {
@@ -80,7 +81,13 @@ export async function POST(request: NextRequest) {
     }
     const claim = await prisma.athlete_races.findFirst({
       where: { id: athleteRaceIdInput, athleteId: gate.athlete.id },
-      select: { id: true, name: true, slug: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        race_registry: { select: { logoUrl: true } },
+      },
     });
     if (!claim) {
       return NextResponse.json({ success: false, error: "Race not found on your profile" }, { status: 404 });
@@ -100,6 +107,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "That race is already on your link page" }, { status: 400 });
     }
     athleteRaceId = claim.id;
+    athleteRaceLogoUrl =
+      claim.logoUrl?.trim() || claim.race_registry?.logoUrl?.trim() || null;
     name = claim.name;
     url = athleteRacePublicCardUrl(raceSlug, gate.handle);
   } else if (!isSection) {
@@ -153,7 +162,8 @@ export async function POST(request: NextRequest) {
       publicLabel: isSection ? null : body.publicLabel?.trim() || linkName,
       internalDescription: isSection ? null : body.internalDescription?.trim() || null,
       description: isSection ? null : body.description?.trim() || null,
-      linkLogoUrl: null,
+      linkLogoUrl:
+        parsedKind === AthleteLinkTreeLinkKind.ATHLETE_RACE ? athleteRaceLogoUrl : null,
       emoji: isSection || isHydratedLinkKind(parsedKind) ? null : body.emoji?.trim() || null,
       url,
       sortOrder,

@@ -23,6 +23,7 @@ function toLinkRow(link: athlete_link_tree_links): AthleteLinkTreeLink {
     emoji: link.emoji,
     url: link.url,
     athleteRaceId: link.athleteRaceId,
+    parentSectionId: link.parentSectionId,
     sortOrder: link.sortOrder,
   };
 }

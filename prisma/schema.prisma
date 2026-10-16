@@ -524,15 +524,20 @@ model athlete_link_tree_links {
   /// CUSTOM = URL button; RACES = legacy; ATHLETE_RACE = generated link to athlete race card.
   kind                AthleteLinkTreeLinkKind  @default(CUSTOM)
   athleteRaceId       String?
+  /// When set, row renders under that section on public page (section row id).
+  parentSectionId     String?
   isSection           Boolean                  @default(false)
   sortOrder           Int                      @default(0)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   tree                athlete_link_trees @relation(fields: [treeId], references: [id], onDelete: Cascade)
   athlete_race        athlete_races?           @relation(fields: [athleteRaceId], references: [id], onDelete: Cascade)
+  parentSection       athlete_link_tree_links? @relation("LinkTreeSectionChildren", fields: [parentSectionId], references: [id], onDelete: SetNull)
+  sectionChildren     athlete_link_tree_links[] @relation("LinkTreeSectionChildren")
 
   @@index([treeId])
   @@index([treeId, sortOrder])
+  @@index([parentSectionId])
   @@map("athlete_link_tree_links")
 }
 
