@@ -89,7 +89,8 @@ export default function CreateRunInviteForm({
   const [title, setTitle] = useState(prefill?.title ?? '');
   const [totalMiles, setTotalMiles] = useState(prefill?.totalMiles ?? '');
   const [pace, setPace] = useState('');
-  const [description, setDescription] = useState('');
+  const [meetUpNote, setMeetUpNote] = useState('');
+  const [aboutThisRun, setAboutThisRun] = useState('');
   const [meetupDate, setMeetupDate] = useState(prefill?.date ?? todayYmd());
   const [startHour, setStartHour] = useState('');
   const [startMinute, setStartMinute] = useState('');
@@ -269,7 +270,8 @@ export default function CreateRunInviteForm({
         startTimePeriod: startPeriod,
         totalMiles: Number.isFinite(milesNum) && milesNum > 0 ? milesNum : undefined,
         pace: pace.trim() || undefined,
-        description: description.trim() || undefined,
+        meetUpNote: meetUpNote.trim() || undefined,
+        description: aboutThisRun.trim() || undefined,
       });
 
       if (data?.cityRunId && data?.path) {
@@ -401,12 +403,13 @@ export default function CreateRunInviteForm({
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Description
+            About this run <span className="font-normal text-gray-400">(optional)</span>
           </label>
           <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            value={aboutThisRun}
+            onChange={(e) => setAboutThisRun(e.target.value)}
             rows={3}
+            placeholder="Why join — early crew, training buddy, social pace."
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
@@ -438,6 +441,19 @@ export default function CreateRunInviteForm({
           {meetupConfirmation ? (
             <p className="text-sm text-emerald-800">{meetupConfirmation}</p>
           ) : null}
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            Meetup note <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          <textarea
+            value={meetUpNote}
+            onChange={(e) => setMeetUpNote(e.target.value)}
+            rows={2}
+            placeholder="Parking or how to find the group at the meetup spot."
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
 
         <div>

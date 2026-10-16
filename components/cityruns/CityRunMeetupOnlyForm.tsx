@@ -67,7 +67,8 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
 
   const [totalMiles, setTotalMiles] = useState("");
   const [pace, setPace] = useState("Various");
-  const [description, setDescription] = useState("");
+  const [meetUpNote, setMeetUpNote] = useState("");
+  const [aboutThisRun, setAboutThisRun] = useState("");
   const [routeNeighborhood, setRouteNeighborhood] = useState("");
 
   const [busy, setBusy] = useState(false);
@@ -148,7 +149,8 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
         meetUpPlaceId: meetUpPlaceId || undefined,
         meetUpLat: meetUpLat ?? undefined,
         meetUpLng: meetUpLng ?? undefined,
-        description: description.trim() || undefined,
+        meetUpNote: meetUpNote.trim() || undefined,
+        description: aboutThisRun.trim() || undefined,
         routeNeighborhood: routeNeighborhood.trim() || undefined,
         pace: pace.trim() && pace !== "Various" ? pace : undefined,
         totalMiles:
@@ -389,13 +391,25 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
 
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              Note <span className="font-normal text-gray-400">(optional)</span>
+              Meetup note <span className="font-normal text-gray-400">(optional)</span>
             </label>
             <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={meetUpNote}
+              onChange={(e) => setMeetUpNote(e.target.value)}
               rows={2}
-              placeholder="Anything runners should know before they show up."
+              placeholder="Parking or how to find the group at the meetup spot."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              About this run <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <textarea
+              value={aboutThisRun}
+              onChange={(e) => setAboutThisRun(e.target.value)}
+              rows={2}
+              placeholder="Why join — early crew, training buddy, social pace."
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
             />
           </div>

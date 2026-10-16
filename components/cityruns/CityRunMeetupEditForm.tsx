@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, MapPin } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ExternalLink, MapPin, Route } from "lucide-react";
 import GooglePlacesAutocomplete, {
   type GooglePlaceSelectedData,
 } from "@/components/RunCrew/GooglePlacesAutocomplete";
+import CityRunPostInviteRouteStep from "@/components/cityruns/CityRunPostInviteRouteStep";
 import api from "@/lib/api";
 import { ensureAthleteIdInStorage } from "@/lib/ensure-athlete-session";
 import {
@@ -13,6 +15,7 @@ import {
   parseGoogleAddressFromComponents,
 } from "@/lib/parse-google-address";
 import { PACE_OPTIONS } from "@/lib/runTypes";
+import type { HostedRunInviteRouteSnap } from "@/lib/city-run/list-athlete-hosted-invites";
 
 function hasValidStartTime(hour: string, minute: string, period: "AM" | "PM"): boolean {
   const h = parseInt(hour, 10);
@@ -42,8 +45,14 @@ type InviteDetail = {
   meetUpPlaceId: string | null;
   meetUpLat: number | null;
   meetUpLng: number | null;
+  meetUpNote: string | null;
   description: string | null;
   routeNeighborhood: string | null;
+  routeId: string | null;
+  stravaMapUrl: string | null;
+  mapImageUrl: string | null;
+  workoutDescription: string | null;
+  route: HostedRunInviteRouteSnap | null;
   totalMiles: number | null;
   pace: string | null;
   startTimeHour: number | null;
@@ -61,6 +70,8 @@ function dateInputFromIso(iso: string): string {
 type Props = { cityRunId: string };
 
 export default function CityRunMeetupEditForm({ cityRunId }: Props) {
+  const router = useRouter();
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [meetupTitle, setMeetupTitle] = useState("");
@@ -79,16 +90,62 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
   const [meetUpPlaceSet, setMeetUpPlaceSet] = useState(false);
   const [totalMiles, setTotalMiles] = useState("");
   const [pace, setPace] = useState("Various");
-  const [description, setDescription] = useState("");
+  const [meetUpNote, setMeetUpNote] = useState("");
+  const [aboutThisRun, setAboutThisRun] = useState("");
   const [routeNeighborhood, setRouteNeighborhood] = useState("");
   const [gorunPath, setGorunPath] = useState("/build-a-run");
+  const [routeSnap, setRouteSnap] = useState<HostedRunInviteRouteSnap | null>(null);
+  const [runMapImageUrl, setRunMapImageUrl] = useState<string | null>(null);
+  const [runStravaMapUrl, setRunStravaMapUrl] = useState<string | null>(null);
+  const [workoutDescription, setWorkoutDescription] = useState<string | null>(null);
+  const [routeAttachKey, setRouteAttachKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const hydrate = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
+  useEffect(() => {
+    return () => {
+      if (redirectTimer.current) clearTimeout(redirectTimer.current);
+    };
+  }, []);
+
+  const applyInvite = useCallback((inv: InviteDetail) => {
+    setMeetupTitle(inv.title);
+    setMeetupDate(dateInputFromIso(inv.date));
+    setStartHour(inv.startTimeHour != null ? String(inv.startTimeHour) : "");
+    setStartMinute(
+      inv.startTimeMinute != null ? String(inv.startTimeMinute).padStart(2, "0") : "",
+    );
+    setStartPeriod(
+      inv.startTimePeriod === "PM" || inv.startTimePeriod === "AM" ? inv.startTimePeriod : "AM",
+    );
+    setMeetUpPoint(inv.meetUpPoint);
+    setMeetUpStreetAddress(inv.meetUpStreetAddress ?? "");
+    setMeetUpCity(inv.meetUpCity ?? "");
+    setMeetUpState(inv.meetUpState ?? "");
+    setMeetUpZip(inv.meetUpZip ?? "");
+    setMeetUpPlaceId(inv.meetUpPlaceId);
+    setMeetUpLat(inv.meetUpLat);
+    setMeetUpLng(inv.meetUpLng);
+    setMeetUpPlaceSet(Boolean(inv.meetUpPoint.trim()));
+    setTotalMiles(inv.totalMiles != null ? String(inv.totalMiles) : "");
+    setPace(inv.pace?.trim() || "Various");
+    setMeetUpNote(inv.meetUpNote ?? "");
+    setAboutThisRun(inv.description ?? "");
+    setRouteNeighborhood(inv.routeNeighborhood ?? "");
+    setGorunPath(inv.gorunPath);
+    setRouteSnap(inv.route);
+    setRunMapImageUrl(inv.mapImageUrl ?? inv.route?.mapImageUrl ?? null);
+    setRunStravaMapUrl(inv.stravaMapUrl ?? inv.route?.stravaMapUrl ?? null);
+    setWorkoutDescription(inv.workoutDescription);
+    setRouteAttachKey((k) => k + 1);
+  }, []);
+
+  const hydrate = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       const res = await api.get<{ invite?: InviteDetail }>(
         `/me/hosted-run-invites/${encodeURIComponent(cityRunId)}`,
@@ -98,37 +155,13 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
         setLoadError("Run invite not found.");
         return;
       }
-      setMeetupTitle(inv.title);
-      setMeetupDate(dateInputFromIso(inv.date));
-      setStartHour(inv.startTimeHour != null ? String(inv.startTimeHour) : "");
-      setStartMinute(
-        inv.startTimeMinute != null ? String(inv.startTimeMinute).padStart(2, "0") : "",
-      );
-      setStartPeriod(
-        inv.startTimePeriod === "PM" || inv.startTimePeriod === "AM"
-          ? inv.startTimePeriod
-          : "AM",
-      );
-      setMeetUpPoint(inv.meetUpPoint);
-      setMeetUpStreetAddress(inv.meetUpStreetAddress ?? "");
-      setMeetUpCity(inv.meetUpCity ?? "");
-      setMeetUpState(inv.meetUpState ?? "");
-      setMeetUpZip(inv.meetUpZip ?? "");
-      setMeetUpPlaceId(inv.meetUpPlaceId);
-      setMeetUpLat(inv.meetUpLat);
-      setMeetUpLng(inv.meetUpLng);
-      setMeetUpPlaceSet(Boolean(inv.meetUpPoint.trim()));
-      setTotalMiles(inv.totalMiles != null ? String(inv.totalMiles) : "");
-      setPace(inv.pace?.trim() || "Various");
-      setDescription(inv.description ?? "");
-      setRouteNeighborhood(inv.routeNeighborhood ?? "");
-      setGorunPath(inv.gorunPath);
+      applyInvite(inv);
     } catch {
-      setLoadError("Could not load this run invite.");
+      if (!opts?.silent) setLoadError("Could not load this run invite.");
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
-  }, [cityRunId]);
+  }, [cityRunId, applyInvite]);
 
   useEffect(() => {
     void hydrate();
@@ -180,7 +213,7 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
 
     setBusy(true);
     setError(null);
-    setSaved(false);
+    setSaveSuccess(false);
     try {
       const hourNum = Math.min(12, Math.max(1, parseInt(startHour, 10)));
       const minuteNum = Math.min(59, Math.max(0, parseInt(startMinute, 10) || 0));
@@ -196,16 +229,20 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
         meetUpPlaceId: meetUpPlaceId || undefined,
         meetUpLat: meetUpLat ?? undefined,
         meetUpLng: meetUpLng ?? undefined,
-        description: description.trim() || null,
+        meetUpNote: meetUpNote.trim() || null,
+        description: aboutThisRun.trim() || null,
         routeNeighborhood: routeNeighborhood.trim() || null,
         pace: pace.trim() && pace !== "Various" ? pace : null,
-        totalMiles:
-          Number.isFinite(milesNum) && milesNum > 0 ? milesNum : null,
+        totalMiles: Number.isFinite(milesNum) && milesNum > 0 ? milesNum : null,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
       });
-      setSaved(true);
+      setSaveSuccess(true);
+      const path = gorunPath;
+      redirectTimer.current = setTimeout(() => {
+        router.push(path);
+      }, 800);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };
       setError(err.response?.data?.error || "Could not save.");
@@ -213,6 +250,9 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
       setBusy(false);
     }
   };
+
+  const mapPreviewUrl = runMapImageUrl?.trim() || routeSnap?.mapImageUrl?.trim() || null;
+  const stravaUrl = runStravaMapUrl?.trim() || routeSnap?.stravaMapUrl?.trim() || null;
 
   if (loading) {
     return (
@@ -243,14 +283,59 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
         Runs I created
       </Link>
       <h1 className="text-2xl font-bold text-gray-900">Edit run invite</h1>
-      {saved ? (
-        <p className="text-sm text-emerald-700 font-medium">Saved.</p>
+      {saveSuccess ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          <p className="font-semibold">Run updated</p>
+          <p className="mt-0.5 text-emerald-800">Opening your run page…</p>
+        </div>
       ) : null}
       {error ? (
         <p className="text-sm text-red-600" role="alert">
           {error}
         </p>
       ) : null}
+
+      {routeSnap || mapPreviewUrl ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
+            <Route className="h-4 w-4 text-orange-500" />
+            Attached route
+          </p>
+          {routeSnap?.name ? (
+            <p className="font-semibold text-gray-900">{routeSnap.name}</p>
+          ) : null}
+          {mapPreviewUrl ? (
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={mapPreviewUrl} alt="Route map" className="w-full h-auto" />
+            </div>
+          ) : null}
+          {workoutDescription?.trim() ? (
+            <p className="text-sm text-gray-600 whitespace-pre-wrap">{workoutDescription.trim()}</p>
+          ) : null}
+          {stravaUrl ? (
+            <a
+              href={stravaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600 hover:text-orange-700"
+            >
+              View on Strava
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+
+      <CityRunPostInviteRouteStep
+        key={routeAttachKey}
+        cityRunId={cityRunId}
+        cityRunRouteNeighborhood={routeNeighborhood.trim() || null}
+        variant="edit"
+        onSkip={() => undefined}
+        onAttached={() => void hydrate({ silent: true })}
+      />
+
       <label className="block">
         <span className="text-sm font-medium text-gray-800">Title</span>
         <input
@@ -344,16 +429,32 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
       </label>
       <label className="block">
         <span className="text-sm font-medium text-gray-800">Meetup note</span>
+        <span className="block text-xs text-gray-500 mt-0.5">
+          Parking, landmarks, or how to find the group at the meetup spot.
+        </span>
         <textarea
           className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-[80px]"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          value={meetUpNote}
+          onChange={(e) => setMeetUpNote(e.target.value)}
+          placeholder="E.g. We meet at the back of the parking lot."
+        />
+      </label>
+      <label className="block">
+        <span className="text-sm font-medium text-gray-800">About this run</span>
+        <span className="block text-xs text-gray-500 mt-0.5">
+          Why join — early morning crew, training buddy, social pace, etc.
+        </span>
+        <textarea
+          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-[80px]"
+          value={aboutThisRun}
+          onChange={(e) => setAboutThisRun(e.target.value)}
+          placeholder="E.g. Join a group of runners who like meeting early."
         />
       </label>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || saveSuccess}
           onClick={() => void handleSave()}
           className="rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
         >

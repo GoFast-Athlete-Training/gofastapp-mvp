@@ -14,6 +14,9 @@ type Props = {
   cityRunRouteNeighborhood?: string | null;
   suggestedRouteId?: string | null;
   onSkip: () => void;
+  /** Edit run invite — no skip, different heading. */
+  variant?: "postCreate" | "edit";
+  onAttached?: () => void;
 };
 
 type StepMode = "choose" | "attach" | "create";
@@ -29,6 +32,8 @@ export default function CityRunPostInviteRouteStep({
   cityRunRouteNeighborhood = null,
   suggestedRouteId = null,
   onSkip,
+  variant = "postCreate",
+  onAttached,
 }: Props) {
   const [mode, setMode] = useState<StepMode>("choose");
   const [busy, setBusy] = useState(false);
@@ -69,8 +74,15 @@ export default function CityRunPostInviteRouteStep({
           throw new Error(res.data?.error || "Could not attach route");
         }
         setConflict(null);
-        setAttachedName(res.data.routeName || "Route");
-        setMode("choose");
+        const name = res.data.routeName || "Route";
+        if (variant === "edit") {
+          setAttachedName(null);
+          setMode("choose");
+          onAttached?.();
+        } else {
+          setAttachedName(name);
+          setMode("choose");
+        }
       } catch (e: unknown) {
         const err = e as {
           response?: {
@@ -100,7 +112,7 @@ export default function CityRunPostInviteRouteStep({
         setBusy(false);
       }
     },
-    [cityRunId, cityRunRouteNeighborhood]
+    [cityRunId, cityRunRouteNeighborhood, onAttached, variant]
   );
 
   const handleSelectSaved = (snap: SavedRouteSnapshot) => {
@@ -122,11 +134,12 @@ export default function CityRunPostInviteRouteStep({
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
           <Route className="h-4 w-4 text-orange-500" />
-          Step 2 — Route (optional)
+          {variant === "edit" ? "Route" : "Step 2 — Route (optional)"}
         </p>
         <p className="text-sm text-gray-600 mt-1">
-          Your invite is saved. A route is a named saved path — attach one you already built or create
-          one now.
+          {variant === "edit"
+            ? "Attach a saved route so runners see the map and path on your invite."
+            : "Your invite is saved. A route is a named saved path — attach one you already built or create one now."}
         </p>
         {cityRunRouteNeighborhood?.trim() ? (
           <p className="text-xs text-gray-600 mt-2">
@@ -196,13 +209,15 @@ export default function CityRunPostInviteRouteStep({
           >
             Create a route
           </button>
-          <button
-            type="button"
-            onClick={onSkip}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-          >
-            Skip for now
-          </button>
+          {variant === "postCreate" ? (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+            >
+              Skip for now
+            </button>
+          ) : null}
         </div>
       ) : null}
 

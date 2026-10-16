@@ -111,6 +111,14 @@ export async function listAthleteHostedRunInvites(
 }
 
 /** Single invite for host edit — null if not found or not a created invite. */
+export type HostedRunInviteRouteSnap = {
+  id: string;
+  name: string;
+  mapImageUrl: string | null;
+  stravaMapUrl: string | null;
+  routeNeighborhood: string | null;
+};
+
 export async function getAthleteHostedRunInviteForHost(
   athleteId: string,
   cityRunId: string,
@@ -123,8 +131,14 @@ export async function getAthleteHostedRunInviteForHost(
   meetUpPlaceId: string | null;
   meetUpLat: number | null;
   meetUpLng: number | null;
+  meetUpNote: string | null;
   description: string | null;
   routeNeighborhood: string | null;
+  routeId: string | null;
+  stravaMapUrl: string | null;
+  mapImageUrl: string | null;
+  workoutDescription: string | null;
+  route: HostedRunInviteRouteSnap | null;
 }) | null> {
   const run = await prisma.city_runs.findFirst({
     where: {
@@ -142,8 +156,22 @@ export async function getAthleteHostedRunInviteForHost(
       meetUpPlaceId: true,
       meetUpLat: true,
       meetUpLng: true,
+      meetUpNote: true,
       description: true,
       routeNeighborhood: true,
+      routeId: true,
+      stravaMapUrl: true,
+      mapImageUrl: true,
+      workoutDescription: true,
+      route: {
+        select: {
+          id: true,
+          name: true,
+          mapImageUrl: true,
+          stravaMapUrl: true,
+          routeNeighborhood: true,
+        },
+      },
     },
   });
   if (!run || !isCreatedInviteCityRun(run)) return null;
@@ -159,7 +187,13 @@ export async function getAthleteHostedRunInviteForHost(
     meetUpPlaceId: run.meetUpPlaceId,
     meetUpLat: run.meetUpLat,
     meetUpLng: run.meetUpLng,
+    meetUpNote: run.meetUpNote,
     description: run.description,
     routeNeighborhood: run.routeNeighborhood,
+    routeId: run.routeId,
+    stravaMapUrl: run.stravaMapUrl,
+    mapImageUrl: run.mapImageUrl,
+    workoutDescription: run.workoutDescription,
+    route: run.route,
   };
 }

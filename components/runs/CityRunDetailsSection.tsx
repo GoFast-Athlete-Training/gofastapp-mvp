@@ -216,10 +216,13 @@ export default function CityRunDetailsSection({
           </div>
         ) : null}
 
-        {run.description ? (
-          <p className="mt-4 sm:mt-5 text-gray-700 text-sm whitespace-pre-wrap border-t border-gray-100 pt-4 sm:pt-5">
-            {run.description}
-          </p>
+        {run.description?.trim() ? (
+          <div className="mt-4 sm:mt-5 border-t border-gray-100 pt-4 sm:pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+              About this run
+            </p>
+            <p className="text-gray-700 text-sm whitespace-pre-wrap">{run.description.trim()}</p>
+          </div>
         ) : null}
       </div>
 

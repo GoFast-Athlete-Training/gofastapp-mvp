@@ -22,6 +22,7 @@ type PatchBody = {
   meetUpPlaceId?: string | null;
   meetUpLat?: number | null;
   meetUpLng?: number | null;
+  meetUpNote?: string | null;
   description?: string | null;
   routeNeighborhood?: string | null;
   pace?: string | null;
@@ -117,6 +118,10 @@ export async function PATCH(
           : existing.meetUpPlaceId,
       meetUpLat: body.meetUpLat !== undefined ? body.meetUpLat : existing.meetUpLat,
       meetUpLng: body.meetUpLng !== undefined ? body.meetUpLng : existing.meetUpLng,
+      meetUpNote:
+        body.meetUpNote !== undefined
+          ? body.meetUpNote?.trim() || null
+          : existing.meetUpNote,
       description:
         body.description !== undefined
           ? body.description?.trim() || null
