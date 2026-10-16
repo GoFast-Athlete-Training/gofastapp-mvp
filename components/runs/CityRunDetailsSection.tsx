@@ -134,7 +134,9 @@ export default function CityRunDetailsSection({
         ) : null}
 
         <h1 className={`font-bold text-gray-900 mb-4 ${compact ? 'text-xl' : 'text-2xl'}`}>
-          {run.workout?.title?.trim() || run.title}
+          {run.cityRunType === 'INDIVIDUAL'
+            ? run.title
+            : run.workout?.title?.trim() || run.title}
         </h1>
 
         <div className="space-y-2 sm:space-y-3 text-gray-700">
@@ -204,6 +206,15 @@ export default function CityRunDetailsSection({
             <p className="text-sm text-gray-600 pt-1 whitespace-pre-wrap">{run.routeNeighborhood.trim()}</p>
           ) : null}
         </div>
+
+        {run.workoutDescription?.trim() ? (
+          <div className="mt-4 sm:mt-5 border-t border-gray-100 pt-4 sm:pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+              Route description
+            </p>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{run.workoutDescription.trim()}</p>
+          </div>
+        ) : null}
 
         {run.description ? (
           <p className="mt-4 sm:mt-5 text-gray-700 text-sm whitespace-pre-wrap border-t border-gray-100 pt-4 sm:pt-5">

@@ -17,6 +17,7 @@ import api from '@/lib/api';
 import { auth } from '@/lib/firebase';
 import {
   isRunPast,
+  runShouldShowWorkoutPrescribe,
   type CityRunCheckin,
   type CityRunDetails,
   type CityRunRsvp,
@@ -299,10 +300,7 @@ function CityRunPreRSVP({
   }, [run.date, run.startTimeHour, run.startTimeMinute, run.startTimePeriod, run.timezone]);
 
   const isSeries = run.runSeriesId != null;
-  const hasWorkout =
-    Boolean(run.workoutId || run.workout) ||
-    Boolean(run.workout?.workoutNarrative?.trim()) ||
-    Boolean(run.workoutDescription?.trim());
+  const hasWorkout = runShouldShowWorkoutPrescribe(run);
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">

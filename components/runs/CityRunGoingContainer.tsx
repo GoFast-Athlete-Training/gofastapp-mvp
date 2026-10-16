@@ -6,9 +6,13 @@ import CityRunChatSection from '@/components/runs/CityRunChatSection';
 import CityRunDetailsSection, { CityRunGoingBanner } from '@/components/runs/CityRunDetailsSection';
 import CityRunMobileTabs from '@/components/runs/CityRunMobileTabs';
 import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
-import CityRunRunDayCompanion from '@/components/runs/CityRunRunDayCompanion';
 import CityRunWorkoutCard, { type PlannedWorkoutSummary } from '@/components/runs/CityRunWorkoutCard';
-import { isRunPast, runHasWorkoutContent, type CityRunDetails, type CityRunRsvp } from '@/components/runs/city-run-types';
+import {
+  isRunPast,
+  runShouldShowWorkoutPrescribe,
+  type CityRunDetails,
+  type CityRunRsvp,
+} from '@/components/runs/city-run-types';
 import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
 
 interface Props {
@@ -51,7 +55,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
     }
   };
 
-  const hasWorkout = runHasWorkoutContent(run);
+  const showWorkoutPrescribe = runShouldShowWorkoutPrescribe(run);
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -68,14 +72,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
         <div className="hidden lg:block space-y-4">
           <CityRunGoingBanner />
 
-          <CityRunRunDayCompanion
-            run={run}
-            runIsPast={runIsPast}
-            onAddShout={socialRun && runIsPast ? () => void handleCheckin() : undefined}
-            checkingIn={checkingIn}
-          />
-
-          {hasWorkout ? (
+          {showWorkoutPrescribe ? (
             <CityRunWorkoutCard
               workoutId={run.workoutId}
               workout={run.workout}

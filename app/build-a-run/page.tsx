@@ -9,6 +9,7 @@ import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import api from "@/lib/api";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
+import HostedRunInvitesPanel from "@/components/runs/HostedRunInvitesPanel";
 
 const PAGE_SIZE = 20;
 
@@ -114,7 +115,8 @@ export default function BuildARunPage() {
                 </Link>
               </section>
 
-              <StandaloneRunsList />
+              <HostedRunInvitesPanel />
+              <StandaloneWorkoutsList />
             </div>
           </div>
         </main>
@@ -123,7 +125,7 @@ export default function BuildARunPage() {
   );
 }
 
-function StandaloneRunsList() {
+function StandaloneWorkoutsList() {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [workouts, setWorkouts] = useState<LiteWorkout[]>([]);
@@ -154,7 +156,7 @@ function StandaloneRunsList() {
       setOffset(start + list.length);
       setWorkouts((prev) => (append ? [...prev, ...list] : list));
     } catch (e: unknown) {
-      setError("Could not load your runs.");
+      setError("Could not load your workouts.");
       console.error(e);
     } finally {
       setLoading(false);
@@ -224,10 +226,10 @@ function StandaloneRunsList() {
     <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Your runs</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Your workouts</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Open one to send to Garmin or share. Expand to list what you&apos;ve
-            built.
+            Prescribed segments and Garmin pushes — not run invite links. Expand
+            only when you need an older workout.
           </p>
         </div>
         <button

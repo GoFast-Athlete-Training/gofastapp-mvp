@@ -28,22 +28,6 @@ export default function CityRunRoutePhotosField({
   addPhotosLabel = 'Add photos',
 }: Props) {
   const [uploading, setUploading] = useState(false);
-  const [urlDraft, setUrlDraft] = useState('');
-
-  function addUrlPhoto() {
-    const url = urlDraft.trim();
-    if (!url || photos.length >= MAX_ROUTE_PHOTOS) return;
-    try {
-      // eslint-disable-next-line no-new
-      new URL(url);
-    } catch {
-      onError?.('Enter a valid image URL.');
-      return;
-    }
-    onChange([...photos, url]);
-    setUrlDraft('');
-    onError?.(null);
-  }
 
   return (
     <div className={className}>
@@ -108,25 +92,6 @@ export default function CityRunRoutePhotosField({
           </label>
         ) : null}
       </div>
-      {photos.length < MAX_ROUTE_PHOTOS ? (
-        <div className="mt-2 flex gap-2">
-          <input
-            type="url"
-            value={urlDraft}
-            onChange={(e) => setUrlDraft(e.target.value)}
-            placeholder="Or paste image URL"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          <button
-            type="button"
-            onClick={addUrlPhoto}
-            disabled={!urlDraft.trim() || uploading}
-            className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-          >
-            Add
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -157,6 +157,32 @@ export interface CityRunDetails {
   currentRSVPRole?: string | null;
 }
 
+/** Route prose (staff route description / attached route) — not a training prescribe. */
+export function runHasRouteDescription(run: { workoutDescription?: string | null }): boolean {
+  return Boolean(run.workoutDescription?.trim());
+}
+
+/**
+ * Show the training prescribe card (segments, planned workout) — not host-a-run plumbing.
+ * `workoutDescription` alone is route copy on the details card, not a workout block.
+ */
+export function runShouldShowWorkoutPrescribe(run: {
+  cityRunType?: string | null;
+  runClubId?: string | null;
+  runCrewId?: string | null;
+  plannedWorkoutId?: string | null;
+  plannedWorkout?: { id?: string; title?: string | null; segments?: unknown[] } | null;
+  workoutId?: string | null;
+  workout?: CityRunWorkoutSummary | null;
+}): boolean {
+  if (run.plannedWorkoutId || run.plannedWorkout?.segments?.length) return true;
+  if (run.workout?.workoutNarrative?.trim()) return true;
+  // Athlete host-a-run keeps a linked Easy workout for backend — not a public prescribe.
+  if (run.cityRunType === 'INDIVIDUAL' || (!run.runClubId && !run.runCrewId)) return false;
+  return Boolean(run.workoutId || run.workout);
+}
+
+/** @deprecated Prefer runShouldShowWorkoutPrescribe for UI; route text uses runHasRouteDescription. */
 export function runHasWorkoutContent(run: {
   plannedWorkoutId?: string | null;
   plannedWorkout?: { id?: string; title?: string | null } | null;
@@ -164,12 +190,7 @@ export function runHasWorkoutContent(run: {
   workout?: CityRunWorkoutSummary | null;
   workoutDescription?: string | null;
 }): boolean {
-  return (
-    Boolean(run.plannedWorkoutId || run.plannedWorkout) ||
-    Boolean(run.workoutId || run.workout) ||
-    Boolean(run.workout?.workoutNarrative?.trim()) ||
-    Boolean(run.workoutDescription?.trim())
-  );
+  return runShouldShowWorkoutPrescribe(run) || runHasRouteDescription(run);
 }
 
 export interface PostRunRun {

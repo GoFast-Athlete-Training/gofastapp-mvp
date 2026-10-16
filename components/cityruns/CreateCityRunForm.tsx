@@ -23,6 +23,7 @@ import GooglePlacesAutocomplete, {
 } from "@/components/RunCrew/GooglePlacesAutocomplete";
 import WorkoutStructurePreview from "@/components/training/WorkoutStructurePreview";
 import api from "@/lib/api";
+import { markLastHostedRunForBuildPage } from "@/components/runs/HostedRunInvitesPanel";
 import { ensureAthleteIdInStorage } from "@/lib/ensure-athlete-session";
 import { displayWorkoutListTitle } from "@/lib/training/workout-display-title";
 import type { WorkoutPreviewSegment } from "@/lib/training/workout-segment-preview";
@@ -177,6 +178,7 @@ export default function CreateCityRunForm({
   const [workoutNarrative, setWorkoutNarrative] = useState("");
   const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
   const [invitePace, setInvitePace] = useState("Various");
+  const [routeNeighborhood, setRouteNeighborhood] = useState("");
 
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
 
@@ -417,11 +419,13 @@ export default function CreateCityRunForm({
         meetUpNote: meetUpNote.trim() || undefined,
         workoutNarrative: workoutNarrative.trim() || undefined,
         pace: invitePace.trim() && invitePace !== "Various" ? invitePace : undefined,
+        routeNeighborhood: routeNeighborhood.trim() || undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
       });
       if (data?.cityRunId && data?.path) {
+        markLastHostedRunForBuildPage(data.cityRunId);
         setSuccess(data);
         setRouteStepDismissed(false);
       } else {
@@ -563,6 +567,7 @@ export default function CreateCityRunForm({
         {!routeStepDismissed ? (
           <CityRunPostInviteRouteStep
             cityRunId={success.cityRunId}
+            cityRunRouteNeighborhood={routeNeighborhood.trim() || null}
             suggestedRouteId={initialRouteId}
             onSkip={() => setRouteStepDismissed(true)}
           />
@@ -737,6 +742,7 @@ export default function CreateCityRunForm({
             },
             setTotalMiles: setEditMiles,
             setPace: setInvitePace,
+            setRouteNeighborhood,
           });
         }}
       />
@@ -849,6 +855,22 @@ export default function CreateCityRunForm({
             </option>
           ))}
         </select>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Route neighborhood <span className="font-normal text-gray-400">(optional)</span>
+        </label>
+        <input
+          type="text"
+          value={routeNeighborhood}
+          onChange={(e) => setRouteNeighborhood(e.target.value)}
+          placeholder="e.g. Fletcher's Cove, Carderock"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Where the route runs — saved on your invite; step 2 attaches the map.
+        </p>
       </div>
 
       <div className="border-t border-gray-100 pt-2">

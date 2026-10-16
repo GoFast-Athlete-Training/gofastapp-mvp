@@ -1726,6 +1726,8 @@ model routes {
   mapImageUrl        String?
   routePhotos        Json?
   routeNeighborhood  String?
+  /// Prose for this path — copies to city_runs.workoutDescription on attach (staff: route description).
+  routeDescription   String?              @db.Text
   runType            String?
   /// City slug for lookup (e.g. dc); city_runs.citySlug remains source of truth for the event.
   citySlug           String?

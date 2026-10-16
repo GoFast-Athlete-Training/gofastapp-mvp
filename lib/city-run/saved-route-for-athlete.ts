@@ -9,6 +9,7 @@ const routeSelect = {
   mapImageUrl: true,
   routePhotos: true,
   routeNeighborhood: true,
+  routeDescription: true,
   runType: true,
   distanceMiles: true,
   citySlug: true,

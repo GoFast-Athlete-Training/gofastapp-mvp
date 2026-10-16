@@ -10,7 +10,6 @@ import CityRunDetailsSection, {
   CityRunSeriesPanel,
 } from '@/components/runs/CityRunDetailsSection';
 import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
-import CityRunRunDayCompanion from '@/components/runs/CityRunRunDayCompanion';
 import CityRunWorkoutCard, { type PlannedWorkoutSummary } from '@/components/runs/CityRunWorkoutCard';
 import {
   CityRunPostRunCrewSection,
@@ -23,9 +22,7 @@ import type {
   CityRunRsvp,
   PostRunRun,
 } from '@/components/runs/city-run-types';
-import { runHasWorkoutContent } from '@/components/runs/city-run-types';
-import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
-
+import { runShouldShowWorkoutPrescribe } from '@/components/runs/city-run-types';
 type PreRsvpMobileProps = {
   mode: 'pre-rsvp';
   run: CityRunDetails;
@@ -94,7 +91,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
 
   if (props.mode === 'pre-rsvp') {
     const isSeries = props.run.runSeriesId != null;
-    const hasWorkout = runHasWorkoutContent(props.run);
+    const hasWorkout = runShouldShowWorkoutPrescribe(props.run);
     return (
       <MobileHubTabs
         tabs={[...PRE_RSVP_TABS]}
@@ -147,8 +144,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
   }
 
   if (props.mode === 'going') {
-    const hasWorkout = runHasWorkoutContent(props.run);
-    const socialRun = hasSocialRunLifecycle(props.run);
+    const hasWorkout = runShouldShowWorkoutPrescribe(props.run);
 
     return (
       <MobileHubTabs tabs={[...GOING_TABS]} activeTab={activeTab} onTabChange={setActiveTab}>
@@ -160,12 +156,6 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
         ) : null}
         {activeTab === 'details' ? (
           <div className="space-y-4">
-            <CityRunRunDayCompanion
-              run={props.run}
-              runIsPast={props.runIsPast}
-              onAddShout={socialRun && props.runIsPast ? props.onCheckin : undefined}
-              checkingIn={props.checkingIn}
-            />
             {hasWorkout ? (
               <CityRunWorkoutCard
                 workoutId={props.run.workoutId}

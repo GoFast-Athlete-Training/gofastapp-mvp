@@ -32,7 +32,8 @@ export default function CityRunWorkoutCard({
 }: CityRunWorkoutCardProps) {
   const linkedId = workoutId || workout?.id || null;
   const narrative = workout?.workoutNarrative?.trim() || null;
-  const legacyText = workoutDescription?.trim() || workout?.description?.trim() || null;
+  // Route prose lives on CityRunDetailsSection — not in this prescribe card.
+  const legacyText = workout?.description?.trim() || null;
   const isGroupWorkout = workout?.scope === 'GROUP';
   const prescribe = plannedWorkout ?? null;
 

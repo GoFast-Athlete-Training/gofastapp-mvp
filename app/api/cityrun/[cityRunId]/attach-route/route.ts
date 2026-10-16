@@ -19,15 +19,40 @@ export async function POST(
     }
 
     const { cityRunId } = await params;
-    const body = (await request.json()) as { routeId?: string };
+    const body = (await request.json()) as {
+      routeId?: string;
+      neighborhoodAuthority?: 'auto' | 'cityRun' | 'route';
+    };
     const routeId = typeof body.routeId === 'string' ? body.routeId.trim() : '';
     if (!routeId) {
       return NextResponse.json({ error: 'routeId is required' }, { status: 400 });
     }
 
-    const result = await attachSavedRouteToCityRun(cityRunId, auth.athlete.id, routeId);
+    const authority =
+      body.neighborhoodAuthority === 'cityRun' || body.neighborhoodAuthority === 'route'
+        ? body.neighborhoodAuthority
+        : 'auto';
+
+    const result = await attachSavedRouteToCityRun(
+      cityRunId,
+      auth.athlete.id,
+      routeId,
+      authority
+    );
     if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+      return NextResponse.json(
+        {
+          error: result.error,
+          ...(result.conflict
+            ? {
+                conflict: true,
+                cityRunNeighborhood: result.cityRunNeighborhood,
+                routeNeighborhood: result.routeNeighborhood,
+              }
+            : {}),
+        },
+        { status: result.status }
+      );
     }
 
     return NextResponse.json({

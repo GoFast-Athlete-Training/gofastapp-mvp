@@ -156,6 +156,8 @@ export async function POST(request: NextRequest) {
             : Prisma.JsonNull,
         routeNeighborhood:
           typeof body.routeNeighborhood === "string" ? body.routeNeighborhood.trim() || null : null,
+        routeDescription:
+          typeof body.routeDescription === "string" ? body.routeDescription.trim() || null : null,
         runType: typeof body.runType === "string" ? body.runType.trim() || null : null,
         citySlug: typeof body.citySlug === "string" ? body.citySlug.trim() || null : null,
         createdByAthleteId: athlete.id,
