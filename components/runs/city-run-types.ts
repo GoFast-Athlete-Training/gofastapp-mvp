@@ -40,6 +40,7 @@ export interface CityRunRsvp {
     firstName: string;
     lastName: string;
     photoURL: string | null;
+    gofastHandle?: string | null;
   };
 }
 

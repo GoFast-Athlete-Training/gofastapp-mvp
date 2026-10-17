@@ -12,6 +12,7 @@ export default function GoRunUpcomingRunsPanel() {
   const [agenda, setAgenda] = useState<RunnerAgendaPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
+  const [showPast, setShowPast] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -36,8 +37,9 @@ export default function GoRunUpcomingRunsPanel() {
     setCheckingInId(runId);
     try {
       await api.post(`/runs/${runId}/checkin`, {});
-      if (run?.runClub?.slug) {
-        router.push(`/runclub/${run.runClub.slug}`);
+      if (run?.slug || run?.id) {
+        const segment = encodeURIComponent(run.slug?.trim() || run.id);
+        router.push(`/cityruntogether/${segment}`);
         return;
       }
       await load();
@@ -49,14 +51,15 @@ export default function GoRunUpcomingRunsPanel() {
   };
 
   const items: RunnerAgendaItem[] = agenda?.items ?? [];
-  const empty = !loading && items.length === 0;
+  const pastItems: RunnerAgendaItem[] = agenda?.pastItems ?? [];
+  const empty = !loading && items.length === 0 && pastItems.length === 0;
 
   return (
     <section className="space-y-4 border-t border-gray-200 pt-8" aria-label="My upcoming runs">
       <div>
         <h2 className="text-lg font-semibold text-gray-900">My upcoming runs</h2>
         <p className="text-sm text-gray-600 mt-0.5">
-          Runs you created and runs you&apos;re going to — upcoming only.
+          City runs you created or joined — open the run group for details and chatter.
         </p>
       </div>
 
@@ -68,7 +71,7 @@ export default function GoRunUpcomingRunsPanel() {
 
       {empty ? (
         <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-8 text-center space-y-3">
-          <p className="text-gray-700 font-medium">No upcoming runs on your list</p>
+          <p className="text-gray-700 font-medium">No runs on your list yet</p>
           <p className="text-sm text-gray-500">Host a run or join one from Find a Run.</p>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
             <Link
@@ -97,6 +100,30 @@ export default function GoRunUpcomingRunsPanel() {
               onCheckin={(runId) => void handleCheckin(runId)}
             />
           ))}
+        </div>
+      ) : null}
+
+      {!loading && pastItems.length > 0 ? (
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={() => setShowPast((v) => !v)}
+            className="text-sm font-semibold text-sky-700 hover:text-sky-800"
+          >
+            {showPast ? "Hide past runs" : "See past runs"}
+          </button>
+          {showPast ? (
+            <div className="mt-4 space-y-4">
+              {pastItems.map((item) => (
+                <RunnerAgendaCard
+                  key={item.id}
+                  item={item}
+                  checkingInId={checkingInId}
+                  onCheckin={(runId) => void handleCheckin(runId)}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>

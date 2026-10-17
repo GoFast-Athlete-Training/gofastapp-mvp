@@ -30,11 +30,8 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
     startTimePeriod: run.startTimePeriod,
   });
 
-  const runHref = run.runClub?.slug
-    ? `/runclub/${run.runClub.slug}`
-    : run.slug
-      ? `/gorun/${run.slug}`
-      : `/gorun/${run.id}`;
+  const runSegment = run.slug?.trim() || run.id;
+  const runHref = `/cityruntogether/${encodeURIComponent(runSegment)}`;
 
   const isHost = isHostRsvpRole(run.rsvpRole);
   const roleLabel = isHost
@@ -43,11 +40,7 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
       ? run.runClub.name
       : 'Member';
 
-  const headerLabel = item.isToday
-    ? "Today's run"
-    : run.needsWereYouThere
-      ? 'Confirm attendance'
-      : 'Upcoming';
+  const headerLabel = item.isToday ? "Today's run" : run.isPast ? 'Past run' : 'Upcoming';
 
   return (
     <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200/80 space-y-4">
@@ -100,21 +93,11 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
             {checkingInId === run.id ? 'Checking in…' : 'Check in'}
           </button>
         ) : null}
-        {!isHost && run.supportsCheckin && run.needsWereYouThere && !run.hasCheckin ? (
-          <button
-            type="button"
-            disabled={checkingInId !== null}
-            onClick={() => onCheckin(run.id)}
-            className="inline-flex rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-60"
-          >
-            {checkingInId === run.id ? 'Saving…' : 'Were you there?'}
-          </button>
-        ) : null}
         <Link
           href={runHref}
           className="inline-flex rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
-          {run.runClub?.slug ? 'Club home' : 'Run details'}
+          Open run group
         </Link>
       </div>
     </article>

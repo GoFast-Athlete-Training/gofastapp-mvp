@@ -79,6 +79,8 @@ export type RunnerAgendaPayload = {
   memberItems: RunnerAgendaItem[];
   /** @deprecated Prefer hostedItems + memberItems */
   items: RunnerAgendaItem[];
+  /** Dates before today — same runs list, opens CityRunRsvpGroup. */
+  pastItems: RunnerAgendaItem[];
 };
 
 type JoinedRunInput = RunnerJoinedRun;

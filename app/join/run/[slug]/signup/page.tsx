@@ -86,7 +86,8 @@ function JoinRunSignupContent() {
         // RSVP failed — still navigate, they can RSVP from the run page
         console.warn('RSVP failed after signup, continuing:', err?.response?.status);
       }
-      router.replace(`/gorun/${r.id}`);
+      const segment = encodeURIComponent(r.slug?.trim() || r.id);
+      router.replace(`/cityruntogether/${segment}`);
     } else {
       router.replace(`/gorun`);
     }

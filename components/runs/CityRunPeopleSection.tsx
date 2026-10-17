@@ -142,3 +142,38 @@ export function CityRunGoingSummary({ count }: { count: number }) {
     </div>
   );
 }
+
+function PublicPersonRow({ rsvp }: { rsvp: CityRunRsvp }) {
+  const handle = rsvp.Athlete?.gofastHandle?.trim();
+  const label = handle ? `@${handle.replace(/^@/, '')}` : 'Runner';
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2">
+      <Avatar athlete={rsvp.Athlete} />
+      <span className="text-sm font-medium text-gray-800">{label}</span>
+    </div>
+  );
+}
+
+/** Public RSVP page — face + gofastHandle, no RSVP lock. */
+export function PublicSeeWhosGoingSection({ rsvps }: { rsvps: CityRunRsvp[] }) {
+  const { host, members } = splitCityRunRsvpsByRole(rsvps);
+  const attending = [host, ...members].filter(Boolean) as CityRunRsvp[];
+
+  return (
+    <section className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+      <div>
+        <h2 className="font-semibold text-gray-900">See Who&apos;s Going</h2>
+        {attending.length === 0 ? (
+          <p className="text-sm text-gray-500 mt-2">Be the first one to commit.</p>
+        ) : null}
+      </div>
+      {attending.length > 0 ? (
+        <div className="space-y-2">
+          {attending.map((r) => (
+            <PublicPersonRow key={r.id} rsvp={r} />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}

@@ -353,6 +353,9 @@ export function CityRunRsvpPanel({
   cityRunType,
   runTitle,
   allowCheckin = true,
+  publicRsvpPage = false,
+  alreadyRsvped = false,
+  hubHref,
 }: {
   runIsPast: boolean;
   rsvpLoading: boolean;
@@ -362,12 +365,30 @@ export function CityRunRsvpPanel({
   cityRunType?: string | null;
   runTitle?: string | null;
   allowCheckin?: boolean;
+  /** Public `/runrsvp` — no time-based check-in CTA. */
+  publicRsvpPage?: boolean;
+  alreadyRsvped?: boolean;
+  hubHref?: string | null;
 }) {
   const socialCtx = { cityRunType, runClub, title: runTitle };
   const pastCopy = resolveRunPastCheckinCopy(socialCtx);
   const rsvpCopy = resolveRunRsvpCopy(socialCtx);
 
-  if (runIsPast) {
+  if (alreadyRsvped && hubHref) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+        <p className="text-sm font-semibold text-gray-900">You RSVPed</p>
+        <a
+          href={hubHref}
+          className="flex w-full items-center justify-center rounded-xl bg-sky-600 py-3 text-center font-semibold text-white transition hover:bg-sky-700"
+        >
+          Go to this run&apos;s hub
+        </a>
+      </div>
+    );
+  }
+
+  if (runIsPast && !publicRsvpPage) {
     if (!allowCheckin) return null;
     return (
       <div className="bg-white rounded-xl shadow-sm p-6">
@@ -384,16 +405,21 @@ export function CityRunRsvpPanel({
     );
   }
 
+  const joinLabel = publicRsvpPage ? 'Join this Run' : rsvpCopy.goingLabel;
+  const prompt = publicRsvpPage
+    ? 'Add yourself to this run. Sign in if you need an account first.'
+    : rsvpCopy.prompt;
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
-      <p className="text-sm text-gray-500 mb-4">{rsvpCopy.prompt}</p>
+      <p className="text-sm text-gray-500 mb-4">{prompt}</p>
       <button
         type="button"
         onClick={() => onRsvp('going')}
         disabled={rsvpLoading}
         className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 disabled:opacity-50 transition"
       >
-        {rsvpLoading ? 'Saving…' : rsvpCopy.goingLabel}
+        {rsvpLoading ? 'Saving…' : joinLabel}
       </button>
     </div>
   );

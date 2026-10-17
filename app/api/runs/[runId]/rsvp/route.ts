@@ -8,6 +8,7 @@ import { resolveCityRunIdBySegment } from '@/lib/city-run-resolve-segment';
 import { upsertCityRunStampForAthlete } from '@/lib/city-run/city-run-stamp';
 import { upsertIndividualCityRunStampForAthlete } from '@/lib/city-run/individual-city-run-stamp';
 import { RSVP_ROLE_GOING, RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
+import { isAttendingCityRunRsvp } from '@/lib/city-run/rsvp-attendance';
 
 /**
  * GET /api/runs/[runId]/rsvp
@@ -54,12 +55,14 @@ export async function GET(
             id: true,
             firstName: true,
             lastName: true,
+            photoURL: true,
+            gofastHandle: true,
           },
         },
       },
     });
 
-    const rsvps = rows.map((r) => ({
+    const rsvps = rows.filter(isAttendingCityRunRsvp).map((r) => ({
       id: r.id,
       status: r.status,
       role: r.role,

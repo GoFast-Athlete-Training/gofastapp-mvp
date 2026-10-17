@@ -12,7 +12,7 @@ import TopNav from '@/components/shared/TopNav';
  *
  * Unsigned auth gate only. No public run card — that lives on gofastlinks /run/{slug}.
  *
- * - Already signed in → RSVP going → /gorun/{slug} (web athlete run)
+ * - Already signed in → RSVP going → /cityruntogether/{slug}
  * - Not signed in → create account / sign in → signup flow returns here, then same hop
  */
 export default function JoinRunPage() {
@@ -78,7 +78,8 @@ export default function JoinRunPage() {
     };
   }, []);
 
-  const gorunPath = () => `/gorun/${encodeURIComponent(runSlug ?? runId ?? slug)}`;
+  const hubPath = () =>
+    `/cityruntogether/${encodeURIComponent(runSlug ?? runId ?? slug)}`;
 
   const completeGoingRsvp = async () => {
     if (!runId) return;
@@ -86,7 +87,7 @@ export default function JoinRunPage() {
     setRsvpError(null);
     try {
       await api.post(`/runs/${runId}/rsvp`, { status: 'going' });
-      router.replace(gorunPath());
+      router.replace(hubPath());
     } catch (err: unknown) {
       console.error('RSVP error:', err);
       setRsvpError('Could not save your RSVP. Please try again.');

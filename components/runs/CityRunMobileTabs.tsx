@@ -9,7 +9,7 @@ import CityRunDetailsSection, {
   CityRunRsvpPanel,
   CityRunSeriesPanel,
 } from '@/components/runs/CityRunDetailsSection';
-import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
+import CityRunPeopleSection, { PublicSeeWhosGoingSection } from '@/components/runs/CityRunPeopleSection';
 import CityRunWorkoutCard, { type PlannedWorkoutSummary } from '@/components/runs/CityRunWorkoutCard';
 import {
   CityRunPostRunCrewSection,
@@ -34,6 +34,9 @@ type PreRsvpMobileProps = {
   onCheckin: () => void;
   onBack: () => void;
   allowCheckin?: boolean;
+  publicRsvpPage?: boolean;
+  alreadyRsvped?: boolean;
+  hubHref?: string | null;
 };
 
 type GoingMobileProps = {
@@ -137,11 +140,18 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
               cityRunType={props.run.cityRunType}
               runTitle={props.run.title}
               allowCheckin={props.allowCheckin ?? true}
+              publicRsvpPage={props.publicRsvpPage}
+              alreadyRsvped={props.alreadyRsvped}
+              hubHref={props.hubHref}
             />
           </div>
         ) : null}
         {activeTab === 'people' ? (
-          <CityRunPeopleSection rsvps={props.run.rsvps || []} locked expanded />
+          props.publicRsvpPage ? (
+            <PublicSeeWhosGoingSection rsvps={props.run.rsvps || []} />
+          ) : (
+            <CityRunPeopleSection rsvps={props.run.rsvps || []} locked expanded />
+          )
         ) : null}
       </MobileHubTabs>
     );

@@ -38,9 +38,9 @@ function formatRunDate(iso: string): string {
   });
 }
 
-function gorunPath(run: DiscoverRunCardRun): string {
+function runRsvpDetailPath(run: DiscoverRunCardRun): string {
   const segment = run.slug?.trim() || run.id;
-  return `/gorun/${encodeURIComponent(segment)}`;
+  return `/runrsvp/${encodeURIComponent(segment)}`;
 }
 
 export default function DiscoverRunCard({ run }: { run: DiscoverRunCardRun }) {
@@ -122,7 +122,7 @@ export default function DiscoverRunCard({ run }: { run: DiscoverRunCardRun }) {
 
       <div className="mt-4">
         <Link
-          href={gorunPath(run)}
+          href={runRsvpDetailPath(run)}
           className="inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
         >
           More details

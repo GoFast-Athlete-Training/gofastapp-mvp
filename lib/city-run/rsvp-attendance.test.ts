@@ -38,12 +38,9 @@ describe('rsvp-attendance', () => {
     expect(members[0]?.id).toBe('2');
   });
 
-  it('isAthleteOnCityRun uses role not status alone', () => {
-    expect(
-      isAthleteOnCityRun({ currentRSVP: 'going', currentRSVPRole: 'host' }),
-    ).toBe(true);
-    expect(
-      isAthleteOnCityRun({ currentRSVP: 'not-going', currentRSVPRole: 'host' }),
-    ).toBe(false);
+  it('isAthleteOnCityRun uses role only', () => {
+    expect(isAthleteOnCityRun({ currentRSVPRole: 'host' })).toBe(true);
+    expect(isAthleteOnCityRun({ currentRSVPRole: 'going' })).toBe(true);
+    expect(isAthleteOnCityRun({ currentRSVPRole: null })).toBe(false);
   });
 });

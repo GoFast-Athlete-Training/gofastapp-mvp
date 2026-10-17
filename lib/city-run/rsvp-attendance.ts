@@ -41,13 +41,29 @@ export function attendingCountFromRsvps(rsvps: RsvpRoleSplitRow[]): number {
   return rsvps.filter(isAttendingCityRunRsvp).length;
 }
 
-/** Signed-in athlete has an RSVP row on this run (host or member). */
+/** Signed-in athlete has a membership role on this run (Organizer or Participate). */
 export function isAthleteOnCityRun(run: {
-  currentRSVP?: string | null;
   currentRSVPRole?: string | null;
 }): boolean {
-  if (run.currentRSVP === 'not-going') return false;
   if (isHostRsvpRole(run.currentRSVPRole)) return true;
   if (isMemberRsvpRole(run.currentRSVPRole)) return true;
-  return run.currentRSVP === 'going';
+  return false;
+}
+
+/** Organizer without a junction row (legacy create path). */
+export function isAthleteOrganizerOfCityRun(
+  run: { athleteGeneratedId?: string | null },
+  athleteId: string | null | undefined,
+): boolean {
+  return Boolean(athleteId && run.athleteGeneratedId === athleteId);
+}
+
+export function athleteHasCityRunMembership(
+  run: {
+    currentRSVPRole?: string | null;
+    athleteGeneratedId?: string | null;
+  },
+  athleteId: string | null | undefined,
+): boolean {
+  return isAthleteOnCityRun(run) || isAthleteOrganizerOfCityRun(run, athleteId);
 }

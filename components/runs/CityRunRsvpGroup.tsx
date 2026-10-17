@@ -26,7 +26,7 @@ interface Props {
   onLeave: () => void;
 }
 
-export default function CityRunGoingContainer({ run, onLeave }: Props) {
+export default function CityRunRsvpGroup({ run, onLeave }: Props) {
   const [rsvps, setRsvps] = useState<CityRunRsvp[]>(run.rsvps || []);
   const [checkingIn, setCheckingIn] = useState(false);
   const [runIsPast, setRunIsPast] = useState(false);
