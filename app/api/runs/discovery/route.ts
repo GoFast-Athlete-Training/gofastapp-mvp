@@ -1,64 +1,58 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebaseAdmin';
 import { getDiscoveryRuns } from '@/lib/domain-runs';
-import {
-  hasDiscoveryLocationScope,
-  parseDiscoveryLocationParams,
-} from '@/lib/discovery-location';
+import { discoveryLocationFromAthlete } from '@/lib/discovery-athlete-scope';
+import { requireAthleteFromBearer } from '@/lib/training/require-athlete';
 
 /**
  * GET /api/runs/discovery
  *
- * Authenticated app discovery surface for Group Runs.
- * Returns Product club runs without SEO `published` gating.
- *
- * Query params:
- * - citySlug | gofastCity | athleteCity (+ athleteState)
- * - regionSlug — metro reel-in (e.g. dc)
- * - day (optional) — weekday name
- * - runClubSlug (optional)
+ * Authenticated Find a Run list. Location scope comes from the athlete profile
+ * (DMV region or single city). Client citySlug / regionSlug params are ignored.
  */
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAthleteFromBearer(request);
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    try {
-      await adminAuth.verifyIdToken(authHeader.substring(7));
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
+    const location = discoveryLocationFromAthlete({
+      city: auth.athlete.city,
+      state: auth.athlete.state,
+    });
 
-    const { searchParams } = new URL(request.url);
-    const location = parseDiscoveryLocationParams(searchParams);
-    const day = searchParams.get('day') || undefined;
-
-    if (!hasDiscoveryLocationScope(location)) {
+    if (!location) {
       return NextResponse.json(
-        { success: false, error: 'citySlug, regionSlug, or runClubSlug is required' },
+        {
+          success: false,
+          error: 'Add your city to your profile to find runs near you.',
+          code: 'missing_athlete_city',
+        },
         { status: 400 }
       );
     }
+
+    const { searchParams } = new URL(request.url);
+    const day = searchParams.get('day') || undefined;
 
     const runs = await getDiscoveryRuns({
       citySlug: location.citySlug,
       regionSlug: location.regionSlug,
       day,
-      runClubSlug: location.runClubSlug,
     });
 
     return NextResponse.json({
       success: true,
       runs,
+      scope: location,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error('Error fetching discovery runs:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch discovery runs', details: error?.message },
+      { success: false, error: 'Failed to fetch discovery runs', details: message },
       { status: 500 }
     );
   }

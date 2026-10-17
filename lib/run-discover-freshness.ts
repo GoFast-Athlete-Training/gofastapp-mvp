@@ -120,7 +120,21 @@ export function runCalendarStartMs(run: RunWithStartTime): number | null {
 }
 
 /**
- * Discover freshness: future calendar days always show; same-day runs hide
+ * Calendar-day gate for Find a Run. Today stays visible all day.
+ * startsAt is not read here.
+ */
+export function isRunOnOrAfterToday(
+  run: Pick<RunWithStartTime, 'date' | 'timezone'>,
+  now: Date = new Date()
+): boolean {
+  const timeZone = resolveRunTimezone(run);
+  const todayKey = todayKeyInTimezone(now, timeZone);
+  const runKey = runCalendarDayKey(run);
+  return runKey >= todayKey;
+}
+
+/**
+ * Public-list freshness: future calendar days always show; same-day runs hide
  * after local start time + grace unless no start time is set (keep visible all day).
  */
 export function isRunStillUpcomingForDiscover(

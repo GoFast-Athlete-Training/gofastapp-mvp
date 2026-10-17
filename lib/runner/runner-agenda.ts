@@ -135,10 +135,12 @@ export async function fetchRunnerAgendaForAthlete(
     };
   });
 
+  const upcomingRuns = joinedRuns.filter((run) => run.dateKey >= todayKey);
+
   const allItems = buildRunnerAgenda({
     todayKey,
     planSessions: [],
-    joinedRuns,
+    joinedRuns: upcomingRuns,
   });
 
   const hostedItems: RunnerAgendaItem[] = [];

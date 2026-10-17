@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   athleteCityToSlug,
   citySlugsForRegion,
+  discoveryScopeForAthleteCity,
   DMV_REGION_SLUG,
   inferRegionSlugFromCitySlug,
 } from './region-slug';
@@ -18,6 +19,16 @@ test('normalizes athlete Washington DC variants to dc', () => {
   assert.equal(athleteCityToSlug('Washington', 'DC'), 'dc');
   assert.equal(athleteCityToSlug('Washington DC'), 'dc');
   assert.equal(athleteCityToSlug('Arlington', 'VA'), 'arlington');
+});
+
+test('discovery scope expands DC athlete to DMV region', () => {
+  assert.deepEqual(discoveryScopeForAthleteCity('Washington', 'DC'), {
+    regionSlug: DMV_REGION_SLUG,
+  });
+  assert.deepEqual(discoveryScopeForAthleteCity('Oakland', 'CA'), {
+    citySlug: 'oakland-ca',
+  });
+  assert.equal(discoveryScopeForAthleteCity(null), null);
 });
 
 test('lists city slugs for DMV region', () => {

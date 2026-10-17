@@ -1,5 +1,9 @@
 import { prisma } from './prisma';
-import { isRunStillUpcomingForDiscover } from '@/lib/run-discover-freshness';
+import {
+  isRunOnOrAfterToday,
+  isRunStillUpcomingForDiscover,
+} from '@/lib/run-discover-freshness';
+import { DMV_REGION_SLUG } from '@/lib/region-slug';
 import { getDayOfWeekFromDate } from '@/lib/utils/dayOfWeek';
 import { sameDayOfWeek } from '@/lib/utils/dayOfWeekConverter';
 
@@ -172,11 +176,19 @@ function mapCityRunForResponse(run: Awaited<ReturnType<typeof queryCityRunsForDi
   };
 }
 
+function normalizeDiscoverRegionSlug(regionSlug: string | undefined): string | undefined {
+  if (!regionSlug) return regionSlug;
+  const r = regionSlug.trim().toLowerCase();
+  if (r === 'dc') return DMV_REGION_SLUG;
+  return regionSlug;
+}
+
 async function buildCityRunDiscoverWhere(filters: GetRunsFilters, mode: GetRunsMode) {
   const andParts: Record<string, unknown>[] = [];
 
-  if (filters.regionSlug) {
-    andParts.push({ regionSlug: filters.regionSlug });
+  const regionSlug = normalizeDiscoverRegionSlug(filters.regionSlug);
+  if (regionSlug) {
+    andParts.push({ regionSlug });
   } else if (filters.citySlug) {
     andParts.push({ citySlug: filters.citySlug });
   }
@@ -253,18 +265,18 @@ async function queryCityRunsForDiscover(filters: GetRunsFilters, mode: GetRunsMo
   }
 
   const now = new Date();
+  const clockFields = (run: (typeof allRuns)[number]) => ({
+    date: run.date,
+    startsAt: run.startsAt,
+    startTimeHour: run.startTimeHour,
+    startTimeMinute: run.startTimeMinute,
+    startTimePeriod: run.startTimePeriod,
+    timezone: run.timezone,
+  });
   let filteredRuns = allRuns.filter((run) =>
-    isRunStillUpcomingForDiscover(
-      {
-        date: run.date,
-        startsAt: run.startsAt,
-        startTimeHour: run.startTimeHour,
-        startTimeMinute: run.startTimeMinute,
-        startTimePeriod: run.startTimePeriod,
-        timezone: run.timezone,
-      },
-      now
-    )
+    mode === 'discovery'
+      ? isRunOnOrAfterToday(clockFields(run), now)
+      : isRunStillUpcomingForDiscover(clockFields(run), now)
   );
 
   if (filters.day && filters.day !== 'All Days') {

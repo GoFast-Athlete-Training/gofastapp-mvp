@@ -149,9 +149,9 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
             </Suspense>
 
             <Link
-              href="/runner"
+              href="/myruns"
               className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
-              title="My run agenda"
+              title="My runs"
             >
               <Footprints className="h-5 w-5" />
             </Link>

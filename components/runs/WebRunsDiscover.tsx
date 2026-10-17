@@ -1,14 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Calendar, Clock, Copy, ExternalLink, MapPin, Users } from "lucide-react";
+import { Calendar, Clock, Copy, ExternalLink, MapPin } from "lucide-react";
 import api from "@/lib/api";
-import { athleteCityToSlug, DC_REGION_SLUG } from "@/lib/region-slug";
 import { getPublicRunContentUrl } from "@/lib/publicRunUrl";
 import { dateKeyFromIsoOrDateKey } from "@/lib/calendar-date";
-
-type DiscoverMode = "schedule" | "club";
+import { isAxiosError } from "axios";
 
 type DiscoveryRun = {
   id: string;
@@ -25,21 +23,6 @@ type DiscoveryRun = {
   published?: boolean;
   runClub?: { slug: string; name: string; logoUrl: string | null; city: string | null } | null;
 };
-
-type DiscoveryRunClub = {
-  id: string;
-  slug: string;
-  name: string;
-  logoUrl: string | null;
-  city: string | null;
-  upcomingRunCount: number;
-  nextRun: DiscoveryRun | null;
-  runs: DiscoveryRun[];
-};
-
-type DiscoverScope =
-  | { mode: "city"; citySlug: string }
-  | { mode: "region"; regionSlug: string };
 
 function formatRunTime(run: DiscoveryRun): string {
   const h = run.startTimeHour;
@@ -156,177 +139,76 @@ function RunDiscoverCard({ run }: { run: DiscoveryRun }) {
 }
 
 export default function WebRunsDiscover() {
-  const [mode, setMode] = useState<DiscoverMode>("schedule");
   const [runs, setRuns] = useState<DiscoveryRun[]>([]);
-  const [clubs, setClubs] = useState<DiscoveryRunClub[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [scope, setScope] = useState<DiscoverScope>({ mode: "region", regionSlug: DC_REGION_SLUG });
-  const [athleteCitySlug, setAthleteCitySlug] = useState<string>("unknown");
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await api.post<{
-          success?: boolean;
-          identity?: { city?: string | null; state?: string | null };
-        }>("/athlete/identity", {});
-        const city = res.data?.identity?.city;
-        const state = res.data?.identity?.state;
-        const slug = athleteCityToSlug(city, state);
-        setAthleteCitySlug(slug);
-        if (slug !== "unknown") {
-          setScope({ mode: "city", citySlug: slug });
-        }
-      } catch {
-        /* keep DMV region default */
-      }
-    })();
-  }, []);
-
-  const discoveryParams = useMemo(() => {
-    if (scope.mode === "region") {
-      return { regionSlug: scope.regionSlug };
-    }
-    return { citySlug: scope.citySlug };
-  }, [scope]);
+  const [missingCity, setMissingCity] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setMissingCity(false);
     try {
-      const [runsRes, clubsRes] = await Promise.all([
-        api.get<{ success?: boolean; runs?: DiscoveryRun[] }>("/runs/discovery", {
-          params: discoveryParams,
-        }),
-        api.get<{ success?: boolean; clubs?: DiscoveryRunClub[] }>("/run-clubs/discovery", {
-          params: discoveryParams,
-        }),
-      ]);
+      const runsRes = await api.get<{ success?: boolean; runs?: DiscoveryRun[] }>("/runs/discovery");
       setRuns(Array.isArray(runsRes.data?.runs) ? runsRes.data.runs : []);
-      setClubs(Array.isArray(clubsRes.data?.clubs) ? clubsRes.data.clubs : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load discover runs");
+      if (isAxiosError(e) && e.response?.status === 400) {
+        const body = e.response.data as { code?: string; error?: string };
+        if (body?.code === "missing_athlete_city") {
+          setMissingCity(true);
+          setRuns([]);
+          setError(null);
+          setLoading(false);
+          return;
+        }
+        setError(typeof body?.error === "string" ? body.error : "Could not load runs.");
+      } else {
+        setError(e instanceof Error ? e.message : "Failed to load discover runs");
+      }
       setRuns([]);
-      setClubs([]);
     } finally {
       setLoading(false);
     }
-  }, [discoveryParams]);
+  }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const exploreDmv = () => setScope({ mode: "region", regionSlug: DC_REGION_SLUG });
-  const backToMyCity = () => {
-    if (athleteCitySlug !== "unknown") {
-      setScope({ mode: "city", citySlug: athleteCitySlug });
-    }
-  };
-
   return (
     <section className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Discover group runs</h2>
-          <p className="text-sm text-gray-600 mt-0.5">
-            Club runs you build show here for testing — including before they are published on dcruns.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {scope.mode === "city" ? (
-            <button
-              type="button"
-              onClick={exploreDmv}
-              className="text-sm font-semibold text-sky-700 hover:underline"
-            >
-              Explore DMV area
-            </button>
-          ) : (
-            athleteCitySlug !== "unknown" && (
-              <button
-                type="button"
-                onClick={backToMyCity}
-                className="text-sm font-semibold text-sky-700 hover:underline"
-              >
-                Back to my city
-              </button>
-            )
-          )}
-        </div>
-      </div>
-
-      <div className="flex rounded-lg bg-gray-100 p-1">
-        <button
-          type="button"
-          onClick={() => setMode("schedule")}
-          className={`flex-1 rounded-md py-2 text-sm font-semibold ${
-            mode === "schedule" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"
-          }`}
-        >
-          Schedule
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("club")}
-          className={`flex-1 rounded-md py-2 text-sm font-semibold ${
-            mode === "club" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"
-          }`}
-        >
-          By club
-        </button>
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">Find a run</h2>
+        <p className="text-sm text-gray-600 mt-0.5">
+          Club runs in your region, including drafts you are testing before publishing on dcruns.
+        </p>
       </div>
 
       {loading ? (
         <p className="text-sm text-gray-500 py-8 text-center">Loading runs…</p>
+      ) : missingCity ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-8 text-center space-y-3">
+          <p className="text-gray-700 font-medium">Add your city to find runs near you</p>
+          <p className="text-sm text-gray-500">
+            We use your profile city to show your metro area without loading every city in the country.
+          </p>
+          <Link
+            href="/settings"
+            className="inline-flex rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+          >
+            Update profile
+          </Link>
+        </div>
       ) : error ? (
         <p className="text-sm text-red-600 py-4">{error}</p>
-      ) : mode === "schedule" ? (
-        runs.length === 0 ? (
-          <p className="text-sm text-gray-500 py-6 text-center">
-            No upcoming club runs in this area. Try Explore DMV area or publish a run from Run Manage.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {runs.map((run) => (
-              <RunDiscoverCard key={run.id} run={run} />
-            ))}
-          </div>
-        )
-      ) : clubs.length === 0 ? (
-        <p className="text-sm text-gray-500 py-6 text-center">No run clubs in this area yet.</p>
+      ) : runs.length === 0 ? (
+        <p className="text-sm text-gray-500 py-6 text-center">
+          No upcoming club runs in your area yet. Publish a run from Run Manage or check back soon.
+        </p>
       ) : (
-        <div className="space-y-4">
-          {clubs.map((club) => (
-            <div key={club.id} className="rounded-xl border border-gray-200 bg-white p-4">
-              <div className="flex items-center gap-3 mb-3">
-                {club.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={club.logoUrl} alt="" className="h-12 w-12 rounded-full object-cover" />
-                ) : (
-                  <div className="h-12 w-12 rounded-full bg-sky-100 flex items-center justify-center">
-                    <Users className="h-6 w-6 text-sky-700" />
-                  </div>
-                )}
-                <div>
-                  <h3 className="font-semibold text-gray-900">{club.name}</h3>
-                  <p className="text-xs text-gray-500">
-                    {club.upcomingRunCount} upcoming
-                    {club.city ? ` · ${club.city}` : ""}
-                  </p>
-                </div>
-              </div>
-              {club.runs.length === 0 ? (
-                <p className="text-sm text-gray-500">No upcoming runs on the calendar.</p>
-              ) : (
-                <div className="space-y-3 border-t border-gray-100 pt-3">
-                  {club.runs.map((run) => (
-                    <RunDiscoverCard key={run.id} run={{ ...run, runClub: club }} />
-                  ))}
-                </div>
-              )}
-            </div>
+        <div className="space-y-3">
+          {runs.map((run) => (
+            <RunDiscoverCard key={run.id} run={run} />
           ))}
         </div>
       )}

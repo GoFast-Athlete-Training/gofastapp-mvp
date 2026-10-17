@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { formatCalendarDate, dateKeyFromIsoOrDateKey, dateKeyToLocalNoonDate } from '@/lib/calendar-date';
-import { generateCitySlugFromParts } from '@/lib/parse-google-address';
 import { displayWorkoutListTitle } from '@/lib/training/workout-display-title';
 import WorkoutStructurePreview from '@/components/training/WorkoutStructurePreview';
 import type { CreateCityRunFormWorkout } from '@/components/cityruns/CreateCityRunForm';
@@ -103,25 +102,7 @@ export default function GoFastWithMeInvitePathFork({
     setLoadingRuns(true);
     setLoadError(null);
     try {
-      let citySlug: string | undefined;
-      try {
-        const identityRes = await api.post<{ success?: boolean; identity?: { city?: string | null; state?: string | null } }>(
-          '/athlete/identity'
-        );
-        const identity = identityRes.data?.identity;
-        if (identity?.city) {
-          citySlug = generateCitySlugFromParts(identity.city, identity.state ?? null) || undefined;
-        }
-      } catch {
-        // Discovery still works without city filter.
-      }
-
-      const params: Record<string, string> = {};
-      if (citySlug) params.citySlug = citySlug;
-
-      const { data } = await api.get<{ runs?: InviteDiscoveryRun[] }>('/runs/discovery', {
-        params,
-      });
+      const { data } = await api.get<{ runs?: InviteDiscoveryRun[] }>('/runs/discovery');
       const allRuns = (data?.runs ?? []) as InviteDiscoveryRun[];
       const clubRuns = allRuns.filter((r) => r.runClub != null);
       const nearby = clubRuns.filter((r) => isNearbyRunDate(String(r.date), planDateKey));

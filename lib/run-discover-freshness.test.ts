@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  isRunOnOrAfterToday,
   isRunStillUpcomingForDiscover,
   runCalendarStartMs,
   SAME_DAY_RUN_START_GRACE_MS,
@@ -80,6 +81,20 @@ test('Ballston-style morning run stays visible at 6:30 AM Eastern same day', () 
   // 7:00 AM ET is after grace window — should drop off
   const sevenAmEastern = new Date('2026-07-08T11:00:00.000Z');
   assert.equal(isRunStillUpcomingForDiscover(run, sevenAmEastern), false);
+});
+
+test('Find a Run day gate keeps same calendar day even after startsAt', () => {
+  const run = {
+    date: new Date('2026-10-17T00:00:00.000Z'),
+    startsAt: new Date('2026-10-17T13:00:00.000Z'),
+    startTimeHour: 9,
+    startTimeMinute: 0,
+    startTimePeriod: 'AM',
+    timezone: 'America/New_York',
+  };
+  const lateMorningEt = new Date('2026-10-17T15:00:00.000Z');
+  assert.equal(isRunOnOrAfterToday(run, lateMorningEt), true);
+  assert.equal(isRunStillUpcomingForDiscover(run, lateMorningEt), false);
 });
 
 test('future calendar day runs always stay visible', () => {

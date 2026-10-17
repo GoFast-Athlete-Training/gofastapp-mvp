@@ -41,6 +41,21 @@ export function athleteCityToSlug(
   return toCitySlug(trimmedCity);
 }
 
+/**
+ * Signed-in Find a Run scope. DMV cities expand to the region.
+ * Any other known city stays that city. Unknown city is null.
+ */
+export function discoveryScopeForAthleteCity(
+  city: string | null | undefined,
+  state?: string | null
+): { regionSlug: string } | { citySlug: string } | null {
+  const citySlug = athleteCityToSlug(city, state);
+  if (citySlug === 'unknown') return null;
+  const regionSlug = inferRegionSlugFromCitySlug(citySlug);
+  if (regionSlug) return { regionSlug };
+  return { citySlug };
+}
+
 export function citySlugsForRegion(regionSlug: string | null | undefined): string[] {
   const region = regionSlug?.trim().toLowerCase();
   if (!region) return [];
