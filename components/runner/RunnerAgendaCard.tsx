@@ -1,20 +1,32 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, CheckCircle2, MapPin } from 'lucide-react';
+import { Calendar, CheckCircle2, Copy, ExternalLink, MapPin, Pencil, Trash2 } from 'lucide-react';
 import { formatCalendarDate } from '@/lib/calendar-date';
 import { formatRunTime } from '@/utils/formatTime';
 import type { RunnerAgendaItem } from '@/lib/runner/runner-agenda';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
+import { companyRunLinkSliceUrl } from '@/lib/city-run-public-card-url';
+import api from '@/lib/api';
 
 type RunnerAgendaCardProps = {
   item: RunnerAgendaItem;
   checkingInId: string | null;
   onCheckin: (runId: string) => void;
+  onDeleted?: () => void;
 };
 
-export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: RunnerAgendaCardProps) {
+export default function RunnerAgendaCard({
+  item,
+  checkingInId,
+  onCheckin,
+  onDeleted,
+}: RunnerAgendaCardProps) {
   const run = item.joinedRun;
+  const [copied, setCopied] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   if (!run) return null;
 
   const dateKey = item.dateKey;
@@ -33,14 +45,38 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
   const runSegment = run.slug?.trim() || run.id;
   const runHref = `/cityruntogether/${encodeURIComponent(runSegment)}`;
 
-  const isHost = isHostRsvpRole(run.rsvpRole);
-  const roleLabel = isHost
-    ? 'Run you created'
-    : run.runClub?.name
-      ? run.runClub.name
-      : 'Member';
+  const isCreated = isHostRsvpRole(run.rsvpRole);
+  const membershipBadge = isCreated ? 'Created' : 'Joined';
 
   const headerLabel = item.isToday ? "Today's run" : run.isPast ? 'Past run' : 'Upcoming';
+
+  async function copyInviteLink() {
+    const url = companyRunLinkSliceUrl(runSegment);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  async function deleteRun() {
+    if (
+      !window.confirm(`Delete "${run.title}"? This removes the invite and cannot be undone.`)
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api.delete(`/me/hosted-run-invites/${encodeURIComponent(run.id)}`);
+      onDeleted?.();
+    } catch (err) {
+      console.error('Delete run failed:', err);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200/80 space-y-4">
@@ -62,7 +98,15 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
       </div>
 
       <div className="rounded-xl border border-sky-200 bg-sky-50/40 px-4 py-3 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">{roleLabel}</p>
+        <span
+          className={
+            isCreated
+              ? 'inline-flex rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-orange-800'
+              : 'inline-flex rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-sky-900'
+          }
+        >
+          {membershipBadge}
+        </span>
         <p className="font-semibold text-gray-900">{run.title}</p>
         <p className="text-sm text-gray-600 flex items-start gap-1.5">
           <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-gray-400" aria-hidden />
@@ -83,7 +127,7 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {!isHost && run.supportsCheckin && run.isLive && !run.hasCheckin ? (
+        {!isCreated && run.supportsCheckin && run.isLive && !run.hasCheckin ? (
           <button
             type="button"
             disabled={checkingInId !== null}
@@ -93,12 +137,41 @@ export default function RunnerAgendaCard({ item, checkingInId, onCheckin }: Runn
             {checkingInId === run.id ? 'Checking in…' : 'Check in'}
           </button>
         ) : null}
+        <button
+          type="button"
+          onClick={() => void copyInviteLink()}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
+        >
+          <Copy className="h-4 w-4" />
+          {copied ? 'Copied' : 'Copy invite link'}
+        </button>
+        {isCreated ? (
+          <Link
+            href={`/host-a-run/${encodeURIComponent(run.id)}`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+          >
+            <Pencil className="h-4 w-4" />
+            Edit
+          </Link>
+        ) : null}
         <Link
           href={runHref}
-          className="inline-flex rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
         >
-          Open run group
+          <ExternalLink className="h-4 w-4" />
+          Open run page
         </Link>
+        {isCreated ? (
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={() => void deleteRun()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50"
+          >
+            <Trash2 className="h-4 w-4" />
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+        ) : null}
       </div>
     </article>
   );

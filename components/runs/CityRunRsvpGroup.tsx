@@ -9,10 +9,8 @@ import CityRunChatSection from '@/components/runs/CityRunChatSection';
 import CityRunDetailsSection, { CityRunGoingBanner } from '@/components/runs/CityRunDetailsSection';
 import CityRunMobileTabs from '@/components/runs/CityRunMobileTabs';
 import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
-import CityRunWorkoutCard, { type PlannedWorkoutSummary } from '@/components/runs/CityRunWorkoutCard';
 import {
   isRunPast,
-  runShouldShowWorkoutPrescribe,
   type CityRunDetails,
   type CityRunRsvp,
 } from '@/components/runs/city-run-types';
@@ -57,7 +55,7 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
   );
   const isHost = isHostRsvpRole(viewerRsvpRole);
   const isIndividual = run.cityRunType === 'INDIVIDUAL';
-  const backHref = '/gorun';
+  const backHref = isHost ? '/gorun' : '/myruns';
   const backLabel = isHost ? 'Run' : 'My Runs';
   const socialRun = hasSocialRunLifecycle(run);
 
@@ -74,7 +72,6 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
     }
   };
 
-  const showWorkoutPrescribe = runShouldShowWorkoutPrescribe(run);
   const shellMax = isIndividual ? 'max-w-4xl' : 'max-w-6xl';
 
   return (
@@ -97,20 +94,12 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
           onCheckin={() => void handleCheckin()}
           viewerRsvpRole={viewerRsvpRole}
           allowCheckin={!isHost && socialRun}
+          hideWorkoutPrescribe
         />
 
         <div className="hidden lg:block space-y-3">
           <CityRunGoingBanner rsvpRole={viewerRsvpRole} />
           {isHost ? <CityRunHostActions cityRunId={run.id} /> : null}
-
-          {showWorkoutPrescribe ? (
-            <CityRunWorkoutCard
-              workoutId={run.workoutId}
-              workout={run.workout}
-              plannedWorkout={run.plannedWorkout as PlannedWorkoutSummary | null | undefined}
-              workoutDescription={run.workoutDescription}
-            />
-          ) : null}
 
           <div
             className={
@@ -124,13 +113,9 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
             </div>
             <div className="space-y-3">
               <CityRunPeopleSection rsvps={rsvps} sticky />
-              {isIndividual ? null : (
-                <CityRunChatSection runId={run.id} variant="sidebar-square" />
-              )}
+              <CityRunChatSection runId={run.id} variant="sidebar-square" />
             </div>
           </div>
-
-          {isIndividual ? <CityRunChatSection runId={run.id} /> : null}
         </div>
       </div>
     </div>

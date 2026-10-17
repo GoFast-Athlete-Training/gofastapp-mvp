@@ -6,7 +6,8 @@ import {
 import { hasSocialRunLifecycle } from '@/lib/city-run-type';
 import { localTodayKey, ymdFromDate } from '@/lib/training/plan-utils';
 import { prisma } from '@/lib/prisma';
-import { isHostRsvpRole, isMemberRsvpRole, RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
+import { isHostRsvpRole, RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
+import { isAttendingCityRunRsvp } from '@/lib/city-run/rsvp-attendance';
 import {
   buildRunnerAgenda,
   type RunnerAgendaItem,
@@ -66,10 +67,6 @@ const cityRunSelect = {
     select: { id: true, checkedInAt: true },
   },
 } as const;
-
-function isOnRunByRole(role: string | null | undefined): boolean {
-  return isHostRsvpRole(role) || isMemberRsvpRole(role);
-}
 
 function mapCityRunToJoinedRun(
   run: {
@@ -170,7 +167,7 @@ export async function fetchRunnerAgendaForAthlete(
     take: 80,
   });
 
-  const onRunRsvps = rsvps.filter((r) => isOnRunByRole(r.role));
+  const onRunRsvps = rsvps.filter((r) => isAttendingCityRunRsvp(r));
   const rsvpRunIds = new Set(onRunRsvps.map((r) => r.runId));
 
   const createdWithoutRsvp = await prisma.city_runs.findMany({
@@ -210,11 +207,7 @@ export async function fetchRunnerAgendaForAthlete(
     .filter((run) => run.dateKey < todayKey)
     .sort((a, b) => b.dateKey.localeCompare(a.dateKey));
 
-  const allItems = buildRunnerAgenda({
-    todayKey,
-    planSessions: [],
-    joinedRuns: upcomingRuns,
-  });
+  const allItems = upcomingRuns.map((run) => joinedRunToAgendaItem(run));
 
   const hostedItems: RunnerAgendaItem[] = [];
   const memberItems: RunnerAgendaItem[] = [];

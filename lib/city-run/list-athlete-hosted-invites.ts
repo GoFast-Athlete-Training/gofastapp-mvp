@@ -1,7 +1,10 @@
 import prisma from "@/lib/prisma";
 import { buildJoinRunSignupUrl } from "@/lib/host-run-rsvp";
 import { isCreatedInviteCityRun } from "@/lib/city-run/is-created-invite-city-run";
-import { cityRunPublicCardUrl } from "@/lib/city-run-public-card-url";
+import {
+  cityRunPublicCardUrl,
+  companyRunLinkSliceUrl,
+} from "@/lib/city-run-public-card-url";
 
 export type AthleteHostedRunInvite = {
   id: string;
@@ -74,7 +77,7 @@ function mapInviteRow(run: InviteRow, startOfToday: Date): AthleteHostedRunInvit
     totalMiles: run.totalMiles,
     pace: run.pace,
     gorunPath,
-    shareUrl: `${base}${gorunPath}`,
+    shareUrl: companyRunLinkSliceUrl(publicKey),
     joinSignupUrl: buildJoinRunSignupUrl(run.slug, base),
     publicCardUrl: cityRunPublicCardUrl(publicKey, run.citySlug, run.id),
     isUpcoming: run.date >= startOfToday,

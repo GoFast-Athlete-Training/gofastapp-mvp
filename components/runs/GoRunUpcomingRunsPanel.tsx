@@ -98,6 +98,7 @@ export default function GoRunUpcomingRunsPanel() {
               item={item}
               checkingInId={checkingInId}
               onCheckin={(runId) => void handleCheckin(runId)}
+              onDeleted={() => void load()}
             />
           ))}
         </div>
@@ -120,6 +121,7 @@ export default function GoRunUpcomingRunsPanel() {
                   item={item}
                   checkingInId={checkingInId}
                   onCheckin={(runId) => void handleCheckin(runId)}
+                  onDeleted={() => void load()}
                 />
               ))}
             </div>

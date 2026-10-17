@@ -114,7 +114,7 @@ export function buildRunnerAgenda(params: {
   }
 
   const isRelevantRun = (run: JoinedRunInput) =>
-    !run.isPast || run.needsWereYouThere || run.isLive;
+    run.dateKey >= todayKey || run.needsWereYouThere || run.isLive;
 
   const isRelevantPlan = (plan: PlanSessionInput) => {
     if (plan.dateKey >= todayKey) return true;

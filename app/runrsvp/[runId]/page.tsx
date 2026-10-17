@@ -8,15 +8,11 @@ import CityRunDetailsSection, {
   CityRunRsvpPanel,
   CityRunSeriesPanel,
 } from '@/components/runs/CityRunDetailsSection';
-import CityRunWorkoutCard from '@/components/runs/CityRunWorkoutCard';
 import { PublicSeeWhosGoingSection } from '@/components/runs/CityRunPeopleSection';
 import { useCityRunPageLoad } from '@/components/runs/useCityRunPageLoad';
 import api from '@/lib/api';
 import { auth } from '@/lib/firebase';
-import {
-  runShouldShowWorkoutPrescribe,
-  type CityRunDetails,
-} from '@/components/runs/city-run-types';
+import type { CityRunDetails } from '@/components/runs/city-run-types';
 import { athleteHasCityRunMembership } from '@/lib/city-run/rsvp-attendance';
 import { cityRunTogetherPath } from '@/lib/city-run/run-nav-paths';
 import { LocalStorageAPI } from '@/lib/localstorage';
@@ -86,7 +82,6 @@ export default function RunRsvpPage() {
   }
 
   const isSeries = run.runSeriesId != null;
-  const hasWorkout = runShouldShowWorkoutPrescribe(run);
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
@@ -114,13 +109,6 @@ export default function RunRsvpPage() {
               onBack={() => router.push('/discoverruns')}
               showHostCard
             />
-            {hasWorkout ? (
-              <CityRunWorkoutCard
-                workoutId={run.workoutId}
-                workout={run.workout}
-                workoutDescription={run.workoutDescription}
-              />
-            ) : null}
           </div>
 
           <div className={`space-y-4 ${isSeries ? '' : 'order-1 lg:order-2'}`}>

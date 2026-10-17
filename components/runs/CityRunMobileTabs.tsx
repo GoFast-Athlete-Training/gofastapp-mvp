@@ -48,6 +48,7 @@ type GoingMobileProps = {
   onCheckin: () => void;
   allowCheckin?: boolean;
   viewerRsvpRole?: string | null;
+  hideWorkoutPrescribe?: boolean;
 };
 
 type PostRunMobileProps = {
@@ -98,7 +99,8 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
 
   if (props.mode === 'pre-rsvp') {
     const isSeries = props.run.runSeriesId != null;
-    const hasWorkout = runShouldShowWorkoutPrescribe(props.run);
+    const hasWorkout =
+      !props.publicRsvpPage && runShouldShowWorkoutPrescribe(props.run);
     return (
       <MobileHubTabs
         tabs={[...PRE_RSVP_TABS]}
@@ -158,7 +160,8 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
   }
 
   if (props.mode === 'going') {
-    const hasWorkout = runShouldShowWorkoutPrescribe(props.run);
+    const hasWorkout =
+      !props.hideWorkoutPrescribe && runShouldShowWorkoutPrescribe(props.run);
     const viewerRsvpRole = props.viewerRsvpRole ?? props.run.currentRSVPRole;
     const isHost = isHostRsvpRole(viewerRsvpRole);
 
