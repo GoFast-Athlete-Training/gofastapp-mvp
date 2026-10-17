@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Compass, Dumbbell, Users } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
+import GoRunUpcomingRunsPanel from "@/components/runs/GoRunUpcomingRunsPanel";
+
 export default function GoRunPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -52,6 +54,8 @@ export default function GoRunPage() {
                 <p className="text-sm text-gray-600 mt-1">Club runs in your region.</p>
               </Link>
             </section>
+
+            <GoRunUpcomingRunsPanel />
           </div>
         </main>
       </div>

@@ -23,11 +23,11 @@ export default function RunnerAgendaCard({
   onCheckin,
   onDeleted,
 }: RunnerAgendaCardProps) {
-  const run = item.joinedRun;
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  if (!run) return null;
+  if (!item.joinedRun) return null;
+  const run = item.joinedRun;
 
   const dateKey = item.dateKey;
   const dateLabel = formatCalendarDate(`${dateKey}T12:00:00.000Z`, {

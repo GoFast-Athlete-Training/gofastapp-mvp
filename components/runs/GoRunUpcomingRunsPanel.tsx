@@ -104,7 +104,7 @@ export default function GoRunUpcomingRunsPanel() {
         </div>
       ) : null}
 
-      {!loading && pastItems.length > 0 ? (
+      {!loading ? (
         <div className="pt-2">
           <button
             type="button"
@@ -114,17 +114,21 @@ export default function GoRunUpcomingRunsPanel() {
             {showPast ? "Hide past runs" : "See past runs"}
           </button>
           {showPast ? (
-            <div className="mt-4 space-y-4">
-              {pastItems.map((item) => (
-                <RunnerAgendaCard
-                  key={item.id}
-                  item={item}
-                  checkingInId={checkingInId}
-                  onCheckin={(runId) => void handleCheckin(runId)}
-                  onDeleted={() => void load()}
-                />
-              ))}
-            </div>
+            pastItems.length > 0 ? (
+              <div className="mt-4 space-y-4">
+                {pastItems.map((item) => (
+                  <RunnerAgendaCard
+                    key={item.id}
+                    item={item}
+                    checkingInId={checkingInId}
+                    onCheckin={(runId) => void handleCheckin(runId)}
+                    onDeleted={() => void load()}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-gray-500">No past runs on your list yet.</p>
+            )
           ) : null}
         </div>
       ) : null}
