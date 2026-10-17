@@ -10,6 +10,7 @@ export {
 
 export const RUN_MANAGE_SERIES_PATH = '/runmanage/series';
 export const RUN_MANAGE_CLUBS_PATH = '/runmanage/clubs';
+export const RUN_MANAGE_ALL_RUNS_PATH = '/runmanage/all-runs';
 
 export function runManageTypePath(bucket: CockpitBucket): string {
   return `/runmanage/types/${bucket}`;
