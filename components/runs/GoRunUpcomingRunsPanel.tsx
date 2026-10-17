@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import RunnerAgendaCard from "@/components/runner/RunnerAgendaCard";
+import GoRunPastSections from "@/components/runs/GoRunPastSections";
+import { pastGroupRunItems } from "@/lib/runner/past-run-sections";
 import api from "@/lib/api";
 import type { RunnerAgendaItem, RunnerAgendaPayload } from "@/lib/runner/runner-agenda";
 
@@ -12,7 +14,6 @@ export default function GoRunUpcomingRunsPanel() {
   const [agenda, setAgenda] = useState<RunnerAgendaPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
-  const [showPast, setShowPast] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -52,7 +53,8 @@ export default function GoRunUpcomingRunsPanel() {
 
   const items: RunnerAgendaItem[] = agenda?.items ?? [];
   const pastItems: RunnerAgendaItem[] = agenda?.pastItems ?? [];
-  const empty = !loading && items.length === 0 && pastItems.length === 0;
+  const pastGroupCount = pastGroupRunItems(pastItems).length;
+  const empty = !loading && items.length === 0 && pastGroupCount === 0;
 
   return (
     <section className="space-y-4 border-t border-gray-200 pt-8" aria-label="My upcoming runs">
@@ -104,34 +106,7 @@ export default function GoRunUpcomingRunsPanel() {
         </div>
       ) : null}
 
-      {!loading ? (
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={() => setShowPast((v) => !v)}
-            className="text-sm font-semibold text-sky-700 hover:text-sky-800"
-          >
-            {showPast ? "Hide past runs" : "See past runs"}
-          </button>
-          {showPast ? (
-            pastItems.length > 0 ? (
-              <div className="mt-4 space-y-4">
-                {pastItems.map((item) => (
-                  <RunnerAgendaCard
-                    key={item.id}
-                    item={item}
-                    checkingInId={checkingInId}
-                    onCheckin={(runId) => void handleCheckin(runId)}
-                    onDeleted={() => void load()}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-gray-500">No past runs on your list yet.</p>
-            )
-          ) : null}
-        </div>
-      ) : null}
+      {!loading ? <GoRunPastSections /> : null}
     </section>
   );
 }

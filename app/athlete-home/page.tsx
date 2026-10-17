@@ -31,7 +31,6 @@ import RunClubLeaderHomeCard from '@/components/runclub/leader/RunClubLeaderHome
 import type { RaceCompleteAnalysis } from '@/components/athlete/RaceCompleteModal';
 import Image from 'next/image';
 import api from '@/lib/api';
-import { buildPostRunCtaCopy } from '@/lib/city-run-copy';
 import { formatCalendarDate } from '@/lib/calendar-date';
 import Link from 'next/link';
 import {
@@ -269,21 +268,6 @@ function raceDateToIsoString(rd: string | Date | null | undefined): string | nul
   }
 }
 
-const CITY_RECAP_DISMISS_STORAGE_KEY = 'athleteHomeDismissedCityRecapRunIds';
-
-function readDismissedCityRecapRunIdsFromStorage(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    const raw = localStorage.getItem(CITY_RECAP_DISMISS_STORAGE_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw) as unknown;
-    if (!Array.isArray(arr)) return new Set();
-    return new Set(arr.filter((x): x is string => typeof x === 'string'));
-  } catch {
-    return new Set();
-  }
-}
-
 export default function AthleteHomePage() {
   const router = useRouter();
   const [athlete, setAthlete] = useState<any>(null);
@@ -316,11 +300,6 @@ export default function AthleteHomePage() {
   const [primaryRaceResultHydrated, setPrimaryRaceResultHydrated] = useState(false);
   const [logResultOpen, setLogResultOpen] = useState(false);
   const [raceCompleteModalOpen, setRaceCompleteModalOpen] = useState(false);
-  const [myPastRuns, setMyPastRuns] = useState<GoingRunRow[]>([]);
-  const [dismissedRecapRunIds, setDismissedRecapRunIds] = useState<Set<string>>(
-    () => readDismissedCityRecapRunIdsFromStorage()
-  );
-
   const loadHome = useCallback(async () => {
     const athleteId = LocalStorageAPI.getAthleteId();
     if (!athleteId) {
@@ -356,7 +335,7 @@ export default function AthleteHomePage() {
       return;
     }
 
-    const [goalsRes, upcomingRes, paceRes, goingRes, lastActivityRes, raceSignupsRes, pastRunsRes] =
+    const [goalsRes, upcomingRes, paceRes, goingRes, lastActivityRes, raceSignupsRes] =
       await Promise.allSettled([
         api.get('/goals?status=ALL'),
         api.get('/training/upcoming'),
@@ -364,7 +343,6 @@ export default function AthleteHomePage() {
         api.get('/me/my-going-runs'),
         api.get('/me/last-activity'),
         api.get('/race-signups'),
-        api.get('/me/my-past-runs'),
       ]);
 
     let pickedPrimary: any = null;
@@ -439,13 +417,6 @@ export default function AthleteHomePage() {
       setMyGoingRuns(Array.isArray(runs) ? runs : []);
     } else {
       setMyGoingRuns([]);
-    }
-
-    if (pastRunsRes.status === 'fulfilled') {
-      const runs = pastRunsRes.value.data?.runs;
-      setMyPastRuns(Array.isArray(runs) ? runs : []);
-    } else {
-      setMyPastRuns([]);
     }
 
     if (paceRes.status === 'fulfilled') {
@@ -877,35 +848,6 @@ export default function AthleteHomePage() {
     upcomingRaceSignupForHome != null &&
     daysUntilUpcomingRace === 1;
 
-  const cityRecapRun =
-    myPastRuns.find((r) => !dismissedRecapRunIds.has(r.id)) ?? null;
-  const cityRecapCopy = cityRecapRun
-    ? buildPostRunCtaCopy({
-        runClub: cityRecapRun.runClub,
-        runTitle: cityRecapRun.title,
-        runDate: cityRecapRun.date,
-        ctaTarget: 'checkin',
-      })
-    : null;
-
-  const dismissCityRecapBanner = (runId: string) => {
-    setDismissedRecapRunIds((prev) => {
-      const next = new Set(prev);
-      next.add(runId);
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(
-            CITY_RECAP_DISMISS_STORAGE_KEY,
-            JSON.stringify([...next])
-          );
-        } catch {
-          /* ignore */
-        }
-      }
-      return next;
-    });
-  };
-
   const cardFindRun =
     'block rounded-xl border-2 border-sky-200 bg-sky-50/70 p-5 shadow-sm hover:border-sky-300 hover:shadow-md transition-all h-full';
   const cardTraining =
@@ -1308,48 +1250,6 @@ export default function AthleteHomePage() {
               />
             ) : null}
 
-
-            {cityRecapRun ? (
-              <div className="mb-4 rounded-2xl border-2 border-amber-400/80 bg-gradient-to-br from-amber-50 to-orange-50/90 p-4 sm:p-5 shadow-sm">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex gap-3 min-w-0">
-                    <MessageCircle
-                      className="h-10 w-10 shrink-0 text-amber-600"
-                      strokeWidth={1.75}
-                      aria-hidden
-                    />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-900/90">
-                        Run look back
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900 leading-snug">
-                        {cityRecapCopy?.headline ?? 'Were you at your run?'}
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {cityRecapCopy?.subline ?? 'See who showed up and share how it felt.'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 shrink-0 sm:flex-col sm:items-end">
-                    <Link
-                      href={`/gorun/${cityRecapRun.id}`}
-                      className="inline-flex items-center justify-center rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white shadow hover:bg-amber-700 w-full sm:w-auto"
-                    >
-                      Open
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => dismissCityRecapBanner(cityRecapRun.id)}
-                      className="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-amber-900/80 hover:bg-amber-100/80"
-                      aria-label="Dismiss run look back nudge"
-                    >
-                      <X className="h-4 w-4" aria-hidden />
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
 
             {/* Row 1: Today + Race goal */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">

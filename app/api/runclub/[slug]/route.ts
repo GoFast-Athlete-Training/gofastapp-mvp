@@ -192,7 +192,10 @@ export async function GET(
         where: {
           runClubId: club.id,
           date: { lt: now, gte: windowStart },
-          postRunPublished: true,
+          OR: [
+            { cityRunExecutionStatus: 'RAN' },
+            { postRunPublished: true },
+          ],
         },
         orderBy: { date: 'desc' },
         take: 20,

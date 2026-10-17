@@ -5,6 +5,9 @@ import {
   cityRunPublicCardUrl,
   companyRunLinkSliceUrl,
 } from "@/lib/city-run-public-card-url";
+import { buildCityRunShareText } from "@/lib/city-run/build-run-share-text";
+import { getCityRunRsvpCounts, type CityRunRsvpCounts } from "@/lib/city-run/rsvp-counts";
+import type { CityRunExecutionStatus } from "@prisma/client";
 
 export type AthleteHostedRunInvite = {
   id: string;
@@ -23,6 +26,13 @@ export type AthleteHostedRunInvite = {
   joinSignupUrl: string | null;
   publicCardUrl: string;
   isUpcoming: boolean;
+  cityRunExecutionStatus: CityRunExecutionStatus;
+  executedAt: string | null;
+  canceledAt: string | null;
+  shareText: string;
+  rsvpCounts: CityRunRsvpCounts;
+  plannedWorkoutId: string | null;
+  workoutId: string | null;
 };
 
 function appBaseUrl(): string {
@@ -49,9 +59,17 @@ const inviteSelect = {
   startTimePeriod: true,
   totalMiles: true,
   pace: true,
+  cityRunType: true,
+  cityRunExecutionStatus: true,
+  executedAt: true,
+  canceledAt: true,
   plannedWorkoutId: true,
-  workout: { select: { planId: true } },
+  workoutId: true,
+  description: true,
+  workout: { select: { planId: true, title: true } },
   planned_workouts: { select: { planId: true } },
+  route: { select: { routeDescription: true } },
+  runClub: { select: { name: true } },
 } as const;
 
 type InviteRow = Awaited<
@@ -60,10 +78,22 @@ type InviteRow = Awaited<
   >
 >[number];
 
-function mapInviteRow(run: InviteRow, startOfToday: Date): AthleteHostedRunInvite {
+async function mapInviteRow(
+  run: InviteRow,
+  startOfToday: Date,
+  rsvpCounts: CityRunRsvpCounts,
+): Promise<AthleteHostedRunInvite> {
   const gorunPath = gorunPathForRun(run);
   const base = appBaseUrl();
   const publicKey = run.slug?.trim() || run.id;
+  const routeDescription =
+    run.route?.routeDescription?.trim() || null;
+  const shareText = buildCityRunShareText({
+    runTitle: run.title,
+    routeDescription,
+    cityRunType: run.cityRunType,
+    runClubName: run.runClub?.name ?? null,
+  });
   return {
     id: run.id,
     title: run.title?.trim() || "Run invite",
@@ -80,7 +110,14 @@ function mapInviteRow(run: InviteRow, startOfToday: Date): AthleteHostedRunInvit
     shareUrl: companyRunLinkSliceUrl(publicKey),
     joinSignupUrl: buildJoinRunSignupUrl(run.slug, base),
     publicCardUrl: cityRunPublicCardUrl(publicKey, run.citySlug, run.id),
-    isUpcoming: run.date >= startOfToday,
+    isUpcoming: run.date >= startOfToday && run.cityRunExecutionStatus === "PLANNED",
+    cityRunExecutionStatus: run.cityRunExecutionStatus,
+    executedAt: run.executedAt?.toISOString() ?? null,
+    canceledAt: run.canceledAt?.toISOString() ?? null,
+    shareText,
+    rsvpCounts,
+    plannedWorkoutId: run.plannedWorkoutId,
+    workoutId: run.workoutId,
   };
 }
 
@@ -107,7 +144,8 @@ export async function listAthleteHostedRunInvites(
   const out: AthleteHostedRunInvite[] = [];
   for (const run of rows) {
     if (!isCreatedInviteCityRun(run)) continue;
-    out.push(mapInviteRow(run, startOfToday));
+    const rsvpCounts = await getCityRunRsvpCounts(run.id);
+    out.push(await mapInviteRow(run, startOfToday, rsvpCounts));
     if (out.length >= limit) break;
   }
   return out;
@@ -160,7 +198,6 @@ export async function getAthleteHostedRunInviteForHost(
       meetUpLat: true,
       meetUpLng: true,
       meetUpNote: true,
-      description: true,
       routeNeighborhood: true,
       routeId: true,
       stravaMapUrl: true,
@@ -180,8 +217,9 @@ export async function getAthleteHostedRunInviteForHost(
   if (!run || !isCreatedInviteCityRun(run)) return null;
   const startOfToday = new Date();
   startOfToday.setUTCHours(0, 0, 0, 0);
+  const rsvpCounts = await getCityRunRsvpCounts(run.id);
   return {
-    ...mapInviteRow(run, startOfToday),
+    ...(await mapInviteRow(run as InviteRow, startOfToday, rsvpCounts)),
     meetUpPoint: run.meetUpPoint,
     meetUpStreetAddress: run.meetUpStreetAddress,
     meetUpCity: run.meetUpCity,

@@ -3,7 +3,6 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, CheckCircle2, ExternalLink, MapPin } from "lucide-react";
-import type { IntakeMode } from "@/components/runmanage/intake/IntakeModePicker";
 import GooglePlacesAutocomplete, {
   type GooglePlaceSelectedData,
 } from "@/components/RunCrew/GooglePlacesAutocomplete";
@@ -13,11 +12,31 @@ import {
   generateCitySlugFromParts,
   parseGoogleAddressFromComponents,
 } from "@/lib/parse-google-address";
-import CityRunIntake, { applyIntakePatch } from "@/components/cityruns/CityRunIntake";
 import CityRunPostInviteRouteStep from "@/components/cityruns/CityRunPostInviteRouteStep";
 import { markLastHostedRunForBuildPage } from "@/components/runs/HostedRunInvitesPanel";
 import type { CityRunFromWorkoutSuccess } from "@/components/cityruns/CreateCityRunForm";
-import { PACE_OPTIONS } from "@/lib/runTypes";
+import HostRunWorkoutAttachStep from "@/components/runs/HostRunWorkoutAttachStep";
+import { cityRunTogetherPath } from "@/lib/city-run/run-nav-paths";
+
+export type CityRunMeetupTemplate = {
+  title?: string;
+  description?: string | null;
+  meetUpPoint?: string;
+  meetUpStreetAddress?: string | null;
+  meetUpCity?: string | null;
+  meetUpState?: string | null;
+  meetUpZip?: string | null;
+  meetUpPlaceId?: string | null;
+  meetUpLat?: number | null;
+  meetUpLng?: number | null;
+  meetUpNote?: string | null;
+  routeNeighborhood?: string | null;
+  totalMiles?: number | null;
+  pace?: string | null;
+  startTimeHour?: number | null;
+  startTimeMinute?: number | null;
+  startTimePeriod?: string | null;
+};
 
 function formatMeetupConfirmation(city: string, state: string): string {
   const c = city.trim();
@@ -44,32 +63,53 @@ function hasValidStartTime(hour: string, minute: string, period: "AM" | "PM"): b
   );
 }
 
-type Props = { initialRouteId?: string | null };
+type Props = {
+  initialRouteId?: string | null;
+  initialTemplate?: CityRunMeetupTemplate | null;
+};
 
-export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) {
-  const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
+export default function CityRunMeetupOnlyForm({
+  initialRouteId = null,
+  initialTemplate = null,
+}: Props) {
 
-  const [meetupTitle, setMeetupTitle] = useState("");
+  const [meetupTitle, setMeetupTitle] = useState(initialTemplate?.title ?? "");
   const [meetupDate, setMeetupDate] = useState("");
-  const [startHour, setStartHour] = useState("");
-  const [startMinute, setStartMinute] = useState("");
-  const [startPeriod, setStartPeriod] = useState<"AM" | "PM">("AM");
+  const [startHour, setStartHour] = useState(
+    initialTemplate?.startTimeHour != null ? String(initialTemplate.startTimeHour) : "",
+  );
+  const [startMinute, setStartMinute] = useState(
+    initialTemplate?.startTimeMinute != null ? String(initialTemplate.startTimeMinute) : "",
+  );
+  const [startPeriod, setStartPeriod] = useState<"AM" | "PM">(
+    initialTemplate?.startTimePeriod === "PM" ? "PM" : "AM",
+  );
 
-  const [meetUpPoint, setMeetUpPoint] = useState("");
-  const [meetUpStreetAddress, setMeetUpStreetAddress] = useState("");
-  const [meetUpCity, setMeetUpCity] = useState("");
-  const [meetUpState, setMeetUpState] = useState("");
-  const [meetUpZip, setMeetUpZip] = useState("");
-  const [meetUpPlaceId, setMeetUpPlaceId] = useState<string | null>(null);
-  const [meetUpLat, setMeetUpLat] = useState<number | null>(null);
-  const [meetUpLng, setMeetUpLng] = useState<number | null>(null);
-  const [meetUpPlaceSet, setMeetUpPlaceSet] = useState(false);
+  const [meetUpPoint, setMeetUpPoint] = useState(initialTemplate?.meetUpPoint ?? "");
+  const [meetUpStreetAddress, setMeetUpStreetAddress] = useState(
+    initialTemplate?.meetUpStreetAddress ?? "",
+  );
+  const [meetUpCity, setMeetUpCity] = useState(initialTemplate?.meetUpCity ?? "");
+  const [meetUpState, setMeetUpState] = useState(initialTemplate?.meetUpState ?? "");
+  const [meetUpZip, setMeetUpZip] = useState(initialTemplate?.meetUpZip ?? "");
+  const [meetUpPlaceId, setMeetUpPlaceId] = useState<string | null>(
+    initialTemplate?.meetUpPlaceId ?? null,
+  );
+  const [meetUpLat, setMeetUpLat] = useState<number | null>(initialTemplate?.meetUpLat ?? null);
+  const [meetUpLng, setMeetUpLng] = useState<number | null>(initialTemplate?.meetUpLng ?? null);
+  const [meetUpPlaceSet, setMeetUpPlaceSet] = useState(Boolean(initialTemplate?.meetUpPlaceId));
 
-  const [totalMiles, setTotalMiles] = useState("");
-  const [pace, setPace] = useState("Various");
-  const [meetUpNote, setMeetUpNote] = useState("");
-  const [aboutThisRun, setAboutThisRun] = useState("");
-  const [routeNeighborhood, setRouteNeighborhood] = useState("");
+  const [totalMiles, setTotalMiles] = useState(
+    initialTemplate?.totalMiles != null ? String(initialTemplate.totalMiles) : "",
+  );
+  const [pace, setPace] = useState(initialTemplate?.pace?.trim() || "");
+  const [meetUpNote, setMeetUpNote] = useState(initialTemplate?.meetUpNote ?? "");
+  const [aboutThisRun, setAboutThisRun] = useState(initialTemplate?.description ?? "");
+  const [routeNeighborhood, setRouteNeighborhood] = useState(
+    initialTemplate?.routeNeighborhood ?? "",
+  );
+  const [plannedWorkoutId, setPlannedWorkoutId] = useState<string | null>(null);
+  const [workoutId, setWorkoutId] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,12 +192,15 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
         meetUpNote: meetUpNote.trim() || undefined,
         description: aboutThisRun.trim() || undefined,
         routeNeighborhood: routeNeighborhood.trim() || undefined,
-        pace: pace.trim() && pace !== "Various" ? pace : undefined,
+        pace: pace.trim() ? pace.trim() : undefined,
         totalMiles:
           Number.isFinite(milesNum) && milesNum > 0 ? milesNum : undefined,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
+        plannedWorkoutId: plannedWorkoutId ?? undefined,
+        workoutId: workoutId ?? undefined,
+        routeId: initialRouteId ?? undefined,
       });
       if (data?.cityRunId && data?.path) {
         markLastHostedRunForBuildPage(data.cityRunId);
@@ -200,11 +243,17 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
               {copiedField === "rsvp" ? "Copied" : "Copy invite link"}
             </button>
             <Link
-              href={success.path}
+              href={cityRunTogetherPath(success.slug || success.cityRunId)}
               className="inline-flex items-center gap-2 rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-semibold text-green-900"
             >
               <ExternalLink className="w-4 h-4" />
               Open run page
+            </Link>
+            <Link
+              href={`/host-a-run/${encodeURIComponent(success.cityRunId)}`}
+              className="inline-flex items-center gap-2 rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-semibold text-green-900"
+            >
+              Run dashboard
             </Link>
           </div>
         </div>
@@ -222,43 +271,19 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
 
   return (
     <div className="space-y-5">
-      <CityRunIntake
-        mode={intakeMode}
-        onModeChange={setIntakeMode}
-        onError={setError}
-        onApply={(patch) => {
-          applyIntakePatch(patch, {
-            setTitle: setMeetupTitle,
-            setDate: setMeetupDate,
-            setStartHour,
-            setStartMinute,
-            setStartPeriod,
-            setMeetUpPoint: (v) => {
-              setMeetUpPoint(v);
-              setMeetUpPlaceSet(false);
-            },
-            setTotalMiles,
-            setPace,
-            setDescription: setAboutThisRun,
-            setRouteNeighborhood,
-          });
-        }}
-      />
-
-      {intakeMode === null ? null : (
-        <div className="space-y-5 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+      <div className="space-y-5 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              Meetup details
+              Build the meetup and invite
             </p>
             <p className="text-sm text-gray-600">
-              Confirm meetup from search after paste — we need a Google Places pin for listings.
+              Title, time, and meetup spot — then optional workout and route.
             </p>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              Meetup title *
+              Title *
             </label>
             <input
               type="text"
@@ -341,37 +366,28 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Miles (optional)
-              </label>
-              <input
-                type="number"
-                step={0.1}
-                min={0}
-                value={totalMiles}
-                onChange={(e) => setTotalMiles(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Pace (optional)
-              </label>
-              <select
-                value={pace}
-                onChange={(e) => setPace(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              >
-                {PACE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt === "Various" ? "All paces welcome" : opt}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Short description <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <textarea
+              value={aboutThisRun}
+              onChange={(e) => setAboutThisRun(e.target.value)}
+              rows={2}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
           </div>
+
+          <HostRunWorkoutAttachStep
+            selectedPlannedWorkoutId={plannedWorkoutId}
+            onSelectPlannedWorkoutId={setPlannedWorkoutId}
+            selectedWorkoutId={workoutId}
+            onSelectWorkoutId={setWorkoutId}
+            paceBand={pace}
+            onPaceBandChange={setPace}
+            miles={totalMiles}
+            onMilesChange={setTotalMiles}
+          />
 
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
@@ -401,19 +417,6 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
             />
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              About this run <span className="font-normal text-gray-400">(optional)</span>
-            </label>
-            <textarea
-              value={aboutThisRun}
-              onChange={(e) => setAboutThisRun(e.target.value)}
-              rows={2}
-              placeholder="Why join — early crew, training buddy, social pace."
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-
           {error ? (
             <p className="text-sm text-red-600" role="alert">
               {error}
@@ -429,7 +432,6 @@ export default function CityRunMeetupOnlyForm({ initialRouteId = null }: Props) 
             {busy ? "Creating…" : "Create invite"}
           </button>
         </div>
-      )}
     </div>
   );
 }

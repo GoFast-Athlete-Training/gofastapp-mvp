@@ -1826,6 +1826,10 @@ model city_runs {
   slug                String?              @unique // URL-friendly slug: "title-of-run" (generated from title)
   dayOfWeek           String?
   workflowStatus      RunWorkflowStatus    @default(DEVELOP)
+  /// Did the run happen (host/staff toggle). Not workflowStatus and not the past clock.
+  cityRunExecutionStatus CityRunExecutionStatus @default(PLANNED)
+  executedAt          DateTime?
+  canceledAt          DateTime?
   /// Club/community runs: socialized with the club before go-live. Ignored for non-CLUB cityRunType.
   clubReviewStatus    ClubReviewStatus     @default(draft)
   /// Public discoverability — independent of workflowStatus editorial pipeline.
@@ -3510,6 +3514,12 @@ enum ClubReviewStatus {
   draft
   pending_club_review
   verified
+}
+
+enum CityRunExecutionStatus {
+  PLANNED
+  RAN
+  CANCELED
 }
 
 enum CityRunType {

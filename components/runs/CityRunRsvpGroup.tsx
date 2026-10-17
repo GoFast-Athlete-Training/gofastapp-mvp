@@ -55,7 +55,7 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
   );
   const isHost = isHostRsvpRole(viewerRsvpRole);
   const isIndividual = run.cityRunType === 'INDIVIDUAL';
-  const backHref = isHost ? '/gorun' : '/myruns';
+  const backHref = isHost ? '/host-a-run' : '/myruns';
   const backLabel = isHost ? 'Run' : 'My Runs';
   const socialRun = hasSocialRunLifecycle(run);
 

@@ -47,6 +47,7 @@ export type RunnerJoinedRun = {
   runClub: { slug: string; name: string; logoUrl: string | null } | null;
   runClubId: string | null;
   plannedWorkoutId: string | null;
+  workoutId: string | null;
   plannedWorkoutPreview: RunnerPlannedWorkoutPreview | null;
   rsvpRole: string | null;
   hasCheckin: boolean;
@@ -56,6 +57,7 @@ export type RunnerJoinedRun = {
   isLive: boolean;
   needsWereYouThere: boolean;
   supportsCheckin: boolean;
+  cityRunExecutionStatus: 'PLANNED' | 'RAN' | 'CANCELED';
 };
 
 export type RunnerAgendaItemKind = 'merged' | 'plan-only' | 'joined-run-only';

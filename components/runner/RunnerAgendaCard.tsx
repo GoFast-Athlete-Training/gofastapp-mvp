@@ -8,6 +8,7 @@ import { formatRunTime } from '@/utils/formatTime';
 import type { RunnerAgendaItem } from '@/lib/runner/runner-agenda';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
 import { companyRunLinkSliceUrl } from '@/lib/city-run-public-card-url';
+import { runCompletePath } from '@/lib/city-run/run-nav-paths';
 import api from '@/lib/api';
 
 type RunnerAgendaCardProps = {
@@ -44,6 +45,8 @@ export default function RunnerAgendaCard({
 
   const runSegment = run.slug?.trim() || run.id;
   const runHref = `/cityruntogether/${encodeURIComponent(runSegment)}`;
+  const recapHref = runCompletePath(runSegment);
+  const showRecapCta = run.isPast || run.cityRunExecutionStatus === 'RAN';
 
   const isCreated = isHostRsvpRole(run.rsvpRole);
   const membershipBadge = isCreated ? 'Created' : 'Joined';
@@ -154,13 +157,23 @@ export default function RunnerAgendaCard({
             Edit
           </Link>
         ) : null}
-        <Link
-          href={runHref}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-        >
-          <ExternalLink className="h-4 w-4" />
-          Open run page
-        </Link>
+        {showRecapCta ? (
+          <Link
+            href={recapHref}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
+          >
+            <ExternalLink className="h-4 w-4" />
+            See how the run went
+          </Link>
+        ) : (
+          <Link
+            href={runHref}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Open run page
+          </Link>
+        )}
         {isCreated ? (
           <button
             type="button"

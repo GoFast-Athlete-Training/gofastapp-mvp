@@ -8,6 +8,8 @@ import { localTodayKey, ymdFromDate } from '@/lib/training/plan-utils';
 import { prisma } from '@/lib/prisma';
 import { isHostRsvpRole, RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
 import { isAttendingCityRunRsvp } from '@/lib/city-run/rsvp-attendance';
+import { isCityRunUpcomingForLists } from '@/lib/city-run/execution-status';
+import type { CityRunExecutionStatus } from '@prisma/client';
 import {
   buildRunnerAgenda,
   type RunnerAgendaItem,
@@ -59,6 +61,11 @@ const cityRunSelect = {
   startTimeMinute: true,
   startTimePeriod: true,
   timezone: true,
+  cityRunExecutionStatus: true,
+  workoutId: true,
+  plannedWorkoutId: true,
+  workout: { select: { id: true, title: true, workoutType: true } },
+  plannedWorkout: { select: { id: true, title: true, workoutType: true } },
   runClubId: true,
   runClub: {
     select: { slug: true, name: true, logoUrl: true },
@@ -86,6 +93,11 @@ function mapCityRunToJoinedRun(
     startTimeMinute: number | null;
     startTimePeriod: string | null;
     timezone: string | null;
+    cityRunExecutionStatus: CityRunExecutionStatus;
+    workoutId: string | null;
+    plannedWorkoutId: string | null;
+    workout: { id: string; title: string | null; workoutType: string | null } | null;
+    plannedWorkout: { id: string; title: string | null; workoutType: string | null } | null;
     runClubId: string | null;
     runClub: { slug: string; name: string; logoUrl: string | null } | null;
     city_run_checkins: Array<{ id: string; checkedInAt: Date }>;
@@ -116,8 +128,23 @@ function mapCityRunToJoinedRun(
     timezone: run.timezone,
     runClub: run.runClub,
     runClubId: run.runClubId,
-    plannedWorkoutId: null,
-    plannedWorkoutPreview: null,
+    plannedWorkoutId: run.plannedWorkoutId,
+    plannedWorkoutPreview: run.plannedWorkout
+      ? {
+          id: run.plannedWorkout.id,
+          title: run.plannedWorkout.title?.trim() || run.title,
+          workoutType: run.plannedWorkout.workoutType?.trim() || 'Run',
+          segments: [],
+        }
+      : run.workout
+        ? {
+            id: run.workout.id,
+            title: run.workout.title?.trim() || run.title,
+            workoutType: run.workout.workoutType?.trim() || 'Run',
+            segments: [],
+          }
+        : null,
+    workoutId: run.workoutId,
     rsvpRole,
     hasCheckin: Boolean(checkin),
     checkedInAt: checkin?.checkedInAt.toISOString() ?? null,
@@ -126,6 +153,7 @@ function mapCityRunToJoinedRun(
     isLive: isCityRunLiveForCheckin(clock, nowMs),
     needsWereYouThere: false,
     supportsCheckin: hasSocialRunLifecycle(run),
+    cityRunExecutionStatus: run.cityRunExecutionStatus,
   };
 }
 
@@ -202,9 +230,15 @@ export async function fetchRunnerAgendaForAthlete(
   }
   const deduped = [...byId.values()].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
-  const upcomingRuns = deduped.filter((run) => run.dateKey >= todayKey);
+  const upcomingRuns = deduped.filter(
+    (run) =>
+      run.dateKey >= todayKey && isCityRunUpcomingForLists(run.cityRunExecutionStatus),
+  );
   const pastRuns = deduped
-    .filter((run) => run.dateKey < todayKey)
+    .filter(
+      (run) =>
+        run.dateKey < todayKey || !isCityRunUpcomingForLists(run.cityRunExecutionStatus),
+    )
     .sort((a, b) => b.dateKey.localeCompare(a.dateKey));
 
   const allItems = upcomingRuns.map((run) => joinedRunToAgendaItem(run));

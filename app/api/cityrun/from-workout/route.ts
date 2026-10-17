@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
     }
 
     let workout: Awaited<ReturnType<typeof resolveOwnedWorkoutForCityRunInvite>> = null;
-    let resolvedPlannedWorkoutId: string | null = null;
+    let resolvedPlannedWorkoutId: string | null = plannedWorkoutIdBody?.trim() || null;
 
     if (workoutIdTrimmed) {
       workout = await resolveOwnedWorkoutForCityRunInvite(
@@ -258,24 +258,24 @@ export async function POST(request: NextRequest) {
       resolvedPlannedWorkoutId =
         plannedWorkoutIdBody?.trim() ||
         (workoutTarget?.kind === "planned" ? workoutTarget.plannedWorkoutId : null);
+    }
 
-      if (resolvedPlannedWorkoutId) {
-        const plannedRow = await prisma.planned_workouts.findFirst({
-          where: { id: resolvedPlannedWorkoutId, athleteId: athlete.id },
-          select: { id: true, cityRunId: true },
-        });
-        if (!plannedRow) {
-          return NextResponse.json(
-            { error: "Planned workout not found for this athlete" },
-            { status: 404 }
-          );
-        }
-        if (plannedRow.cityRunId) {
-          return NextResponse.json(
-            { error: "This plan day already has a meetup linked." },
-            { status: 400 }
-          );
-        }
+    if (resolvedPlannedWorkoutId) {
+      const plannedRow = await prisma.planned_workouts.findFirst({
+        where: { id: resolvedPlannedWorkoutId, athleteId: athlete.id },
+        select: { id: true, cityRunId: true },
+      });
+      if (!plannedRow) {
+        return NextResponse.json(
+          { error: "Planned workout not found for this athlete" },
+          { status: 404 }
+        );
+      }
+      if (plannedRow.cityRunId) {
+        return NextResponse.json(
+          { error: "This plan day already has a meetup linked." },
+          { status: 400 }
+        );
       }
     }
 
@@ -566,6 +566,15 @@ export async function POST(request: NextRequest) {
       if (!stamp.ok) {
         return NextResponse.json({ error: stamp.message }, { status: 400 });
       }
+    }
+
+    if (workout?.id) {
+      const { pushWorkoutToGarminForAthlete } = await import(
+        "@/lib/garmin-workouts/push-workout-for-athlete"
+      );
+      void pushWorkoutToGarminForAthlete(athlete.id, workout.id).catch((err) => {
+        console.warn("[cityrun/from-workout] Garmin push skipped:", err);
+      });
     }
 
     await autoRsvpHostRole(run.id, athlete.id);

@@ -10,6 +10,10 @@ import { parseRunTotalMiles } from "@/lib/parse-run-total-miles";
 import { generateCitySlugFromParts } from "@/lib/parse-google-address";
 import prisma from "@/lib/prisma";
 import { upsertIndividualCityRunStampForAthlete } from "@/lib/city-run/individual-city-run-stamp";
+import {
+  executionStatusPatchData,
+  parseCityRunExecutionStatus,
+} from "@/lib/city-run/execution-status";
 
 type PatchBody = {
   title?: string;
@@ -30,6 +34,9 @@ type PatchBody = {
   startTimeHour?: number | string | null;
   startTimeMinute?: number | string | null;
   startTimePeriod?: string | null;
+  cityRunExecutionStatus?: string;
+  postRunNote?: string | null;
+  postRunPhotoUrl?: string | null;
 };
 
 export async function GET(
@@ -94,6 +101,17 @@ export async function PATCH(
     if (!Number.isNaN(d.getTime())) runDate = d;
   }
 
+  const executionPatch =
+    body.cityRunExecutionStatus !== undefined
+      ? parseCityRunExecutionStatus(body.cityRunExecutionStatus)
+      : null;
+  if (body.cityRunExecutionStatus !== undefined && !executionPatch) {
+    return NextResponse.json(
+      { error: "cityRunExecutionStatus must be PLANNED, RAN, or CANCELED" },
+      { status: 400 },
+    );
+  }
+
   await prisma.city_runs.update({
     where: { id: cityRunId.trim() },
     data: {
@@ -138,6 +156,13 @@ export async function PATCH(
       startTimeHour,
       startTimeMinute,
       startTimePeriod,
+      ...(executionPatch ? executionStatusPatchData(executionPatch) : {}),
+      ...(body.postRunNote !== undefined
+        ? { postRunNote: body.postRunNote?.trim() || null }
+        : {}),
+      ...(body.postRunPhotoUrl !== undefined
+        ? { postRunPhotoUrl: body.postRunPhotoUrl?.trim() || null }
+        : {}),
       updatedAt: new Date(),
     },
   });

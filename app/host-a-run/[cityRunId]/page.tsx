@@ -3,6 +3,7 @@
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import CityRunMeetupEditForm from "@/components/cityruns/CityRunMeetupEditForm";
+import HostRunDashboard from "@/components/runs/HostRunDashboard";
 import { use } from "react";
 
 export default function HostARunEditPage({
@@ -18,6 +19,7 @@ export default function HostARunEditPage({
         <AthleteSidebar />
         <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
           <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+            <HostRunDashboard cityRunId={cityRunId} />
             <CityRunMeetupEditForm cityRunId={cityRunId} />
           </div>
         </main>

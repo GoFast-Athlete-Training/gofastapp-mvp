@@ -92,6 +92,11 @@ export async function PATCH(
       const published = patch.postRunPublished === true || patch.postRunPublished === 'true';
       updateData.postRunPublished = published;
       updateData.postRunPublishedAt = published ? new Date() : null;
+      if (published) {
+        updateData.cityRunExecutionStatus = 'RAN';
+        updateData.executedAt = new Date();
+        updateData.canceledAt = null;
+      }
     }
     if (patch.meetUpPoint !== undefined && String(patch.meetUpPoint).trim()) {
       updateData.meetUpPoint = String(patch.meetUpPoint).trim();
