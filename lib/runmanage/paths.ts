@@ -1,3 +1,5 @@
+import type { CockpitBucket } from '@/lib/runmanage/run-cockpit-buckets';
+
 export {
   runManageWelcomePath,
   runManageSignInPath,
@@ -7,6 +9,15 @@ export {
 } from '@/lib/runmanage/door';
 
 export const RUN_MANAGE_SERIES_PATH = '/runmanage/series';
+export const RUN_MANAGE_CLUBS_PATH = '/runmanage/clubs';
+
+export function runManageTypePath(bucket: CockpitBucket): string {
+  return `/runmanage/types/${bucket}`;
+}
+
+export function runManageClubHubPath(clubId: string): string {
+  return `/runmanage/clubs/${encodeURIComponent(clubId.trim())}`;
+}
 
 export type RunInstanceManageMode = "view" | "edit" | "rsvps";
 

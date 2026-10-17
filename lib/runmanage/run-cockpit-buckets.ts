@@ -66,3 +66,7 @@ export const COCKPIT_BUCKET_ORDER: CockpitBucket[] = [
   "shakeout",
   "individual",
 ];
+
+export function isCockpitBucket(value: string): value is CockpitBucket {
+  return (COCKPIT_BUCKET_ORDER as string[]).includes(value);
+}

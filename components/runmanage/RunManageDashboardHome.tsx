@@ -2,29 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Building2,
-  Calendar,
-  CheckCircle,
-  ChevronDown,
-  ChevronUp,
-  Edit,
-  Eye,
-  Flag,
-  MapPin,
-  Plus,
-  Sparkles,
-  Store,
-  User,
-  Users,
-} from "lucide-react";
+import { Calendar, Edit, Eye, MapPin, Plus, Users } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
-import { runManageCreatePath } from "@/lib/runmanage/paths";
+import {
+  runManageCreatePath,
+  runManageTypePath,
+  RUN_MANAGE_CLUBS_PATH,
+  RUN_MANAGE_SERIES_PATH,
+} from "@/lib/runmanage/paths";
 import {
   COCKPIT_BUCKET_META,
   COCKPIT_BUCKET_ORDER,
   cockpitBucketForRun,
-  type CockpitBucket,
 } from "@/lib/runmanage/run-cockpit-buckets";
 import {
   RunManageWeekStrip,
@@ -37,16 +26,7 @@ const REGION_CITY_FILTER_PREFIX = "region:";
 
 interface RunClub {
   id: string;
-  slug: string;
   name: string;
-  logoUrl: string | null;
-  city: string | null;
-}
-
-interface RunBrand {
-  id: string;
-  name: string;
-  logoUrl: string | null;
 }
 
 interface Run {
@@ -56,7 +36,6 @@ interface Run {
   regionSlug?: string | null;
   meetUpPoint: string;
   meetUpCity: string | null;
-  meetUpState: string | null;
   date: string;
   startTimeHour: number | null;
   startTimeMinute: number | null;
@@ -65,23 +44,10 @@ interface Run {
   runClub: RunClub | null;
   runClubId?: string | null;
   runBrandId?: string | null;
-  runBrand?: RunBrand | null;
   cityRunType?: string | null;
   athleteGeneratedId?: string | null;
+  runStoreId?: string | null;
   rsvpCount?: number;
-  stravaMapUrl?: string | null;
-  totalMiles?: number | null;
-}
-
-function getRunCompletion(run: Run): { complete: boolean; missing: string[] } {
-  const missing: string[] = [];
-  if (!run.title?.trim()) missing.push("Title");
-  if (!run.date) missing.push("Date");
-  if (run.startTimeHour == null || run.startTimeMinute == null) missing.push("Time");
-  if (!run.meetUpPoint?.trim()) missing.push("Location");
-  if (run.totalMiles == null || run.totalMiles === 0) missing.push("Miles");
-  if (!run.stravaMapUrl?.trim()) missing.push("Strava URL");
-  return { complete: missing.length === 0, missing };
 }
 
 function formatRunDate(iso: string) {
@@ -104,8 +70,7 @@ function formatTime(hour: number | null, minute: number | null, period: string |
 
 function dateKeyFromRun(run: Run): string {
   if (!run.date) return "";
-  const d = new Date(run.date);
-  return ymdLocal(d);
+  return ymdLocal(new Date(run.date));
 }
 
 function workflowBadgeClass(status: string) {
@@ -115,24 +80,11 @@ function workflowBadgeClass(status: string) {
   return "bg-gray-100 text-gray-700 border-gray-200";
 }
 
-const BUCKET_ICONS: Record<CockpitBucket, typeof Building2> = {
-  club: Building2,
-  individual: User,
-  shakeout: Flag,
-  special: Sparkles,
-  run_store: Store,
-};
-
-type Filter = "all" | "develop" | "pending" | "submitted" | "approved";
-
 export function RunManageDashboardHome() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBucket, setSelectedBucket] = useState<CockpitBucket | null>(null);
   const [selectedDayYmd, setSelectedDayYmd] = useState<string | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
-  const [fullListOpen, setFullListOpen] = useState(false);
-  const [filter, setFilter] = useState<Filter>("all");
   const [selectedCityKey, setSelectedCityKey] = useState<string>("");
   const [selectedRunClubId, setSelectedRunClubId] = useState<string>("");
 
@@ -237,94 +189,26 @@ export function RunManageDashboardHome() {
     return map;
   }, [runsInWeek]);
 
-  const bucketStats = useMemo(() => {
-    const stats: Record<
-      CockpitBucket,
-      { count: number; next: Run | null }
-    > = {
-      club: { count: 0, next: null },
-      individual: { count: 0, next: null },
-      shakeout: { count: 0, next: null },
-      special: { count: 0, next: null },
-      run_store: { count: 0, next: null },
-    };
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-
-    for (const r of scopedRuns) {
-      const bucket = cockpitBucketForRun(r);
-      if (!bucket) continue;
-      stats[bucket].count++;
-    }
-
-    for (const bucket of COCKPIT_BUCKET_ORDER) {
-      const inBucket = scopedRuns
-        .filter((r) => cockpitBucketForRun(r) === bucket && r.date)
-        .filter((r) => new Date(r.date) >= startOfToday)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      stats[bucket].next = inBucket[0] ?? null;
-    }
-
-    return stats;
-  }, [scopedRuns]);
-
-  const cockpitGridRuns = useMemo(() => {
-    let list = scopedRuns;
-    if (selectedBucket) {
-      list = list.filter((r) => cockpitBucketForRun(r) === selectedBucket);
-    }
+  const weekListRuns = useMemo(() => {
+    let list = runsInWeek;
     if (selectedDayYmd) {
       list = list.filter((r) => dateKeyFromRun(r) === selectedDayYmd);
-    } else {
-      list = list.filter((r) => {
-        if (!r.date) return false;
-        const d = new Date(r.date);
-        return d >= weekStart && d < weekEndExclusive;
-      });
     }
     return [...list].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [scopedRuns, selectedBucket, selectedDayYmd, weekStart, weekEndExclusive]);
-
-  const filteredRuns = useMemo(() => {
-    if (filter === "all") return scopedRuns;
-    const target = filter.toUpperCase();
-    return scopedRuns.filter((r) => (r.workflowStatus || "DEVELOP").toUpperCase() === target);
-  }, [scopedRuns, filter]);
-
-  const handleApprove = async (runId: string) => {
-    if (!confirm("Approve this run? It will be marked approved in the editorial workflow.")) {
-      return;
-    }
-    try {
-      const response = await runmanageApi.post(`/api/runs/manage/${runId}/approve`, {});
-      if (response.data.success) {
-        await loadRuns(selectedRunClubId || undefined);
-      }
-    } catch {
-      alert("Failed to approve run. Please try again.");
-    }
-  };
-
-  const toggleBucket = (bucket: CockpitBucket) => {
-    setSelectedBucket((prev) => (prev === bucket ? null : bucket));
-  };
+  }, [runsInWeek, selectedDayYmd]);
 
   const gridTitle = selectedDayYmd
     ? `Runs on ${formatRunDate(selectedDayYmd + "T12:00:00")}`
-    : selectedBucket
-      ? COCKPIT_BUCKET_META[selectedBucket].label
-      : selectedCityKey || selectedRunClubId
-        ? "Filtered week on the calendar"
-        : "This week on the calendar";
+    : selectedCityKey || selectedRunClubId
+      ? "This week (filtered)"
+      : "This week";
 
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Run Manage</h1>
-          <p className="mt-1 text-gray-600">
-            Cockpit by run type — pick a lane, scan the week, drill in when you need the full list.
-          </p>
+          <p className="mt-1 text-gray-600">Week cockpit — scan dated runs, then drill into series or clubs.</p>
         </div>
         <Link
           href={runManageCreatePath()}
@@ -333,6 +217,30 @@ export function RunManageDashboardHome() {
           <Plus className="h-4 w-4" />
           Create run
         </Link>
+      </div>
+
+      <div className="flex flex-wrap gap-2 text-sm">
+        <Link
+          href={RUN_MANAGE_SERIES_PATH}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-sky-800 hover:bg-sky-50"
+        >
+          All series
+        </Link>
+        <Link
+          href={RUN_MANAGE_CLUBS_PATH}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-sky-800 hover:bg-sky-50"
+        >
+          All clubs
+        </Link>
+        {COCKPIT_BUCKET_ORDER.map((bucket) => (
+          <Link
+            key={bucket}
+            href={runManageTypePath(bucket)}
+            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+          >
+            {COCKPIT_BUCKET_META[bucket].label}
+          </Link>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-end gap-4 rounded-xl border border-gray-200 bg-white p-4">
@@ -387,39 +295,6 @@ export function RunManageDashboardHome() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {COCKPIT_BUCKET_ORDER.map((bucket) => {
-          const meta = COCKPIT_BUCKET_META[bucket];
-          const Icon = BUCKET_ICONS[bucket];
-          const { count, next } = bucketStats[bucket];
-          const active = selectedBucket === bucket;
-          return (
-            <button
-              key={bucket}
-              type="button"
-              onClick={() => toggleBucket(bucket)}
-              className={`rounded-xl border-2 p-4 text-left transition-colors ${meta.border} ${meta.bg} ${
-                active ? "ring-2 ring-sky-500 ring-offset-1" : "hover:brightness-[0.98]"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <Icon className="h-5 w-5 text-gray-700" />
-                <span className="text-2xl font-bold text-gray-900">{loading ? "…" : count}</span>
-              </div>
-              <p className="mt-2 text-sm font-semibold text-gray-900">{meta.label}</p>
-              <p className="text-xs text-gray-600">{meta.description}</p>
-              {next ? (
-                <p className="mt-2 truncate text-xs font-medium text-gray-800">
-                  Next: {next.title} · {formatRunDate(next.date)}
-                </p>
-              ) : (
-                <p className="mt-2 text-xs text-gray-500">No upcoming in this lane</p>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
       <RunManageWeekStrip
         weekStart={weekStart}
         runsByDay={runsByDayInWeek}
@@ -439,16 +314,21 @@ export function RunManageDashboardHome() {
         <h2 className="mb-3 text-lg font-semibold text-gray-900">{gridTitle}</h2>
         {loading ? (
           <p className="text-gray-500">Loading runs…</p>
-        ) : cockpitGridRuns.length === 0 ? (
+        ) : weekListRuns.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500">
-            Nothing in this view.{" "}
+            Nothing this week.{" "}
             <Link href={runManageCreatePath()} className="font-medium text-sky-700 hover:underline">
               Create a run
+            </Link>{" "}
+            or build from{" "}
+            <Link href={RUN_MANAGE_SERIES_PATH} className="font-medium text-sky-700 hover:underline">
+              series
             </Link>
+            .
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {cockpitGridRuns.map((run) => {
+            {weekListRuns.map((run) => {
               const status = (run.workflowStatus || "DEVELOP").toUpperCase();
               const bucket = cockpitBucketForRun(run);
               const bucketLabel = bucket ? COCKPIT_BUCKET_META[bucket].label : "Other";
@@ -480,9 +360,6 @@ export function RunManageDashboardHome() {
                       </span>
                     </p>
                     {run.runClub?.name ? <p>{run.runClub.name}</p> : null}
-                    {run.runBrand?.name ? (
-                      <p className="text-emerald-800">Brand: {run.runBrand.name}</p>
-                    ) : null}
                     <p className="inline-flex items-center gap-1 text-xs text-gray-500">
                       <Users className="h-3.5 w-3.5" />
                       {run.rsvpCount ?? 0} RSVPs
@@ -507,127 +384,6 @@ export function RunManageDashboardHome() {
             })}
           </div>
         )}
-      </section>
-
-      <section className="rounded-xl border border-gray-200 bg-gray-50/80">
-        <button
-          type="button"
-          onClick={() => setFullListOpen((o) => !o)}
-          className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
-        >
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">All instances</h2>
-            <p className="text-sm text-gray-600">
-              Full workflow list with View, Edit, and Approve ({runs.length} total)
-            </p>
-          </div>
-          {fullListOpen ? (
-            <ChevronUp className="h-5 w-5 shrink-0 text-gray-500" />
-          ) : (
-            <ChevronDown className="h-5 w-5 shrink-0 text-gray-500" />
-          )}
-        </button>
-
-        {fullListOpen ? (
-          <div className="border-t border-gray-200 px-5 pb-5 pt-4">
-            <div className="mb-4 flex flex-wrap gap-2">
-              {(["all", "develop", "pending", "submitted", "approved"] as const).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFilter(f)}
-                  className={`rounded-full px-3 py-1 text-sm capitalize ${
-                    filter === f
-                      ? "bg-sky-600 text-white"
-                      : "bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-
-            {loading ? (
-              <p className="text-gray-500">Loading…</p>
-            ) : filteredRuns.length === 0 ? (
-              <p className="text-center text-gray-500">No runs match this filter.</p>
-            ) : (
-              <div className="space-y-3">
-                {filteredRuns.map((run) => {
-                  const completion = getRunCompletion(run);
-                  const status = (run.workflowStatus || "DEVELOP").toUpperCase();
-                  return (
-                    <div
-                      key={run.id}
-                      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-1 flex flex-wrap items-center gap-2">
-                            <h3 className="text-lg font-semibold text-gray-900">{run.title}</h3>
-                            <span
-                              className={`rounded-full border px-2 py-0.5 text-xs ${workflowBadgeClass(status)}`}
-                            >
-                              {status.charAt(0) + status.slice(1).toLowerCase()}
-                            </span>
-                            {!completion.complete ? (
-                              <span className="text-xs text-amber-700">
-                                Missing: {completion.missing.join(", ")}
-                              </span>
-                            ) : null}
-                          </div>
-                          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                            <span className="inline-flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              {formatRunDate(run.date)} ·{" "}
-                              {formatTime(
-                                run.startTimeHour,
-                                run.startTimeMinute,
-                                run.startTimePeriod
-                              )}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
-                              {run.meetUpPoint}
-                            </span>
-                            {run.runClub ? <span>{run.runClub.name}</span> : null}
-                            <span className="inline-flex items-center gap-1">
-                              <Users className="h-4 w-4" />
-                              {run.rsvpCount ?? 0} RSVPs
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Link
-                            href={`/runmanage/runs/${run.id}?mode=view`}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
-                          >
-                            <Eye className="h-4 w-4" /> View
-                          </Link>
-                          <Link
-                            href={`/runmanage/runs/${run.id}?mode=edit`}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
-                          >
-                            <Edit className="h-4 w-4" /> Edit
-                          </Link>
-                          {status !== "APPROVED" ? (
-                            <button
-                              type="button"
-                              onClick={() => void handleApprove(run.id)}
-                              className="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-700"
-                            >
-                              <CheckCircle className="h-4 w-4" /> Approve
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ) : null}
       </section>
     </div>
   );

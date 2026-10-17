@@ -5,6 +5,7 @@ import {
 } from "@/lib/advance-club-instances";
 import { prisma } from "@/lib/prisma";
 import { localCalendarYmd } from "@/lib/date-local";
+import { compareSeriesByWeekdayTime } from "@/lib/runmanage/sort-series-by-weekday";
 
 const WEEKDAY_TO_JS: Record<string, number> = {
   SUNDAY: 0,
@@ -176,15 +177,7 @@ export async function buildOperationalSeriesList(opts?: {
     });
   }
 
-  rows.sort((a, b) => {
-    const rank = (s: SeriesStoplight) =>
-      s === "build_next" ? 0 : s === "build_first" ? 1 : 2;
-    const d = rank(a.stoplight) - rank(b.stoplight);
-    if (d !== 0) return d;
-    const club = (a.clubName ?? "").localeCompare(b.clubName ?? "");
-    if (club !== 0) return club;
-    return a.dayOfWeek.localeCompare(b.dayOfWeek);
-  });
+  rows.sort((a, b) => compareSeriesByWeekdayTime(a, b));
 
   return rows;
 }

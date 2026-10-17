@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useRunManageAuth } from "@/components/runmanage/RunManageProviders";
-import { RUN_MANAGE_SERIES_PATH } from "@/lib/runmanage/paths";
+import { RUN_MANAGE_CLUBS_PATH, RUN_MANAGE_SERIES_PATH } from "@/lib/runmanage/paths";
 
 export function RunManageShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -45,7 +45,17 @@ export function RunManageShell({ children }: { children: ReactNode }) {
                     : "text-gray-600 hover:text-gray-900"
                 }
               >
-                Run series
+                All series
+              </Link>
+              <Link
+                href={RUN_MANAGE_CLUBS_PATH}
+                className={
+                  pathname === RUN_MANAGE_CLUBS_PATH || pathname?.startsWith(`${RUN_MANAGE_CLUBS_PATH}/`)
+                    ? "font-medium text-sky-700"
+                    : "text-gray-600 hover:text-gray-900"
+                }
+              >
+                All clubs
               </Link>
               <Link
                 href="/runmanage/runs/new"
