@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const result = await searchSponsorManageBrands(request, auth.staffId, { q });
+  const brandType = request.nextUrl.searchParams.get("brandType")?.trim() || undefined;
+  const result = await searchSponsorManageBrands(request, auth.staffId, { q, brandType });
   if (!result.ok) {
     return NextResponse.json({ success: false, error: result.error }, { status: 502 });
   }

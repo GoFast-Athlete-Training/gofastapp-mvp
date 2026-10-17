@@ -14,7 +14,16 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
-const BRAND_TYPES = ["SHOE", "APPAREL", "RUN_STORE_CHAIN", "GEAR", "OTHER"] as const;
+const BRAND_TYPES = [
+  "SHOE",
+  "APPAREL",
+  "NUTRITION",
+  "PERFORMANCE",
+  "COFFEE_FOOD_STORE",
+  "RUN_STORE_CHAIN",
+  "GEAR",
+  "OTHER",
+] as const;
 
 function parseBrandType(v: unknown): (typeof BRAND_TYPES)[number] {
   if (typeof v === "string" && BRAND_TYPES.includes(v as (typeof BRAND_TYPES)[number])) {

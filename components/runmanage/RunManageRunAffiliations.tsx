@@ -23,11 +23,23 @@ export type AffiliationPick = {
   websiteUrl?: string | null;
   instagramHandle?: string | null;
   kindLabel?: string | null;
+  coffeeFoodKind?: string | null;
+  shortDescription?: string | null;
+  streetAddress?: string | null;
+  formattedAddress?: string | null;
+  placeId?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  zipCode?: string | null;
 };
 
 function metaLine(hit: AffiliationPick): string {
-  const place = [hit.city, hit.state].filter(Boolean).join(", ");
-  return [place || null, hit.slug ? `/${hit.slug}` : null, hit.websiteUrl || null]
+  const address =
+    hit.formattedAddress?.trim() ||
+    [hit.streetAddress, hit.city, hit.state, hit.zipCode].filter(Boolean).join(", ").trim() ||
+    null;
+  const place = address || [hit.city, hit.state].filter(Boolean).join(", ");
+  return [place || null, hit.shortDescription || null, hit.slug ? `/${hit.slug}` : null]
     .filter(Boolean)
     .join(" · ");
 }
@@ -165,6 +177,7 @@ export function EntitySearch({
   onSelect,
   onClear,
   kind,
+  brandTypeFilter,
 }: {
   label: string;
   placeholder: string;
@@ -172,6 +185,8 @@ export function EntitySearch({
   onSelect: (hit: AffiliationPick) => void;
   onClear: () => void;
   kind: SearchKind;
+  /** Sponsor Manage brandType filter (e.g. COFFEE_FOOD_STORE). */
+  brandTypeFilter?: string;
 }) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<AffiliationPick[]>([]);
@@ -186,9 +201,9 @@ export function EntitySearch({
     setHits([]);
     try {
       if (kind === "brand") {
-        const res = await runmanageApi.get(
-          `/api/runmanage/brands/search?${new URLSearchParams({ q }).toString()}`
-        );
+        const brandParams = new URLSearchParams({ q });
+        if (brandTypeFilter?.trim()) brandParams.set("brandType", brandTypeFilter.trim());
+        const res = await runmanageApi.get(`/api/runmanage/brands/search?${brandParams.toString()}`);
         if (!res.data?.success) {
           setStatus({ kind: "error", message: res.data?.error ?? "Brand search failed" });
           return;
@@ -201,6 +216,16 @@ export function EntitySearch({
           websiteUrl?: string | null;
           instagramHandle?: string | null;
           brandType?: string | null;
+          coffeeFoodKind?: string | null;
+          shortDescription?: string | null;
+          streetAddress?: string | null;
+          formattedAddress?: string | null;
+          placeId?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          zipCode?: string | null;
+          city?: string | null;
+          state?: string | null;
           description?: string | null;
         }>;
         const mapped = brands.map((b) => ({
@@ -210,9 +235,22 @@ export function EntitySearch({
           slug: b.slug,
           websiteUrl: b.websiteUrl,
           instagramHandle: b.instagramHandle,
-          kindLabel: b.brandType,
+          city: b.city,
+          state: b.state,
+          streetAddress: b.streetAddress,
+          formattedAddress: b.formattedAddress,
+          placeId: b.placeId,
+          lat: b.lat,
+          lng: b.lng,
+          zipCode: b.zipCode,
+          coffeeFoodKind: b.coffeeFoodKind,
+          shortDescription: b.shortDescription,
+          kindLabel: b.coffeeFoodKind || b.brandType,
           secondary:
-            (typeof b.description === "string" && b.description.trim()) || b.brandType || null,
+            b.shortDescription?.trim() ||
+            (typeof b.description === "string" && b.description.trim()) ||
+            b.brandType ||
+            null,
         }));
         setHits(mapped);
         setStatus(mapped.length === 0 ? { kind: "empty", q } : null);
@@ -281,7 +319,7 @@ export function EntitySearch({
     } finally {
       setSearching(false);
     }
-  }, [query, kind]);
+  }, [query, kind, brandTypeFilter]);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3">

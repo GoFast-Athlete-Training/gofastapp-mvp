@@ -1307,10 +1307,18 @@ model brands {
   slug            String    @unique
   name            String
   brandType       BrandType @default(OTHER)
+  coffeeFoodKind  CoffeeFoodKind?
+  shortDescription String?
   description     String?
   websiteUrl      String?
   instagramHandle String?
   logoUrl         String?
+  streetAddress   String?
+  formattedAddress String?
+  placeId         String?
+  lat             Float?
+  lng             Float?
+  zipCode         String?
   city            String?
   state           String?
   yearFounded     Int?
@@ -1769,6 +1777,22 @@ model city_runs {
   stravaMapUrl        String?              // Public Strava route URL shown on the run page
   description         String?
   postRunActivity     String?              // Post-run activity (e.g. "light social at X", "coffee at Y")
+  /// Sponsor Manage brand id for post-run stop (coffee/food); display stamp, no brands FK.
+  postRunBrandId                 String?
+  postRunBrandName               String?
+  postRunBrandLogoUrl            String?
+  postRunBrandWebsiteUrl         String?
+  postRunBrandInstagramHandle    String?
+  postRunBrandStreetAddress      String?
+  postRunBrandFormattedAddress   String?
+  postRunBrandPlaceId            String?
+  postRunBrandLat                Float?
+  postRunBrandLng                Float?
+  postRunBrandCity               String?
+  postRunBrandState              String?
+  postRunBrandZip                String?
+  postRunFoodKind                CoffeeFoodKind?
+  postRunBrandShortDescription   String?
   postRunNote         String?              // Club manager published recap after the run
   postRunPhotoUrl     String?              // Club group/result photo (blob URL)
   postRunPublished    Boolean              @default(false)
@@ -1871,6 +1895,7 @@ model city_runs {
   @@index([raceRegistryId])
   @@index([runStoreId])
   @@index([runBrandId])
+  @@index([postRunBrandId])
   @@index([specialEventId])
   @@index([routeId])
   @@index([workoutId])
@@ -3501,8 +3526,15 @@ enum BrandType {
   APPAREL
   NUTRITION
   PERFORMANCE
+  COFFEE_FOOD_STORE
   RUN_STORE_CHAIN
   GEAR
+  OTHER
+}
+
+enum CoffeeFoodKind {
+  COFFEE
+  BAGELS
   OTHER
 }
 

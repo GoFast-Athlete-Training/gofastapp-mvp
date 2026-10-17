@@ -55,7 +55,7 @@ export function RunManageShell({ children }: { children: ReactNode }) {
                     : "text-gray-600 hover:text-gray-900"
                 }
               >
-                All clubs
+                Build by clubs
               </Link>
               <Link
                 href="/runmanage/runs/new"

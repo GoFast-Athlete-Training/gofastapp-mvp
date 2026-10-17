@@ -26,7 +26,13 @@ import {
   relationshipPatchFromBody,
 } from '@/lib/city-run-type';
 import { partnerExtrasForWrite } from '@/lib/runmanage/partner-extras';
+import { ensureCityRunRoute } from '@/lib/city-run/ensure-city-run-route';
 import { attachRunBrandSnap, runBrandStampFieldsFromBody } from '@/lib/runmanage/run-brand-stamp';
+import {
+  postRunBrandProdSelect,
+  postRunBrandStampFieldsFromBody,
+  postRunBrandStampFromProdBrand,
+} from '@/lib/runmanage/post-run-brand-stamp';
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
   process.env.RENDER_GIT_COMMIT ||
@@ -199,6 +205,21 @@ export async function GET(
           igPostGraphic: true,
         workflowStatus: true,
         postRunActivity: true,
+        postRunBrandId: true,
+        postRunBrandName: true,
+        postRunBrandLogoUrl: true,
+        postRunBrandWebsiteUrl: true,
+        postRunBrandInstagramHandle: true,
+        postRunBrandStreetAddress: true,
+        postRunBrandFormattedAddress: true,
+        postRunBrandPlaceId: true,
+        postRunBrandLat: true,
+        postRunBrandLng: true,
+        postRunBrandCity: true,
+        postRunBrandState: true,
+        postRunBrandZip: true,
+        postRunFoodKind: true,
+        postRunBrandShortDescription: true,
         routeNeighborhood: true,
         runType: true,
         workoutDescription: true,
@@ -604,6 +625,21 @@ export async function GET(
         pace: run.pace,
         description: run.description,
         postRunActivity: run.postRunActivity ?? null,
+        postRunBrandId: run.postRunBrandId ?? null,
+        postRunBrandName: run.postRunBrandName ?? null,
+        postRunBrandLogoUrl: run.postRunBrandLogoUrl ?? null,
+        postRunBrandWebsiteUrl: run.postRunBrandWebsiteUrl ?? null,
+        postRunBrandInstagramHandle: run.postRunBrandInstagramHandle ?? null,
+        postRunBrandStreetAddress: run.postRunBrandStreetAddress ?? null,
+        postRunBrandFormattedAddress: run.postRunBrandFormattedAddress ?? null,
+        postRunBrandPlaceId: run.postRunBrandPlaceId ?? null,
+        postRunBrandLat: run.postRunBrandLat ?? null,
+        postRunBrandLng: run.postRunBrandLng ?? null,
+        postRunBrandCity: run.postRunBrandCity ?? null,
+        postRunBrandState: run.postRunBrandState ?? null,
+        postRunBrandZip: run.postRunBrandZip ?? null,
+        postRunFoodKind: run.postRunFoodKind ?? null,
+        postRunBrandShortDescription: run.postRunBrandShortDescription ?? null,
         stravaMapUrl: run.stravaMapUrl,
         route: run.route
           ? {
@@ -717,6 +753,12 @@ export async function PUT(
       updateData.stravaMapUrl = body.stravaMapUrl === null || body.stravaMapUrl === ''
         ? null
         : String(body.stravaMapUrl);
+    }
+    if (body.routeId !== undefined) {
+      updateData.routeId =
+        body.routeId === null || body.routeId === ''
+          ? null
+          : String(body.routeId).trim() || null;
     }
     if (body.staffNotes !== undefined) {
       updateData.staffNotes = body.staffNotes === null || body.staffNotes === ''
@@ -908,6 +950,18 @@ export async function PUT(
     }
     Object.assign(updateData, runBrandStampFieldsFromBody(body as Record<string, unknown>));
 
+    const postRunStampBody = postRunBrandStampFieldsFromBody(body as Record<string, unknown>);
+    Object.assign(updateData, postRunStampBody);
+    if (postRunStampBody.postRunBrandId) {
+      const brandRow = await prisma.brands.findUnique({
+        where: { id: postRunStampBody.postRunBrandId },
+        select: postRunBrandProdSelect,
+      });
+      if (brandRow) {
+        Object.assign(updateData, postRunBrandStampFromProdBrand(brandRow));
+      }
+    }
+
     const mergedRelationships = mergeRelationshipSnapshot(run, {
       ...relationshipPatch,
       runClubId:
@@ -1013,9 +1067,43 @@ export async function PUT(
       }
     }
 
+    try {
+      await ensureCityRunRoute(resolvedId);
+    } catch (routeEnsureError: unknown) {
+      console.error(
+        '[PUT /api/runs/[runId]] ensureCityRunRoute failed:',
+        routeEnsureError instanceof Error ? routeEnsureError.message : routeEnsureError
+      );
+    }
+
+    const hydrated = await prisma.city_runs.findUnique({
+      where: { id: resolvedId },
+      select: {
+        id: true,
+        title: true,
+        totalMiles: true,
+        pace: true,
+        description: true,
+        meetUpPoint: true,
+        meetUpStreetAddress: true,
+        meetUpCity: true,
+        meetUpState: true,
+        meetUpZip: true,
+        routePhotos: true,
+        mapImageUrl: true,
+        stravaMapUrl: true,
+        routeId: true,
+        staffNotes: true,
+        published: true,
+        runClubId: true,
+        runCrewId: true,
+        cityRunType: true,
+      },
+    });
+
     return NextResponse.json({
       success: true,
-      run: {
+      run: hydrated ?? {
         id: updated.id,
         title: updated.title,
         totalMiles: updated.totalMiles,
@@ -1029,6 +1117,7 @@ export async function PUT(
         routePhotos: updated.routePhotos,
         mapImageUrl: updated.mapImageUrl,
         stravaMapUrl: updated.stravaMapUrl,
+        routeId: updated.routeId ?? null,
         staffNotes: updated.staffNotes,
         published: updated.published,
         runClubId: updated.runClubId,

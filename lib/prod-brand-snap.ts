@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { parseCoffeeFoodKind } from "@/lib/brands/coffee-food-kind";
 
 const BRAND_TYPES = [
   "SHOE",
   "APPAREL",
   "NUTRITION",
   "PERFORMANCE",
+  "COFFEE_FOOD_STORE",
   "RUN_STORE_CHAIN",
   "GEAR",
   "OTHER",
@@ -25,6 +27,14 @@ export type ProdBrandSnapInput = {
   websiteUrl?: string | null;
   description?: string | null;
   brandType?: string | null;
+  coffeeFoodKind?: string | null;
+  shortDescription?: string | null;
+  streetAddress?: string | null;
+  formattedAddress?: string | null;
+  placeId?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  zipCode?: string | null;
   instagramHandle?: string | null;
   city?: string | null;
   state?: string | null;
@@ -49,6 +59,16 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
   const websiteUrl = b.websiteUrl?.trim() || null;
   const logoUrl = b.logoUrl?.trim() || null;
   const instagramHandle = b.instagramHandle?.trim().replace(/^@+/, "") || null;
+  const coffeeFoodKind = parseCoffeeFoodKind(b.coffeeFoodKind);
+  const shortDescription = b.shortDescription?.trim() || null;
+  const streetAddress = b.streetAddress?.trim() || null;
+  const formattedAddress = b.formattedAddress?.trim() || null;
+  const placeId = b.placeId?.trim() || null;
+  const zipCode = b.zipCode?.trim() || null;
+  const lat =
+    typeof b.lat === "number" && Number.isFinite(b.lat) ? b.lat : null;
+  const lng =
+    typeof b.lng === "number" && Number.isFinite(b.lng) ? b.lng : null;
   const city = b.city?.trim() || null;
   const state = b.state?.trim() || null;
   const yearFounded =
@@ -71,6 +91,14 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
       websiteUrl,
       instagramHandle,
       logoUrl,
+      coffeeFoodKind,
+      shortDescription,
+      streetAddress,
+      formattedAddress,
+      placeId,
+      lat,
+      lng,
+      zipCode,
       city,
       state,
       yearFounded,
@@ -87,6 +115,14 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
       websiteUrl,
       instagramHandle,
       logoUrl,
+      coffeeFoodKind,
+      shortDescription,
+      streetAddress,
+      formattedAddress,
+      placeId,
+      lat,
+      lng,
+      zipCode,
       city,
       state,
       yearFounded,
@@ -111,6 +147,14 @@ const prodBrandReadSelect = {
   websiteUrl: true,
   instagramHandle: true,
   logoUrl: true,
+  coffeeFoodKind: true,
+  shortDescription: true,
+  streetAddress: true,
+  formattedAddress: true,
+  placeId: true,
+  lat: true,
+  lng: true,
+  zipCode: true,
   city: true,
   state: true,
   yearFounded: true,

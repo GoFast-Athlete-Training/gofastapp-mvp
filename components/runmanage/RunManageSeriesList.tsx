@@ -4,13 +4,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
 import { RunManageOperationalSeriesTable } from "@/components/runmanage/RunManageOperationalSeriesTable";
+import { formatDayLabel } from "@/lib/runmanage/format-day-label";
 import type { OperationalSeriesRow } from "@/lib/runmanage/series-operational-list";
+
+const WEEKDAY_FILTER_ORDER = [
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+  "SUNDAY",
+] as const;
 
 export default function RunManageSeriesList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<OperationalSeriesRow[]>([]);
-  const [clubFilter, setClubFilter] = useState("");
+  const [dayFilter, setDayFilter] = useState("");
   const [stoplightFilter, setStoplightFilter] = useState<"all" | "needs_build" | "ready">("all");
 
   const load = useCallback(async () => {
@@ -37,22 +48,19 @@ export default function RunManageSeriesList() {
     void load();
   }, [load]);
 
-  const clubOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const r of rows) {
-      if (r.runClubId && r.clubName) map.set(r.runClubId, r.clubName);
-    }
-    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const dayOptions = useMemo(() => {
+    const present = new Set(rows.map((r) => r.dayOfWeek.trim().toUpperCase()));
+    return WEEKDAY_FILTER_ORDER.filter((d) => present.has(d));
   }, [rows]);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      if (clubFilter && r.runClubId !== clubFilter) return false;
+      if (dayFilter && r.dayOfWeek.trim().toUpperCase() !== dayFilter) return false;
       if (stoplightFilter === "ready" && r.stoplight !== "ready") return false;
       if (stoplightFilter === "needs_build" && r.stoplight === "ready") return false;
       return true;
     });
-  }, [rows, clubFilter, stoplightFilter]);
+  }, [rows, dayFilter, stoplightFilter]);
 
   return (
     <div className="space-y-6">
@@ -74,16 +82,16 @@ export default function RunManageSeriesList() {
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="block text-sm">
-          <span className="font-medium text-gray-700">Club</span>
+          <span className="font-medium text-gray-700">Day</span>
           <select
-            value={clubFilter}
-            onChange={(e) => setClubFilter(e.target.value)}
+            value={dayFilter}
+            onChange={(e) => setDayFilter(e.target.value)}
             className="mt-1 block min-w-[200px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
           >
-            <option value="">All clubs</option>
-            {clubOptions.map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
+            <option value="">All days</option>
+            {dayOptions.map((d) => (
+              <option key={d} value={d}>
+                {formatDayLabel(d)}
               </option>
             ))}
           </select>

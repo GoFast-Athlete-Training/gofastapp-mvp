@@ -230,7 +230,7 @@ export function RunManageDashboardHome() {
           href={RUN_MANAGE_CLUBS_PATH}
           className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-sky-800 hover:bg-sky-50"
         >
-          All clubs
+          Build by clubs
         </Link>
         {COCKPIT_BUCKET_ORDER.map((bucket) => (
           <Link

@@ -62,7 +62,7 @@ export function RunManageClubHub({ clubId }: { clubId: string }) {
         className="inline-flex items-center gap-1 text-sm font-medium text-sky-800 hover:underline"
       >
         <ChevronLeft className="h-4 w-4" />
-        All clubs
+        Build by clubs
       </Link>
 
       <div>

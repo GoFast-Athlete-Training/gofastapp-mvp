@@ -1,3 +1,4 @@
+import type { AffiliationPick } from "@/components/runmanage/RunManageRunAffiliations";
 import type { RunInstanceContext, RunSeriesContext } from "@/lib/runInstanceContent";
 import type { GroupWorkoutSegment } from "@/lib/group-workout-segment-editor";
 
@@ -103,6 +104,10 @@ export type RunInstanceWizardValues = {
   endCity: string;
   endState: string;
   routeNeighborhood: string;
+  /** Linked saved route — empty after Replace route; null on save clears FK. */
+  routeId: string;
+  /** Display-only label from hydrated routes.name when routeId is set. */
+  linkedRouteName: string;
   /** Pasted route directions — persisted on city_runs, copies forward on series advance. */
   directionsText: string;
   runType: string;
@@ -115,6 +120,7 @@ export type RunInstanceWizardValues = {
   routePhotos: string[];
   description: string;
   postRunActivity: string;
+  postRunBrandPick: AffiliationPick | null;
   staffNotes: string;
   stravaEventUrl: string;
   stravaText: string;
@@ -232,6 +238,8 @@ export function emptyWizardValues(defaultDate?: string): RunInstanceWizardValues
     endCity: "",
     endState: "",
     routeNeighborhood: "",
+    routeId: "",
+    linkedRouteName: "",
     directionsText: "",
     runType: "",
     routeDescription: "",
@@ -242,6 +250,7 @@ export function emptyWizardValues(defaultDate?: string): RunInstanceWizardValues
     routePhotos: [],
     description: "",
     postRunActivity: "",
+    postRunBrandPick: null,
     staffNotes: "",
     stravaEventUrl: "",
     stravaText: "",

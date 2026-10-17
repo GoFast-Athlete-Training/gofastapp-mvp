@@ -8,6 +8,14 @@ export type SponsorManageBrandRow = {
   instagramHandle: string | null;
   logoUrl: string | null;
   brandType: string | null;
+  coffeeFoodKind?: string | null;
+  shortDescription?: string | null;
+  streetAddress?: string | null;
+  formattedAddress?: string | null;
+  placeId?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  zipCode?: string | null;
   description: string | null;
   city?: string | null;
   state?: string | null;
@@ -45,7 +53,7 @@ function staffForwardHeaders(request: NextRequest, staffId: string): HeadersInit
 export async function searchSponsorManageBrands(
   request: NextRequest,
   staffId: string,
-  opts: { q: string },
+  opts: { q: string; brandType?: string },
 ): Promise<{ ok: true; brands: SponsorManageBrandRow[] } | { ok: false; error: string }> {
   const base = sponsorManageBaseUrl();
   if (!base) {
@@ -53,6 +61,9 @@ export async function searchSponsorManageBrands(
   }
 
   const params = new URLSearchParams({ search: opts.q.trim() });
+  if (opts.brandType?.trim()) {
+    params.set("brandType", opts.brandType.trim());
+  }
 
   try {
     const res = await fetch(`${base}/api/brands?${params}`, {

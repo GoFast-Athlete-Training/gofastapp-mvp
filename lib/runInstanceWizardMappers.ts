@@ -5,6 +5,8 @@ import {
 } from "@/components/runmanage/runInstanceWizard/shared";
 import { isTrackRun, normalizeRunType, nullRouteFieldsForTrackRun } from "@/lib/runTypes";
 import { parseRunTotalMiles } from "@/lib/parse-run-total-miles";
+import { postRunBrandPickFromRunStamp } from "@/lib/runmanage/post-run-brand-stamp";
+import type { AffiliationPick } from "@/components/runmanage/RunManageRunAffiliations";
 
 function routeMapFields(run: CityRunData) {
   const route = run.route;
@@ -46,6 +48,8 @@ export function cityRunToWizardValues(run: CityRunData): RunInstanceWizardValues
     endCity: run.endCity || "",
     endState: run.endState || "",
     routeNeighborhood: routeFields.routeNeighborhood,
+    routeId: run.routeId?.trim() || "",
+    linkedRouteName: run.route?.name?.trim() || "",
     directionsText: run.directionsText || "",
     runType: run.runType || "",
     routeDescription: isTrack ? "" : run.workoutDescription || "",
@@ -59,6 +63,7 @@ export function cityRunToWizardValues(run: CityRunData): RunInstanceWizardValues
     routePhotos: routeFields.routePhotos,
     description: run.description || "",
     postRunActivity: run.postRunActivity || "",
+    postRunBrandPick: postRunBrandPickFromRunStamp(run) as AffiliationPick | null,
     staffNotes: run.staffNotes || "",
     stravaEventUrl: run.stravaEventUrl || "",
     stravaText: run.stravaText || "",
@@ -115,6 +120,7 @@ export function wizardValuesToSavePayload(
     endCity: values.endPointSameAsStart ? null : values.endCity.trim() || null,
     endState: values.endPointSameAsStart ? null : values.endState.trim() || null,
     routeNeighborhood: trackRouteNulls ? null : values.routeNeighborhood.trim() || null,
+    routeId: trackRouteNulls ? null : values.routeId.trim() || null,
     runType: normalizeRunType(values.runType) || values.runType.trim() || null,
     workoutDescription: isTrack
       ? values.trackWorkoutDescription.trim() || null
@@ -128,7 +134,11 @@ export function wizardValuesToSavePayload(
       ? []
       : (values.routePhotos || []).filter((u) => typeof u === "string" && u.trim()),
     description: values.description.trim() || null,
-    postRunActivity: values.postRunActivity.trim() || null,
+    postRunActivity: values.postRunBrandPick
+      ? values.postRunBrandPick.name.trim() || null
+      : values.postRunActivity.trim() || null,
+    postRunBrandId: values.postRunBrandPick?.id ?? null,
+    postRunBrandPick: values.postRunBrandPick,
     staffNotes: values.staffNotes.trim() || null,
     stravaEventUrl: values.stravaEventUrl.trim() || null,
     stravaText: values.stravaText.trim() || null,

@@ -11,6 +11,8 @@ import {
   RUN_TYPE_LABELS,
   RUN_TYPE_VALUES,
 } from "@/lib/runTypes";
+import { EntitySearch } from "@/components/runmanage/RunManageRunAffiliations";
+import { coffeeFoodKindLabel } from "@/lib/brands/coffee-food-kind";
 import type { RunInstanceWizardContext, RunInstanceWizardValues } from "./shared";
 
 type Props = {
@@ -44,6 +46,8 @@ export default function RunManageOpenCorePanel({
         mapImageUrl: nulls ? "" : values.mapImageUrl,
         routePhotos: nulls ? [] : values.routePhotos,
         routeNeighborhood: nulls ? "" : values.routeNeighborhood,
+        routeId: nulls ? "" : values.routeId,
+        linkedRouteName: nulls ? "" : values.linkedRouteName,
         directionsText: nulls ? "" : values.directionsText,
         routeDescription: nulls ? "" : values.routeDescription,
       });
@@ -249,14 +253,42 @@ export default function RunManageOpenCorePanel({
         ) : null}
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900">Post-run</label>
-          <input
-            type="text"
-            value={values.postRunActivity}
-            onChange={(e) => patch({ postRunActivity: e.target.value })}
-            placeholder="Coffee, bagels, social…"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          <EntitySearch
+            label="Post-run stop"
+            placeholder="Search coffee and food stores…"
+            kind="brand"
+            brandTypeFilter="COFFEE_FOOD_STORE"
+            selected={values.postRunBrandPick}
+            onSelect={(hit) =>
+              patch({
+                postRunBrandPick: hit,
+                postRunActivity: hit.name,
+              })
+            }
+            onClear={() =>
+              patch({
+                postRunBrandPick: null,
+                postRunActivity: "",
+              })
+            }
           />
+          {values.postRunBrandPick ? (
+            <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+              {values.postRunBrandPick.coffeeFoodKind ? (
+                <p className="font-semibold text-gray-900">
+                  {coffeeFoodKindLabel(values.postRunBrandPick.coffeeFoodKind)}
+                </p>
+              ) : null}
+              {values.postRunBrandPick.shortDescription ? (
+                <p className="mt-1">{values.postRunBrandPick.shortDescription}</p>
+              ) : null}
+            </div>
+          ) : values.postRunActivity.trim() ? (
+            <p className="mt-2 text-xs text-amber-800">
+              Legacy text on this run: “{values.postRunActivity.trim()}”. Attach a store from Sponsor
+              Manage to replace it.
+            </p>
+          ) : null}
         </div>
 
         <div>

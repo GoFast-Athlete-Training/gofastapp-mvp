@@ -285,12 +285,32 @@ export default function RunInstanceWizard({
         mapImageUrl: nulls ? "" : values.mapImageUrl,
         routePhotos: nulls ? [] : values.routePhotos,
         routeNeighborhood: nulls ? "" : values.routeNeighborhood,
+        routeId: nulls ? "" : values.routeId,
+        linkedRouteName: nulls ? "" : values.linkedRouteName,
         directionsText: nulls ? "" : values.directionsText,
         routeDescription: nulls ? "" : values.routeDescription,
       });
     } else {
       patch({ runType: nextRunType });
     }
+  };
+
+  const linkedSavedRoute = Boolean(values.routeId.trim());
+  const linkedRouteLabel = values.linkedRouteName.trim() || "Saved route";
+
+  const handleReplaceRoute = () => {
+    onChange({
+      ...values,
+      routeId: "",
+      linkedRouteName: "",
+      stravaMapUrl: "",
+      mapImageUrl: "",
+      routePhotos: [],
+      routeNeighborhood: "",
+      directionsText: "",
+      routeDescription: "",
+    });
+    onErrorChange?.(null);
   };
 
   const meetUpSummary = useMemo(() => {
@@ -628,6 +648,27 @@ export default function RunInstanceWizard({
                 </p>
               </div>
 
+              {linkedSavedRoute ? (
+                <div className="rounded-lg border border-orange-200 bg-orange-50/80 px-4 py-3 space-y-2">
+                  <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <Route className="h-4 w-4 text-orange-600 shrink-0" />
+                    Linked route: {linkedRouteLabel}
+                  </p>
+                  <p className="text-xs text-gray-700">
+                    Strava URL, map image, photos, and neighborhood come from this saved route and
+                    are shared with other runs that use it. Route directions and description below
+                    are for this instance only.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleReplaceRoute}
+                    className="rounded-lg border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-orange-900 hover:bg-orange-50"
+                  >
+                    Replace route
+                  </button>
+                </div>
+              ) : null}
+
               <>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-900">Strava route URL</label>
@@ -636,7 +677,8 @@ export default function RunInstanceWizard({
                       value={values.stravaMapUrl}
                       onChange={(e) => patch({ stravaMapUrl: e.target.value })}
                       placeholder="https://www.strava.com/routes/…"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      disabled={linkedSavedRoute}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
                     />
                     <p className="mt-1 text-xs text-gray-500">
                       Route/map link shown to runners. Put route links here — not in description sources.
@@ -650,7 +692,8 @@ export default function RunInstanceWizard({
                       value={values.routeNeighborhood}
                       onChange={(e) => patch({ routeNeighborhood: e.target.value })}
                       placeholder="e.g. Fletcher's Cove, Carderock"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      disabled={linkedSavedRoute}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
                     />
                   </div>
 
@@ -663,15 +706,17 @@ export default function RunInstanceWizard({
                           alt="Route map"
                           className="w-full max-w-md rounded-lg border border-gray-200"
                         />
-                        <button
-                          type="button"
-                          onClick={() => patch({ mapImageUrl: "" })}
-                          className="text-sm text-red-600 hover:text-red-800"
-                        >
-                          Remove
-                        </button>
+                        {!linkedSavedRoute ? (
+                          <button
+                            type="button"
+                            onClick={() => patch({ mapImageUrl: "" })}
+                            className="text-sm text-red-600 hover:text-red-800"
+                          >
+                            Remove
+                          </button>
+                        ) : null}
                       </div>
-                    ) : (
+                    ) : linkedSavedRoute ? null : (
                       <label className="block cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-4 hover:border-sky-500">
                         <span className="flex items-center justify-center gap-2 text-sm text-gray-600">
                           <ImageIcon className="h-4 w-4" />
@@ -759,20 +804,22 @@ export default function RunInstanceWizard({
                             alt={`Route photo ${index + 1}`}
                             className="aspect-video w-full rounded-lg border border-gray-200 object-cover"
                           />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              patch({
-                                routePhotos: values.routePhotos.filter((_, i) => i !== index),
-                              })
-                            }
-                            className="absolute right-1 top-1 rounded-full bg-red-500 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
+                          {!linkedSavedRoute ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                patch({
+                                  routePhotos: values.routePhotos.filter((_, i) => i !== index),
+                                })
+                              }
+                              className="absolute right-1 top-1 rounded-full bg-red-500 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          ) : null}
                         </div>
                       ))}
-                      {values.routePhotos.length < MAX_ROUTE_PHOTOS && (
+                      {!linkedSavedRoute && values.routePhotos.length < MAX_ROUTE_PHOTOS && (
                         <label className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 hover:border-sky-500 hover:bg-sky-50">
                           <ImageIcon className="h-6 w-6 text-gray-400" />
                           <span className="text-xs text-gray-600">
