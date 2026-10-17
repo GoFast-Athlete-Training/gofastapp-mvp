@@ -730,6 +730,11 @@ export async function PUT(
         cityRunType: true,
         clubReviewStatus: true,
         citySlug: true,
+        date: true,
+        startTimeHour: true,
+        startTimeMinute: true,
+        startTimePeriod: true,
+        timezone: true,
       },
     });
 
