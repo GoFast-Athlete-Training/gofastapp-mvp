@@ -329,6 +329,15 @@ export async function POST(request: NextRequest) {
       racePayload,
       "courseSlug"
     );
+    const startLineLabel = readOptionalTrimmedString(
+      racePayload,
+      "startLineLabel"
+    );
+    const finishLineLabel = readOptionalTrimmedString(
+      racePayload,
+      "finishLineLabel"
+    );
+    const isLoop = readOptionalBoolean(racePayload, "isLoop");
     const resultsUrlFromPayload = readOptionalTrimmedString(
       racePayload,
       "resultsUrl"
@@ -417,6 +426,9 @@ export async function POST(request: NextRequest) {
       ...(courseSlugFromPayload !== undefined
         ? { courseSlug: courseSlugFromPayload }
         : {}),
+      ...(startLineLabel !== undefined ? { startLineLabel } : {}),
+      ...(finishLineLabel !== undefined ? { finishLineLabel } : {}),
+      ...(isLoop !== undefined ? { isLoop } : {}),
       ...(resultsUrlFromPayload !== undefined
         ? { resultsUrl: resultsUrlFromPayload }
         : {}),

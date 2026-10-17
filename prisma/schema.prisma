@@ -908,6 +908,12 @@ model race_registry {
   charityName             String?
   charityUrl              String?
   courseMapUrl            String?
+  /// Start line display (name or city snap from Race Manage course).
+  startLineLabel          String?
+  /// Finish line display (name or city snap from Race Manage course).
+  finishLineLabel         String?
+  /// true = loop, false = point-to-point, null = not set.
+  isLoop                  Boolean?
   /// Public content site /course/[slug] — from Company race_courses.slug (prodpush).
   courseSlug              String?
   description             String?
