@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, MapPin, Route } from "lucide-react";
@@ -14,8 +14,22 @@ import {
   generateCitySlugFromParts,
   parseGoogleAddressFromComponents,
 } from "@/lib/parse-google-address";
-import { PACE_OPTIONS } from "@/lib/runTypes";
 import type { HostedRunInviteRouteSnap } from "@/lib/city-run/list-athlete-hosted-invites";
+
+function ManageCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+      <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500">{title}</h2>
+      {children}
+    </section>
+  );
+}
 
 function hasValidStartTime(hour: string, minute: string, period: "AM" | "PM"): boolean {
   const h = parseInt(hour, 10);
@@ -53,8 +67,6 @@ type InviteDetail = {
   mapImageUrl: string | null;
   workoutDescription: string | null;
   route: HostedRunInviteRouteSnap | null;
-  totalMiles: number | null;
-  pace: string | null;
   startTimeHour: number | null;
   startTimeMinute: number | null;
   startTimePeriod: string | null;
@@ -88,12 +100,10 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
   const [meetUpLat, setMeetUpLat] = useState<number | null>(null);
   const [meetUpLng, setMeetUpLng] = useState<number | null>(null);
   const [meetUpPlaceSet, setMeetUpPlaceSet] = useState(false);
-  const [totalMiles, setTotalMiles] = useState("");
-  const [pace, setPace] = useState("Various");
   const [meetUpNote, setMeetUpNote] = useState("");
   const [aboutThisRun, setAboutThisRun] = useState("");
   const [routeNeighborhood, setRouteNeighborhood] = useState("");
-  const [gorunPath, setGorunPath] = useState("/build-a-run");
+  const [gorunPath, setGorunPath] = useState("/host-a-run");
   const [routeSnap, setRouteSnap] = useState<HostedRunInviteRouteSnap | null>(null);
   const [runMapImageUrl, setRunMapImageUrl] = useState<string | null>(null);
   const [runStravaMapUrl, setRunStravaMapUrl] = useState<string | null>(null);
@@ -128,8 +138,6 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
     setMeetUpLat(inv.meetUpLat);
     setMeetUpLng(inv.meetUpLng);
     setMeetUpPlaceSet(Boolean(inv.meetUpPoint.trim()));
-    setTotalMiles(inv.totalMiles != null ? String(inv.totalMiles) : "");
-    setPace(inv.pace?.trim() || "Various");
     setMeetUpNote(inv.meetUpNote ?? "");
     setAboutThisRun(inv.description ?? "");
     setRouteNeighborhood(inv.routeNeighborhood ?? "");
@@ -217,7 +225,6 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
     try {
       const hourNum = Math.min(12, Math.max(1, parseInt(startHour, 10)));
       const minuteNum = Math.min(59, Math.max(0, parseInt(startMinute, 10) || 0));
-      const milesNum = parseFloat(totalMiles);
       await api.patch(`/me/hosted-run-invites/${encodeURIComponent(cityRunId)}`, {
         title: meetupTitle.trim(),
         date: meetupDate,
@@ -232,8 +239,6 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
         meetUpNote: meetUpNote.trim() || null,
         description: aboutThisRun.trim() || null,
         routeNeighborhood: routeNeighborhood.trim() || null,
-        pace: pace.trim() && pace !== "Various" ? pace : null,
-        totalMiles: Number.isFinite(milesNum) && milesNum > 0 ? milesNum : null,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
@@ -266,7 +271,7 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
         <p>{loadError}</p>
-        <Link href="/build-a-run" className="mt-3 inline-block text-sm font-semibold underline">
+        <Link href="/host-a-run" className="mt-3 inline-block text-sm font-semibold underline">
           Back to Run
         </Link>
       </div>
@@ -276,13 +281,13 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
   return (
     <div className="space-y-5">
       <Link
-        href="/build-a-run"
+        href="/host-a-run"
         className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="h-4 w-4" />
         Runs I created
       </Link>
-      <h1 className="text-2xl font-bold text-gray-900">Edit run invite</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Manage run</h1>
       {saveSuccess ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           <p className="font-semibold">Run updated</p>
@@ -295,163 +300,154 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
         </p>
       ) : null}
 
-      {routeSnap || mapPreviewUrl ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
-            <Route className="h-4 w-4 text-orange-500" />
-            Attached route
-          </p>
-          {routeSnap?.name ? (
-            <p className="font-semibold text-gray-900">{routeSnap.name}</p>
-          ) : null}
-          {mapPreviewUrl ? (
-            <div className="overflow-hidden rounded-lg border border-gray-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={mapPreviewUrl} alt="Route map" className="w-full h-auto" />
-            </div>
-          ) : null}
-          {workoutDescription?.trim() ? (
-            <p className="text-sm text-gray-600 whitespace-pre-wrap">{workoutDescription.trim()}</p>
-          ) : null}
-          {stravaUrl ? (
-            <a
-              href={stravaUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600 hover:text-orange-700"
+      <ManageCard title="Meta">
+        <label className="block">
+          <span className="text-sm font-medium text-gray-800">Title</span>
+          <input
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+            value={meetupTitle}
+            onChange={(e) => setMeetupTitle(e.target.value)}
+          />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-gray-800">Description</span>
+          <span className="block text-xs text-gray-500 mt-0.5">
+            Why join — early crew, training buddy, social pace, etc.
+          </span>
+          <textarea
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-[100px]"
+            value={aboutThisRun}
+            onChange={(e) => setAboutThisRun(e.target.value)}
+            placeholder="Short blurb for the invite."
+          />
+        </label>
+      </ManageCard>
+
+      <ManageCard title="Meetup">
+        <label className="block">
+          <span className="text-sm font-medium text-gray-800">Date</span>
+          <input
+            type="date"
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+            value={meetupDate}
+            onChange={(e) => setMeetupDate(e.target.value)}
+          />
+        </label>
+        <div className="grid grid-cols-3 gap-2">
+          <label className="block">
+            <span className="text-sm font-medium text-gray-800">Hour</span>
+            <input
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              value={startHour}
+              onChange={(e) => setStartHour(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-800">Min</span>
+            <input
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              value={startMinute}
+              onChange={(e) => setStartMinute(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-gray-800">AM/PM</span>
+            <select
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              value={startPeriod}
+              onChange={(e) => setStartPeriod(e.target.value as "AM" | "PM")}
             >
-              View on Strava
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          ) : null}
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </label>
         </div>
-      ) : null}
-
-      <CityRunPostInviteRouteStep
-        key={routeAttachKey}
-        cityRunId={cityRunId}
-        cityRunRouteNeighborhood={routeNeighborhood.trim() || null}
-        variant="edit"
-        onSkip={() => undefined}
-        onAttached={() => void hydrate({ silent: true })}
-      />
-
-      <label className="block">
-        <span className="text-sm font-medium text-gray-800">Title</span>
-        <input
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-          value={meetupTitle}
-          onChange={(e) => setMeetupTitle(e.target.value)}
-        />
-      </label>
-      <label className="block">
-        <span className="text-sm font-medium text-gray-800">Date</span>
-        <input
-          type="date"
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-          value={meetupDate}
-          onChange={(e) => setMeetupDate(e.target.value)}
-        />
-      </label>
-      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <span className="text-sm font-medium text-gray-800 flex items-center gap-1">
+            <MapPin className="h-4 w-4" />
+            Meetup spot
+          </span>
+          <GooglePlacesAutocomplete
+            value={meetUpPoint}
+            onChange={(e) => {
+              setMeetUpPoint(e.target.value);
+              setMeetUpPlaceSet(false);
+            }}
+            onPlaceSelected={handleStartPlaceSelected}
+            placeholder="Search meetup spot"
+            className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
         <label className="block">
-          <span className="text-sm font-medium text-gray-800">Hour</span>
-          <input
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-            value={startHour}
-            onChange={(e) => setStartHour(e.target.value)}
+          <span className="text-sm font-medium text-gray-800">Meetup note</span>
+          <span className="block text-xs text-gray-500 mt-0.5">
+            Parking, landmarks, or how to find the group at the meetup spot.
+          </span>
+          <textarea
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-[80px]"
+            value={meetUpNote}
+            onChange={(e) => setMeetUpNote(e.target.value)}
+            placeholder="E.g. We meet at the back of the parking lot."
           />
         </label>
+      </ManageCard>
+
+      <ManageCard title="Route">
+        {routeSnap || mapPreviewUrl ? (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <Route className="h-4 w-4 text-orange-500" />
+              Attached route
+            </p>
+            {routeSnap?.name ? (
+              <p className="font-semibold text-gray-900">{routeSnap.name}</p>
+            ) : null}
+            {mapPreviewUrl ? (
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={mapPreviewUrl} alt="Route map" className="w-full h-auto" />
+              </div>
+            ) : null}
+            {workoutDescription?.trim() ? (
+              <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                {workoutDescription.trim()}
+              </p>
+            ) : null}
+            {stravaUrl ? (
+              <a
+                href={stravaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600 hover:text-orange-700"
+              >
+                View on Strava
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">No route attached yet.</p>
+        )}
         <label className="block">
-          <span className="text-sm font-medium text-gray-800">Min</span>
+          <span className="text-sm font-medium text-gray-800">Route neighborhood</span>
           <input
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-            value={startMinute}
-            onChange={(e) => setStartMinute(e.target.value)}
+            value={routeNeighborhood}
+            onChange={(e) => setRouteNeighborhood(e.target.value)}
+            placeholder="e.g. Fletcher's Cove"
           />
         </label>
-        <label className="block">
-          <span className="text-sm font-medium text-gray-800">AM/PM</span>
-          <select
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-            value={startPeriod}
-            onChange={(e) => setStartPeriod(e.target.value as "AM" | "PM")}
-          >
-            <option value="AM">AM</option>
-            <option value="PM">PM</option>
-          </select>
-        </label>
-      </div>
-      <div>
-        <span className="text-sm font-medium text-gray-800 flex items-center gap-1">
-          <MapPin className="h-4 w-4" />
-          Meetup
-        </span>
-        <GooglePlacesAutocomplete
-          value={meetUpPoint}
-          onChange={(e) => {
-            setMeetUpPoint(e.target.value);
-            setMeetUpPlaceSet(false);
-          }}
-          onPlaceSelected={handleStartPlaceSelected}
-          placeholder="Search meetup spot"
+        <CityRunPostInviteRouteStep
+          key={routeAttachKey}
+          cityRunId={cityRunId}
+          cityRunRouteNeighborhood={routeNeighborhood.trim() || null}
+          variant="edit"
+          onSkip={() => undefined}
+          onAttached={() => void hydrate({ silent: true })}
         />
-      </div>
-      <label className="block">
-        <span className="text-sm font-medium text-gray-800">Route neighborhood</span>
-        <input
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-          value={routeNeighborhood}
-          onChange={(e) => setRouteNeighborhood(e.target.value)}
-        />
-      </label>
-      <label className="block">
-        <span className="text-sm font-medium text-gray-800">Miles</span>
-        <input
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-          value={totalMiles}
-          onChange={(e) => setTotalMiles(e.target.value)}
-        />
-      </label>
-      <label className="block">
-        <span className="text-sm font-medium text-gray-800">Pace</span>
-        <select
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-          value={pace}
-          onChange={(e) => setPace(e.target.value)}
-        >
-          {PACE_OPTIONS.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block">
-        <span className="text-sm font-medium text-gray-800">Meetup note</span>
-        <span className="block text-xs text-gray-500 mt-0.5">
-          Parking, landmarks, or how to find the group at the meetup spot.
-        </span>
-        <textarea
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-[80px]"
-          value={meetUpNote}
-          onChange={(e) => setMeetUpNote(e.target.value)}
-          placeholder="E.g. We meet at the back of the parking lot."
-        />
-      </label>
-      <label className="block">
-        <span className="text-sm font-medium text-gray-800">About this run</span>
-        <span className="block text-xs text-gray-500 mt-0.5">
-          Why join — early morning crew, training buddy, social pace, etc.
-        </span>
-        <textarea
-          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-[80px]"
-          value={aboutThisRun}
-          onChange={(e) => setAboutThisRun(e.target.value)}
-          placeholder="E.g. Join a group of runners who like meeting early."
-        />
-      </label>
-      <div className="flex flex-wrap gap-2">
+      </ManageCard>
+
+      <div className="flex flex-wrap gap-2 pt-1">
         <button
           type="button"
           disabled={busy || saveSuccess}
