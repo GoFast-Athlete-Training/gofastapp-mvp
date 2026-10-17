@@ -82,6 +82,7 @@ export default function HostedRunInvitesPanel() {
 
   async function copyLink(invite: HostedInvite) {
     const url = invite.shareUrl || invite.joinSignupUrl;
+    if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(invite.id);
