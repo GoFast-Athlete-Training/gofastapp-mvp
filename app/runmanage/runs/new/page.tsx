@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -8,13 +8,18 @@ import RunInstanceWizard from "@/components/runmanage/runInstanceWizard/RunInsta
 import {
   emptyWizardValues,
   type RunInstanceWizardValues,
+  type SeriesBaseline,
 } from "@/components/runmanage/runInstanceWizard/shared";
 import { localCalendarYmd } from "@/lib/date-local";
 import { generateCitySlugFromParts } from "@/lib/utils/parseAddress";
 import { nullRouteFieldsForTrackRun } from "@/lib/runTypes";
 import { normalizeRunType } from "@/lib/runTypes";
 import runmanageApi from "@/lib/runmanage/api-client";
-import { runInstanceEditPath, RUN_MANAGE_DASHBOARD_PATH } from "@/lib/runmanage/paths";
+import {
+  runInstanceEditPath,
+  RUN_MANAGE_DASHBOARD_PATH,
+  runManageCreateFromSeriesPath,
+} from "@/lib/runmanage/paths";
 import {
   affiliationsToPayload,
   emptyAffiliationDraft,
@@ -24,6 +29,21 @@ import { useRunManageAuth } from "@/components/runmanage/RunManageProviders";
 import RunManageCreateRunScope from "@/components/runmanage/create-run/RunManageCreateRunScope";
 import RunPublicDescriptionField from "@/components/runmanage/RunPublicDescriptionField";
 import { validateCreateRunScope } from "@/lib/runmanage/create-run-scope";
+import RunManageCreateRunModeFork, {
+  type CreateRunMode,
+} from "@/components/runmanage/create-run/RunManageCreateRunModeFork";
+import {
+  seriesBaselineFromRow,
+  wizardValuesFromSeries,
+  type SeriesWizardSeedSource,
+} from "@/lib/runmanage/series-wizard-seed";
+import type { RunSeriesContext } from "@/lib/runInstanceContent";
+import type { OperationalSeriesRow } from "@/lib/runmanage/series-operational-list";
+import { formatDayLabel } from "@/lib/runmanage/format-day-label";
+
+type LoadedSeries = SeriesWizardSeedSource & {
+  runClubId: string | null;
+};
 
 export default function RunManageCreateRunPage() {
   const router = useRouter();
@@ -32,22 +52,70 @@ export default function RunManageCreateRunPage() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
 
+  const initialMode: CreateRunMode =
+    searchParams.get("mode") === "series" || searchParams.get("seriesId")?.trim()
+      ? "series"
+      : "regular";
+
+  const [createMode, setCreateMode] = useState<CreateRunMode>(initialMode);
+  const [seriesId, setSeriesId] = useState<string | null>(
+    () => searchParams.get("seriesId")?.trim() || null
+  );
+  const [seriesRow, setSeriesRow] = useState<LoadedSeries | null>(null);
+  const [seriesPicklist, setSeriesPicklist] = useState<OperationalSeriesRow[]>([]);
+  const [seriesPickLoading, setSeriesPickLoading] = useState(false);
+
   const [affiliations, setAffiliations] = useState<RunAffiliationDraft>(() =>
     emptyAffiliationDraft("CLUB")
   );
   const [wizardValues, setWizardValues] = useState<RunInstanceWizardValues>(() =>
     emptyWizardValues(localCalendarYmd(tomorrow))
   );
+  const [seriesBaseline, setSeriesBaseline] = useState<SeriesBaseline | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imprintedCompanyRaceId, setImprintedCompanyRaceId] = useState<string | null>(null);
   const [imprintedRaceLabel, setImprintedRaceLabel] = useState<string | null>(null);
   const [frontDoorReady, setFrontDoorReady] = useState(false);
 
+  const isSeriesCreate = createMode === "series" && Boolean(seriesId);
+
+  const applySeriesSeed = useCallback(
+    (s: LoadedSeries, operational: OperationalSeriesRow | null, dateOverride?: string | null) => {
+      const dateYmd =
+        dateOverride?.trim() ||
+        searchParams.get("dateYmd")?.trim() ||
+        operational?.suggestedBuildDateYmd ||
+        null;
+      const priorTitle = operational?.latestPriorRun?.title ?? null;
+      setWizardValues(wizardValuesFromSeries(s, { suggestedDateYmd: dateYmd, priorTitle }));
+      setSeriesBaseline(seriesBaselineFromRow(s));
+      setAffiliations({
+        ...emptyAffiliationDraft("CLUB"),
+        runClubId: s.runClubId,
+        runClubLabel: s.runClub?.name ?? null,
+        runClubPick: s.runClubId
+          ? {
+              id: s.runClubId,
+              name: s.runClub?.name ?? "Run club",
+            }
+          : null,
+      });
+    },
+    [searchParams]
+  );
+
   useEffect(() => {
     const clubId = searchParams.get("clubId")?.trim();
     const companyRaceId = searchParams.get("companyRaceId")?.trim();
     const typeParam = searchParams.get("cityRunType")?.trim();
+    const paramSeriesId = searchParams.get("seriesId")?.trim();
+
+    if (paramSeriesId) {
+      setCreateMode("series");
+      setSeriesId(paramSeriesId);
+      return;
+    }
 
     if (clubId) {
       setAffiliations((prev) => ({
@@ -88,6 +156,66 @@ export default function RunManageCreateRunPage() {
     setFrontDoorReady(true);
   }, [searchParams]);
 
+  useEffect(() => {
+    if (createMode !== "series" || seriesId) return;
+    setSeriesPickLoading(true);
+    void (async () => {
+      try {
+        const res = await runmanageApi.get("/api/runmanage/run-series");
+        if (res.data?.success) {
+          setSeriesPicklist((res.data.series ?? []) as OperationalSeriesRow[]);
+        }
+      } finally {
+        setSeriesPickLoading(false);
+      }
+    })();
+  }, [createMode, seriesId]);
+
+  useEffect(() => {
+    if (!seriesId) {
+      setSeriesRow(null);
+      return;
+    }
+
+    setFrontDoorReady(false);
+    void (async () => {
+      try {
+        const res = await runmanageApi.get(`/api/runmanage/run-series/${seriesId}`);
+        if (!res.data?.success || !res.data.series) {
+          setError(res.data?.error || "Failed to load series");
+          setFrontDoorReady(true);
+          return;
+        }
+        const s = res.data.series as LoadedSeries;
+        const operational = (res.data.operational ?? null) as OperationalSeriesRow | null;
+        if (operational?.nextRun?.id) {
+          router.replace(runInstanceEditPath(operational.nextRun.id, s.runClubId));
+          return;
+        }
+        setSeriesRow(s);
+        applySeriesSeed(s, operational);
+        setError(null);
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { error?: string } }; message?: string };
+        setError(err.response?.data?.error || err.message || "Failed to load series");
+      } finally {
+        setFrontDoorReady(true);
+      }
+    })();
+  }, [seriesId, router, applySeriesSeed, createMode]);
+
+  const seriesContext: RunSeriesContext | null = useMemo(() => {
+    if (!seriesRow) return null;
+    return {
+      dayOfWeek: seriesRow.dayOfWeek,
+      meetUpPoint: seriesRow.meetUpPoint,
+      totalMiles: seriesRow.totalMiles,
+      routeNeighborhood: seriesRow.routeNeighborhood,
+      workoutDescription: seriesRow.workoutDescription,
+      postRunActivity: seriesRow.postRunActivity,
+    };
+  }, [seriesRow]);
+
   const handleCreate = async () => {
     const scopeErr = validateCreateRunScope(wizardValues.title, affiliations, { clubBoltMode: null });
     if (scopeErr) {
@@ -113,6 +241,7 @@ export default function RunManageCreateRunPage() {
       const payload: Record<string, unknown> = {
         ...affiliationsToPayload(affiliations, session?.athleteId, { specialEventId: null }),
         ...(imprintedCompanyRaceId ? { companyRaceId: imprintedCompanyRaceId } : {}),
+        ...(isSeriesCreate && seriesId ? { runSeriesId: seriesId } : {}),
         citySlug: finalCitySlug,
         title: wizardValues.title.trim(),
         dayOfWeek: wizardValues.dayOfWeek?.trim() || null,
@@ -180,6 +309,13 @@ export default function RunManageCreateRunPage() {
 
   const headerSlot = (
     <div className="mb-4 space-y-3 border-b border-gray-100 pb-4">
+      {isSeriesCreate && seriesRow ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
+          Building from weekly series — {formatDayLabel(seriesRow.dayOfWeek)}
+          {seriesRow.runClub?.name ? ` · ${seriesRow.runClub.name}` : ""}. Confirm date, time, and
+          meet-up before saving.
+        </div>
+      ) : null}
       <RunPublicDescriptionField
         values={wizardValues}
         onDescriptionChange={(description) => setWizardValues((v) => ({ ...v, description }))}
@@ -190,6 +326,41 @@ export default function RunManageCreateRunPage() {
       />
     </div>
   );
+
+  const seriesPicker = (
+    <div className="mt-3">
+      <label className="block text-sm font-medium text-gray-800" htmlFor="series-pick">
+        Weekly series
+      </label>
+      {seriesPickLoading ? (
+        <p className="mt-2 text-sm text-gray-500">Loading series…</p>
+      ) : (
+        <select
+          id="series-pick"
+          value={seriesId ?? ""}
+          onChange={(e) => {
+            const id = e.target.value.trim();
+            if (!id) {
+              setSeriesId(null);
+              return;
+            }
+            router.replace(runManageCreateFromSeriesPath(id));
+          }}
+          className="mt-1 w-full max-w-xl rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">Choose a series…</option>
+          {seriesPicklist.map((row) => (
+            <option key={row.seriesId} value={row.seriesId}>
+              {row.clubName ?? "Club"} — {formatDayLabel(row.dayOfWeek)}
+              {row.stoplight !== "ready" ? " · needs build" : ""}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+
+  const wizardReady = frontDoorReady && (createMode === "regular" || Boolean(seriesId && seriesRow));
 
   return (
     <div className="py-2">
@@ -212,19 +383,36 @@ export default function RunManageCreateRunPage() {
         />
       </label>
       <p className="mt-2 text-sm text-gray-600">
-        Pick run type, add title and public description, then fill core details in the wizard.
+        {isSeriesCreate
+          ? "Confirm core details seeded from the series, then save this dated run."
+          : "Pick run type, add title and public description, then fill core details in the wizard."}
       </p>
 
-      <div className="mt-4">
-        <RunManageCreateRunScope
-          draft={affiliations}
-          onDraftChange={setAffiliations}
-          imprintedCompanyRaceId={imprintedCompanyRaceId}
-          imprintedRaceLabel={imprintedRaceLabel}
-        />
-      </div>
+      <RunManageCreateRunModeFork
+        mode={createMode}
+        onModeChange={(mode) => {
+          setCreateMode(mode);
+          if (mode === "regular") {
+            setSeriesId(null);
+            setSeriesRow(null);
+            router.replace("/runmanage/runs/new");
+          }
+        }}
+        seriesPicker={seriesPicker}
+      />
 
-      {frontDoorReady ? (
+      {!isSeriesCreate ? (
+        <div className="mt-4">
+          <RunManageCreateRunScope
+            draft={affiliations}
+            onDraftChange={setAffiliations}
+            imprintedCompanyRaceId={imprintedCompanyRaceId}
+            imprintedRaceLabel={imprintedRaceLabel}
+          />
+        </div>
+      ) : null}
+
+      {wizardReady ? (
         <div className="mt-6">
           {saving ? (
             <div className="flex items-center gap-2 text-gray-500">
@@ -236,11 +424,15 @@ export default function RunManageCreateRunPage() {
               values={wizardValues}
               onChange={setWizardValues}
               context={{
-                variant: "edit",
+                variant: isSeriesCreate ? "create-series" : "edit",
                 cityRunType: affiliations.cityRunType,
-                isSeriesInstance: false,
+                isSeriesInstance: isSeriesCreate,
+                dayOfWeek: seriesRow?.dayOfWeek ?? wizardValues.dayOfWeek,
                 clubName: affiliations.runClubLabel,
                 clubId: affiliations.runClubId,
+                seriesContext,
+                seriesBaseline,
+                requireSeriesDay: isSeriesCreate ? seriesRow?.dayOfWeek ?? null : null,
               }}
               titleInPageHeading
               initialWizardStep="core"
@@ -248,13 +440,18 @@ export default function RunManageCreateRunPage() {
               saving={saving}
               error={error}
               onErrorChange={setError}
-              saveLabel="Create draft run"
+              saveLabel={isSeriesCreate ? "Build dated run" : "Create draft run"}
               publicSources={null}
               headerSlot={headerSlot}
-              associateDraft={affiliations}
-              onAssociateChange={setAffiliations}
+              associateDraft={isSeriesCreate ? undefined : affiliations}
+              onAssociateChange={isSeriesCreate ? undefined : setAffiliations}
             />
           )}
+        </div>
+      ) : createMode === "series" && seriesId && !seriesRow ? (
+        <div className="mt-6 flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Loading series…
         </div>
       ) : null}
     </div>

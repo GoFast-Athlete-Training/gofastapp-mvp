@@ -32,7 +32,6 @@ import {
   runInstanceViewPath,
   type RunInstanceManageMode,
 } from "@/lib/runmanage/paths";
-import { getCompanyAppUrl } from "@/lib/app-urls";
 import type { WizardStep } from "@/components/runmanage/runInstanceWizard/shared";
 import { formatDayLabel } from "@/lib/runmanage/format-day-label";
 import {
@@ -894,12 +893,18 @@ export default function RunManageStaffEditor({
               {run.dayOfWeek ? `${formatDayLabel(run.dayOfWeek)} · ` : ""}
               {run.meetUpPoint}
             </p>
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap gap-3">
               <Link
-                href={`${getCompanyAppUrl()}/dashboard/entities/manage/runclubs/${run.runClub.id}/series/${run.runSeriesId}`}
+                href={`/runmanage/series?series=${encodeURIComponent(run.runSeriesId)}`}
                 className="text-xs font-medium text-violet-700 hover:text-violet-900"
               >
-                Manage series
+                View in Run series
+              </Link>
+              <Link
+                href={`/runmanage/runs/new?mode=series&seriesId=${encodeURIComponent(run.runSeriesId)}`}
+                className="text-xs font-medium text-amber-800 hover:text-amber-950"
+              >
+                Build next run
               </Link>
             </div>
           </div>

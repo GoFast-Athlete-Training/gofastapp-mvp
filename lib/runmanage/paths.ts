@@ -6,6 +6,8 @@ export {
   RUN_MANAGE_DASHBOARD_PATH,
 } from '@/lib/runmanage/door';
 
+export const RUN_MANAGE_SERIES_PATH = '/runmanage/series';
+
 export type RunInstanceManageMode = "view" | "edit" | "rsvps";
 
 export function runManageCreatePath(opts?: {
@@ -21,6 +23,17 @@ export function runManageCreatePath(opts?: {
   if (opts?.raceName?.trim()) params.set("raceName", opts.raceName.trim());
   const q = params.toString();
   return q ? `/runmanage/runs/new?${q}` : "/runmanage/runs/new";
+}
+
+export function runManageCreateFromSeriesPath(
+  seriesId: string,
+  opts?: { dateYmd?: string | null }
+): string {
+  const params = new URLSearchParams();
+  params.set("mode", "series");
+  params.set("seriesId", seriesId.trim());
+  if (opts?.dateYmd?.trim()) params.set("dateYmd", opts.dateYmd.trim());
+  return `/runmanage/runs/new?${params.toString()}`;
 }
 
 export function runInstanceViewPath(runId: string, _clubId?: string | null): string {

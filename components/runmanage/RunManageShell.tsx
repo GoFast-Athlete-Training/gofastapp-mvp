@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useRunManageAuth } from "@/components/runmanage/RunManageProviders";
+import { RUN_MANAGE_SERIES_PATH } from "@/lib/runmanage/paths";
 
 export function RunManageShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -35,6 +36,16 @@ export function RunManageShell({ children }: { children: ReactNode }) {
                 }
               >
                 Dashboard
+              </Link>
+              <Link
+                href={RUN_MANAGE_SERIES_PATH}
+                className={
+                  pathname === RUN_MANAGE_SERIES_PATH || pathname?.startsWith(`${RUN_MANAGE_SERIES_PATH}/`)
+                    ? "font-medium text-sky-700"
+                    : "text-gray-600 hover:text-gray-900"
+                }
+              >
+                Run series
               </Link>
               <Link
                 href="/runmanage/runs/new"
