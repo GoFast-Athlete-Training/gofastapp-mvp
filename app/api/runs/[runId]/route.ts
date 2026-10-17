@@ -33,6 +33,7 @@ import {
   postRunBrandStampFieldsFromBody,
   postRunBrandStampFromProdBrand,
 } from '@/lib/runmanage/post-run-brand-stamp';
+import { maybeStampCityRunStartsAtOnUpdate } from '@/lib/city-run/stamp-city-run-write';
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
   process.env.RENDER_GIT_COMMIT ||
@@ -1020,6 +1021,15 @@ export async function PUT(
     if (body.runClubStravaUrl !== undefined) {
       runClubUpdateData.stravaUrl = body.runClubStravaUrl === null || body.runClubStravaUrl === '' ? null : String(body.runClubStravaUrl).trim();
     }
+
+    maybeStampCityRunStartsAtOnUpdate(updateData, {
+      date: run.date,
+      startTimeHour: run.startTimeHour,
+      startTimeMinute: run.startTimeMinute,
+      startTimePeriod: run.startTimePeriod,
+      timezone: run.timezone,
+      citySlug: run.citySlug,
+    });
 
     if (Object.keys(updateData).length <= 1) {
       // only updatedAt

@@ -17,6 +17,7 @@ import { cityRunTypeForWrite } from "@/lib/city-run-type";
 import { resolveActiveRaceByCompanyRaceId } from "@/lib/race-hub-internal-company";
 import { partnerExtrasForWrite } from "@/lib/runmanage/partner-extras";
 import { runBrandStampFieldsFromBody } from "@/lib/runmanage/run-brand-stamp";
+import { stampCityRunStartsAtOnCreateData } from "@/lib/city-run/stamp-city-run-write";
 
 export const dynamic = "force-dynamic";
 
@@ -747,6 +748,8 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+
+    stampCityRunStartsAtOnCreateData(createData);
 
     // Create the run
     let run;

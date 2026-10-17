@@ -394,6 +394,11 @@ async function duplicateRunForward(
     updatedAt: new Date(),
   };
 
+  const { stampCityRunStartsAtOnCreateData } = await import(
+    '@/lib/city-run/stamp-city-run-write'
+  );
+  stampCityRunStartsAtOnCreateData(createData);
+
   const created = await prisma.city_runs.create({
     data: createData as Parameters<typeof prisma.city_runs.create>[0]["data"],
     select: {

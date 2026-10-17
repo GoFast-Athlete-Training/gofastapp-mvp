@@ -5,6 +5,7 @@ export const DEFAULT_RUN_TIMEZONE = 'America/New_York';
 
 export type RunWithStartTime = {
   date: Date;
+  startsAt?: Date | null;
   startTimeHour: number | null;
   startTimeMinute: number | null;
   startTimePeriod: string | null;
@@ -95,6 +96,9 @@ export function zonedLocalWallClockToUtcMs(
 
 /** UTC timestamp for run calendar date + optional start time in the run timezone. */
 export function runCalendarStartMs(run: RunWithStartTime): number | null {
+  if (run.startsAt instanceof Date && !Number.isNaN(run.startsAt.getTime())) {
+    return run.startsAt.getTime();
+  }
   if (run.startTimeHour == null) return null;
 
   let hour = run.startTimeHour;
@@ -123,6 +127,10 @@ export function isRunStillUpcomingForDiscover(
   run: RunWithStartTime,
   now: Date = new Date()
 ): boolean {
+  if (run.startsAt instanceof Date && !Number.isNaN(run.startsAt.getTime())) {
+    return now.getTime() <= run.startsAt.getTime() + SAME_DAY_RUN_START_GRACE_MS;
+  }
+
   const timeZone = resolveRunTimezone(run);
   const todayKey = todayKeyInTimezone(now, timeZone);
   const runKey = runCalendarDayKey(run);

@@ -99,6 +99,7 @@ export async function GET(
         startTimeMinute: run.startTimeMinute,
         startTimePeriod: run.startTimePeriod,
         timezone: run.timezone,
+        startsAt: run.startsAt?.toISOString() ?? null,
         totalMiles: run.totalMiles,
         pace: run.pace,
         runDescription,

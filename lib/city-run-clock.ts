@@ -1,7 +1,8 @@
 /**
- * Shared City Run time semantics — date-only row + optional start clock.
- * Past = start (or end of civil day) + buffer, not UTC noon + 4h.
+ * Shared City Run time semantics — DB `startsAt` is the clock when set.
  */
+
+import { computeCityRunStartsAt } from '@/lib/city-run/city-run-starts-at-setter';
 
 export const RUN_PAST_BUFFER_MS = 4 * 60 * 60 * 1000;
 
@@ -11,37 +12,30 @@ export type CityRunClockInput = {
   startTimeMinute?: number | null;
   startTimePeriod?: string | null;
   timezone?: string | null;
+  citySlug?: string | null;
+  startsAt?: Date | null;
 };
 
-function parseCalendarParts(dateInput: Date | string): { y: number; m: number; d: number } {
-  const raw = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-  return {
-    y: raw.getUTCFullYear(),
-    m: raw.getUTCMonth(),
-    d: raw.getUTCDate(),
-  };
+function asDate(dateInput: Date | string): Date {
+  return typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
 }
 
-function hour24(hour: number, period: string | null | undefined): number {
-  const p = (period || 'AM').toUpperCase();
-  if (p === 'PM' && hour < 12) return hour + 12;
-  if (p === 'AM' && hour === 12) return 0;
-  return hour;
-}
-
-/** When the run is considered to have started (local wall clock approximated via UTC date parts + start time). */
+/** When the run is considered to have started. */
 export function getCityRunStartMs(input: CityRunClockInput): number {
-  const { y, m, d } = parseCalendarParts(input.date);
-  const hour = input.startTimeHour;
-  const minute = input.startTimeMinute ?? 0;
-
-  if (hour != null && input.startTimeMinute != null) {
-    const h24 = hour24(hour, input.startTimePeriod);
-    return Date.UTC(y, m, d, h24, minute, 0, 0);
+  if (input.startsAt instanceof Date && !Number.isNaN(input.startsAt.getTime())) {
+    return input.startsAt.getTime();
   }
 
-  // No start time: end of civil day (23:59:59 UTC on stored calendar day)
-  return Date.UTC(y, m, d, 23, 59, 59, 999);
+  const date = asDate(input.date);
+  const { startsAt } = computeCityRunStartsAt({
+    date,
+    startTimeHour: input.startTimeHour,
+    startTimeMinute: input.startTimeMinute,
+    startTimePeriod: input.startTimePeriod,
+    timezone: input.timezone,
+    citySlug: input.citySlug,
+  });
+  return startsAt.getTime();
 }
 
 /** Run is past once start + buffer has elapsed. */
@@ -61,11 +55,11 @@ export function isCityRunWithinPostRunCheckinWindow(
 
 /** Run is today on the stored calendar date (UTC civil day). */
 export function isCityRunToday(input: CityRunClockInput, today = new Date()): boolean {
-  const { y, m, d } = parseCalendarParts(input.date);
+  const date = asDate(input.date);
   return (
-    y === today.getUTCFullYear() &&
-    m === today.getUTCMonth() &&
-    d === today.getUTCDate()
+    date.getUTCFullYear() === today.getUTCFullYear() &&
+    date.getUTCMonth() === today.getUTCMonth() &&
+    date.getUTCDate() === today.getUTCDate()
   );
 }
 

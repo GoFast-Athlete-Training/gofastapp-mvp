@@ -1767,6 +1767,8 @@ model city_runs {
   title               String
   date                DateTime
   timezone            String?
+  /// UTC instant of scheduled start (wall clock in `timezone`). Set on every create/update — readers compare this, not Date.UTC on hour fields.
+  startsAt            DateTime?
   meetUpPoint         String
   meetUpPlaceId       String?
   meetUpLat           Float?

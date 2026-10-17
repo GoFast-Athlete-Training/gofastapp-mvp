@@ -35,6 +35,7 @@ const CITY_RUN_DISCOVER_SELECT = {
   startTimeMinute: true,
   startTimePeriod: true,
   timezone: true,
+  startsAt: true,
   totalMiles: true,
   pace: true,
   description: true,
@@ -158,6 +159,7 @@ function mapCityRunForResponse(run: Awaited<ReturnType<typeof queryCityRunsForDi
     startTimeMinute: run.startTimeMinute,
     startTimePeriod: run.startTimePeriod,
     timezone: run.timezone,
+    startsAt: run.startsAt,
     totalMiles: run.totalMiles,
     pace: run.pace,
     description: run.description,
@@ -255,6 +257,7 @@ async function queryCityRunsForDiscover(filters: GetRunsFilters, mode: GetRunsMo
     isRunStillUpcomingForDiscover(
       {
         date: run.date,
+        startsAt: run.startsAt,
         startTimeHour: run.startTimeHour,
         startTimeMinute: run.startTimeMinute,
         startTimePeriod: run.startTimePeriod,

@@ -465,6 +465,11 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
+    const { stampCityRunStartsAtOnCreateData } = await import(
+      "@/lib/city-run/stamp-city-run-write"
+    );
+    stampCityRunStartsAtOnCreateData(createData);
+
     let run;
     try {
       run = await prisma.city_runs.create({
