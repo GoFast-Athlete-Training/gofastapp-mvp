@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import { cityRunPublicCardUrl } from "@/lib/city-run-public-card-url";
 
-/** Fix stored link-tree URLs that still point at races.* instead of dcruns.* */
+/** Fix stored link-tree URLs to canonical gofastlinks /run/{slug} company slice. */
 export async function rewriteCityRunLinkTreeUrls(athleteId: string): Promise<void> {
   const tree = await prisma.athlete_link_trees.findUnique({
     where: { athleteId },
@@ -28,7 +28,6 @@ export async function rewriteCityRunLinkTreeUrls(athleteId: string): Promise<voi
     const publicKey = run.slug?.trim() || run.id;
     const next = cityRunPublicCardUrl(publicKey, run.citySlug, run.id);
     if (link.url?.trim() === next) continue;
-    if (!link.url?.includes("/runs/") || !link.url.includes("/card")) continue;
     await prisma.athlete_link_tree_links.update({
       where: { id: link.id },
       data: { url: next },
