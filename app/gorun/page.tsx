@@ -4,8 +4,7 @@ import Link from "next/link";
 import { Compass, Dumbbell, Users } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
-import WebRunsDiscover from "@/components/runs/WebRunsDiscover";
-import HostedRunInvitesPanel from "@/components/runs/HostedRunInvitesPanel";
+import GoRunUpcomingRunsPanel from "@/components/runs/GoRunUpcomingRunsPanel";
 
 export default function GoRunPage() {
   return (
@@ -44,23 +43,19 @@ export default function GoRunPage() {
                 <h2 className="text-base font-semibold text-gray-900">Create a Run</h2>
                 <p className="text-sm text-gray-600 mt-1">Meetup, time, optional workout.</p>
               </Link>
-              <a
-                href="#find-a-run"
+              <Link
+                href="/discoverruns"
                 className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:border-sky-300 transition group h-full"
               >
                 <div className="rounded-xl bg-sky-100 p-2.5 w-fit mb-3 group-hover:bg-sky-200/80">
                   <Compass className="h-6 w-6 text-sky-800" />
                 </div>
                 <h2 className="text-base font-semibold text-gray-900">Find a Run</h2>
-                <p className="text-sm text-gray-600 mt-1">Club runs in your region — browse below.</p>
-              </a>
+                <p className="text-sm text-gray-600 mt-1">Club runs in your region.</p>
+              </Link>
             </section>
 
-            <HostedRunInvitesPanel />
-
-            <section id="find-a-run" className="scroll-mt-6 border-t border-gray-200 pt-8">
-              <WebRunsDiscover />
-            </section>
+            <GoRunUpcomingRunsPanel />
           </div>
         </main>
       </div>

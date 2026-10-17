@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** Legacy URL — My Runs lives at /myruns */
+/** Legacy URL — upcoming runs live on the Run hub */
 export default function RunnerRedirectPage() {
-  redirect('/myruns');
+  redirect('/gorun');
 }

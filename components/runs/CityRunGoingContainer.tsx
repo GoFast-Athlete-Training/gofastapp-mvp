@@ -57,7 +57,7 @@ export default function CityRunGoingContainer({ run, onLeave }: Props) {
   );
   const isHost = isHostRsvpRole(viewerRsvpRole);
   const isIndividual = run.cityRunType === 'INDIVIDUAL';
-  const backHref = isHost ? '/gorun' : '/myruns';
+  const backHref = '/gorun';
   const backLabel = isHost ? 'Run' : 'My Runs';
   const socialRun = hasSocialRunLifecycle(run);
 

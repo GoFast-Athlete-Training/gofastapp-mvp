@@ -48,6 +48,7 @@ function gorunMatch(p: string | null): boolean {
   if (!p) return false;
   if (p === "/gorun") return true;
   if (p.startsWith("/gorun/")) return true;
+  if (p === "/discoverruns") return true;
   return (
     p === "/build-a-run" ||
     p === "/host-a-run" ||
