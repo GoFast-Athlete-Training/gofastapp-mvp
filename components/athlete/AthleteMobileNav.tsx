@@ -60,7 +60,7 @@ function activityHubMatch(p: string | null): boolean {
 
 const primaryTabs: NavItem[] = [
   { id: 'train', label: 'Train', href: '/training', icon: LayoutDashboard, match: planHubMatch },
-  { id: 'run', label: 'Run', href: '/build-a-run', icon: MapPin, match: gorunMatch },
+  { id: 'run', label: 'Run', href: '/gorun', icon: MapPin, match: gorunMatch },
   { id: 'races', label: 'Races', href: '/races', icon: Trophy, match: racesMatch },
   { id: 'activity', label: 'Activity', href: '/activities', icon: Activity, match: activityHubMatch },
 ];

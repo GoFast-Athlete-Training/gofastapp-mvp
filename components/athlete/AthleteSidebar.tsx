@@ -65,7 +65,7 @@ const primaryNavItems: NavItem[] = [
   },
   {
     label: "Run",
-    href: "/build-a-run",
+    href: "/gorun",
     icon: MapPin,
     match: gorunMatch,
   },
