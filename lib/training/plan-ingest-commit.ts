@@ -1,0 +1,300 @@
+/**
+ * Commit scoped plan ingest previews onto planSchedule + planned_workouts.
+ */
+
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import type { PlanIngestPreviewResult } from "@/lib/training/plan-ingest-contract";
+import type { PlanDaySchedule, PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
+import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
+import {
+  expandWeekSchedule,
+  weekBoundsFromPlan,
+  weekNumberFromPlanDate,
+} from "@/lib/training/plan-schedule";
+import {
+  loadAthletePlanContext,
+  type AthletePlanContext,
+} from "@/lib/training/plan-ingest-plan-context";
+import {
+  materializeWorkoutForPlanDay,
+  MaterializeWorkoutError,
+} from "@/lib/training/workout-materializer";
+import {
+  replacePrescribeSegmentsForAthlete,
+  type PrescribeSegmentInput,
+} from "@/lib/training/workout-or-planned-resolve";
+import { cleanupFuturePlanWorkoutsAfterRegenerate } from "@/lib/training/plan-regenerate-cleanup";
+import { utcDateOnly } from "@/lib/training/plan-utils";
+import type { WorkoutStep } from "@/lib/training/prescription";
+
+function workoutStepsToPrescribeInput(steps: WorkoutStep[]): PrescribeSegmentInput[] {
+  return steps.map((s, i) => ({
+    stepOrder: s.stepOrder ?? i + 1,
+    title: s.title,
+    durationType: s.durationType === "TIME" ? "TIME" : "DISTANCE",
+    durationValue: s.durationValue,
+    targets: (s.targets ?? null) as Prisma.InputJsonValue | null,
+    repeatCount: s.repeatCount ?? null,
+    notes: null,
+    recoveryDurationType: s.recoveryDurationType ?? null,
+    recoveryDurationValue: s.recoveryDurationValue ?? null,
+  }));
+}
+
+function ensureStructuredSchedule(planSchedule: unknown): PlanWeekSchedule[] {
+  if (!Array.isArray(planSchedule)) return [];
+  const out: PlanWeekSchedule[] = [];
+  for (const w of planSchedule) {
+    if (isStructuredPlanWeek(w)) out.push(w);
+  }
+  return out.sort((a, b) => a.weekNumber - b.weekNumber);
+}
+
+function patchDayInWeek(week: PlanWeekSchedule, day: PlanDaySchedule): PlanWeekSchedule {
+  const days = [...week.days];
+  const idx = days.findIndex((d) => d.dow === day.dow);
+  const next: PlanDaySchedule = {
+    ...day,
+    catalogueWorkoutId: day.catalogueWorkoutId ?? null,
+    planCycleIndex: day.planCycleIndex ?? null,
+  };
+  if (idx >= 0) days[idx] = { ...days[idx], ...next };
+  else days.push(next);
+  days.sort((a, b) => a.dow - b.dow);
+  return { ...week, days };
+}
+
+function spliceWeek(schedule: PlanWeekSchedule[], week: PlanWeekSchedule): PlanWeekSchedule[] {
+  const copy = [...schedule];
+  const idx = copy.findIndex((w) => w.weekNumber === week.weekNumber);
+  if (idx >= 0) copy[idx] = week;
+  else {
+    copy.push(week);
+    copy.sort((a, b) => a.weekNumber - b.weekNumber);
+  }
+  return copy;
+}
+
+async function persistPlanSchedule(planId: string, weeks: PlanWeekSchedule[]): Promise<void> {
+  await prisma.training_plans.update({
+    where: { id: planId },
+    data: {
+      planSchedule: weeks as unknown as Prisma.InputJsonValue,
+      updatedAt: new Date(),
+    },
+  });
+}
+
+async function clearPlannedWorkoutsInDateRange(params: {
+  planId: string;
+  athleteId: string;
+  fromDateInclusive: Date;
+  toDateInclusive: Date;
+}): Promise<number> {
+  const planned = await prisma.planned_workouts.findMany({
+    where: {
+      planId: params.planId,
+      athleteId: params.athleteId,
+      date: { gte: params.fromDateInclusive, lte: params.toDateInclusive },
+    },
+    select: { id: true },
+  });
+  if (planned.length === 0) return 0;
+  const ids = planned.map((p) => p.id);
+  await prisma.$transaction(async (tx) => {
+    await tx.planned_workout_segments.deleteMany({ where: { plannedWorkoutId: { in: ids } } });
+    await tx.planned_workouts.deleteMany({ where: { id: { in: ids } } });
+  });
+  return ids.length;
+}
+
+async function rematerializeFutureDaysInWeek(params: {
+  plan: AthletePlanContext;
+  weekNumber: number;
+}): Promise<{ materialized: number; errors: string[] }> {
+  const todayUtc = utcDateOnly(new Date());
+  const bounds = weekBoundsFromPlan(params.plan.startDate, params.weekNumber, {
+    raceDate: params.plan.raceCtx.raceDate,
+    totalWeeks: params.plan.totalWeeks,
+  });
+
+  const days = expandWeekSchedule({
+    planStartDate: params.plan.startDate,
+    planSchedule: params.plan.planSchedule,
+    weekNumber: params.weekNumber,
+    raceDate: params.plan.raceCtx.raceDate,
+    raceName: params.plan.raceCtx.raceName,
+    raceDistanceMiles: params.plan.raceCtx.raceDistanceMiles,
+    totalWeeks: params.plan.totalWeeks,
+  });
+
+  let materialized = 0;
+  const errors: string[] = [];
+
+  for (const d of days) {
+    const dayDate = utcDateOnly(d.date);
+    if (dayDate.getTime() < todayUtc.getTime()) continue;
+    if (d.title === "Rest") continue;
+    try {
+      await materializeWorkoutForPlanDay({
+        athleteId: params.plan.athleteId,
+        planId: params.plan.id,
+        dateParam: d.dateKey,
+      });
+      materialized += 1;
+    } catch (e) {
+      const msg = e instanceof MaterializeWorkoutError ? e.message : String(e);
+      errors.push(`${d.dateKey}: ${msg}`);
+    }
+  }
+
+  return { materialized, errors };
+}
+
+async function commitWorkoutIngest(params: {
+  plan: AthletePlanContext;
+  preview: Extract<PlanIngestPreviewResult, { scope: "workout" }>;
+}): Promise<{ plannedWorkoutId: string | null; warnings: string[] }> {
+  const { workout } = params.preview;
+  const weekNumber = weekNumberFromPlanDate(
+    params.plan.startDate,
+    utcDateOnly(new Date(`${workout.dateKey}T12:00:00.000Z`))
+  );
+
+  const weeks = ensureStructuredSchedule(params.plan.planSchedule);
+  let week = weeks.find((w) => w.weekNumber === weekNumber);
+  if (!week) {
+    week = { weekNumber, days: [] };
+  }
+
+  const daySlot: PlanDaySchedule = {
+    dow: (() => {
+      const d = new Date(`${workout.dateKey}T12:00:00.000Z`);
+      const js = d.getUTCDay();
+      return js === 0 ? 7 : js;
+    })(),
+    workoutType: workout.workoutType,
+    miles: workout.miles,
+    catalogueWorkoutId: workout.catalogueWorkoutId ?? null,
+    planCycleIndex: workout.planCycleIndex ?? null,
+  };
+
+  const patchedWeek = patchDayInWeek(week, daySlot);
+  const nextSchedule = spliceWeek(weeks, patchedWeek);
+  await persistPlanSchedule(params.plan.id, nextSchedule);
+  params.plan.planSchedule = nextSchedule;
+
+  const warnings: string[] = [];
+  let plannedWorkoutId: string | null = null;
+
+  try {
+    const mat = await materializeWorkoutForPlanDay({
+      athleteId: params.plan.athleteId,
+      planId: params.plan.id,
+      dateParam: workout.dateKey,
+    });
+    plannedWorkoutId = mat.plannedWorkoutId;
+  } catch (e) {
+    warnings.push(e instanceof MaterializeWorkoutError ? e.message : String(e));
+  }
+
+  if (workout.segments && workout.segments.length > 0 && plannedWorkoutId) {
+    await replacePrescribeSegmentsForAthlete({
+      id: plannedWorkoutId,
+      athleteId: params.plan.athleteId,
+      normalized: workoutStepsToPrescribeInput(workout.segments),
+    });
+  }
+
+  return { plannedWorkoutId, warnings };
+}
+
+async function commitWeekIngest(params: {
+  plan: AthletePlanContext;
+  preview: Extract<PlanIngestPreviewResult, { scope: "week" }>;
+}): Promise<{ clearedPlanned: number; materialized: number; errors: string[] }> {
+  const { weekNumber, week } = params.preview.week;
+  const weeks = ensureStructuredSchedule(params.plan.planSchedule);
+  const nextSchedule = spliceWeek(weeks, { ...week, weekNumber });
+  await persistPlanSchedule(params.plan.id, nextSchedule);
+  params.plan.planSchedule = nextSchedule;
+
+  const todayUtc = utcDateOnly(new Date());
+  const bounds = weekBoundsFromPlan(params.plan.startDate, weekNumber, {
+    raceDate: params.plan.raceCtx.raceDate,
+    totalWeeks: params.plan.totalWeeks,
+  });
+  const from =
+    bounds.weekStart.getTime() < todayUtc.getTime() ? todayUtc : bounds.weekStart;
+
+  const clearedPlanned = await clearPlannedWorkoutsInDateRange({
+    planId: params.plan.id,
+    athleteId: params.plan.athleteId,
+    fromDateInclusive: from,
+    toDateInclusive: bounds.weekEnd,
+  });
+
+  const { materialized, errors } = await rematerializeFutureDaysInWeek({
+    plan: params.plan,
+    weekNumber,
+  });
+
+  return { clearedPlanned, materialized, errors };
+}
+
+async function commitPlanIngestScope(params: {
+  plan: AthletePlanContext;
+  preview: Extract<PlanIngestPreviewResult, { scope: "plan" }>;
+}): Promise<{ replacedWeeks: number; cleanup: Awaited<ReturnType<typeof cleanupFuturePlanWorkoutsAfterRegenerate>> }> {
+  const todayKey = utcDateOnly(new Date()).toISOString().slice(0, 10);
+  const currentWeek = weekNumberFromPlanDate(
+    params.plan.startDate,
+    utcDateOnly(new Date(`${todayKey}T12:00:00.000Z`))
+  );
+
+  const existing = ensureStructuredSchedule(params.plan.planSchedule);
+  const incoming = params.preview.plan.weeks.filter((w) => w.weekNumber >= currentWeek);
+
+  let next = [...existing.filter((w) => w.weekNumber < currentWeek)];
+  for (const w of incoming) {
+    next = spliceWeek(next, w);
+  }
+
+  await persistPlanSchedule(params.plan.id, next);
+  params.plan.planSchedule = next;
+
+  const cleanup = await cleanupFuturePlanWorkoutsAfterRegenerate({
+    planId: params.plan.id,
+    athleteId: params.plan.athleteId,
+  });
+
+  for (const w of incoming) {
+    await rematerializeFutureDaysInWeek({ plan: params.plan, weekNumber: w.weekNumber });
+  }
+
+  return { replacedWeeks: incoming.length, cleanup };
+}
+
+export async function commitPlanIngest(params: {
+  athleteId: string;
+  planId: string;
+  preview: PlanIngestPreviewResult;
+}): Promise<
+  | { ok: true; result: Record<string, unknown> }
+  | { ok: false; error: string }
+> {
+  const plan = await loadAthletePlanContext(params.planId, params.athleteId);
+  if (!plan) return { ok: false, error: "Plan not found" };
+
+  if (params.preview.scope === "workout") {
+    const r = await commitWorkoutIngest({ plan, preview: params.preview });
+    return { ok: true, result: r };
+  }
+  if (params.preview.scope === "week") {
+    const r = await commitWeekIngest({ plan, preview: params.preview });
+    return { ok: true, result: r };
+  }
+  const r = await commitPlanIngestScope({ plan, preview: params.preview });
+  return { ok: true, result: r };
+}

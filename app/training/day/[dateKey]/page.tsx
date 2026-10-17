@@ -52,6 +52,8 @@ import {
   deriveSessionStatus,
   showFindMissingGarminForStatus,
 } from "@/lib/training/session-status";
+import PlanIngestPanel from "@/components/training/PlanIngestPanel";
+import PlanDayBriefPanel from "@/components/training/PlanDayBriefPanel";
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
   if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
@@ -509,7 +511,17 @@ export default function TrainingPlanDayPreviewPage() {
     workout?.weekNumber != null && Number.isFinite(workout.weekNumber)
       ? workout.weekNumber
       : "—";
+  const weekNumberNumeric =
+    workout?.weekNumber != null && Number.isFinite(workout.weekNumber)
+      ? workout.weekNumber
+      : undefined;
   const isCalendarToday = dateKey != null && dateKey === localYmd(new Date());
+
+  async function getDayToken() {
+    const u = auth.currentUser;
+    if (!u) return null;
+    return u.getIdToken();
+  }
   const isPastPlanDay = dateKey != null && dateKey < localYmd(new Date());
   const planRace = planDetail?.race_registry;
   const showRaceResultCta = Boolean(
@@ -735,6 +747,26 @@ export default function TrainingPlanDayPreviewPage() {
             </div>
 
             <div className="px-5 py-4 space-y-4">
+              {isCalendarToday && planDetail?.id && dateKey ? (
+                <PlanDayBriefPanel
+                  planId={planDetail.id}
+                  dateKey={dateKey}
+                  getToken={getDayToken}
+                  onAccepted={() => void load()}
+                />
+              ) : null}
+              {!isLogged && planDetail?.id && dateKey ? (
+                <PlanIngestPanel
+                  planId={planDetail.id}
+                  scope="workout"
+                  dateKey={dateKey}
+                  weekNumber={weekNumberNumeric}
+                  getToken={getDayToken}
+                  title="Change this workout"
+                  description="Paste a replacement for this day only — preview, then confirm."
+                  onCommitted={() => void load()}
+                />
+              ) : null}
               {isLogged ? (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-gray-800 space-y-1">
                   <p className="font-medium text-emerald-900">This workout is logged.</p>

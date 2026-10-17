@@ -65,6 +65,7 @@ import { buildRaceDayBuilderHref } from "@/lib/training/race-day-builder-href";
 import GoFastWithMeSetupPanel from "@/components/gofast-with-me/GoFastWithMeSetupPanel";
 import type { ShareHubPlanStatus } from "@/lib/profile/share-creator-card-logic";
 import { LocalStorageAPI } from "@/lib/localstorage";
+import PlanIngestPanel from "@/components/training/PlanIngestPanel";
 
 type PlanDetailHub = {
   id: string;
@@ -1272,6 +1273,34 @@ export default function TrainingHubPage() {
                 {deleting ? "Deleting…" : "Delete plan"}
               </button>
             </div>
+
+            {planDetail && planScheduleLooksStructured(planDetail.planSchedule) ? (
+              <div className="space-y-3">
+                <PlanIngestPanel
+                  planId={planDetail.id}
+                  scope="week"
+                  weekNumber={weekNumber}
+                  getToken={getHubToken}
+                  title="Paste this week"
+                  description="Replace the current calendar week without regenerating the whole plan. One line per run day."
+                  onCommitted={() => {
+                    void loadHub();
+                    void fetchWeekDays(weekNumber);
+                  }}
+                />
+                <PlanIngestPanel
+                  planId={planDetail.id}
+                  scope="plan"
+                  getToken={getHubToken}
+                  title="Paste full plan (week to week)"
+                  description="Future weeks only — completed weeks stay as-is. Use Week 8 / Week 9 headers or a long paste."
+                  onCommitted={() => {
+                    void loadHub();
+                    void fetchWeekDays(weekNumber);
+                  }}
+                />
+              </div>
+            ) : null}
 
             <div className="rounded-xl border border-orange-200 bg-orange-50/70 px-4 py-3 text-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
