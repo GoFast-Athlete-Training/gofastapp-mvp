@@ -971,6 +971,7 @@ model race_registry {
   race_messages            race_messages[]
   race_announcements       race_announcements[]
   race_events              race_events[]
+  race_hub_profile         race_hub_profiles?
   city_runs_tagged         city_runs[]               @relation("CityRunRaceRegistry")
   course_segments          race_registry_course_segments[]
   race_triggers            race_triggers?
@@ -1230,6 +1231,18 @@ model race_announcements {
   @@index([raceId])
   @@index([staffGeneratedId])
   @@map("race_announcements")
+}
+
+/// Standing welcome copy for the athlete race hub (not a dated announcement).
+model race_hub_profiles {
+  raceId      String   @id
+  welcomeText String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  race_registry race_registry @relation(fields: [raceId], references: [id], onDelete: Cascade)
+
+  @@map("race_hub_profiles")
 }
 
 /// Race-day / training meetups tied to a race (mirrors run_crew_events).
