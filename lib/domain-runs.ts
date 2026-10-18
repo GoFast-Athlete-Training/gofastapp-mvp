@@ -1,5 +1,9 @@
 import { prisma } from './prisma';
 import {
+  cityRunClubAssociationSelect,
+  mapClubAssociationRow,
+} from '@/lib/city-run/club-association';
+import {
   isRunOnOrAfterToday,
   isRunStillUpcomingForDiscover,
 } from '@/lib/run-discover-freshness';
@@ -57,6 +61,9 @@ const CITY_RUN_DISCOVER_SELECT = {
       logoUrl: true,
       city: true,
     },
+  },
+  club_association: {
+    select: cityRunClubAssociationSelect,
   },
   Athlete: {
     select: {
@@ -152,6 +159,9 @@ function mapCityRunForResponse(run: Awaited<ReturnType<typeof queryCityRunsForDi
       : null,
     runClub: run.runClub || null,
     runClubSlug: run.runClub?.slug || null,
+    clubAssociation: run.club_association
+      ? mapClubAssociationRow(run.club_association)
+      : null,
     meetUpPoint: run.meetUpPoint,
     meetUpStreetAddress: run.meetUpStreetAddress,
     meetUpCity: run.meetUpCity,

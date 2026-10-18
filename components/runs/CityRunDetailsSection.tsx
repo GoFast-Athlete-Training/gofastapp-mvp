@@ -141,6 +141,11 @@ export default function CityRunDetailsSection({
             <span className="text-sm font-medium text-gray-600">{run.runClub.name}</span>
           </div>
         ) : null}
+        {run.cityRunType === 'INDIVIDUAL' && run.clubAssociation && !run.runClub ? (
+          <p className="mb-3 text-xs text-gray-500">
+            Associated with {run.clubAssociation.nameSnapshot}
+          </p>
+        ) : null}
 
         <div className="flex items-start justify-between gap-3 mb-4">
           <h1 className={`font-bold text-gray-900 min-w-0 ${compact ? 'text-xl' : 'text-2xl'}`}>

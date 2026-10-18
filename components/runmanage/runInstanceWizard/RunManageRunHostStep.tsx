@@ -31,6 +31,9 @@ function scopeToDraft(scope: HostScope, prev: RunAffiliationDraft): RunAffiliati
     runClubId: scope === "CLUB" ? prev.runClubId : null,
     runClubLabel: scope === "CLUB" ? prev.runClubLabel : null,
     runClubPick: scope === "CLUB" ? prev.runClubPick : null,
+    associatedRunClubId: scope === "INDIVIDUAL" ? prev.associatedRunClubId : null,
+    associatedRunClubLabel: scope === "INDIVIDUAL" ? prev.associatedRunClubLabel : null,
+    associatedRunClubPick: scope === "INDIVIDUAL" ? prev.associatedRunClubPick : null,
     runStoreId: scope === "RUN_STORE" ? prev.runStoreId : null,
     runStoreLabel: scope === "RUN_STORE" ? prev.runStoreLabel : null,
     runStorePick: scope === "RUN_STORE" ? prev.runStorePick : null,
@@ -207,9 +210,35 @@ export default function RunManageRunHostStep({ draft, onChange, onScopeChange }:
       ) : null}
 
       {activeScope === "INDIVIDUAL" ? (
-        <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          This run will be athlete-hosted. No catalog attach required.
-        </p>
+        <div className="space-y-3">
+          <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            This run will be athlete-hosted. You can optionally link a club for context — that does
+            not make the club the host.
+          </p>
+          <EntitySearch
+            label="Associated club (optional)"
+            placeholder="Search clubs…"
+            kind="club"
+            selected={draft.associatedRunClubPick}
+            onSelect={(h) =>
+              onChange({
+                ...draft,
+                cityRunType: "INDIVIDUAL",
+                associatedRunClubId: h.id,
+                associatedRunClubLabel: h.name,
+                associatedRunClubPick: h,
+              })
+            }
+            onClear={() =>
+              onChange({
+                ...draft,
+                associatedRunClubId: null,
+                associatedRunClubLabel: null,
+                associatedRunClubPick: null,
+              })
+            }
+          />
+        </div>
       ) : null}
 
       {showOptionalBrand ? (

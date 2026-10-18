@@ -13,6 +13,10 @@ import {
 } from '@/lib/club-run-club-review';
 import type { ClubReviewStatus } from '@prisma/client';
 import { attachRunBrandSnap } from '@/lib/runmanage/run-brand-stamp';
+import {
+  cityRunClubAssociationSelect,
+  mapClubAssociationRow,
+} from '@/lib/city-run/club-association';
 
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -118,6 +122,9 @@ export async function GET(
               stravaUrl: true,
             },
           },
+          club_association: {
+            select: cityRunClubAssociationSelect,
+          },
           runSeries: {
             select: {
               id: true,
@@ -202,6 +209,9 @@ export async function GET(
               city: true,
             },
           },
+          club_association: {
+            select: cityRunClubAssociationSelect,
+          },
           plannedWorkout: {
             select: {
               id: true,
@@ -250,6 +260,9 @@ export async function GET(
       success: true,
       run: attachRunBrandSnap({
         ...run,
+        clubAssociation: run.club_association
+          ? mapClubAssociationRow(run.club_association)
+          : null,
         routePhotos: Array.isArray(run.routePhotos) ? run.routePhotos : null,
         rsvps: run.city_run_rsvps,
       }),

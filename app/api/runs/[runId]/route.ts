@@ -27,6 +27,13 @@ import {
 } from '@/lib/city-run-type';
 import { partnerExtrasForWrite } from '@/lib/runmanage/partner-extras';
 import { ensureCityRunRoute } from '@/lib/city-run/ensure-city-run-route';
+import {
+  associatedRunClubIdFromBody,
+  cityRunClubAssociationSelect,
+  clearCityRunClubAssociation,
+  mapClubAssociationRow,
+  syncCityRunClubAssociation,
+} from '@/lib/city-run/club-association';
 import { attachRunBrandSnap, runBrandStampFieldsFromBody } from '@/lib/runmanage/run-brand-stamp';
 import {
   postRunBrandProdSelect,
@@ -302,6 +309,9 @@ export async function GET(
             stravaUrl: true,
           },
         },
+        club_association: {
+          select: cityRunClubAssociationSelect,
+        },
         runStore: {
           select: { id: true, name: true, websiteUrl: true, logoUrl: true },
         },
@@ -403,6 +413,9 @@ export async function GET(
               logoUrl: true,
               city: true,
             },
+          },
+          club_association: {
+            select: cityRunClubAssociationSelect,
           },
           runSeries: {
             select: {
@@ -577,6 +590,9 @@ export async function GET(
         runClubId: run.runClubId,
         cityRunType: run.cityRunType,
         athleteGeneratedId: run.athleteGeneratedId ?? null,
+        clubAssociation: run.club_association
+          ? mapClubAssociationRow(run.club_association)
+          : null,
         metroBadge: formatCityRunMetroBadge({
           routeNeighborhood: run.routeNeighborhood,
           citySlug: run.citySlug,
@@ -1089,6 +1105,29 @@ export async function PUT(
         '[PUT /api/runs/[runId]] ensureCityRunRoute failed:',
         routeEnsureError instanceof Error ? routeEnsureError.message : routeEnsureError
       );
+    }
+
+    const finalRunClubId =
+      (updateData.runClubId as string | null | undefined) ?? updated.runClubId ?? null;
+    const finalAthleteGeneratedId =
+      (updateData.athleteGeneratedId as string | null | undefined) ??
+      updated.athleteGeneratedId ??
+      null;
+    const associatedRunClubId = associatedRunClubIdFromBody(body as Record<string, unknown>);
+    if (finalRunClubId) {
+      await clearCityRunClubAssociation(resolvedId);
+    } else if (associatedRunClubId !== undefined) {
+      await syncCityRunClubAssociation({
+        cityRunId: resolvedId,
+        associatedRunClubId,
+        athleteGeneratedId: finalAthleteGeneratedId,
+        runClubId: null,
+      });
+    } else if (
+      relationshipPatch.athleteGeneratedId !== undefined &&
+      !finalAthleteGeneratedId
+    ) {
+      await clearCityRunClubAssociation(resolvedId);
     }
 
     const hydrated = await prisma.city_runs.findUnique({

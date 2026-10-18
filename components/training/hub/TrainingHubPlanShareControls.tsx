@@ -208,11 +208,35 @@ export function TrainingHubPlanShareControls({
   if (visibilityOnly) {
     if (!publishable) return null;
     return (
-      <PlanVisibilityToggle
-        isPublic={isPublic}
-        disabled={busy}
-        onChange={(next) => void persistVisibility(next)}
-      />
+      <>
+        <PlanVisibilityToggle
+          isPublic={isPublic}
+          disabled={busy}
+          onChange={(next) => void persistVisibility(next)}
+        />
+        {error || saveSuccess || (publishReviewOpen && !isPublic) ? (
+          <div className="w-full basis-full space-y-2">
+            {saveSuccess ? (
+              <p className="text-sm text-emerald-800">{saveSuccess}</p>
+            ) : null}
+            {error ? <p className="text-sm text-red-700">{error}</p> : null}
+            {publishReviewOpen && !isPublic ? (
+              <PublishReviewPanel
+                reviewTitle={reviewTitle}
+                editingTitle={editingReviewTitle}
+                description={description}
+                summaryParts={summaryParts}
+                busy={busy}
+                onReviewTitleChange={setReviewTitle}
+                onToggleEditTitle={() => setEditingReviewTitle((v) => !v)}
+                onDescriptionChange={setDescription}
+                onCancel={() => setPublishReviewOpen(false)}
+                onConfirm={() => void publishPlan(reviewTitle, description.trim())}
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </>
     );
   }
 

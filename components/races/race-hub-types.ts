@@ -11,6 +11,8 @@ export type RaceSummary = {
   distanceLabel: string | null;
   startTime: string | null;
   courseSlug: string | null;
+  description?: string | null;
+  summaryPhrase?: string | null;
 };
 
 export type MembershipRow = {

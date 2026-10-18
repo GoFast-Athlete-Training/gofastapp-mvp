@@ -146,6 +146,11 @@ export interface CityRunDetails {
   } | null;
   workout?: CityRunWorkoutSummary | null;
   runClub?: RunClub | null;
+  clubAssociation?: {
+    runClubId: string;
+    nameSnapshot: string;
+    logoUrlSnapshot: string | null;
+  } | null;
   runStore?: {
     id: string;
     name: string;

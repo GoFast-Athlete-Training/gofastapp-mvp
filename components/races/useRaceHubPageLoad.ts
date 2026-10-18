@@ -30,7 +30,6 @@ export function useRaceHubPageLoad(
   initialRace: RaceSummary | null,
 ) {
   const [race, setRace] = useState<RaceSummary | null>(null);
-  const [welcomeText, setWelcomeText] = useState<string | null>(null);
   const [announcements, setAnnouncements] = useState<AnnouncementRow[]>([]);
   const [memberships, setMemberships] = useState<MembershipRow[]>([]);
   const [events, setEvents] = useState<RaceEventRow[]>([]);
@@ -53,10 +52,7 @@ export function useRaceHubPageLoad(
   const loadPublicSlice = useCallback(async () => {
     if (!id) return;
     const enc = encodeURIComponent(id);
-    const [profileRes, aRes, mRes, eRes, shRes] = await Promise.all([
-      hubFetchJson<{ success?: boolean; welcomeText?: string | null }>(
-        `/api/race-hub/${enc}/profile`,
-      ),
+    const [aRes, mRes, eRes, shRes] = await Promise.all([
       hubFetchJson<{ announcements?: AnnouncementRow[] }>(
         `/api/race-hub/${enc}/announcements`,
       ),
@@ -65,7 +61,6 @@ export function useRaceHubPageLoad(
       hubFetchJson<{ shakeouts?: ShakeoutRunRow[] }>(`/api/race-hub/${enc}/shakeouts`),
     ]);
 
-    setWelcomeText(profileRes?.welcomeText ?? null);
     setAnnouncements(aRes?.announcements ?? []);
     setMemberships(mRes?.memberships ?? []);
     setEvents(eRes?.events ?? []);
@@ -218,7 +213,6 @@ export function useRaceHubPageLoad(
 
   return {
     race,
-    welcomeText,
     announcements,
     memberships,
     events,

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { isRaceRegistryUuid } from "@/lib/race-hub-urls";
 import { serializeHubShakeout } from "@/lib/race-hub-shakeout-utils";
 import { loadRaceInfoPacketsForStaffView } from "@/lib/races/load-race-info-packets";
+import { hubWelcomeFromRegistry } from "@/lib/race-hub/hub-welcome-from-registry";
 
 const raceSelect = {
   id: true,
@@ -15,6 +16,8 @@ const raceSelect = {
   distanceMeters: true,
   startTime: true,
   courseSlug: true,
+  description: true,
+  summaryPhrase: true,
 } as const;
 
 export type RaceHubStaffPreview = {
@@ -80,12 +83,8 @@ export async function loadRaceHubStaffPreviewBySlug(
 
   const raceId = race.id;
 
-  const [profile, announcements, events, runs, memberships, messages, packetResult] =
+  const [announcements, events, runs, memberships, messages, packetResult] =
     await Promise.all([
-    prisma.race_hub_profiles.findUnique({
-      where: { raceId },
-      select: { welcomeText: true },
-    }),
     prisma.race_announcements.findMany({
       where: { raceId, archivedAt: null },
       orderBy: { createdAt: "desc" },
@@ -164,7 +163,7 @@ export async function loadRaceHubStaffPreviewBySlug(
   const shakeouts = runs.map((r) => serializeHubShakeout(r, undefined));
 
   return {
-    welcomeText: profile?.welcomeText?.trim() || null,
+    welcomeText: hubWelcomeFromRegistry(race),
     race: {
       id: race.id,
       name: race.name,
@@ -177,6 +176,8 @@ export async function loadRaceHubStaffPreviewBySlug(
       distanceMeters: race.distanceMeters,
       startTime: race.startTime?.trim() || null,
       courseSlug: race.courseSlug,
+      description: race.description,
+      summaryPhrase: race.summaryPhrase,
     },
     announcements: JSON.parse(JSON.stringify(announcements)),
     events: JSON.parse(JSON.stringify(events)),

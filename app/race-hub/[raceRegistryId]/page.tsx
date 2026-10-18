@@ -17,6 +17,7 @@ import {
   type RaceSummary,
 } from "@/components/races/race-hub-types";
 import { buildRaceHubDoorLinks } from "@/lib/race-hub/build-hub-door-links";
+import { hubWelcomeFromRegistry } from "@/lib/race-hub/hub-welcome-from-registry";
 import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
 import { raceCalendarOnOrBeforeTodayUtc } from "@/lib/training/plan-utils";
 import { isRaceRegistryUuid, raceHubPath } from "@/lib/race-hub-urls";
@@ -225,11 +226,14 @@ function RaceHubPageInner() {
           ) : null}
         </header>
 
-        {hub.welcomeText?.trim() ? (
-          <section className="rounded-2xl border border-gray-200 bg-white p-4 text-sm leading-relaxed text-gray-800 shadow-sm sm:p-5">
-            {hub.welcomeText.trim()}
-          </section>
-        ) : null}
+        {(() => {
+          const welcome = hubWelcomeFromRegistry(hub.race ?? resolvedRace ?? {});
+          return welcome ? (
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 text-sm leading-relaxed text-gray-800 shadow-sm sm:p-5">
+              {welcome}
+            </section>
+          ) : null;
+        })()}
 
         <RaceHubAnnouncementsSection
           announcements={hub.announcements}

@@ -18,6 +18,10 @@ import { resolveActiveRaceByCompanyRaceId } from "@/lib/race-hub-internal-compan
 import { partnerExtrasForWrite } from "@/lib/runmanage/partner-extras";
 import { runBrandStampFieldsFromBody } from "@/lib/runmanage/run-brand-stamp";
 import { stampCityRunStartsAtOnCreateData } from "@/lib/city-run/stamp-city-run-write";
+import {
+  associatedRunClubIdFromBody,
+  syncCityRunClubAssociation,
+} from "@/lib/city-run/club-association";
 
 export const dynamic = "force-dynamic";
 
@@ -773,6 +777,16 @@ export async function POST(request: NextRequest) {
           run_crews: true,
           Athlete: true,
         },
+      });
+    }
+
+    const associatedRunClubId = associatedRunClubIdFromBody(body as Record<string, unknown>);
+    if (associatedRunClubId !== undefined) {
+      await syncCityRunClubAssociation({
+        cityRunId: run.id,
+        associatedRunClubId,
+        athleteGeneratedId: run.athleteGeneratedId,
+        runClubId: run.runClubId,
       });
     }
 

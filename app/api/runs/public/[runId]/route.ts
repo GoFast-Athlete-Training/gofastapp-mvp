@@ -2,6 +2,10 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  cityRunClubAssociationSelect,
+  mapClubAssociationRow,
+} from '@/lib/city-run/club-association';
 
 /**
  * GET /api/runs/public/[runId]
@@ -36,6 +40,9 @@ export async function GET(
           instagramUrl: true,
           stravaUrl: true,
         },
+      },
+      club_association: {
+        select: cityRunClubAssociationSelect,
       },
       runSeries: {
         select: {
@@ -131,6 +138,9 @@ export async function GET(
             }
           : null,
         runClub: run.runClub || null,
+        clubAssociation: run.club_association
+          ? mapClubAssociationRow(run.club_association)
+          : null,
         runSeries: run.runSeries
           ? {
               id: run.runSeries.id,

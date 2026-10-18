@@ -33,6 +33,12 @@ export async function upsertIndividualCityRunStampForAthlete(
     where: { id: cityRunId },
     include: {
       runClub: { select: { id: true, slug: true, name: true, matchToken: true } },
+      club_association: {
+        select: {
+          runClubId: true,
+          nameSnapshot: true,
+        },
+      },
     },
   });
 
@@ -45,9 +51,18 @@ export async function upsertIndividualCityRunStampForAthlete(
 
   const courseSnap = buildCourseSnapFromRun(run, 'city_run_rsvp');
   const courseJson = courseSnapToJson(courseSnap);
-  const matchLabel = run.runClub
+  const associatedClub = run.club_association
+    ? {
+        id: run.club_association.runClubId,
+        slug: null as string | null,
+        name: run.club_association.nameSnapshot,
+        matchToken: null as string | null,
+      }
+    : null;
+  const clubForMatch = run.runClub ?? associatedClub;
+  const matchLabel = clubForMatch
     ? buildCityRunMatchLabel({
-        club: run.runClub,
+        club: clubForMatch,
         dayOfWeek: run.dayOfWeek,
         runDate: run.date,
         workoutTitle: run.title,

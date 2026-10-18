@@ -8,7 +8,7 @@ import {
   getForwardedStaffId,
 } from "@/lib/training/training-engine-auth";
 
-/** GET — hub welcome profile (staff Firebase auth via Company proxy) */
+/** GET — hub welcome copy lives on race_registry.description */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ companyRaceId: string }> },
@@ -27,27 +27,34 @@ export async function GET(
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
 
-    const profile = await prisma.race_hub_profiles.findUnique({
-      where: { raceId: race.id },
+    const row = await prisma.race_registry.findUnique({
+      where: { id: race.id },
+      select: { id: true, description: true, summaryPhrase: true, updatedAt: true },
     });
 
     return NextResponse.json({
       success: true,
-      profile: profile
+      registry: row
         ? {
-            raceId: profile.raceId,
-            welcomeText: profile.welcomeText,
-            updatedAt: profile.updatedAt.toISOString(),
+            raceId: row.id,
+            description: row.description,
+            summaryPhrase: row.summaryPhrase,
+            updatedAt: row.updatedAt.toISOString(),
           }
-        : { raceId: race.id, welcomeText: null, updatedAt: null },
+        : {
+            raceId: race.id,
+            description: null,
+            summaryPhrase: null,
+            updatedAt: null,
+          },
     });
   } catch (err) {
-    console.error("internal company hub profile GET:", err);
+    console.error("internal company registry-description GET:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
-/** PUT — upsert welcome text */
+/** PUT — update standing hub welcome (race_registry.description) */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ companyRaceId: string }> },
@@ -72,30 +79,26 @@ export async function PUT(
     }
 
     const body = await request.json().catch(() => ({}));
-    const welcomeText =
-      typeof body.welcomeText === "string" ? body.welcomeText.trim() : "";
+    const description =
+      typeof body.description === "string" ? body.description.trim() : "";
 
-    const profile = await prisma.race_hub_profiles.upsert({
-      where: { raceId: race.id },
-      create: {
-        raceId: race.id,
-        welcomeText: welcomeText || null,
-      },
-      update: {
-        welcomeText: welcomeText || null,
-      },
+    const updated = await prisma.race_registry.update({
+      where: { id: race.id },
+      data: { description: description || null },
+      select: { id: true, description: true, summaryPhrase: true, updatedAt: true },
     });
 
     return NextResponse.json({
       success: true,
-      profile: {
-        raceId: profile.raceId,
-        welcomeText: profile.welcomeText,
-        updatedAt: profile.updatedAt.toISOString(),
+      registry: {
+        raceId: updated.id,
+        description: updated.description,
+        summaryPhrase: updated.summaryPhrase,
+        updatedAt: updated.updatedAt.toISOString(),
       },
     });
   } catch (err) {
-    console.error("internal company hub profile PUT:", err);
+    console.error("internal company registry-description PUT:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

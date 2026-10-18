@@ -4,6 +4,10 @@ import { attachRunBrandSnap } from '@/lib/runmanage/run-brand-stamp';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { assertRunManageAuth } from '@/lib/runmanage/require-run-manage-auth';
+import {
+  cityRunClubAssociationSelect,
+  mapClubAssociationRow,
+} from '@/lib/city-run/club-association';
 
 function isMissingPostRunActivityColumn(error: any) {
   return (
@@ -89,6 +93,9 @@ const manageRunSelect = {
       city: true,
     },
   },
+  club_association: {
+    select: cityRunClubAssociationSelect,
+  },
   _count: {
     select: {
       city_run_rsvps: {
@@ -117,7 +124,10 @@ export async function GET(request: NextRequest) {
       where.workflowStatus = workflowStatus;
     }
     if (runClubIdFilter) {
-      where.runClubId = runClubIdFilter;
+      where.OR = [
+        { runClubId: runClubIdFilter },
+        { club_association: { runClubId: runClubIdFilter } },
+      ];
     }
     if (runTypeFilter && ['track', 'trail', 'neighborhood', 'park'].includes(runTypeFilter)) {
       where.runType = runTypeFilter;
@@ -151,6 +161,9 @@ export async function GET(request: NextRequest) {
     const runsWithCounts = runs.map((run) =>
       attachRunBrandSnap({
         ...run,
+        clubAssociation: run.club_association
+          ? mapClubAssociationRow(run.club_association)
+          : null,
         rsvpCount: run._count.city_run_rsvps,
       }),
     );

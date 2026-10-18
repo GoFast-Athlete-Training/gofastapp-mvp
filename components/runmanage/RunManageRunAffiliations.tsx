@@ -49,6 +49,10 @@ export type RunAffiliationDraft = {
   runClubId: string | null;
   runClubLabel: string | null;
   runClubPick: AffiliationPick | null;
+  /** INDIVIDUAL runs only — stored in city_run_club_associations, not runClubId. */
+  associatedRunClubId: string | null;
+  associatedRunClubLabel: string | null;
+  associatedRunClubPick: AffiliationPick | null;
   runBrandId: string | null;
   runBrandLabel: string | null;
   runBrandPick: AffiliationPick | null;
@@ -192,6 +196,53 @@ export function EntitySearch({
   const [hits, setHits] = useState<AffiliationPick[]>([]);
   const [searching, setSearching] = useState(false);
   const [status, setStatus] = useState<SearchStatus | null>(null);
+  const [showAddClub, setShowAddClub] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addCity, setAddCity] = useState("");
+  const [addReference, setAddReference] = useState("");
+  const [addingClub, setAddingClub] = useState(false);
+  const [addClubError, setAddClubError] = useState<string | null>(null);
+
+  const submitQuickClub = useCallback(async () => {
+    const name = addName.trim();
+    const city = addCity.trim();
+    const reference = addReference.trim();
+    if (!name || !city || !reference) {
+      setAddClubError("Club name, city, and one website or social link are required.");
+      return;
+    }
+    setAddingClub(true);
+    setAddClubError(null);
+    try {
+      const res = await runmanageApi.post("/api/runmanage/run-clubs/quick-ingest", {
+        name,
+        city,
+        reference,
+      });
+      if (!res.data?.success || !res.data?.clubId) {
+        setAddClubError(res.data?.error ?? "Quick club create failed");
+        return;
+      }
+      const club = res.data.club as { id: string; name: string; city?: string | null } | undefined;
+      onSelect({
+        id: res.data.clubId as string,
+        name: club?.name ?? name,
+        city: club?.city ?? city,
+        secondary: club?.city ?? city,
+      });
+      setShowAddClub(false);
+      setHits([]);
+      setQuery("");
+      setStatus(null);
+      setAddName("");
+      setAddCity("");
+      setAddReference("");
+    } catch (err) {
+      setAddClubError(apiErrorMessage(err));
+    } finally {
+      setAddingClub(false);
+    }
+  }, [addCity, addName, addReference, onSelect]);
 
   const search = useCallback(async () => {
     const q = query.trim();
@@ -283,6 +334,10 @@ export function EntitySearch({
         }));
         setHits(mapped);
         setStatus(mapped.length === 0 ? { kind: "empty", q } : null);
+        if (mapped.length === 0) {
+          setAddName(q);
+          setShowAddClub(true);
+        }
       } else {
         const res = await runmanageApi.get(
           `/api/runmanage/run-stores/search?${new URLSearchParams({ q }).toString()}`
@@ -358,7 +413,74 @@ export function EntitySearch({
           {status?.kind === "searching" ? (
             <p className="mt-2 text-sm text-gray-600">Searching the catalog…</p>
           ) : status?.kind === "empty" ? (
-            <p className="mt-2 text-sm text-gray-600">No matches for &ldquo;{status.q}&rdquo;.</p>
+            <div className="mt-2 space-y-2">
+              <p className="text-sm text-gray-600">No matches for &ldquo;{status.q}&rdquo;.</p>
+              {kind === "club" ? (
+                <>
+                  {!showAddClub ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddClub(true)}
+                      className="text-sm font-medium text-sky-700 hover:text-sky-900"
+                    >
+                      Add club
+                    </button>
+                  ) : (
+                    <div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3 space-y-2">
+                      <p className="text-xs font-medium text-gray-700">Quick club — name, city, one link</p>
+                      <input
+                        type="text"
+                        value={addName}
+                        onChange={(e) => setAddName(e.target.value)}
+                        placeholder="Club name"
+                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                      />
+                      <input
+                        type="text"
+                        value={addCity}
+                        onChange={(e) => setAddCity(e.target.value)}
+                        placeholder="City or market"
+                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                      />
+                      <input
+                        type="text"
+                        value={addReference}
+                        onChange={(e) => setAddReference(e.target.value)}
+                        placeholder="Website, Instagram, or Strava URL"
+                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                      />
+                      {addClubError ? (
+                        <p className="text-xs text-red-600">{addClubError}</p>
+                      ) : null}
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={addingClub}
+                          onClick={() => void submitQuickClub()}
+                          className="rounded-md bg-sky-700 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                        >
+                          {addingClub ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Create & attach"
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAddClub(false);
+                            setAddClubError(null);
+                          }}
+                          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
           ) : status?.kind === "error" ? (
             <p className="mt-2 text-sm text-red-600">{status.message}</p>
           ) : hits.length === 0 ? (
@@ -398,6 +520,9 @@ export function emptyAffiliationDraft(
     runClubId: null,
     runClubLabel: null,
     runClubPick: null,
+    associatedRunClubId: null,
+    associatedRunClubLabel: null,
+    associatedRunClubPick: null,
     runBrandId: null,
     runBrandLabel: null,
     runBrandPick: null,
@@ -493,6 +618,31 @@ export function RunManageRunAffiliations({
           }
           onClear={() =>
             onChange({ ...draft, runClubId: null, runClubLabel: null, runClubPick: null })
+          }
+        />
+      ) : null}
+
+      {!partnersOnly && draft.cityRunType === "INDIVIDUAL" ? (
+        <EntitySearch
+          label="Associated club (optional)"
+          placeholder="Search clubs…"
+          kind="club"
+          selected={draft.associatedRunClubPick}
+          onSelect={(h) =>
+            onChange({
+              ...draft,
+              associatedRunClubId: h.id,
+              associatedRunClubLabel: h.name,
+              associatedRunClubPick: h,
+            })
+          }
+          onClear={() =>
+            onChange({
+              ...draft,
+              associatedRunClubId: null,
+              associatedRunClubLabel: null,
+              associatedRunClubPick: null,
+            })
           }
         />
       ) : null}
@@ -792,6 +942,11 @@ export function draftFromRun(run: {
   cityRunType?: string | null;
   runClubId?: string | null;
   runClub?: RelationSnap | null;
+  clubAssociation?: {
+    runClubId: string;
+    nameSnapshot: string;
+    logoUrlSnapshot?: string | null;
+  } | null;
   runBrandId?: string | null;
   runBrandName?: string | null;
   runBrandLogoUrl?: string | null;
@@ -809,6 +964,14 @@ export function draftFromRun(run: {
       ? (t as StaffCreateRunType)
       : "SPECIAL";
   const runClubPick = pickFromRelation(run.runClub, run.runClubId);
+  const assoc = run.clubAssociation;
+  const associatedRunClubPick = assoc
+    ? {
+        id: assoc.runClubId,
+        name: assoc.nameSnapshot,
+        logoUrl: assoc.logoUrlSnapshot ?? null,
+      }
+    : null;
   const runBrandPick =
     run.runBrandName?.trim() && run.runBrandId
       ? {
@@ -825,6 +988,9 @@ export function draftFromRun(run: {
     runClubId: runClubPick?.id ?? null,
     runClubLabel: run.runClub?.name ?? null,
     runClubPick,
+    associatedRunClubId: associatedRunClubPick?.id ?? null,
+    associatedRunClubLabel: assoc?.nameSnapshot ?? null,
+    associatedRunClubPick,
     runBrandId: runBrandPick?.id ?? null,
     runBrandLabel: run.runBrand?.name ?? null,
     runBrandPick,
@@ -851,8 +1017,16 @@ export function associateStampsToPayload(draft: RunAffiliationDraft) {
       partnerExtras: draft.partnerExtras.length > 0 ? draft.partnerExtras : null,
     };
   }
+  if (draft.cityRunType === "INDIVIDUAL") {
+    return {
+      runClubId: null,
+      associatedRunClubId: draft.associatedRunClubId,
+      ...brandFields,
+    };
+  }
   return {
     runClubId: draft.runClubId,
+    associatedRunClubId: null,
     ...brandFields,
   };
 }
@@ -863,9 +1037,11 @@ export function affiliationsToPayload(
   opts?: { specialEventId?: string | null }
 ) {
   const isSpecial = draft.cityRunType === "SPECIAL";
+  const isIndividual = draft.cityRunType === "INDIVIDUAL";
   return {
     cityRunType: draft.cityRunType,
-    runClubId: isSpecial ? null : draft.runClubId,
+    runClubId: isSpecial || isIndividual ? null : draft.runClubId,
+    associatedRunClubId: isIndividual ? draft.associatedRunClubId : null,
     runBrandId: isSpecial ? null : draft.runBrandId,
     runBrandName: isSpecial ? null : draft.runBrandPick?.name ?? draft.runBrandLabel,
     runBrandLogoUrl: isSpecial ? null : draft.runBrandPick?.logoUrl ?? null,

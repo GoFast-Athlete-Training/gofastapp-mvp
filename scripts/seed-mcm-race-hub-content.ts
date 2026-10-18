@@ -33,22 +33,21 @@ async function resolveStaffId(): Promise<string> {
   return existing?.staffGeneratedId?.trim() || FALLBACK_STAFF_ID;
 }
 
-async function seedWelcomeProfile(raceId: string) {
-  const existing = await prisma.race_hub_profiles.findUnique({
-    where: { raceId },
-    select: { welcomeText: true },
+async function seedRegistryWelcome(raceId: string) {
+  const existing = await prisma.race_registry.findUnique({
+    where: { id: raceId },
+    select: { description: true },
   });
-  if (existing?.welcomeText?.trim()) {
-    console.log(`Welcome profile already set for ${raceId}`);
+  if (existing?.description?.trim()) {
+    console.log(`race_registry.description already set for ${raceId}`);
     return;
   }
 
-  await prisma.race_hub_profiles.upsert({
-    where: { raceId },
-    create: { raceId, welcomeText: WELCOME_BODY },
-    update: { welcomeText: WELCOME_BODY },
+  await prisma.race_registry.update({
+    where: { id: raceId },
+    data: { description: WELCOME_BODY },
   });
-  console.log(`Upserted race_hub_profiles welcome for ${raceId}`);
+  console.log(`Set race_registry.description welcome for ${raceId}`);
 }
 
 async function archiveLegacyWelcomeAnnouncement(raceId: string) {
@@ -122,7 +121,7 @@ async function main() {
   console.log(`Registry ${race.id} slug=${race.slug}`);
 
   const staffGeneratedId = await resolveStaffId();
-  await seedWelcomeProfile(race.id);
+  await seedRegistryWelcome(race.id);
   await archiveLegacyWelcomeAnnouncement(race.id);
   await seedShakeout(race, staffGeneratedId);
 }

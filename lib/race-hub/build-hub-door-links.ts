@@ -1,7 +1,7 @@
 import type { RaceHubDoorLink } from "@/components/races/RaceHubDoorNav";
 import {
+  getPublicRaceCourseUrl,
   getRaceGettingToStartUrl,
-  getRacePrepCourseUrl,
 } from "@/lib/public-race-url";
 import { raceHubRunsPath } from "@/lib/race-hub-urls";
 import type { ShakeoutRunRow } from "@/components/races/race-hub-types";
@@ -29,15 +29,13 @@ export function buildRaceHubDoorLinks(input: {
 
   const links: RaceHubDoorLink[] = [];
 
-  if (input.courseSlug?.trim() || slug) {
-    const href = getRacePrepCourseUrl(slug);
-    if (href) {
-      links.push({
-        label: "Course overview",
-        href,
-        external: true,
-      });
-    }
+  const courseHref = getPublicRaceCourseUrl(slug);
+  if (courseHref) {
+    links.push({
+      label: "Course overview",
+      href: courseHref,
+      external: true,
+    });
   }
 
   const startHref = getRaceGettingToStartUrl(slug);
