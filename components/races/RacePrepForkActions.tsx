@@ -25,22 +25,35 @@ const SECONDARY: Record<RacePrepForkVariant, string> = {
 type Props = {
   plannerHref: string | null | undefined;
   raceHubHref: string | null | undefined;
+  /** Training hub — shown beside race CTAs on home. */
+  seeMyPlanHref?: string | null | undefined;
   variant?: RacePrepForkVariant;
   className?: string;
   layout?: "column" | "row";
 };
 
 /** Canonical prep fork: personal planner + public race hub. */
+const SEE_MY_PLAN: Record<RacePrepForkVariant, string> = {
+  heroDark:
+    "inline-flex items-center justify-center rounded-xl border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/20",
+  heroLight:
+    "inline-flex items-center justify-center rounded-xl border border-violet-200 bg-white px-5 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-50",
+  compact:
+    "inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100",
+};
+
 export function RacePrepForkActions({
   plannerHref,
   raceHubHref,
+  seeMyPlanHref,
   variant = "compact",
   className = "",
   layout = "column",
 }: Props) {
   const plan = plannerHref?.trim();
   const hub = raceHubHref?.trim();
-  if (!plan && !hub) return null;
+  const training = seeMyPlanHref?.trim();
+  if (!plan && !hub && !training) return null;
 
   const layoutClass =
     layout === "row"
@@ -57,6 +70,11 @@ export function RacePrepForkActions({
       {hub ? (
         <Link href={hub} className={SECONDARY[variant]}>
           Race hub
+        </Link>
+      ) : null}
+      {training ? (
+        <Link href={training} className={SEE_MY_PLAN[variant]}>
+          See my plan
         </Link>
       ) : null}
     </div>

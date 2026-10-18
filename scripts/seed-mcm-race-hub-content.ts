@@ -19,6 +19,8 @@ const COMPANY_RACE_ID = "cmomycd2z0000l504nzfqyu8g";
 const FALLBACK_STAFF_ID = "cmqpz9yqf0001i804hldtj0cz";
 
 const WELCOME_TITLE = "Welcome to the MCM hub";
+const WELCOME_BODY =
+  "You are in the GoFast hub for Marine Corps Marathon. Check shakeouts, race-day updates, and chatter with runners training for The People's Marathon. Add your goal in My Races and say hi in the feed.";
 const SHAKEOUT_TITLE = "Marine Corps Marathon shakeout";
 
 async function resolveStaffId(): Promise<string> {
@@ -31,27 +33,35 @@ async function resolveStaffId(): Promise<string> {
   return existing?.staffGeneratedId?.trim() || FALLBACK_STAFF_ID;
 }
 
-async function seedAnnouncement(raceId: string, staffGeneratedId: string) {
-  const existing = await prisma.race_announcements.findFirst({
+async function seedWelcomeProfile(raceId: string) {
+  const existing = await prisma.race_hub_profiles.findUnique({
+    where: { raceId },
+    select: { welcomeText: true },
+  });
+  if (existing?.welcomeText?.trim()) {
+    console.log(`Welcome profile already set for ${raceId}`);
+    return;
+  }
+
+  await prisma.race_hub_profiles.upsert({
+    where: { raceId },
+    create: { raceId, welcomeText: WELCOME_BODY },
+    update: { welcomeText: WELCOME_BODY },
+  });
+  console.log(`Upserted race_hub_profiles welcome for ${raceId}`);
+}
+
+async function archiveLegacyWelcomeAnnouncement(raceId: string) {
+  const legacy = await prisma.race_announcements.findFirst({
     where: { raceId, title: WELCOME_TITLE, archivedAt: null },
     select: { id: true },
   });
-  if (existing) {
-    console.log(`Announcement already exists: ${existing.id}`);
-    return existing.id;
-  }
-
-  const row = await prisma.race_announcements.create({
-    data: {
-      raceId,
-      staffGeneratedId,
-      title: WELCOME_TITLE,
-      content:
-        "You are in the GoFast hub for Marine Corps Marathon. Check shakeouts, race-day updates, and chatter with runners training for The People's Marathon. Add your goal in My Races and say hi in the feed.",
-    },
+  if (!legacy) return;
+  await prisma.race_announcements.update({
+    where: { id: legacy.id },
+    data: { archivedAt: new Date() },
   });
-  console.log(`Created announcement: ${row.id}`);
-  return row.id;
+  console.log(`Archived legacy welcome announcement: ${legacy.id}`);
 }
 
 async function seedShakeout(
@@ -112,7 +122,8 @@ async function main() {
   console.log(`Registry ${race.id} slug=${race.slug}`);
 
   const staffGeneratedId = await resolveStaffId();
-  await seedAnnouncement(race.id, staffGeneratedId);
+  await seedWelcomeProfile(race.id);
+  await archiveLegacyWelcomeAnnouncement(race.id);
   await seedShakeout(race, staffGeneratedId);
 }
 

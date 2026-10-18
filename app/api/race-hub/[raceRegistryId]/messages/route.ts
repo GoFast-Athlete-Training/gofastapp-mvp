@@ -3,8 +3,9 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAthleteFromBearer } from "@/lib/race-container-auth";
-import { requireRaceMembership } from "@/lib/race-container-membership";
-import { assertRaceHubReadAccess } from "@/lib/race-hub/hub-read-access";
+import { assertRaceHubReadAccessOrPublic } from "@/lib/race-hub/hub-read-access";
+import { ensureRaceHubMembership } from "@/lib/race-hub/ensure-race-hub-membership";
+import { normalizeRaceHubTopic } from "@/lib/race-hub/race-hub-topics";
 
 /** GET /api/race-hub/[raceRegistryId]/messages */
 export async function GET(
@@ -24,7 +25,7 @@ export async function GET(
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
 
-    const access = await assertRaceHubReadAccess(request, race.id);
+    const access = await assertRaceHubReadAccessOrPublic(request, race.id);
     if ("error" in access) {
       return NextResponse.json(
         { error: access.error, code: "MEMBERSHIP_REQUIRED" },
@@ -70,7 +71,9 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}));
     const content = typeof body.content === "string" ? body.content.trim() : "";
-    const topic = typeof body.topic === "string" && body.topic.trim() ? body.topic.trim() : "general";
+    const topic = normalizeRaceHubTopic(
+      typeof body.topic === "string" ? body.topic : undefined,
+    );
 
     if (!content) {
       return NextResponse.json({ error: "content is required" }, { status: 400 });
@@ -83,10 +86,7 @@ export async function POST(
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
 
-    const membership = await requireRaceMembership(auth.athlete.id, race.id);
-    if (!membership) {
-      return NextResponse.json({ error: "Join this race to post chatter" }, { status: 403 });
-    }
+    await ensureRaceHubMembership(auth.athlete.id, race.id);
 
     const message = await prisma.race_messages.create({
       data: {

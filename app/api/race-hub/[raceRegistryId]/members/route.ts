@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { assertRaceHubReadAccess } from "@/lib/race-hub/hub-read-access";
+import { assertRaceHubReadAccessOrPublic } from "@/lib/race-hub/hub-read-access";
 
 /** GET /api/race-hub/[raceRegistryId]/members — hub members only */
 export async function GET(
@@ -22,24 +22,32 @@ export async function GET(
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
 
-    const access = await assertRaceHubReadAccess(request, race.id);
+    const access = await assertRaceHubReadAccessOrPublic(request, race.id);
     if ("error" in access) {
       return NextResponse.json({ error: access.error, code: "MEMBERSHIP_REQUIRED" }, { status: access.status });
     }
+
+    const publicList = access.mode === "public";
 
     const memberships = await prisma.race_memberships.findMany({
       where: { raceId: race.id },
       orderBy: { joinedAt: "asc" },
       include: {
         Athlete: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            gofastHandle: true,
-            photoURL: true,
-            bio: true,
-          },
+          select: publicList
+            ? {
+                id: true,
+                gofastHandle: true,
+                photoURL: true,
+              }
+            : {
+                id: true,
+                firstName: true,
+                lastName: true,
+                gofastHandle: true,
+                photoURL: true,
+                bio: true,
+              },
         },
       },
     });

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { assertRaceHubReadAccess } from "@/lib/race-hub/hub-read-access";
+import { assertRaceHubReadAccessOrPublic } from "@/lib/race-hub/hub-read-access";
 import { serializeHubShakeout } from "@/lib/race-hub-shakeout-utils";
 
 /** GET — race hub members; lists synced shakeout `city_runs` for this registry. */
@@ -23,7 +23,7 @@ export async function GET(
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
 
-    const access = await assertRaceHubReadAccess(request, race.id);
+    const access = await assertRaceHubReadAccessOrPublic(request, race.id);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }

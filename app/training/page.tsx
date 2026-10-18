@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, CalendarClock, Clock, MessageCircle, MoreHorizontal, Users } from "lucide-react";
+import { BookOpen, CalendarClock, MessageCircle, Users } from "lucide-react";
 import api from "@/lib/api";
 import type { ScheduledRunJson } from "@/app/api/training/schedule-run/route";
 import { onAuthStateChanged } from "firebase/auth";
@@ -11,15 +11,7 @@ import { auth } from "@/lib/firebase";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import PlanWeekViewer from "@/components/training/PlanWeekViewer";
-import WorkoutActivityMatchPanel from "@/components/training/WorkoutActivityMatchPanel";
-import WorkoutSkipActions from "@/components/training/WorkoutSkipActions";
 import { buildWeekSummary } from "@/lib/training/week-summary-service";
-import {
-  deriveSessionStatus,
-  sessionStatusBadgeClass,
-  sessionStatusLabel,
-  showFindMissingGarminForStatus,
-} from "@/lib/training/session-status";
 import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
@@ -28,20 +20,12 @@ import {
   localTodayKey,
   raceCalendarBeforeTodayUtc,
 } from "@/lib/training/plan-utils";
-import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
-import { formatPlanDisplayTitle } from "@/lib/training/workout-display-title";
 import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
   type PlanDayCard,
   type RaceReadinessSummary,
 } from "@/lib/training/fetch-plan-week-client";
-import {
-  detailIdForHydrated,
-  hydratePlanButSwapIfExecuted,
-  matchTargetIdForHydrated,
-  prescribeIdForHydrated,
-} from "@/lib/training/hydrate-plan-day";
 import { planScheduleLooksStructured } from "@/lib/training/plan-schedule-schema";
 import { getRacePhaseLocal } from "@/lib/race-calendar-phase";
 import { isInRaceCloseOutWindow } from "@/lib/training/race-plan-closeout";
@@ -50,22 +34,14 @@ import {
   planRaceDisplayName,
   planTitleRaceMismatch,
 } from "@/lib/training/plan-display-title";
-import {
-  PlanLongRunTrajectorySection,
-  trajectoryContextFromPlanDetail,
-} from "@/components/training/PlanLongRunTrajectorySection";
-import { RegeneratePlanScheduleButton } from "@/components/training/RegeneratePlanScheduleButton";
 import { myRacePlannerHref } from "@/lib/races/athlete-race-signup-display";
-import { RacePrepForkActions } from "@/components/races/RacePrepForkActions";
 import { SignupRaceDayBeforeBanner } from "@/components/races/RaceDayBanner";
 import { RaceDayGoalBanner } from "@/components/races/RaceDayGoalBanner";
-import { AthleteRacePoint } from "@/components/races/AthleteRacePoint";
-import type { MyRacePointJson } from "@/lib/races/load-my-race";
-import { buildRaceDayBuilderHref } from "@/lib/training/race-day-builder-href";
-import GoFastWithMeSetupPanel from "@/components/gofast-with-me/GoFastWithMeSetupPanel";
 import type { ShareHubPlanStatus } from "@/lib/profile/share-creator-card-logic";
 import { LocalStorageAPI } from "@/lib/localstorage";
-import PlanIngestPanel from "@/components/training/PlanIngestPanel";
+import { TrainingHubPlanShareControls } from "@/components/training/hub/TrainingHubPlanShareControls";
+import { TrainingHubEditPlanGear } from "@/components/training/hub/TrainingHubEditPlanGear";
+import { TrainingHubWeekGear } from "@/components/training/hub/TrainingHubWeekGear";
 
 type PlanDetailHub = {
   id: string;
@@ -143,14 +119,6 @@ function effectiveWeeksForPlanHub(p: PlanDetailHub): number {
   );
 }
 
-function planDayMilesDisplay(meters: number | null | undefined): string {
-  if (meters == null || !Number.isFinite(meters) || meters <= 0) return "—";
-  const mi = meters / 1609.34;
-  const rounded =
-    Math.abs(mi - Math.round(mi)) < 0.06 ? Math.round(mi) : Math.round(mi * 10) / 10;
-  return `${rounded} mi`;
-}
-
 function formatSecPerMile(sec: number | null | undefined): string {
   if (sec == null || sec <= 0) return "—";
   const m = Math.floor(sec / 60);
@@ -158,21 +126,11 @@ function formatSecPerMile(sec: number | null | undefined): string {
   return `${m}:${s.toString().padStart(2, "0")}/mi`;
 }
 
-function formatDurationSeconds(sec: number | null | undefined): string | null {
-  if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
-  const m = Math.floor(sec / 60);
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
-  if (h > 0) return `${h}h ${rm}m`;
-  return `${m} min`;
-}
-
 export default function TrainingHubPage() {
   const router = useRouter();
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [planDetail, setPlanDetail] = useState<PlanDetailHub | null>(null);
-  const [myRacePoint, setMyRacePoint] = useState<MyRacePointJson | null>(null);
   const [goalRacePaceResolved, setGoalRacePaceResolved] = useState<GoalRacePaceResolved | null>(null);
   const [raceReadiness, setRaceReadiness] = useState<RaceReadinessSummary | null>(null);
   const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
@@ -189,15 +147,11 @@ export default function TrainingHubPage() {
     { id: string; name: string; raceDate: string; goalTime: string | null }[]
   >([]);
   const [hubError, setHubError] = useState<string | null>(null);
-  const [planMenuOpen, setPlanMenuOpen] = useState(false);
   const [parkedPlans, setParkedPlans] = useState<
     { id: string; name: string; race_registry?: { name: string } | null }[]
   >([]);
   const [restoringParkedId, setRestoringParkedId] = useState<string | null>(null);
   const [selectedDayKey, setSelectedDayKey] = useState<string>("");
-  const [pushingGarmin, setPushingGarmin] = useState(false);
-  const [garminPushMessage, setGarminPushMessage] = useState<string | null>(null);
-  const [showMatchPanel, setShowMatchPanel] = useState(false);
   /** ACTIVE plan in the 2-day post-race close-out window. */
   const [closeOutPlanId, setCloseOutPlanId] = useState<string | null>(null);
   /** Active plan in DB is past race day — prompt next goal instead of full schedule UI. */
@@ -269,7 +223,6 @@ export default function TrainingHubPage() {
     setLegacyPlanReselect(null);
     setMyRacesForPick([]);
     setPlanDetail(null);
-    setMyRacePoint(null);
     setRaceReadiness(null);
     setPastRacePlan(null);
     setCloseOutPlanId(null);
@@ -364,13 +317,11 @@ export default function TrainingHubPage() {
         athleteFiveKPace: athPace,
         goalRacePaceResolved: resolvedPace,
         raceReadiness: readiness,
-        myRace,
       } = await fetchTrainingPlanDetail(planId, token);
       const plan = raw as PlanDetailHub;
       setAthleteFiveKPace(athPace);
       setGoalRacePaceResolved(resolvedPace ?? null);
       setRaceReadiness(readiness ?? null);
-      setMyRacePoint(myRace ?? null);
 
       const raceDateIso =
         typeof plan.race_registry?.raceDate === "string"
@@ -540,10 +491,6 @@ export default function TrainingHubPage() {
   }, [authReady, planDetail?.id, weekNumber, fetchWeekDays]);
 
   useEffect(() => {
-    setShowMatchPanel(false);
-  }, [selectedDayKey]);
-
-  useEffect(() => {
     if (!authReady) return;
     let cancelled = false;
     (async () => {
@@ -560,53 +507,6 @@ export default function TrainingHubPage() {
       cancelled = true;
     };
   }, [authReady]);
-
-  async function handleSendTodayToGarmin() {
-    const u = auth.currentUser;
-    if (!u) return;
-    setPushingGarmin(true);
-    setGarminPushMessage(null);
-    try {
-      const token = await u.getIdToken();
-      const res = await fetch("/api/me/push-todays-plan-workout", {
-        method: "POST",
-        headers: athleteBearerFetchHeaders(token),
-      });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        scheduledDate?: string;
-      };
-      if (!res.ok) {
-        throw new Error(data.error || "Could not push to Garmin");
-      }
-      setGarminPushMessage(
-        data.scheduledDate
-          ? `Added to Garmin Training Calendar for ${data.scheduledDate}. Sync your watch, then press Run — Garmin should prompt today’s workout.`
-          : "Added to Garmin Training Calendar. Sync your watch in Garmin Connect."
-      );
-      if (planDetail) {
-        void fetchWeekDays(weekNumber);
-      }
-    } catch (e) {
-      setGarminPushMessage(e instanceof Error ? e.message : "Push failed");
-    } finally {
-      setPushingGarmin(false);
-    }
-  }
-
-  function handleOpenSession(day: PlanDayCard) {
-    if (day.workoutType === "Race") {
-      router.push(`/training/day/${day.dateKey}`);
-      return;
-    }
-    const hydrated = hydratePlanButSwapIfExecuted(day);
-    if (hydrated) {
-      router.push(workoutDetailPathWithBackHref(detailIdForHydrated(hydrated), "/training"));
-      return;
-    }
-    router.push(`/training/day/${day.dateKey}`);
-  }
 
   async function restoreParkedPlan(parkedPlanId: string) {
     const parked = parkedPlans.find((p) => p.id === parkedPlanId);
@@ -634,7 +534,6 @@ export default function TrainingHubPage() {
       if (!res.ok) {
         throw new Error(data.error ?? "Could not restore plan");
       }
-      setPlanMenuOpen(false);
       await loadHub();
     } catch (e) {
       setHubError(e instanceof Error ? e.message : "Could not restore plan");
@@ -669,7 +568,6 @@ export default function TrainingHubPage() {
       if (!res.ok) {
         throw new Error(data.error ?? "Could not archive plan");
       }
-      setPlanMenuOpen(false);
       await loadHub();
     } catch (e) {
       setHubError(e instanceof Error ? e.message : "Could not archive plan");
@@ -740,32 +638,6 @@ export default function TrainingHubPage() {
 
   const todayKey = localTodayKey();
   const focusKey = selectedDayKey || todayKey;
-  const focusPlanDay = weekDays.find((d) => d.dateKey === focusKey) ?? null;
-  const focusIsToday = focusKey === todayKey;
-  const focusStatus = focusPlanDay
-    ? deriveSessionStatus({
-        dateKey: focusPlanDay.dateKey,
-        garminDetailActivityId: focusPlanDay.garminDetailActivityId,
-        skippedAt: focusPlanDay.skippedAt,
-        workoutType: focusPlanDay.workoutType,
-        title: focusPlanDay.title,
-      })
-    : null;
-  const showFindMissingGarmin =
-    Boolean(focusPlanDay && !focusPlanDay.garminDetailActivityId) &&
-    showFindMissingGarminForStatus(focusStatus);
-  const focusHydrated = focusPlanDay
-    ? hydratePlanButSwapIfExecuted(focusPlanDay)
-    : null;
-  const focusIsRaceDay = focusPlanDay?.workoutType === "Race";
-  const focusRaceDayBuilderHref = useMemo(() => {
-    if (!planDetail?.id || !focusPlanDay?.dateKey || !focusIsRaceDay) return null;
-    return buildRaceDayBuilderHref({
-      planId: planDetail.id,
-      dateKey: focusPlanDay.dateKey,
-      back: "/training",
-    });
-  }, [planDetail?.id, focusPlanDay?.dateKey, focusIsRaceDay]);
 
   const weekPlannedMiles = useMemo(() => {
     if (!weekDays.length) return null;
@@ -779,11 +651,6 @@ export default function TrainingHubPage() {
     if (raw == null || !Number.isFinite(Number(raw))) return null;
     return Math.round(Number(raw));
   }, [planDetail?.weeklyMileageTarget]);
-
-  const trajectoryContext = useMemo(
-    () => (planDetail ? trajectoryContextFromPlanDetail(planDetail) : null),
-    [planDetail]
-  );
 
   const presetMinWeeklyMiles = useMemo(() => {
     const raw = planDetail?.training_plan_preset?.minWeeklyMiles;
@@ -824,6 +691,10 @@ export default function TrainingHubPage() {
     setWeekNumber((n) => Math.min(effectiveTotalWeeks, n + 1));
   }
 
+  function openDayDetails(day: PlanDayCard) {
+    router.push(`/training/day/${encodeURIComponent(day.dateKey)}?source=hub`);
+  }
+
   return (
     <AthleteAppShell>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
@@ -853,18 +724,6 @@ export default function TrainingHubPage() {
             </div>
           </div>
         </div>
-
-        {authReady && !loading ? (
-          <div className="mb-8">
-            <GoFastWithMeSetupPanel
-              plan={shareHubPlan}
-              landingSlug={planShareLandingSlug}
-              firstName={planShareFirstName}
-              loading={shareHubPlanLoading}
-              onRefresh={refreshShareHubPlan}
-            />
-          </div>
-        ) : null}
 
         {loading && (
           <p className="mb-6 text-sm text-gray-500">Loading your training…</p>
@@ -1086,13 +945,6 @@ export default function TrainingHubPage() {
 
         {showTrainingHub && planDetail && (
           <div className="space-y-4 mb-8">
-            <p className="text-xs text-gray-500">
-              <Link href="/community/hub" className="text-orange-600 font-semibold hover:underline">
-                Manage Community
-              </Link>
-              {" — share your training and train alongside others."}
-            </p>
-            {/* Goal strip — plan, race, week progress */}
             <div className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-gray-900">
@@ -1140,89 +992,39 @@ export default function TrainingHubPage() {
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <RacePrepForkActions
-                  plannerHref={planRacePlannerHref}
-                  raceHubHref={planRaceHubHref}
-                  variant="compact"
-                  layout="row"
+                {shareHubPlan && !shareHubPlanLoading ? (
+                  <TrainingHubPlanShareControls
+                    plan={shareHubPlan}
+                    landingSlug={planShareLandingSlug}
+                    firstName={planShareFirstName}
+                    onRefresh={refreshShareHubPlan}
+                    visibilityOnly
+                  />
+                ) : null}
+                <TrainingHubEditPlanGear
+                  planId={planDetail.id}
+                  planSchedule={planDetail.planSchedule}
+                  weekNumber={weekNumber}
+                  weekDays={weekDays}
+                  sharePlan={shareHubPlan}
+                  landingSlug={planShareLandingSlug}
+                  firstName={planShareFirstName}
+                  savedWeeklyTarget={savedWeeklyTarget}
+                  presetMinWeeklyMiles={presetMinWeeklyMiles}
+                  weekPlannedMiles={weekPlannedMiles}
+                  presetMaxWeeklyMiles={presetMaxWeeklyMiles}
+                  archiving={archiving}
+                  deleting={deleting}
+                  parkedPlans={parkedPlans}
+                  restoringParkedId={restoringParkedId}
+                  getToken={getHubToken}
+                  onRefreshShare={refreshShareHubPlan}
+                  onRefreshHub={loadHub}
+                  onRefreshWeek={() => void fetchWeekDays(weekNumber)}
+                  onArchive={() => void archiveActivePlan()}
+                  onDelete={() => void deleteActivePlan()}
+                  onRestoreParked={(id) => void restoreParkedPlan(id)}
                 />
-                <div className="relative">
-                  <button
-                    type="button"
-                    aria-expanded={planMenuOpen}
-                    aria-haspopup="true"
-                    onClick={() => setPlanMenuOpen((o) => !o)}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50"
-                    title="Plan options"
-                  >
-                    <MoreHorizontal className="h-5 w-5" aria-hidden />
-                  </button>
-                  {planMenuOpen ? (
-                    <>
-                      <button
-                        type="button"
-                        aria-label="Close menu"
-                        className="fixed inset-0 z-40 cursor-default"
-                        onClick={() => setPlanMenuOpen(false)}
-                      />
-                      <div className="absolute right-0 z-50 mt-1 min-w-[11rem] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                        <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                          Tools
-                        </p>
-                        <Link
-                          href="/training/schedule-run"
-                          className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
-                          onClick={() => setPlanMenuOpen(false)}
-                        >
-                          Schedule a run
-                        </Link>
-                        <Link
-                          href="/build-a-run"
-                          className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
-                          onClick={() => setPlanMenuOpen(false)}
-                        >
-                          Add my own run
-                        </Link>
-                        <Link
-                          href="/workouts"
-                          className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
-                          onClick={() => setPlanMenuOpen(false)}
-                        >
-                          Workout log
-                        </Link>
-                        <div className="my-1 border-t border-gray-100" />
-                        <Link
-                          href={`/training-setup/${planDetail.id}`}
-                          className="block px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
-                          onClick={() => setPlanMenuOpen(false)}
-                        >
-                          Edit weekly miles
-                        </Link>
-                        {parkedPlans.length > 0 ? (
-                          <>
-                            <div className="my-1 border-t border-gray-100" />
-                            <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                              Parked plans
-                            </p>
-                            {parkedPlans.map((p) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                disabled={restoringParkedId != null}
-                                onClick={() => void restoreParkedPlan(p.id)}
-                                className="w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-                              >
-                                {restoringParkedId === p.id
-                                  ? "Restoring…"
-                                  : `Restore ${p.race_registry?.name ?? p.name}`}
-                              </button>
-                            ))}
-                          </>
-                        ) : null}
-                      </div>
-                    </>
-                  ) : null}
-                </div>
               </div>
             </div>
 
@@ -1236,133 +1038,36 @@ export default function TrainingHubPage() {
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 w-full sm:w-auto">
-                Plan actions
-              </span>
-              <RegeneratePlanScheduleButton
-                planId={planDetail.id}
-                getToken={getHubToken}
-                weeklyMileageTarget={savedWeeklyTarget ?? presetMinWeeklyMiles}
-                minWeeklyMiles={presetMinWeeklyMiles}
-                onSuccess={async () => {
-                  await loadHub();
-                  void fetchWeekDays(weekNumber);
-                }}
-              />
-              <Link
-                href={`/training-setup/${planDetail.id}`}
-                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-              >
-                Edit weekly miles
-              </Link>
-              <button
-                type="button"
-                disabled={archiving || deleting}
-                onClick={() => void archiveActivePlan()}
-                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-              >
-                {archiving ? "Archiving…" : "Archive this plan"}
-              </button>
-              <button
-                type="button"
-                disabled={deleting || archiving}
-                onClick={() => void deleteActivePlan()}
-                className="inline-flex items-center rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-              >
-                {deleting ? "Deleting…" : "Delete plan"}
-              </button>
-            </div>
-
-            {planDetail && planScheduleLooksStructured(planDetail.planSchedule) ? (
-              <div className="space-y-3">
-                <PlanIngestPanel
-                  planId={planDetail.id}
-                  scope="week"
-                  weekNumber={weekNumber}
-                  getToken={getHubToken}
-                  title="Paste this week"
-                  description="Replace the current calendar week without regenerating the whole plan. One line per run day."
-                  onCommitted={() => {
-                    void loadHub();
-                    void fetchWeekDays(weekNumber);
-                  }}
-                />
-                <PlanIngestPanel
-                  planId={planDetail.id}
-                  scope="plan"
-                  getToken={getHubToken}
-                  title="Paste full plan (week to week)"
-                  description="Future weeks only — completed weeks stay as-is. Use Week 8 / Week 9 headers or a long paste."
-                  onCommitted={() => {
-                    void loadHub();
-                    void fetchWeekDays(weekNumber);
-                  }}
-                />
-              </div>
-            ) : null}
-
-            <div className="rounded-xl border border-orange-200 bg-orange-50/70 px-4 py-3 text-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
-                    Weekly miles
-                  </p>
-                  {savedWeeklyTarget != null ? (
-                    <p className="mt-1 tabular-nums text-gray-900">
-                      Target:{" "}
-                      <span className="font-semibold">{savedWeeklyTarget} mi/week</span>
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-gray-700">No target set yet</p>
-                  )}
-                  {weekPlannedMiles != null ? (
-                    <p className="mt-1 tabular-nums text-gray-700">
-                      This week:{" "}
-                      <span className="font-medium">{weekPlannedMiles} mi planned</span>
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-gray-600">This week: schedule loading…</p>
-                  )}
-                  <p className="mt-2 text-xs text-gray-600">
-                    Your weekly target stays in the preset band
-                    {presetMaxWeeklyMiles != null
-                      ? ` (${presetMinWeeklyMiles}–${presetMaxWeeklyMiles} mi)`
-                      : ` (from ${presetMinWeeklyMiles} mi up)`}
-                    . Most weeks build toward the peak week at the top of the range, then taper
-                    and race week take over. Planned miles are what was generated for this week.
-                  </p>
-                </div>
-                <Link
-                  href={`/training-setup/${planDetail.id}`}
-                  className="inline-flex shrink-0 items-center justify-center rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm font-semibold text-orange-900 hover:bg-orange-100"
-                >
-                  {savedWeeklyTarget != null ? "Edit weekly miles" : "Set weekly target"}
-                </Link>
-              </div>
-            </div>
-
-            {planDetail && trajectoryContext ? (
-              <PlanLongRunTrajectorySection
-                planId={planDetail.id}
-                getToken={getHubToken}
+            <div id="training-section-this-week" className="scroll-mt-24">
+              <PlanWeekViewer
+                weekNumber={weekNumber}
                 totalWeeks={effectiveTotalWeeks}
-                planStartDate={planDetail.startDate}
-                peakLongRunPoolMiles={planDetail.peakLongRunPoolMiles ?? null}
-                blueprintPeakLongRunPoolMiles={trajectoryContext.blueprintPeakLongRunPoolMiles}
-                fitnessPhase={trajectoryContext.fitnessPhase}
-                longRunPositions={trajectoryContext.longRunPositions}
-                currentWeek={weekNumber}
-                hasSchedule
-                editable
-                weeklyMileageTarget={savedWeeklyTarget ?? 40}
-                presetMinWeeklyMiles={presetMinWeeklyMiles}
-                onRegenerated={async () => {
-                  await loadHub();
-                  void fetchWeekDays(weekNumber);
-                }}
+                days={weekDays}
+                loading={loadingWeek}
+                todayKey={todayKey}
+                selectedDateKey={focusKey}
+                calendarRangeLabel={calendarRangeLabel}
+                summary={weekSummary}
+                onPrevWeek={goPrevWeek}
+                onNextWeek={goNextWeek}
+                onSelectDay={(d) => setSelectedDayKey(d.dateKey)}
+                sectionLabel={null}
+                showCalendarRangeLabel={false}
+                onOpenDayDetails={openDayDetails}
+                headerActions={
+                  <TrainingHubWeekGear
+                    planId={planDetail.id}
+                    weekNumber={weekNumber}
+                    weekDays={weekDays}
+                    getToken={getHubToken}
+                    onCommitted={() => {
+                      void loadHub();
+                      void fetchWeekDays(weekNumber);
+                    }}
+                  />
+                }
               />
-            ) : null}
+            </div>
 
             {scheduledRuns.length > 0 ? (
               <div className="rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm">
@@ -1406,307 +1111,16 @@ export default function TrainingHubPage() {
               </div>
             ) : null}
 
-            {/* Week calendar and selected workout */}
-            <div id="training-section-this-week" className="scroll-mt-24">
-              <PlanWeekViewer
-                weekNumber={weekNumber}
-                totalWeeks={effectiveTotalWeeks}
-                days={weekDays}
-                loading={loadingWeek}
-                todayKey={todayKey}
-                selectedDateKey={focusKey}
-                calendarRangeLabel={calendarRangeLabel}
-                summary={weekSummary}
-                onPrevWeek={goPrevWeek}
-                onNextWeek={goNextWeek}
-                onSelectDay={(d) => setSelectedDayKey(d.dateKey)}
-                collapseCardsOnMobile
-                sectionLabel={null}
-                showCalendarRangeLabel={false}
-                selectedDayDetail={
-                  !loadingWeek ? (
-                <div
-                  id="training-section-today"
-                  className={
-                    focusPlanDay?.garminDetailActivityId
-                      ? "rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm scroll-mt-24"
-                      : focusIsRaceDay
-                        ? "rounded-2xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-white p-6 shadow-sm scroll-mt-24"
-                        : "rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-6 shadow-sm scroll-mt-24"
-                  }
+            {planRacePlannerHref ? (
+              <p className="text-sm">
+                <Link
+                  href={planRacePlannerHref}
+                  className="font-semibold text-violet-800 hover:text-violet-950 hover:underline"
                 >
-                  <p
-                    className={`text-xs font-semibold uppercase tracking-wide ${
-                      focusPlanDay?.garminDetailActivityId
-                        ? "text-emerald-900"
-                        : focusIsRaceDay
-                          ? "text-violet-900"
-                          : "text-orange-900"
-                    }`}
-                  >
-                    {focusIsToday ? "Today" : "Selected day"}
-                  </p>
-                  {focusPlanDay ? (
-                    focusPlanDay.garminDetailActivityId ? (
-                      <>
-                        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">
-                          Workout complete
-                        </p>
-                        <h2 className="mt-1 text-2xl font-bold text-gray-900">
-                          {formatPlanDisplayTitle({
-                            weekNumber,
-                            workoutType: focusPlanDay.workoutType,
-                            estimatedDistanceInMeters: focusPlanDay.estimatedDistanceInMeters,
-                            title: focusPlanDay.title,
-                          })}
-                        </h2>
-                        <p className="mt-1 text-sm text-gray-600">
-                          {formatPlanDateDisplay(focusPlanDay.dateKey || String(focusPlanDay.date), {
-                            weekday: "long",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                          <span className="ml-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-                            Complete
-                          </span>
-                        </p>
-                        <p className="mt-3 text-sm text-gray-600">
-                          Full results and coach feedback are on the workout page.
-                        </p>
-                        <div className="mt-5 flex flex-wrap items-center gap-3">
-                          {focusHydrated?.kind === "executed" ? (
-                            <Link
-                              href={workoutDetailPathWithBackHref(
-                                focusHydrated.workoutId,
-                                "/training"
-                              )}
-                              className="inline-flex justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
-                            >
-                              See your run
-                            </Link>
-                          ) : null}
-                        </div>
-                      </>
-                    ) : focusIsRaceDay && myRacePoint ? (
-                      <>
-                        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-violet-800">
-                          Race day
-                        </p>
-                        <div className="mt-3">
-                          <AthleteRacePoint
-                            myRace={myRacePoint}
-                            raceDayBuilderHref={focusRaceDayBuilderHref}
-                            dayLabel={
-                              focusIsToday
-                                ? "Today"
-                                : formatPlanDateDisplay(focusPlanDay.dateKey, {
-                                    weekday: "long",
-                                    month: "short",
-                                    day: "numeric",
-                                  })
-                            }
-                          />
-                        </div>
-                      </>
-                    ) : focusIsRaceDay ? (
-                      <>
-                        <h2 className="mt-2 text-2xl font-bold text-gray-900">Race day</h2>
-                        <p className="mt-2 text-sm text-gray-700">
-                          Link an athlete race to this plan to see your event logo, start time, and
-                          pace builder.
-                        </p>
-                        {focusRaceDayBuilderHref ? (
-                          <Link
-                            href={focusRaceDayBuilderHref}
-                            className="mt-4 inline-flex justify-center rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white hover:bg-violet-700"
-                          >
-                            Build pace markers
-                          </Link>
-                        ) : null}
-                      </>
-                    ) : (
-                      <>
-                        <h2 className="mt-2 text-2xl font-bold text-gray-900">
-                          {formatPlanDisplayTitle({
-                            weekNumber,
-                            workoutType: focusPlanDay.workoutType,
-                            estimatedDistanceInMeters: focusPlanDay.estimatedDistanceInMeters,
-                            title: focusPlanDay.title,
-                          })}
-                        </h2>
-                        <p className="mt-1 text-sm text-gray-600">
-                          {formatPlanDateDisplay(focusPlanDay.dateKey || String(focusPlanDay.date), {
-                            weekday: "long",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                          {focusStatus && focusStatus !== "rest" ? (
-                            <span
-                              className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${sessionStatusBadgeClass(focusStatus)}`}
-                            >
-                              {sessionStatusLabel(focusStatus)}
-                            </span>
-                          ) : null}
-                          {focusPlanDay.estimatedDistanceInMeters
-                            ? ` · ${planDayMilesDisplay(focusPlanDay.estimatedDistanceInMeters)}`
-                            : ""}
-                        </p>
-                        <div className="mt-5 flex flex-wrap items-center gap-3">
-                          {focusHydrated &&
-                          !focusPlanDay.garminDetailActivityId &&
-                          focusStatus !== "upcoming" ? (
-                            <p className="w-full text-sm text-gray-700 leading-relaxed">
-                              After your run, sync Garmin Connect — GoFast should link the activity
-                              to this workout automatically.
-                            </p>
-                          ) : null}
-                          {showFindMissingGarmin ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowMatchPanel(true);
-                                requestAnimationFrame(() => {
-                                  document
-                                    .getElementById("match-garmin-panel")
-                                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                });
-                              }}
-                              className="w-full text-left text-sm font-medium text-sky-800 hover:text-sky-950 underline-offset-2 hover:underline sm:w-auto"
-                            >
-                              Find missing Garmin activity
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenSession(focusPlanDay)}
-                            disabled={pushingGarmin}
-                            className="inline-flex justify-center rounded-xl border-2 border-orange-300 bg-white px-6 py-3 text-sm font-semibold text-orange-900 hover:bg-orange-50 disabled:opacity-50"
-                          >
-                            Details
-                          </button>
-                          {focusIsToday ? (
-                            <button
-                              type="button"
-                              disabled={pushingGarmin}
-                              onClick={() => void handleSendTodayToGarmin()}
-                              className="inline-flex justify-center rounded-xl border-2 border-sky-600 bg-sky-50 px-6 py-3 text-sm font-semibold text-sky-900 hover:bg-sky-100 disabled:opacity-50"
-                            >
-                              {pushingGarmin ? "Getting it ready…" : "Looks good, I'm ready"}
-                            </button>
-                          ) : null}
-                          <Link
-                            href={
-                              focusHydrated
-                                ? `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}&workoutId=${encodeURIComponent(prescribeIdForHydrated(focusHydrated))}`
-                                : `/training/schedule-run?date=${encodeURIComponent(focusPlanDay.dateKey)}`
-                            }
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-sky-600 bg-white px-5 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-50"
-                          >
-                            <Clock className="h-4 w-4 shrink-0" aria-hidden />
-                            Set start time
-                          </Link>
-                        </div>
-                        {focusIsToday && garminPushMessage ? (
-                          <p className="mt-3 text-sm text-gray-700" role="status">
-                            {garminPushMessage}
-                          </p>
-                        ) : null}
-                        {focusHydrated &&
-                        !focusPlanDay.garminDetailActivityId &&
-                        showMatchPanel &&
-                        showFindMissingGarmin ? (
-                          <div id="match-garmin-panel" className="mt-4 space-y-4">
-                            {focusHydrated.kind === "executed" ? (
-                              <WorkoutSkipActions
-                                workoutId={focusHydrated.workoutId}
-                                dateKey={focusPlanDay.dateKey}
-                                garminDetailActivityId={focusPlanDay.garminDetailActivityId}
-                                skippedAt={focusPlanDay.skippedAt}
-                                workoutType={focusPlanDay.workoutType}
-                                title={focusPlanDay.title}
-                                showMissedPrompt={focusStatus === "missed"}
-                                onUpdated={loadHub}
-                              />
-                            ) : null}
-                            <WorkoutActivityMatchPanel
-                              workoutId={matchTargetIdForHydrated(focusHydrated)}
-                              workoutTitle={formatPlanDisplayTitle({
-                                weekNumber,
-                                workoutType: focusPlanDay.workoutType,
-                                estimatedDistanceInMeters: focusPlanDay.estimatedDistanceInMeters,
-                                title: focusPlanDay.title,
-                              })}
-                              plannedDistanceMeters={focusPlanDay.estimatedDistanceInMeters ?? null}
-                              compact
-                              onMatched={loadHub}
-                              onClose={() => setShowMatchPanel(false)}
-                            />
-                          </div>
-                        ) : null}
-                      </>
-                    )
-                  ) : (
-                    <>
-                      <p className="mt-2 text-lg font-semibold text-gray-900">
-                        {focusIsToday
-                          ? "No session on the schedule for today"
-                          : "Rest or unscheduled on this day"}
-                      </p>
-                      <p className="mt-1 text-sm text-gray-600">
-                        Pick another day above, or log a standalone workout.
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        <Link
-                          href="/performance"
-                          className="inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
-                        >
-                          Performance
-                        </Link>
-                        <Link
-                          href="/workouts/create"
-                          className="inline-flex justify-center rounded-xl border-2 border-orange-300 bg-white px-5 py-2.5 text-sm font-semibold text-orange-900 hover:bg-orange-50"
-                        >
-                          Log a workout
-                        </Link>
-                      </div>
-                    </>
-                  )}
-                </div>
-                  ) : null
-                }
-              />
-            </div>
-
-            {/* Tools — schedule, custom workouts, log */}
-            <div className="px-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                Tools
+                  Plan your race
+                </Link>
               </p>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-              <Link
-                href="/training/schedule-run"
-                className="font-medium text-sky-800 hover:text-sky-950"
-              >
-                Schedule a run
-              </Link>
-              <span className="text-gray-300" aria-hidden>·</span>
-              <Link href="/build-a-run" className="font-medium text-gray-800 hover:text-gray-900">
-                Build or host a run
-              </Link>
-              <span className="text-gray-300" aria-hidden>·</span>
-              <Link href="/host-a-run" className="font-medium text-gray-600 hover:text-gray-900">
-                Host with map meetup
-              </Link>
-              <span className="text-gray-300" aria-hidden>·</span>
-              <Link href="/runcrew" className="font-medium text-gray-600 hover:text-gray-900">
-                RunCrew
-              </Link>
-              <span className="text-gray-300" aria-hidden>·</span>
-              <Link href="/workouts" className="font-medium text-gray-600 hover:text-gray-900">
-                Workout log
-              </Link>
-              </div>
-            </div>
+            ) : null}
           </div>
         )}
 

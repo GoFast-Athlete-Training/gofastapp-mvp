@@ -18,6 +18,7 @@ const raceSelect = {
 } as const;
 
 export type RaceHubStaffPreview = {
+  welcomeText: string | null;
   race: {
     id: string;
     name: string;
@@ -79,7 +80,12 @@ export async function loadRaceHubStaffPreviewBySlug(
 
   const raceId = race.id;
 
-  const [announcements, events, runs, memberships, messages, packetResult] = await Promise.all([
+  const [profile, announcements, events, runs, memberships, messages, packetResult] =
+    await Promise.all([
+    prisma.race_hub_profiles.findUnique({
+      where: { raceId },
+      select: { welcomeText: true },
+    }),
     prisma.race_announcements.findMany({
       where: { raceId, archivedAt: null },
       orderBy: { createdAt: "desc" },
@@ -158,6 +164,7 @@ export async function loadRaceHubStaffPreviewBySlug(
   const shakeouts = runs.map((r) => serializeHubShakeout(r, undefined));
 
   return {
+    welcomeText: profile?.welcomeText?.trim() || null,
     race: {
       id: race.id,
       name: race.name,

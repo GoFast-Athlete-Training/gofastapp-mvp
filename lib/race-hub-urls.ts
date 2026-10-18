@@ -15,6 +15,10 @@ export function raceHubPath(slug: string): string {
   return `/race-hub/${encodeURIComponent(slug.trim())}`;
 }
 
+export function raceHubRunsPath(slug: string): string {
+  return `${raceHubPath(slug)}/runs`;
+}
+
 export function raceCommitmentPath(slug: string, returnTo?: string | null): string {
   const base = `/commitment/race/${encodeURIComponent(slug.trim())}`;
   const rt = returnTo?.trim();

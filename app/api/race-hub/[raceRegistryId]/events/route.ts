@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAthleteFromBearer } from "@/lib/race-container-auth";
 import { requireRaceMembership } from "@/lib/race-container-membership";
-import { assertRaceHubReadAccess } from "@/lib/race-hub/hub-read-access";
+import { assertRaceHubReadAccessOrPublic } from "@/lib/race-hub/hub-read-access";
 
 /** GET — race members or Company staff preview */
 export async function GET(
@@ -24,12 +24,13 @@ export async function GET(
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
 
-    const access = await assertRaceHubReadAccess(request, race.id);
+    const access = await assertRaceHubReadAccessOrPublic(request, race.id);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
-    const athleteIdForRsvp = access.mode === "member" ? access.athleteId : "__none__";
+    const athleteIdForRsvp =
+      access.mode === "member" ? access.athleteId : "__none__";
 
     const events = await prisma.race_events.findMany({
       where: { raceId: race.id },

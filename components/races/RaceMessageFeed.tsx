@@ -2,28 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
+import { auth } from "@/lib/firebase";
 import { LocalStorageAPI } from "@/lib/localstorage";
 
-/** Default chatter channels for race hub (stored as message topic strings). */
-export const RACE_HUB_DEFAULT_TOPICS = [
-  "general",
-  "pace-goals",
-  "getting-there",
-  "logistics",
-  "social-meetups",
-  "tips",
-  "ask-the-community",
-] as const;
+import {
+  RACE_HUB_DEFAULT_TOPICS,
+  labelForRaceHubTopic,
+} from "@/lib/race-hub/race-hub-topics";
 
-const TOPIC_LABELS: Record<string, string> = {
-  general: "General",
-  "pace-goals": "Pace goals",
-  "getting-there": "Getting there",
-  logistics: "Logistics",
-  "social-meetups": "Social / meetups",
-  tips: "Tips",
-  "ask-the-community": "Ask the community",
-};
+export { RACE_HUB_DEFAULT_TOPICS };
 
 interface RaceMessageFeedProps {
   raceRegistryId: string;
@@ -35,6 +22,8 @@ interface RaceMessageFeedProps {
   variant?: "default" | "mobile-hub";
   /** Staff hub — view messages only. */
   readOnly?: boolean;
+  /** When set, called instead of posting when the user is not signed in. */
+  onSignInToWrite?: () => void;
 }
 
 type ApiAthlete = {
@@ -74,6 +63,7 @@ export default function RaceMessageFeed({
   messageListClassName,
   variant = "default",
   readOnly = false,
+  onSignInToWrite,
 }: RaceMessageFeedProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -120,6 +110,10 @@ export default function RaceMessageFeed({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
+    if (!auth.currentUser && onSignInToWrite) {
+      onSignInToWrite();
+      return;
+    }
     setLoading(true);
     try {
       await api.post(`/race-hub/${raceRegistryId}/messages`, {
@@ -168,8 +162,7 @@ export default function RaceMessageFeed({
   const canEditMessage = (message: Message) =>
     Boolean(currentUserId && message.athlete?.id === currentUserId);
 
-  const labelForTopic = (t: string) =>
-    TOPIC_LABELS[t] ?? t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, " ");
+  const labelForTopic = (t: string) => labelForRaceHubTopic(t);
 
   return (
     <div className={isMobileHub ? "flex min-h-0 flex-1 flex-col" : "space-y-4"}>

@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAthleteFromBearer } from "@/lib/race-container-auth";
-import { requireRaceMembership } from "@/lib/race-container-membership";
+import { ensureRaceHubMembership } from "@/lib/race-hub/ensure-race-hub-membership";
 
 const ALLOWED = new Set(["going", "not-going", "maybe"]);
 
@@ -23,10 +23,7 @@ export async function POST(
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const membership = await requireRaceMembership(auth.athlete.id, raceRegistryId.trim());
-    if (!membership) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    await ensureRaceHubMembership(auth.athlete.id, raceRegistryId.trim());
 
     const event = await prisma.race_events.findFirst({
       where: { id: eventId.trim(), raceId: raceRegistryId.trim() },

@@ -37,6 +37,10 @@ type Props = {
   sectionLabel?: string | null;
   /** When false, calendar range is shown only in the hub goal strip. */
   showCalendarRangeLabel?: boolean;
+  /** Gear or actions beside week navigation (hub). */
+  headerActions?: ReactNode;
+  /** Opens the day screen instead of inline selected-day panel. */
+  onOpenDayDetails?: (day: PlanDayCard) => void;
 };
 
 export default function PlanWeekViewer({
@@ -55,6 +59,8 @@ export default function PlanWeekViewer({
   collapseCardsOnMobile = false,
   sectionLabel = "This week",
   showCalendarRangeLabel = true,
+  headerActions,
+  onOpenDayDetails,
 }: Props) {
   const atFirstWeek = weekNumber <= 1;
   const atLastWeek = weekNumber >= totalWeeks;
@@ -101,6 +107,7 @@ export default function PlanWeekViewer({
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {headerActions}
           <button
             type="button"
             onClick={onPrevWeek}
@@ -160,46 +167,61 @@ export default function PlanWeekViewer({
             const statusLabel = status === "rest" ? null : sessionStatusLabel(status);
             return (
               <li key={w.dateKey}>
-                <button
-                  type="button"
-                  onClick={() => onSelectDay(w)}
+                <div
                   className={[
-                    "block w-full overflow-hidden rounded-xl border bg-white text-left shadow-sm transition",
+                    "overflow-hidden rounded-xl border bg-white shadow-sm transition",
                     selected
                       ? "border-orange-300 ring-1 ring-orange-200 shadow-md"
                       : "border-gray-100 hover:border-orange-200 hover:shadow-md",
                   ].join(" ")}
                 >
-                  <div className="flex min-h-[4rem]">
-                    <div
-                      className={`w-1.5 shrink-0 ${workoutTypeLeftBorderClass(w.workoutType)}`}
-                    />
-                    <div className="flex flex-1 flex-col px-4 py-2.5 sm:py-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-xs text-gray-500">
-                          {w.date
-                            ? formatPlanDateDisplay(w.date, {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                              })
-                            : "—"}
+                  <button
+                    type="button"
+                    onClick={() => onSelectDay(w)}
+                    className="block w-full text-left"
+                  >
+                    <div className="flex min-h-[4rem]">
+                      <div
+                        className={`w-1.5 shrink-0 ${workoutTypeLeftBorderClass(w.workoutType)}`}
+                      />
+                      <div className="flex flex-1 flex-col px-4 py-2.5 sm:py-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs text-gray-500">
+                            {w.date
+                              ? formatPlanDateDisplay(w.date, {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                })
+                              : "—"}
+                          </p>
+                          {statusLabel ? (
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${sessionStatusBadgeClass(status)}`}
+                            >
+                              {statusLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-0.5 text-base font-semibold leading-snug text-gray-900">
+                          {workoutCardPrimaryName(w)}
                         </p>
-                        {statusLabel ? (
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${sessionStatusBadgeClass(status)}`}
-                          >
-                            {statusLabel}
-                          </span>
-                        ) : null}
+                        <p className="mt-0.5 text-sm text-gray-500">{workoutCardSubtypeLine(w)}</p>
                       </div>
-                      <p className="mt-0.5 text-base font-semibold leading-snug text-gray-900">
-                        {workoutCardPrimaryName(w)}
-                      </p>
-                      <p className="mt-0.5 text-sm text-gray-500">{workoutCardSubtypeLine(w)}</p>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                  {onOpenDayDetails ? (
+                    <div className="border-t border-gray-100 px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => onOpenDayDetails(w)}
+                        className="text-sm font-semibold text-orange-800 hover:text-orange-950 hover:underline"
+                      >
+                        Details
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </li>
             );
           })}

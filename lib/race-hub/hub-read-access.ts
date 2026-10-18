@@ -8,7 +8,22 @@ import {
 
 export type HubReadAccess =
   | { mode: "staff"; staffId: string }
-  | { mode: "member"; athleteId: string; membership: NonNullable<Awaited<ReturnType<typeof requireRaceMembership>>> };
+  | { mode: "member"; athleteId: string; membership: NonNullable<Awaited<ReturnType<typeof requireRaceMembership>>> }
+  | { mode: "public" };
+
+export async function assertRaceHubReadAccessOrPublic(
+  request: Request,
+  raceRegistryId: string,
+): Promise<HubReadAccess | { error: string; status: number }> {
+  const memberOrStaff = await assertRaceHubReadAccess(request, raceRegistryId);
+  if (!("error" in memberOrStaff)) {
+    return memberOrStaff;
+  }
+  if (memberOrStaff.status === 401 || memberOrStaff.status === 403) {
+    return { mode: "public" };
+  }
+  return memberOrStaff;
+}
 
 export async function assertRaceHubReadAccess(
   request: Request,

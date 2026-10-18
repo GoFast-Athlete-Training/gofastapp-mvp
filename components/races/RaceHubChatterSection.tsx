@@ -13,6 +13,7 @@ type RaceHubChatterSectionProps = {
   showHeading?: boolean;
   messageListClassName?: string;
   readOnly?: boolean;
+  onSignInToWrite?: () => void;
 };
 
 export default function RaceHubChatterSection({
@@ -24,6 +25,7 @@ export default function RaceHubChatterSection({
   showHeading = true,
   messageListClassName,
   readOnly = false,
+  onSignInToWrite,
 }: RaceHubChatterSectionProps) {
   const isMobileHub = variant === "mobile-hub";
 
@@ -39,8 +41,7 @@ export default function RaceHubChatterSection({
         <div className={isMobileHub ? "mb-3 px-0.5" : "mb-4"}>
           <h2 className="text-xl font-bold text-gray-900 mb-1">Race Chat</h2>
           <p className="text-sm text-gray-500">
-            Ask questions, coordinate pace groups, share race-day logistics, and plan meetups with
-            other runners.
+            General chat, goal times, and questions for runners in this hub.
           </p>
         </div>
       ) : null}
@@ -60,6 +61,7 @@ export default function RaceHubChatterSection({
         topics={[...RACE_HUB_DEFAULT_TOPICS]}
         variant={variant}
         readOnly={readOnly}
+        onSignInToWrite={onSignInToWrite}
         messageListClassName={
           messageListClassName ??
           (isMobileHub

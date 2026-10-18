@@ -1230,6 +1230,7 @@ export default function AthleteHomePage() {
                   <RacePrepForkActions
                     plannerHref={goalRacePlanHref}
                     raceHubHref={`/race-hub/${primaryRaceRegistryId}`}
+                    seeMyPlanHref="/training"
                     variant="heroLight"
                     layout="row"
                   />

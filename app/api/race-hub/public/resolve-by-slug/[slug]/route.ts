@@ -20,6 +20,9 @@ const raceSelect = {
   transferDeadline: true,
   summaryPhrase: true,
   description: true,
+  startTime: true,
+  courseSlug: true,
+  companyRaceId: true,
 } as const;
 
 /**
@@ -89,6 +92,9 @@ export async function GET(
         transferDeadline: race.transferDeadline?.toISOString() ?? null,
         summaryPhrase: race.summaryPhrase,
         description: race.description,
+        startTime: race.startTime,
+        courseSlug: race.courseSlug,
+        companyRaceId: race.companyRaceId,
       },
     });
   } catch (err) {
