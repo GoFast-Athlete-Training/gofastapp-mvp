@@ -102,8 +102,8 @@ export function mergeWeekIngestWithGuard(params: {
     }
     byDow.set(day.dow, {
       ...day,
-      catalogueWorkoutId: null,
-      planCycleIndex: null,
+      catalogueWorkoutId: day.catalogueWorkoutId ?? null,
+      planCycleIndex: day.planCycleIndex ?? null,
     });
   }
 

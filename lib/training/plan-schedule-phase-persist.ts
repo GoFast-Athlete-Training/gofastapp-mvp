@@ -41,26 +41,34 @@ export function mergePlanSchedulePhaseSlices(
   );
 }
 
-/** Prefer merged phase columns when present; fall back to legacy planSchedule. */
+/**
+ * Canonical athlete schedule: `planSchedule` only.
+ * Legacy rows may still have phase columns — merge once when planSchedule is empty.
+ */
 export function resolvePlanScheduleFromPlanRow(row: {
   planSchedule?: unknown;
   planScheduleBuild?: unknown;
   planScheduleTaper?: unknown;
   planScheduleRaceWeek?: unknown;
 }): unknown {
+  const primary = row.planSchedule;
+  if (Array.isArray(primary) && primary.length > 0) {
+    return primary;
+  }
+
   const build = row.planScheduleBuild;
   const taper = row.planScheduleTaper;
   const raceWeek = row.planScheduleRaceWeek;
-  const hasPhase =
+  const hasLegacyPhase =
     (Array.isArray(build) && build.length > 0) ||
     (Array.isArray(taper) && taper.length > 0) ||
     (Array.isArray(raceWeek) && raceWeek.length > 0);
-  if (hasPhase) {
+  if (hasLegacyPhase) {
     return mergePlanSchedulePhaseSlices({
       build: (Array.isArray(build) ? build : []) as PlanWeekSchedule[],
       taper: (Array.isArray(taper) ? taper : []) as PlanWeekSchedule[],
       raceWeek: (Array.isArray(raceWeek) ? raceWeek : []) as PlanWeekSchedule[],
     });
   }
-  return row.planSchedule ?? null;
+  return primary ?? null;
 }

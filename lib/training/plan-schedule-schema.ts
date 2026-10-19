@@ -4,6 +4,8 @@
 
 import type { WorkoutType } from "@prisma/client";
 
+export type PlanWeekPhaseKey = "B" | "T" | "RW";
+
 /** One prescribed day inside a plan week */
 export type PlanDaySchedule = {
   /** Training DOW convention: 1=Monday … 7=Sunday */
@@ -31,6 +33,8 @@ export type PlanDaySchedule = {
 
 export type PlanWeekSchedule = {
   weekNumber: number;
+  /** Build, taper, or race week — stamped at generate / ingest. */
+  phase?: PlanWeekPhaseKey;
   days: PlanDaySchedule[];
 };
 

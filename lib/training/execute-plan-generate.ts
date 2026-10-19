@@ -59,7 +59,7 @@ import {
 import { presetTaperHasVolumeCaps } from "@/lib/training/phase-week-pins";
 import { weeklyVolumePeakFromPreset } from "@/lib/training/preset-core";
 import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
-import { slicePlanScheduleByPhases } from "@/lib/training/plan-schedule-phase-persist";
+import { stampPhaseOnPlanSchedule } from "@/lib/training/plan-week-phase-key";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
@@ -550,27 +550,15 @@ export async function executePlanGenerate(params: {
       ? goalRacePaceDisplayString(mergedGoalTime, raceDistanceMiles)
       : null);
 
-  const phaseSlices = slicePlanScheduleByPhases(schedule, phaseSplit);
-  const buildJson =
-    phaseSlices.build.length > 0
-      ? (phaseSlices.build as unknown as Prisma.InputJsonValue)
-      : Prisma.JsonNull;
-  const taperJson =
-    phaseSlices.taper.length > 0
-      ? (phaseSlices.taper as unknown as Prisma.InputJsonValue)
-      : Prisma.JsonNull;
-  const raceWeekJson =
-    phaseSlices.raceWeek.length > 0
-      ? (phaseSlices.raceWeek as unknown as Prisma.InputJsonValue)
-      : Prisma.JsonNull;
+  stampPhaseOnPlanSchedule(schedule, weekCount);
 
   await prisma.training_plans.update({
     where: { id: plan.id },
     data: {
       planSchedule: schedule as unknown as Prisma.InputJsonValue,
-      planScheduleBuild: buildJson,
-      planScheduleTaper: taperJson,
-      planScheduleRaceWeek: raceWeekJson,
+      planScheduleBuild: Prisma.JsonNull,
+      planScheduleTaper: Prisma.JsonNull,
+      planScheduleRaceWeek: Prisma.JsonNull,
       phases: Prisma.JsonNull,
       peakWeekNumber: placement.peakWeekNumber ?? phaseSplit.peakWeekNumber,
       taperStartWeekNumber: placement.taperStartWeekNumber,

@@ -37,6 +37,15 @@ export function buildWeekPreviewDays(params: {
   raceDateKey: string | null;
   metaByDateKey?: Record<string, { workoutName?: string; paceNote?: string }>;
   daySegmentsByDateKey?: Record<string, WorkoutStep[]>;
+  catalogueByDateKey?: Record<
+    string,
+    {
+      catalogueWorkoutId: string | null;
+      catalogueName: string | null;
+      approximateMatch: boolean;
+      missingCatalogue: boolean;
+    }
+  >;
 }): PlanWeekPreviewDay[] {
   const out: PlanWeekPreviewDay[] = [];
   let cursor = utcDateOnly(params.weekStart);
@@ -59,6 +68,7 @@ export function buildWeekPreviewDays(params: {
     }
 
     const segmentSteps = params.daySegmentsByDateKey?.[dateKey];
+    const cat = params.catalogueByDateKey?.[dateKey];
     out.push({
       dateKey,
       weekdayLabel: WEEKDAY_LABELS[ourDow - 1] ?? "Day",
@@ -66,6 +76,10 @@ export function buildWeekPreviewDays(params: {
       miles: day.miles,
       workoutName: meta?.workoutName ?? null,
       paceNote: meta?.paceNote ?? null,
+      catalogueWorkoutId: cat?.catalogueWorkoutId ?? day.catalogueWorkoutId ?? null,
+      catalogueName: cat?.catalogueName ?? null,
+      catalogueApproximate: cat?.approximateMatch ?? false,
+      catalogueMissing: cat?.missingCatalogue ?? false,
       hasCustomSegments: Boolean(segmentSteps?.length),
       structurePreviewLines: segmentSteps?.length
         ? formatIngestStructurePreviewLines(segmentSteps)

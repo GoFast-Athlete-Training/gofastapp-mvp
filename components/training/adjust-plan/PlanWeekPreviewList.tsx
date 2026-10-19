@@ -34,7 +34,8 @@ export function PlanWeekPreviewList({ days, summary, ingestRows }: Props) {
               <th className="px-3 py-2">Workout</th>
               <th className="px-3 py-2">Type</th>
               <th className="px-3 py-2 text-right">Mi</th>
-              <th className="px-3 py-2">Pace / structure</th>
+              <th className="px-3 py-2">Catalogue</th>
+              <th className="px-3 py-2">Pace note</th>
               <th className="px-3 py-2">Status</th>
             </tr>
           </thead>
@@ -58,14 +59,22 @@ export function PlanWeekPreviewList({ days, summary, ingestRows }: Props) {
                 </td>
                 <td className="px-3 py-2.5">{d.workoutType}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{d.miles}</td>
+                <td className="max-w-[10rem] px-3 py-2.5 text-gray-800">
+                  {d.catalogueMissing ? (
+                    <span className="text-amber-800">No match — tell staff</span>
+                  ) : d.catalogueName ? (
+                    <span>
+                      {d.catalogueName}
+                      {d.catalogueApproximate ? (
+                        <span className="block text-xs text-amber-800">Closest match</span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td className="max-w-[14rem] px-3 py-2.5 text-gray-700">
-                  {d.structurePreviewLines && d.structurePreviewLines.length > 0 ? (
-                    <ul className="space-y-0.5 text-xs leading-snug">
-                      {d.structurePreviewLines.map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  ) : d.paceNote?.trim() ? (
+                  {d.paceNote?.trim() ? (
                     <span className="truncate">{d.paceNote}</span>
                   ) : (
                     "—"

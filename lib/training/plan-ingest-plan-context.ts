@@ -10,6 +10,11 @@ import {
 } from "@/lib/training/plan-week-phase-split";
 import { weekNumberFromPlanDate } from "@/lib/training/plan-schedule";
 import { utcDateOnly } from "@/lib/training/plan-utils";
+import { ensureStructuredPlanSchedule } from "@/lib/training/plan-week-ingest-guard";
+import {
+  isTaperPhaseKey,
+  resolveWeekPhase,
+} from "@/lib/training/plan-week-phase-key";
 
 export type AthletePlanContext = {
   id: string;
@@ -77,6 +82,13 @@ export function weekNumberForPlanDate(plan: AthletePlanContext, dateKey: string)
 }
 
 export function isWeekInTaperWindow(plan: AthletePlanContext, weekNumber: number): boolean {
+  const weeks = ensureStructuredPlanSchedule(plan.planSchedule);
+  const week = weeks.find((w) => w.weekNumber === weekNumber);
+  if (week) {
+    const phase = resolveWeekPhase(week, plan.totalWeeks);
+    if (isTaperPhaseKey(phase)) return true;
+    if (phase === "B" || phase === "RW") return false;
+  }
   if (plan.taperStartWeekNumber != null && weekNumber >= plan.taperStartWeekNumber) {
     return weekNumber < plan.totalWeeks;
   }

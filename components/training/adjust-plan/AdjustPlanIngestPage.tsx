@@ -148,7 +148,7 @@ export function AdjustPlanIngestPage({ planId, weekNumber }: Props) {
           ) : null}
           <p className="mt-2 text-sm text-gray-700">
             {isWeekScope
-              ? "Replace workouts in this calendar week. Do not include goal race day in CSV — protected days stay unchanged."
+              ? "Replace workouts in this calendar week. We match each day to the closest workout catalogue entry — it may not be exact. If you do not see the right catalogue, tell staff and we will build it. Do not include goal race day in CSV."
               : "Replace future weeks from your paste. Completed weeks stay as-is."}
           </p>
         </header>
@@ -179,8 +179,8 @@ export function AdjustPlanIngestPage({ planId, weekNumber }: Props) {
                   CSV upload
                 </span>
                 <p className="mt-2 text-sm text-slate-600">
-                  Download the template, fill training days only, upload — we map columns to a
-                  workout table (no raw dump).
+                  Download the template, fill training days only, upload — we parse rows and match
+                  catalogue workouts (not homemade segments).
                 </p>
               </button>
             ) : (

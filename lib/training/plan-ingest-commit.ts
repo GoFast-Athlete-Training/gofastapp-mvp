@@ -29,6 +29,7 @@ import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import type { WorkoutStep } from "@/lib/training/prescription";
 import { applyWeekIngestGuard } from "@/lib/training/plan-week-ingest-guard";
 import { upsertPlannedWorkoutFromIngestDay } from "@/lib/training/plan-ingest-planned-upsert";
+import { planWeekPhaseForNumber } from "@/lib/training/plan-week-phase-key";
 import { WorkoutType as WT } from "@prisma/client";
 
 function workoutStepsToPrescribeInput(steps: WorkoutStep[]): PrescribeSegmentInput[] {
@@ -170,16 +171,26 @@ async function rematerializeFutureDaysInWeek(params: {
     if (d.title === "Rest") continue;
     if (d.workoutType === WT.Race) continue;
 
-    const ingestTitle = params.dayTitlesByDateKey?.[d.dateKey]?.trim();
     const ingestSegments = params.daySegmentsByDateKey?.[d.dateKey];
-    const useIngestPath =
-      Boolean(ingestTitle) ||
-      Boolean(ingestSegments?.length) ||
-      d.catalogueWorkoutId == null;
 
-    if (useIngestPath) {
+    if (d.catalogueWorkoutId) {
       try {
-        const title = ingestTitle || d.title;
+        await materializeWorkoutForPlanDay({
+          athleteId: params.plan.athleteId,
+          planId: params.plan.id,
+          dateParam: d.dateKey,
+        });
+        materialized += 1;
+      } catch (e) {
+        const msg = e instanceof MaterializeWorkoutError ? e.message : String(e);
+        errors.push(`${d.dateKey}: ${msg}`);
+      }
+      continue;
+    }
+
+    if (ingestSegments?.length) {
+      try {
+        const title = params.dayTitlesByDateKey?.[d.dateKey]?.trim() || d.title;
         await upsertPlannedWorkoutFromIngestDay({
           athleteId: params.plan.athleteId,
           planId: params.plan.id,
@@ -194,17 +205,9 @@ async function rematerializeFutureDaysInWeek(params: {
       continue;
     }
 
-    try {
-      await materializeWorkoutForPlanDay({
-        athleteId: params.plan.athleteId,
-        planId: params.plan.id,
-        dateParam: d.dateKey,
-      });
-      materialized += 1;
-    } catch (e) {
-      const msg = e instanceof MaterializeWorkoutError ? e.message : String(e);
-      errors.push(`${d.dateKey}: ${msg}`);
-    }
+    errors.push(
+      `${d.dateKey}: no catalogue workout matched — tell staff if you need a new catalogue entry`,
+    );
   }
 
   return { materialized, errors };
@@ -280,7 +283,13 @@ async function commitWeekIngest(params: {
   });
 
   const weeks = ensureStructuredSchedule(params.plan.planSchedule);
-  const nextSchedule = spliceWeek(weeks, { ...week, weekNumber });
+  const existingWeek = weeks.find((w) => w.weekNumber === weekNumber);
+  const phasedWeek = {
+    ...week,
+    weekNumber,
+    phase: existingWeek?.phase ?? planWeekPhaseForNumber(params.plan.totalWeeks, weekNumber),
+  };
+  const nextSchedule = spliceWeek(weeks, phasedWeek);
   await persistPlanSchedule(params.plan.id, nextSchedule);
   params.plan.planSchedule = nextSchedule;
 
@@ -306,7 +315,6 @@ async function commitWeekIngest(params: {
     plan: params.plan,
     weekNumber,
     protectedDateKeys,
-    daySegmentsByDateKey: params.preview.daySegmentsByDateKey,
     dayTitlesByDateKey,
   });
 
@@ -328,7 +336,13 @@ async function commitPlanIngestScope(params: {
 
   let next = [...existing.filter((w) => w.weekNumber < currentWeek)];
   for (const w of incoming) {
-    next = spliceWeek(next, w);
+    const phased = {
+      ...w,
+      phase:
+        w.phase ??
+        planWeekPhaseForNumber(params.plan.totalWeeks, w.weekNumber),
+    };
+    next = spliceWeek(next, phased);
   }
 
   await persistPlanSchedule(params.plan.id, next);

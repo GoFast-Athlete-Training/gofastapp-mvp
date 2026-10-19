@@ -1,5 +1,6 @@
 /**
- * Write planned_workouts from week ingest (no catalogue prescription).
+ * Write planned_workouts from workout-scope ingest when explicit segments were parsed.
+ * Week ingest should materialize from catalogueWorkoutId instead.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -9,7 +10,6 @@ import {
   type PrescribeSegmentInput,
 } from "@/lib/training/workout-or-planned-resolve";
 import type { WorkoutStep } from "@/lib/training/prescription";
-import { WorkoutType } from "@prisma/client";
 
 function stepsToPrescribeInput(steps: WorkoutStep[]): PrescribeSegmentInput[] {
   return steps.map((s, i) => ({
@@ -25,38 +25,18 @@ function stepsToPrescribeInput(steps: WorkoutStep[]): PrescribeSegmentInput[] {
   }));
 }
 
-function fallbackStepsForDay(day: PlanScheduleDay, title: string): WorkoutStep[] {
-  const miles = day.estimatedDistanceInMeters / 1609.34;
-  const mi = Math.max(0.1, Math.round(miles * 10) / 10);
-  const stepTitle =
-    day.workoutType === WorkoutType.Easy
-      ? "Easy"
-      : day.workoutType === WorkoutType.Tempo
-        ? "Tempo"
-        : day.workoutType === WorkoutType.Intervals
-          ? "Intervals"
-          : title || "Run";
-  return [
-    {
-      stepOrder: 1,
-      title: stepTitle,
-      durationType: "DISTANCE",
-      durationValue: mi,
-    },
-  ];
-}
-
 export async function upsertPlannedWorkoutFromIngestDay(params: {
   athleteId: string;
   planId: string;
   day: PlanScheduleDay;
   title: string;
-  segments?: WorkoutStep[] | null;
+  segments: WorkoutStep[];
 }): Promise<string> {
-  const steps =
-    params.segments && params.segments.length > 0
-      ? params.segments
-      : fallbackStepsForDay(params.day, params.title);
+  if (!params.segments.length) {
+    throw new Error(
+      "Workout ingest requires parsed segments or a catalogue match — re-preview the week.",
+    );
+  }
 
   const existing = await prisma.planned_workouts.findFirst({
     where: {
@@ -75,7 +55,7 @@ export async function upsertPlannedWorkoutFromIngestDay(params: {
         title: params.title,
         workoutType: params.day.workoutType,
         estimatedDistanceInMeters: params.day.estimatedDistanceInMeters,
-        catalogueWorkoutId: null,
+        catalogueWorkoutId: params.day.catalogueWorkoutId ?? null,
         weekNumber: params.day.weekNumber,
         dayAssigned: params.day.dayAssigned,
         nOffset: params.day.nOffset,
@@ -93,7 +73,7 @@ export async function upsertPlannedWorkoutFromIngestDay(params: {
         planId: params.planId,
         date: params.day.date,
         estimatedDistanceInMeters: params.day.estimatedDistanceInMeters,
-        catalogueWorkoutId: null,
+        catalogueWorkoutId: params.day.catalogueWorkoutId ?? null,
         weekNumber: params.day.weekNumber,
         dayAssigned: params.day.dayAssigned,
         nOffset: params.day.nOffset,
@@ -107,7 +87,7 @@ export async function upsertPlannedWorkoutFromIngestDay(params: {
   await replacePrescribeSegmentsForAthlete({
     id: plannedWorkoutId,
     athleteId: params.athleteId,
-    normalized: stepsToPrescribeInput(steps),
+    normalized: stepsToPrescribeInput(params.segments),
   });
 
   return plannedWorkoutId;

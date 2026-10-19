@@ -33,6 +33,15 @@ import {
 import { weekBoundsFromPlan } from "@/lib/training/plan-schedule";
 import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import type { WorkoutStep } from "@/lib/training/prescription";
+import {
+  catalogueListForOpenAiPrompt,
+  enrichWeekDaysWithCatalogue,
+} from "@/lib/training/plan-ingest-enrich-catalogue";
+import {
+  loadCompanyCatalogueForIngest,
+  pickClosestCatalogueEntry,
+} from "@/lib/training/plan-ingest-catalogue-match";
+import { planWeekPhaseForNumber } from "@/lib/training/plan-week-phase-key";
 
 const WORKOUT_TYPES = new Set<string>(["Easy", "Tempo", "Intervals", "LongRun", "Race"]);
 
@@ -109,23 +118,37 @@ async function openAiParseWeekOrPlan(params: {
   scope: "week" | "plan";
   sourceText: string;
   weekNumber?: number;
+  catalogueForPrompt?: ReturnType<typeof catalogueListForOpenAiPrompt>;
 }): Promise<{ weeks: PlanWeekSchedule[]; summary: string } | null> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) return null;
 
+  const catalogueRule =
+    params.catalogueForPrompt?.length
+      ? `For each day, set "catalogueWorkoutId" to the id of the closest matching row from catalogue (same workoutType). Use null only when nothing fits.`
+      : `Set catalogueWorkoutId null on each day.`;
+
   const systemPrompt =
     params.scope === "week"
       ? `Parse one training week from athlete paste. Return JSON only:
-{ "summary": "short human summary", "week": { "weekNumber": number, "days": [{ "dow": 1-7 (Mon=1), "workoutType": "Easy"|"Tempo"|"Intervals"|"LongRun"|"Race", "miles": number }] } }
-Omit rest days. Do not invent catalogue IDs.`
+{ "summary": "short human summary", "week": { "weekNumber": number, "days": [{ "dow": 1-7 (Mon=1), "workoutType": "Easy"|"Tempo"|"Intervals"|"LongRun"|"Race", "miles": number, "catalogueWorkoutId": string|null }] } }
+Omit rest days. ${catalogueRule}`
       : `Parse a multi-week training plan from athlete paste. Return JSON only:
-{ "summary": "short human summary", "weeks": [{ "weekNumber": number, "days": [{ "dow": 1-7, "workoutType": "Easy"|"Tempo"|"Intervals"|"LongRun"|"Race", "miles": number }] }] }
-Omit rest days. Week numbers must be positive integers.`;
+{ "summary": "short human summary", "weeks": [{ "weekNumber": number, "days": [{ "dow": 1-7, "workoutType": "Easy"|"Tempo"|"Intervals"|"LongRun"|"Race", "miles": number, "catalogueWorkoutId": string|null }] }] }
+Omit rest days. Week numbers must be positive integers. ${catalogueRule}`;
 
-  const userContent =
+  const userPayload =
     params.scope === "week"
-      ? JSON.stringify({ weekNumber: params.weekNumber ?? 1, sourceText: params.sourceText })
-      : JSON.stringify({ sourceText: params.sourceText });
+      ? {
+          weekNumber: params.weekNumber ?? 1,
+          sourceText: params.sourceText,
+          catalogue: params.catalogueForPrompt ?? [],
+        }
+      : {
+          sourceText: params.sourceText,
+          catalogue: params.catalogueForPrompt ?? [],
+        };
+  const userContent = JSON.stringify(userPayload);
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -229,6 +252,25 @@ export async function previewPlanIngest(params: {
       segments = [];
     }
 
+    const catalogueRows = await loadCompanyCatalogueForIngest();
+    const catalogueMatch = pickClosestCatalogueEntry({
+      workoutType,
+      miles,
+      hintText: text,
+      catalogue: catalogueRows,
+    });
+
+    let summary = parsed?.suggestedTitle ?? `${workoutType} · ${miles} mi on ${dateKey}`;
+    if (catalogueMatch.catalogueName) {
+      summary += ` · Catalogue: ${catalogueMatch.catalogueName}`;
+      if (catalogueMatch.approximateMatch) {
+        summary += " (closest match)";
+      }
+    } else if (!segments.length) {
+      summary +=
+        " · No catalogue match — tell staff if you need a new workout catalogue entry.";
+    }
+
     return {
       ok: true,
       preview: {
@@ -238,12 +280,12 @@ export async function previewPlanIngest(params: {
           dateKey,
           workoutType,
           miles,
-          catalogueWorkoutId: null,
+          catalogueWorkoutId: catalogueMatch.catalogueWorkoutId,
           segments: segments.length > 0 ? segments : undefined,
           suggestedTitle: parsed?.suggestedTitle,
           suggestedDescription: parsed?.suggestedDescription,
         },
-        summary: parsed?.suggestedTitle ?? `${workoutType} · ${miles} mi on ${dateKey}`,
+        summary,
       },
     };
   }
@@ -263,17 +305,17 @@ export async function previewPlanIngest(params: {
 
     let parseSource: "deterministic" | "openai" = "deterministic";
     let incomingWeek: PlanWeekSchedule | null = null;
-    let daySegmentsByDateKey: Record<string, WorkoutStep[]> | undefined;
     let metaByDateKey: Record<string, { workoutName?: string; paceNote?: string }> | undefined;
     let weekIngestRows: PlanWeekIngestRow[] | undefined;
     const preGuardNotes: string[] = [];
+    const catalogueRows = await loadCompanyCatalogueForIngest();
+    const catalogueForPrompt = catalogueListForOpenAiPrompt(catalogueRows);
 
     if (looksLikePlanWeekCsv(text)) {
       const csv = tryParsePlanWeekCsvText({
         sourceText: text,
         weekNumber,
         weekBounds: bounds,
-        fiveKPace: plan.currentFiveKPace,
         raceDateKey,
       });
       if (!csv) {
@@ -283,10 +325,6 @@ export async function previewPlanIngest(params: {
         };
       }
       incomingWeek = csv.week;
-      daySegmentsByDateKey =
-        Object.keys(csv.daySegmentsByDateKey).length > 0
-          ? csv.daySegmentsByDateKey
-          : undefined;
       metaByDateKey =
         Object.keys(csv.metaByDateKey).length > 0 ? csv.metaByDateKey : undefined;
       weekIngestRows = csv.weekIngestRows;
@@ -297,7 +335,12 @@ export async function previewPlanIngest(params: {
         incomingWeek = deterministic;
       } else {
         parseSource = "openai";
-        const ai = await openAiParseWeekOrPlan({ scope: "week", sourceText: text, weekNumber });
+        const ai = await openAiParseWeekOrPlan({
+          scope: "week",
+          sourceText: text,
+          weekNumber,
+          catalogueForPrompt,
+        });
         const week = ai?.weeks[0];
         if (!week) {
           return {
@@ -314,6 +357,21 @@ export async function previewPlanIngest(params: {
       return { ok: false, error: "Could not parse this week" };
     }
 
+    incomingWeek = {
+      ...incomingWeek,
+      weekNumber,
+      phase: planWeekPhaseForNumber(plan.totalWeeks, weekNumber),
+    };
+
+    const enriched = await enrichWeekDaysWithCatalogue({
+      week: incomingWeek,
+      weekNumber,
+      planStartDate: plan.startDate,
+      metaByDateKey,
+      catalogue: catalogueRows,
+    });
+    incomingWeek = enriched.week;
+
     const { week: guardedWeek, skippedNotes, protectedDateKeys } = await applyWeekIngestGuard({
       plan,
       weekNumber,
@@ -329,12 +387,15 @@ export async function previewPlanIngest(params: {
       protectedDateKeys,
       raceDateKey,
       metaByDateKey,
-      daySegmentsByDateKey,
+      catalogueByDateKey: enriched.byDateKey,
     });
 
     const totalMi = guardedWeek.days.reduce((a, d) => a + d.miles, 0);
     let summary = `Week ${weekNumber}: ${guardedWeek.days.length} days, ~${Math.round(totalMi)} mi`;
     summary = appendSkippedToSummary(summary, [...preGuardNotes, ...skippedNotes]);
+    if (enriched.summaryNotes.length > 0) {
+      summary = `${summary}. ${enriched.summaryNotes.join(" ")}`;
+    }
 
     return {
       ok: true,
@@ -343,40 +404,72 @@ export async function previewPlanIngest(params: {
         parseSource,
         week: { weekNumber, week: guardedWeek },
         summary,
-        daySegmentsByDateKey,
         weekPreviewDays,
         weekIngestRows,
+        catalogueNotes: enriched.summaryNotes,
       },
     };
   }
 
   /** plan scope */
+  if (!plan) {
+    return { ok: false, error: "Plan not found" };
+  }
+  const planCtx = plan;
+  const catalogueRows = await loadCompanyCatalogueForIngest();
+  const catalogueForPrompt = catalogueListForOpenAiPrompt(catalogueRows);
+
+  async function enrichPlanWeeks(weeks: PlanWeekSchedule[]): Promise<PlanWeekSchedule[]> {
+    const out: PlanWeekSchedule[] = [];
+    for (const w of weeks) {
+      const wn = w.weekNumber;
+      const stamped = {
+        ...w,
+        phase: planWeekPhaseForNumber(planCtx.totalWeeks, wn),
+      };
+      const enriched = await enrichWeekDaysWithCatalogue({
+        week: stamped,
+        weekNumber: wn,
+        planStartDate: planCtx.startDate,
+        catalogue: catalogueRows,
+      });
+      out.push(enriched.week);
+    }
+    return out.sort((a, b) => a.weekNumber - b.weekNumber);
+  }
+
   const deterministicWeeks = tryParsePastedFullPlanText(text);
   if (deterministicWeeks && deterministicWeeks.length > 0) {
+    const weeks = await enrichPlanWeeks(deterministicWeeks);
     return {
       ok: true,
       preview: {
         scope: "plan",
         parseSource: "deterministic",
-        plan: { weeks: deterministicWeeks },
-        summary: `${deterministicWeeks.length} week(s) parsed`,
+        plan: { weeks },
+        summary: `${weeks.length} week(s) parsed with catalogue matching`,
       },
     };
   }
 
-  const ai = await openAiParseWeekOrPlan({ scope: "plan", sourceText: text });
+  const ai = await openAiParseWeekOrPlan({
+    scope: "plan",
+    sourceText: text,
+    catalogueForPrompt,
+  });
   if (!ai || ai.weeks.length === 0) {
     return {
       ok: false,
       error: "Could not parse plan — use Week 1 / Week 2 headers or day lines",
     };
   }
+  const weeks = await enrichPlanWeeks(ai.weeks);
   return {
     ok: true,
     preview: {
       scope: "plan",
       parseSource: "openai",
-      plan: { weeks: ai.weeks },
+      plan: { weeks },
       summary: ai.summary,
     },
   };

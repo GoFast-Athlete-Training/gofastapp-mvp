@@ -3,6 +3,7 @@
  */
 
 import type { PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
+import { stampPhaseOnPlanSchedule } from "@/lib/training/plan-week-phase-key";
 import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
 import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import { WorkoutType as WT } from "@prisma/client";
@@ -50,5 +51,5 @@ export function buildWeekByWeekPlanShellSchedule(params: {
     });
   }
 
-  return weeks;
+  return stampPhaseOnPlanSchedule(weeks, params.totalWeeks);
 }

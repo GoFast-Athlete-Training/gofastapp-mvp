@@ -35,6 +35,10 @@ export type PlanWeekPreviewDay = {
   miles: number;
   workoutName?: string | null;
   paceNote?: string | null;
+  catalogueWorkoutId?: string | null;
+  catalogueName?: string | null;
+  catalogueApproximate?: boolean;
+  catalogueMissing?: boolean;
   hasCustomSegments: boolean;
   structurePreviewLines?: string[];
   action: "replace" | "keep";
@@ -70,9 +74,11 @@ export type PlanIngestPreviewResult =
       parseSource: "deterministic" | "openai";
       week: PlanIngestWeekPayload;
       summary: string;
+      /** @deprecated week ingest materializes from catalogueWorkoutId only */
       daySegmentsByDateKey?: Record<string, WorkoutStep[]>;
       weekPreviewDays?: PlanWeekPreviewDay[];
       weekIngestRows?: PlanWeekIngestRow[];
+      catalogueNotes?: string[];
     }
   | {
       scope: "plan";

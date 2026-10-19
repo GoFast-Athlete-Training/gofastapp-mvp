@@ -93,9 +93,6 @@ export async function GET(request: NextRequest) {
       where: { id: planId, athleteId: auth.athlete.id },
       select: {
         planSchedule: true,
-        planScheduleBuild: true,
-        planScheduleTaper: true,
-        planScheduleRaceWeek: true,
         cyclePoolData: true,
       },
     });

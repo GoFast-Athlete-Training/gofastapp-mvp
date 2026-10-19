@@ -1,16 +1,10 @@
 /**
- * Week-scope CSV adapter: Date, Workout, Type, Mileage, Pace → PlanWeekSchedule + optional segments.
+ * Week-scope CSV adapter: Date, Workout, Type, Mileage, Pace → PlanWeekSchedule rows for parse/catalogue match.
  */
 
 import type { WorkoutType } from "@prisma/client";
-import type { WorkoutStep } from "@/lib/training/prescription";
 import type { PlanDaySchedule, PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
 import { dateKeyInWeekBounds } from "@/lib/training/plan-week-ingest-guard";
-import {
-  parsedPasteToAiGenerateResponse,
-  tryParsePastedWorkoutText,
-  type ParsedPasteWorkout,
-} from "@/lib/training/parse-pasted-workout";
 import type { WeekBounds } from "@/lib/training/plan-schedule";
 import { isPlanWeekCsvHeaderLine } from "@/lib/training/plan-week-csv-template";
 import type { PlanWeekIngestRow } from "@/lib/training/plan-ingest-contract";
@@ -19,7 +13,6 @@ export type ParsedPlanWeekCsv = {
   week: PlanWeekSchedule;
   skippedNotes: string[];
   outOfWeekNotes: string[];
-  daySegmentsByDateKey: Record<string, WorkoutStep[]>;
   metaByDateKey: Record<string, { workoutName: string; paceNote: string }>;
   weekIngestRows: PlanWeekIngestRow[];
 };
@@ -95,59 +88,6 @@ function ourDowFromDateKey(dateKey: string): number {
   return js === 0 ? 7 : js;
 }
 
-function paceHasStructure(pace: string): boolean {
-  const p = pace.trim();
-  if (!p) return false;
-  if (p.includes(";")) return true;
-  if (/\d+\s*mi\b/i.test(p) && (/\bwarm/i.test(p) || /\bcool/i.test(p) || /@/.test(p))) {
-    return true;
-  }
-  return tryParsePastedWorkoutText(p) != null;
-}
-
-function segmentsFromStructuredPace(
-  pace: string,
-  workoutType: WorkoutType,
-  fiveKPace: string | null
-): WorkoutStep[] | null {
-  const parsed = tryParsePastedWorkoutText(pace, workoutType);
-  if (parsed) {
-    const built = parsedPasteToAiGenerateResponse(parsed, fiveKPace);
-    if (built.segments.length > 0) return built.segments;
-  }
-
-  const parts = pace.split(";").map((s) => s.trim()).filter(Boolean);
-  if (parts.length < 2) return null;
-
-  const segments: ParsedPasteWorkout["segments"] = [];
-  for (const part of parts) {
-    const mi = part.match(/(\d+(?:\.\d+)?)\s*mi\b/i);
-    if (!mi) continue;
-    const miles = parseFloat(mi[1]!);
-    if (!Number.isFinite(miles) || miles <= 0) continue;
-    const lower = part.toLowerCase();
-    let title = "Easy";
-    if (/\btempo\b/.test(lower) || /@\s*\d/.test(part)) title = "Tempo";
-    else if (/\bwarm/.test(lower)) title = "Warm-up";
-    else if (/\bcool/.test(lower)) title = "Cool-down";
-
-    segments.push({
-      title,
-      durationType: "DISTANCE",
-      durationValue: miles,
-      effortContext: part,
-    });
-  }
-  if (segments.length < 2) return null;
-
-  const synthetic: ParsedPasteWorkout = {
-    segments,
-    suggestedTitle: `${workoutType} blocks`,
-    suggestedDescription: pace.slice(0, 160),
-  };
-  return parsedPasteToAiGenerateResponse(synthetic, fiveKPace).segments;
-}
-
 export function looksLikePlanWeekCsv(sourceText: string): boolean {
   const first = planWeekCsvNonCommentLines(sourceText)[0];
   return first != null && isPlanWeekCsvHeaderLine(first);
@@ -157,7 +97,6 @@ export function tryParsePlanWeekCsvText(params: {
   sourceText: string;
   weekNumber: number;
   weekBounds: WeekBounds;
-  fiveKPace: string | null;
   raceDateKey: string | null;
 }): ParsedPlanWeekCsv | null {
   const lines = planWeekCsvNonCommentLines(params.sourceText);
@@ -166,7 +105,6 @@ export function tryParsePlanWeekCsvText(params: {
 
   const skippedNotes: string[] = [];
   const outOfWeekNotes: string[] = [];
-  const daySegmentsByDateKey: Record<string, WorkoutStep[]> = {};
   const metaByDateKey: Record<string, { workoutName: string; paceNote: string }> = {};
   const weekIngestRows: PlanWeekIngestRow[] = [];
   const byDow = new Map<number, PlanDaySchedule>();
@@ -259,13 +197,6 @@ export function tryParsePlanWeekCsvText(params: {
       pace,
       status: "import",
     });
-
-    if (pace && paceHasStructure(pace)) {
-      const segments = segmentsFromStructuredPace(pace, workoutType, params.fiveKPace);
-      if (segments && segments.length > 0) {
-        daySegmentsByDateKey[dateKey] = segments;
-      }
-    }
   }
 
   if (byDow.size === 0 && skippedNotes.length === 0 && outOfWeekNotes.length > 0) {
@@ -276,7 +207,6 @@ export function tryParsePlanWeekCsvText(params: {
       week: { weekNumber: params.weekNumber, days: [] },
       skippedNotes,
       outOfWeekNotes,
-      daySegmentsByDateKey,
       metaByDateKey,
       weekIngestRows,
     };
@@ -288,7 +218,6 @@ export function tryParsePlanWeekCsvText(params: {
     week: { weekNumber: params.weekNumber, days },
     skippedNotes,
     outOfWeekNotes,
-    daySegmentsByDateKey,
     metaByDateKey,
     weekIngestRows,
   };

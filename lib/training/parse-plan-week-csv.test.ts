@@ -21,7 +21,6 @@ test("CSV week parse skips race row and maps shakeout to Easy", () => {
     sourceText: MCM_CSV,
     weekNumber,
     weekBounds: bounds,
-    fiveKPace: "7:30/mi",
     raceDateKey: "2026-10-25",
   });
   assert.ok(parsed);
@@ -38,7 +37,6 @@ test("CSV weekIngestRows mark race skip and import rows", () => {
     sourceText: MCM_CSV,
     weekNumber,
     weekBounds: bounds,
-    fiveKPace: "7:30/mi",
     raceDateKey: "2026-10-25",
   });
   assert.ok(parsed);
@@ -50,15 +48,13 @@ test("CSV weekIngestRows mark race skip and import rows", () => {
   assert.equal(parsed!.metaByDateKey["2026-10-24"]?.workoutName, "MCM Shakeout");
 });
 
-test("CSV structured tempo pace yields preview segments for that date", () => {
+test("CSV keeps pace note in meta for catalogue matching", () => {
   const parsed = tryParsePlanWeekCsvText({
     sourceText: MCM_CSV,
     weekNumber,
     weekBounds: bounds,
-    fiveKPace: "7:30/mi",
     raceDateKey: "2026-10-25",
   });
   assert.ok(parsed);
-  const segs = parsed!.daySegmentsByDateKey["2026-10-20"];
-  assert.ok(segs && segs.length >= 2);
+  assert.match(parsed!.metaByDateKey["2026-10-20"]?.paceNote ?? "", /tempo/i);
 });
