@@ -21,6 +21,7 @@ import GoFastWithMeStudioAppShell from "@/components/gofast-with-me/GoFastWithMe
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import {
   COMMUNITY_HUB_PATH,
+  contentBuilderPayoutsPath,
   studioContentPath,
 } from "@/lib/athlete/community-nav";
 import {
@@ -107,7 +108,7 @@ export default function GoFastWithOthersDashboard() {
     (view: StudioView, options?: { contentFocus?: ContentEditorFocus }) => {
       if (view === "payouts") {
         setActiveView("payouts");
-        router.replace("/gofast-with-others?view=payouts");
+        router.replace(contentBuilderPayoutsPath());
         return;
       }
       const section = view as StudioSection;

@@ -160,7 +160,7 @@ export default function GoFastWithMeDashboardHome({
             </div>
           </div>
           <Link
-            href="/gofast-with-others?view=payouts"
+            href="/gofast-contentbuilder?view=payouts"
             className="text-sm font-semibold text-orange-600 hover:text-orange-700"
           >
             Earnings →

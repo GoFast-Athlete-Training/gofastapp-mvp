@@ -106,7 +106,7 @@ export default function ContainerHubCommunitySection({
             Manage followers, send announcements, and preview the member experience from your studio.
           </p>
           <Link
-            href="/gofast-with-others"
+            href="/gofast-contentbuilder"
             className="inline-flex rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
           >
             Open studio — Community

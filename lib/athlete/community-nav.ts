@@ -7,17 +7,31 @@ import {
 
 export const COMMUNITY_HUB_PATH = '/community/hub';
 
-export const BUILD_CONTENT_PATH = '/gofast-with-others';
+/** Owner content studio (landing copy, story, tips, routes). */
+export const CONTENT_BUILDER_PATH = '/gofast-contentbuilder';
 
-export const BUILD_CONTENT_LABEL = 'Build content';
+/** @deprecated Use CONTENT_BUILDER_PATH */
+export const BUILD_CONTENT_PATH = CONTENT_BUILDER_PATH;
+
+export const CONTENT_BUILDER_LABEL = 'Content builder';
+
+/** @deprecated Use CONTENT_BUILDER_LABEL */
+export const BUILD_CONTENT_LABEL = CONTENT_BUILDER_LABEL;
 
 export const MANAGE_COMMUNITY_LABEL = 'Manage Community';
+
+/** @deprecated Use `/gofast-with-others` redirect only */
+export const LEGACY_GOFAST_WITH_OTHERS_PATH = '/gofast-with-others';
+
+export function contentBuilderPayoutsPath(): string {
+  return `${CONTENT_BUILDER_PATH}?view=payouts`;
+}
 
 /** Deep-link into the content studio (no entry “doors”). */
 export function studioContentPath(section: StudioSection, focus?: ContentEditorFocus): string {
   const params = new URLSearchParams({ studio: 'content', view: section });
   if (focus) params.set('focus', focus);
-  return `/gofast-with-others?${params.toString()}`;
+  return `${CONTENT_BUILDER_PATH}?${params.toString()}`;
 }
 
 export function communityHubPathForHandle(handle: string): string {
@@ -32,7 +46,13 @@ export function isCommunityHubPath(pathname: string | null): boolean {
 
 export function isContentStudioPath(pathname: string | null): boolean {
   if (!pathname) return false;
-  return pathname === '/gofast-with-others' || pathname.startsWith('/gofast-with-others/');
+  if (pathname === CONTENT_BUILDER_PATH || pathname.startsWith(`${CONTENT_BUILDER_PATH}/`)) {
+    return true;
+  }
+  return (
+    pathname === LEGACY_GOFAST_WITH_OTHERS_PATH ||
+    pathname.startsWith(`${LEGACY_GOFAST_WITH_OTHERS_PATH}/`)
+  );
 }
 
 export function isContentNavItemActive(

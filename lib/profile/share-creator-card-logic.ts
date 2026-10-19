@@ -99,8 +99,8 @@ function buildProfileCard(profile: ShareHubProfileStatus): ShareCreatorCardModel
     description: "How others find and join you — landing, runs, plans, and community.",
     state: "manage",
     statusLine,
-    primaryLabel: "GoFast with Others",
-    primaryHref: "/gofast-with-others",
+    primaryLabel: "Content builder",
+    primaryHref: "/gofast-contentbuilder",
     secondaryLabel: profile.publicPageUrl ? "View public page" : undefined,
     secondaryHref: profile.publicPageUrl ?? undefined,
   };

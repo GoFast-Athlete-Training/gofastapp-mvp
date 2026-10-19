@@ -11,6 +11,7 @@ import MissingPaceBanner from '@/components/profile/MissingPaceBanner';
 import PersonalCommunityCard from '@/components/profile/PersonalCommunityCard';
 
 import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
+import { CONTENT_BUILDER_LABEL, CONTENT_BUILDER_PATH } from '@/lib/athlete/community-nav';
 
 type PublicGoalPayload = {
   trainingSummary: {
@@ -229,10 +230,10 @@ export default function ProfilePage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push('/gofast-with-others')}
+              onClick={() => router.push(CONTENT_BUILDER_PATH)}
               className="border border-orange-200 text-orange-800 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-orange-50"
             >
-              GoFast with Others
+              {CONTENT_BUILDER_LABEL}
             </button>
             {liveGoFastUrl ? (
               <a
@@ -329,18 +330,18 @@ export default function ProfilePage() {
         </section>
 
         <section className="rounded-2xl border border-orange-100 bg-orange-50/40 p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-gray-900">GoFast with Others</h2>
+          <h2 className="text-lg font-bold text-gray-900">{CONTENT_BUILDER_LABEL}</h2>
           <p className="text-sm text-gray-600 mt-1 max-w-xl">
-            Your in-app profile is who you are. GoFastWithMe is how others find and join you — landing
-            copy, community, runs, and plans.
+            Landing copy, story, tips, and routes for your public handle — plus links to your follower
+            community from the app nav.
           </p>
           <div className="flex flex-wrap gap-2 mt-4">
             <button
               type="button"
-              onClick={() => router.push('/gofast-with-others')}
+              onClick={() => router.push(CONTENT_BUILDER_PATH)}
               className="text-sm font-semibold text-orange-600 hover:text-orange-700"
             >
-              Manage GoFastWithMe →
+              Open content builder →
             </button>
             {liveGoFastUrl ? (
               <a

@@ -15,6 +15,7 @@ import {
   resolveChromePhotoSrc,
 } from '@/lib/athlete-chrome-cache';
 import { Settings, Wallet, Footprints, Link2 } from 'lucide-react';
+import { contentBuilderPayoutsPath } from '@/lib/athlete/community-nav';
 
 type TopNavAthleteChrome = {
   firstName?: string;
@@ -226,11 +227,11 @@ function TopNavEarningsLink() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const active =
-    pathname === '/gofast-with-others' && searchParams.get('view') === 'payouts';
+    pathname === '/gofast-contentbuilder' && searchParams.get('view') === 'payouts';
 
   return (
     <Link
-      href="/gofast-with-others?view=payouts"
+      href={contentBuilderPayoutsPath()}
       className={`p-2 rounded-lg transition ${
         active
           ? 'bg-gray-100 text-gray-900'

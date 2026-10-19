@@ -73,7 +73,7 @@ export default function GoFastWithMeFollowersSection({
 
         {hub.isHost ? (
           <Link
-            href="/gofast-with-others"
+            href="/gofast-contentbuilder"
             className="inline-flex text-xs font-semibold text-orange-600 hover:underline"
           >
             Manage in GoFast With Me studio →
@@ -121,7 +121,7 @@ export default function GoFastWithMeFollowersSection({
       )}
       {hub.isHost ? (
         <Link
-          href="/gofast-with-others"
+          href="/gofast-contentbuilder"
           className="inline-flex text-xs font-semibold text-orange-600 hover:underline"
         >
           Manage in GoFast With Me studio →

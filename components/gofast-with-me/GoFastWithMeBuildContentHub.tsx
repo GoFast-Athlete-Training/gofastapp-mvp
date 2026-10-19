@@ -38,7 +38,7 @@ export default function GoFastWithMeBuildContentHub({ onOpen }: Props) {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Build content</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Content builder</h1>
         <p className="mt-1 text-sm text-gray-600">
           Ways to share your story on your handle. What you build shows up on your public pages; leave
           a section empty and it stays off the site. Custom links live under{" "}

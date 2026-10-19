@@ -257,7 +257,7 @@ export default function SettingsPage() {
                 />
               )}
               <Link
-                href="/gofast-with-others"
+                href="/gofast-contentbuilder"
                 className="inline-block mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700"
               >
                 Open My Community →

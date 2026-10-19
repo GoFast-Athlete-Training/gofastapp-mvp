@@ -562,7 +562,7 @@ function AthleteEditProfileInner() {
               <p className="text-sm text-gray-600 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
                 These are your in-app profile fields — who you are inside GoFast. For your public
                 GoFastWithMe landing (runs, plans, community), use{' '}
-                <Link href="/gofast-with-others" className="font-semibold text-orange-600 hover:text-orange-700">
+                <Link href="/gofast-contentbuilder" className="font-semibold text-orange-600 hover:text-orange-700">
                   GoFast with Others
                 </Link>
                 .
@@ -594,7 +594,7 @@ function AthleteEditProfileInner() {
 
               <div className="flex flex-wrap gap-2">
                 <Link
-                  href="/gofast-with-others"
+                  href="/gofast-contentbuilder"
                   className="inline-flex items-center px-4 py-2 rounded-lg border border-orange-200 text-sm font-semibold text-orange-800 hover:bg-orange-50"
                 >
                   Manage GoFastWithMe →

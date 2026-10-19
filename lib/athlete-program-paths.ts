@@ -1,5 +1,7 @@
 /** Post-signup destination for GoFast Amateur Athlete Program landing funnel. */
-export const ATHLETE_PROGRAM_DESTINATION = '/gofast-with-others';
+import { CONTENT_BUILDER_PATH } from '@/lib/athlete/community-nav';
+
+export const ATHLETE_PROGRAM_DESTINATION = CONTENT_BUILDER_PATH;
 
 export const ATHLETE_PROGRAM_SIGNUP_PATH = '/athlete-program/signup';
 

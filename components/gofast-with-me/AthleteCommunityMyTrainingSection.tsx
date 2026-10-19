@@ -108,7 +108,7 @@ export default function AthleteCommunityMyTrainingSection({
           </p>
           {displayAsOwner ? (
             <Link
-              href="/gofast-with-others"
+              href="/gofast-contentbuilder"
               className="mt-3 inline-flex text-sm font-semibold text-orange-600 hover:underline"
             >
               Open Runs &amp; Training →

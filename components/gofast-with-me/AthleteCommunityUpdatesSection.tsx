@@ -38,7 +38,7 @@ export default function AthleteCommunityUpdatesSection({
       )}
       {isOwner ? (
         <Link
-          href="/gofast-with-others"
+          href="/gofast-contentbuilder"
           className="inline-flex text-xs font-semibold text-orange-600 hover:underline"
         >
           Post daily logs from Daily log in studio →

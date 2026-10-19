@@ -39,7 +39,7 @@ export default function GoFastWithMeMyRunsV2Section({ runs, isHost }: Props) {
         ) : null}
         {isHost ? (
           <Link
-            href="/gofast-with-others"
+            href="/gofast-contentbuilder"
             className="inline-flex text-xs font-semibold text-orange-600 hover:underline"
           >
             Open GoFast With Me studio

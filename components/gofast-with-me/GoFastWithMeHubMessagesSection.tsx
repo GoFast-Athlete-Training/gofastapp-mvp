@@ -36,7 +36,7 @@ export default function GoFastWithMeHubMessagesSection({
       {isHost ? (
         <p className="text-xs text-gray-500 px-1">
           Post from{' '}
-          <Link href="/gofast-with-others" className="text-orange-600 font-semibold hover:underline">
+          <Link href="/gofast-contentbuilder" className="text-orange-600 font-semibold hover:underline">
             GoFast With Me studio
           </Link>
           .
