@@ -84,7 +84,7 @@ type PlanDetail = {
     distanceMeters: number | null;
     distanceLabel: string | null;
   } | null;
-  athlete_race?: { id: string } | null;
+  athlete_race?: { id: string; raceDate?: string } | null;
 };
 
 function hasSchedule(p: PlanDetail): boolean {
@@ -326,9 +326,7 @@ export default function TrainingPlanDayPreviewPage() {
       setRaceResultRow(null);
 
       const planRaceIso =
-        (plan as PlanDetail).athlete_race?.raceDate ??
-        (plan as PlanDetail).race_registry?.raceDate ??
-        null;
+        plan.athlete_race?.raceDate ?? plan.race_registry?.raceDate ?? null;
       const planRaceDateKey = planRaceIso
         ? ymdFromDate(utcDateOnly(new Date(planRaceIso)))
         : null;
