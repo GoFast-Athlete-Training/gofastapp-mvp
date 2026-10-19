@@ -41,10 +41,6 @@ export function goalPaceCheckpoints(params: {
     return (goalSec * markMeters) / raceMeters;
   }
 
-  function elapsedAtMiles(markMi: number): number {
-    return (goalSec * markMi) / totalMiles;
-  }
-
   const candidates: Array<{ label: string; atMi: number; elapsedSec: number }> = [];
 
   if (totalMiles <= 13.5) {
