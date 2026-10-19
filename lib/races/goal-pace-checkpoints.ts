@@ -4,32 +4,74 @@ export type GoalPaceCheckpoint = {
   elapsedSec: number;
 };
 
-/** Even-pace elapsed times at standard marks for the slim race plan card. */
-export function goalPaceCheckpoints(
-  totalMiles: number,
-  goalPaceSecPerMi: number
-): GoalPaceCheckpoint[] {
+const METERS_5K = 5000;
+const METERS_10K = 10_000;
+const METERS_HALF = 21_097.5;
+const MILES_5K = 3.1;
+const MILES_10K = 6.2;
+const MILES_HALF = 13.1;
+
+/** Even-pace elapsed times at standard marks — slices of the goal clock, not rounded pace × miles. */
+export function goalPaceCheckpoints(params: {
+  goalSec: number;
+  totalMiles: number;
+  totalMeters?: number | null;
+}): GoalPaceCheckpoint[] {
+  const { goalSec, totalMiles } = params;
+  const raceMeters =
+    params.totalMeters != null && params.totalMeters > 0
+      ? params.totalMeters
+      : totalMiles > 0
+        ? totalMiles * 1609.344
+        : null;
+
   if (
+    !Number.isFinite(goalSec) ||
+    goalSec <= 0 ||
     !Number.isFinite(totalMiles) ||
     totalMiles <= 0 ||
-    !Number.isFinite(goalPaceSecPerMi) ||
-    goalPaceSecPerMi <= 0
+    raceMeters == null ||
+    raceMeters <= 0
   ) {
     return [];
   }
 
-  const candidates: Array<{ label: string; atMi: number }> = [];
+  function elapsedAtMeters(markMeters: number): number {
+    return (goalSec * markMeters) / raceMeters;
+  }
+
+  function elapsedAtMiles(markMi: number): number {
+    return (goalSec * markMi) / totalMiles;
+  }
+
+  const candidates: Array<{ label: string; atMi: number; elapsedSec: number }> = [];
 
   if (totalMiles <= 13.5) {
-    candidates.push({ label: "5K", atMi: 3.1 });
+    candidates.push({
+      label: "5K",
+      atMi: MILES_5K,
+      elapsedSec: raceMeters > 0 ? elapsedAtMeters(METERS_5K) : elapsedAtMiles(MILES_5K),
+    });
   }
-  if (totalMiles > 6.2 + 0.05) {
-    candidates.push({ label: "10K", atMi: 6.2 });
+  if (totalMiles > MILES_10K + 0.05) {
+    candidates.push({
+      label: "10K",
+      atMi: MILES_10K,
+      elapsedSec: elapsedAtMeters(METERS_10K),
+    });
   }
-  if (totalMiles > 13.1 + 0.05) {
-    candidates.push({ label: "Half", atMi: 13.1 });
+  if (totalMiles > MILES_HALF + 0.05) {
+    candidates.push({
+      label: "Half",
+      atMi: MILES_HALF,
+      elapsedSec: elapsedAtMeters(METERS_HALF),
+    });
   }
-  candidates.push({ label: "Finish", atMi: totalMiles });
+  candidates.push({
+    label: "Finish",
+    atMi: totalMiles,
+    elapsedSec: goalSec,
+  });
 
   const seen = new Set<string>();
   return candidates
@@ -41,8 +83,8 @@ export function goalPaceCheckpoints(
       return true;
     })
     .map((c) => ({
-      ...c,
+      label: c.label,
       atMi: c.label === "Finish" ? totalMiles : c.atMi,
-      elapsedSec: goalPaceSecPerMi * (c.label === "Finish" ? totalMiles : c.atMi),
+      elapsedSec: c.elapsedSec,
     }));
 }

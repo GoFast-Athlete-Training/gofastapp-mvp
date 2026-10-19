@@ -15,6 +15,7 @@ import {
 } from "@/lib/races/guided-race-plan";
 import { goalPaceCheckpoints } from "@/lib/races/goal-pace-checkpoints";
 import { guidedStretchesToRacePlanDocument } from "@/lib/races/guided-stretches-to-race-plan";
+import { formatFinishClock, parseGoalTimeToSeconds } from "@/lib/training/race-projection";
 
 type Props = {
   raceForGoal: RaceForGoal;
@@ -32,13 +33,6 @@ function formatSecPerMile(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
   return `${m}:${s.toString().padStart(2, "0")}/mi`;
-}
-
-function formatSplit(sec: number): string {
-  if (!Number.isFinite(sec) || sec <= 0) return "—";
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 function useMyRaceGoalPace(race: RaceForGoal, goal: InlineGoalRow | null) {
@@ -94,10 +88,22 @@ function useMyRaceGoalPace(race: RaceForGoal, goal: InlineGoalRow | null) {
     totalMiles,
   ]);
 
+  const goalSec = useMemo(() => {
+    if (!goalTimeDisplay) return null;
+    return parseGoalTimeToSeconds(goalTimeDisplay);
+  }, [goalTimeDisplay]);
+
+  const totalMeters =
+    plannerDistance.distanceMeters ?? race.distanceMeters ?? null;
+
   const checkpoints = useMemo(() => {
-    if (goalRacePace == null) return [];
-    return goalPaceCheckpoints(totalMiles, goalRacePace);
-  }, [goalRacePace, totalMiles]);
+    if (goalSec == null || goalSec <= 0) return [];
+    return goalPaceCheckpoints({
+      goalSec,
+      totalMiles,
+      totalMeters,
+    });
+  }, [goalSec, totalMeters, totalMiles]);
 
   return { goalTimeDisplay, goalRacePace, totalMiles, checkpoints };
 }
@@ -259,7 +265,7 @@ export function RacePaceHubTabs({
                   <div key={cp.label} className="bg-white px-3 py-3 text-center">
                     <p className="text-xs font-semibold text-gray-500">{cp.label}</p>
                     <p className="text-sm font-bold tabular-nums text-gray-900 mt-0.5">
-                      {formatSplit(cp.elapsedSec)}
+                      {formatFinishClock(cp.elapsedSec)}
                     </p>
                     {cp.label !== "Finish" ? (
                       <p className="text-xs text-gray-500 tabular-nums">{cp.atMi.toFixed(1)} mi</p>
