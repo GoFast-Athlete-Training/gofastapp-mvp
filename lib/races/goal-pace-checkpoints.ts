@@ -18,21 +18,22 @@ export function goalPaceCheckpoints(params: {
   totalMeters?: number | null;
 }): GoalPaceCheckpoint[] {
   const { goalSec, totalMiles } = params;
-  const raceMeters =
-    params.totalMeters != null && params.totalMeters > 0
-      ? params.totalMeters
-      : totalMiles > 0
-        ? totalMiles * 1609.344
-        : null;
 
   if (
     !Number.isFinite(goalSec) ||
     goalSec <= 0 ||
     !Number.isFinite(totalMiles) ||
-    totalMiles <= 0 ||
-    raceMeters == null ||
-    raceMeters <= 0
+    totalMiles <= 0
   ) {
+    return [];
+  }
+
+  const raceMeters =
+    params.totalMeters != null && params.totalMeters > 0
+      ? params.totalMeters
+      : totalMiles * 1609.344;
+
+  if (!Number.isFinite(raceMeters) || raceMeters <= 0) {
     return [];
   }
 
@@ -50,7 +51,7 @@ export function goalPaceCheckpoints(params: {
     candidates.push({
       label: "5K",
       atMi: MILES_5K,
-      elapsedSec: raceMeters > 0 ? elapsedAtMeters(METERS_5K) : elapsedAtMiles(MILES_5K),
+      elapsedSec: elapsedAtMeters(METERS_5K),
     });
   }
   if (totalMiles > MILES_10K + 0.05) {
