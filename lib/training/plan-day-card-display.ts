@@ -47,41 +47,42 @@ export function formatWeekCardMiles(estimatedDistanceInMeters: number | null | u
   return `${rounded} mi`;
 }
 
+/** Thin accent rail on workout cards — redundant with printed type labels. */
 export function workoutTypeLeftBorderClass(workoutType: string): string {
+  return workoutTypeAccentClass(workoutType);
+}
+
+/** Shared workout-type accent (card rail + calendar strip dot). */
+export function workoutTypeAccentClass(workoutType: string): string {
   switch (workoutType) {
     case "Easy":
-      return "bg-green-400";
+      return "bg-green-500";
     case "LongRun":
       return "bg-purple-500";
     case "Tempo":
-      return "bg-amber-400";
     case "Intervals":
       return "bg-orange-500";
     case "Race":
       return "bg-red-500";
+    case "Rest":
+      return "bg-gray-300";
     default:
       return "bg-gray-400";
   }
 }
 
-/** Soft strip cell surface — mirrors workout card left-border colors. */
-export function workoutTypeStripSurfaceClass(workoutType: string): string {
-  switch (workoutType) {
-    case "Easy":
-      return "border-green-200 bg-green-50/80";
-    case "LongRun":
-      return "border-purple-200 bg-purple-50/80";
-    case "Tempo":
-      return "border-amber-200 bg-amber-50/80";
-    case "Intervals":
-      return "border-orange-200 bg-orange-50/80";
-    case "Race":
-      return "border-red-200 bg-red-50/80";
+/** Calendar strip cell — neutral surface; type is shown in text + small accent. */
+export function workoutTypeStripSurfaceClass(_workoutType: string): string {
+  switch (_workoutType) {
     case "Rest":
       return "border-gray-200 bg-gray-50";
     default:
       return "border-gray-200 bg-white";
   }
+}
+
+export function workoutTypeStripAccentClass(workoutType: string): string {
+  return workoutTypeAccentClass(workoutType);
 }
 
 export function workoutCardSubtypeLine(w: PlanDayCard): string {

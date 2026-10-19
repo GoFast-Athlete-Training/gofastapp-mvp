@@ -1000,7 +1000,7 @@ export default function TrainingHubPage() {
               </div>
             ) : null}
 
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm">
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm">
               <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
                 <div className="min-w-0 flex-1 min-w-[12rem] basis-[min(100%,16rem)]">
                   <p className="font-semibold text-gray-900">{hubTrainingPlanTitle}</p>
@@ -1009,30 +1009,30 @@ export default function TrainingHubPage() {
                     {calendarRangeLabel ? ` · ${calendarRangeLabel}` : ""}
                   </p>
                   {weekPlannedMiles != null ? (
-                    <p className="mt-1 text-xs text-emerald-900/80 tabular-nums">
+                    <p className="mt-1 text-xs text-gray-600 tabular-nums">
                       Total miles this week:{" "}
-                      <span className="font-semibold">{weekPlannedMiles} mi</span>
+                      <span className="font-semibold text-gray-900">{weekPlannedMiles} mi</span>
                     </p>
                   ) : null}
                   {raceReadiness?.projectedFinish ? (
-                    <p className="mt-1 text-xs text-emerald-900/80">
+                    <p className="mt-1 text-xs text-gray-600">
                       Predicted:{" "}
-                      <span className="font-mono tabular-nums">{raceReadiness.projectedFinish}</span>
+                      <span className="font-mono tabular-nums text-gray-900">{raceReadiness.projectedFinish}</span>
                       {raceReadiness.projectedPace ? (
-                        <span className="text-emerald-800/70">
+                        <span className="text-gray-500">
                           {" "}
                           · {raceReadiness.projectedPace}/mi
                         </span>
                       ) : null}
                       {raceReadiness.gapLabel ? (
-                        <span className="text-emerald-800/60"> · {raceReadiness.gapLabel}</span>
+                        <span className="text-gray-500"> · {raceReadiness.gapLabel}</span>
                       ) : null}
                     </p>
                   ) : null}
                   {paceDisplay ? (
-                    <p className="mt-1 text-xs text-emerald-900/80">
+                    <p className="mt-1 text-xs text-gray-600">
                       Current 5K pace:{" "}
-                      <span className="font-mono tabular-nums">{paceDisplay}</span>
+                      <span className="font-mono tabular-nums text-gray-900">{paceDisplay}</span>
                     </p>
                   ) : null}
                 </div>

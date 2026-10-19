@@ -12,6 +12,7 @@ import {
 
 test("week CSV template header matches parser contract", () => {
   assert.ok(PLAN_WEEK_CSV_TEMPLATE.includes("Do NOT include goal race day"));
+  assert.ok(!PLAN_WEEK_CSV_TEMPLATE.match(/Types:.*Shakeout/i));
   const dataLines = planWeekCsvNonCommentLines(PLAN_WEEK_CSV_TEMPLATE);
   assert.equal(dataLines[0], PLAN_WEEK_CSV_HEADER_LINE);
   assert.ok(isPlanWeekCsvHeaderLine(dataLines[0]!));

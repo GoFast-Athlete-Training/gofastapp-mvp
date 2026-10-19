@@ -2,7 +2,11 @@
 
 import { useMemo } from "react";
 import type { PlanDayCard } from "@/lib/training/fetch-plan-week-client";
-import { workoutTypeStripSurfaceClass } from "@/lib/training/plan-day-card-display";
+import {
+  typeLabelForCard,
+  workoutTypeStripAccentClass,
+  workoutTypeStripSurfaceClass,
+} from "@/lib/training/plan-day-card-display";
 import { formatPlanDateDisplay } from "@/lib/training/plan-utils";
 import {
   deriveSessionStatus,
@@ -83,15 +87,15 @@ export function buildWeekWorkoutWidgetDays(
 function statusTextColor(status: ReturnType<typeof deriveSessionStatus>): string {
   switch (status) {
     case "completed":
-      return "text-emerald-600";
+      return "text-emerald-700";
     case "missed":
-      return "text-red-600";
+      return "text-red-700";
     case "skipped":
       return "text-neutral-500";
     case "today":
-      return "text-orange-600";
+      return "text-orange-700";
     case "upcoming":
-      return "text-sky-600";
+      return "text-gray-600";
     case "rest":
       return "text-neutral-500";
     default:
@@ -108,7 +112,7 @@ function stripCellClasses(params: {
   const { workoutType, selected, isToday, isRest } = params;
   const surface = isRest ? workoutTypeStripSurfaceClass("Rest") : workoutTypeStripSurfaceClass(workoutType);
   return [
-    "shrink-0 min-w-[3.25rem] sm:min-w-[3.75rem] rounded-xl border px-2 py-2 text-center transition",
+    "shrink-0 min-w-[4rem] sm:min-w-[4.5rem] rounded-xl border px-2 py-2 text-center transition",
     surface,
     selected ? "shadow-sm ring-2 ring-orange-400 border-orange-300" : "",
     isToday && !selected ? "ring-1 ring-orange-300/70" : "",
@@ -151,6 +155,7 @@ export default function WeekWorkoutWidget({
             });
         const statusText = sessionStatusLabel(status);
         const statusColor = statusTextColor(status);
+        const accentClass = workoutTypeStripAccentClass(isRest ? "Rest" : workoutType);
 
         const cellClass = stripCellClasses({
           workoutType,
@@ -161,12 +166,21 @@ export default function WeekWorkoutWidget({
 
         const inner = (
           <>
+            <div
+              className={`mx-auto mb-1 h-1 w-8 rounded-full ${accentClass}`}
+              aria-hidden
+            />
             <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
               {formatPlanDateDisplay(dateKey, { weekday: "short" })}
             </div>
             <div className="text-sm font-bold tabular-nums text-gray-900 mt-0.5">
               {formatPlanDateDisplay(dateKey, { day: "numeric" })}
             </div>
+            {!isRest ? (
+              <div className="mt-0.5 truncate text-[10px] font-semibold text-gray-800">
+                {typeLabelForCard(workoutType)}
+              </div>
+            ) : null}
             <div className={`text-[10px] font-medium mt-0.5 ${statusColor}`}>{statusText}</div>
           </>
         );
@@ -184,7 +198,7 @@ export default function WeekWorkoutWidget({
             key={dateKey}
             type="button"
             onClick={() => onSelectDay(planDay!)}
-            className={`${cellClass} hover:brightness-[0.98]`}
+            className={`${cellClass} hover:bg-gray-50`}
           >
             {inner}
           </button>

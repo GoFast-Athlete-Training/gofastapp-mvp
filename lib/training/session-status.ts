@@ -118,7 +118,7 @@ export function sessionStatusBadgeClass(status: SessionStatus): string {
     case "today":
       return "bg-orange-100 text-orange-900";
     case "upcoming":
-      return "bg-sky-50 text-sky-900";
+      return "bg-gray-100 text-gray-700";
     case "rest":
       return "bg-neutral-100 text-neutral-500";
   }

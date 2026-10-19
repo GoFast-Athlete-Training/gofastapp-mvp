@@ -171,8 +171,8 @@ export default function PlanWeekViewer({
                   className={[
                     "overflow-hidden rounded-xl border bg-white shadow-sm transition",
                     selected
-                      ? "border-orange-300 ring-1 ring-orange-200 shadow-md"
-                      : "border-gray-100 hover:border-orange-200 hover:shadow-md",
+                      ? "border-orange-300 ring-2 ring-orange-200 shadow-md"
+                      : "border-gray-200 hover:border-gray-300 hover:shadow-sm",
                   ].join(" ")}
                 >
                   <button
@@ -215,7 +215,7 @@ export default function PlanWeekViewer({
                       <button
                         type="button"
                         onClick={() => onOpenDayDetails(w)}
-                        className="text-sm font-semibold text-orange-800 hover:text-orange-950 hover:underline"
+                        className="text-sm font-semibold text-gray-800 hover:text-gray-950 hover:underline"
                       >
                         Details
                       </button>

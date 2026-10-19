@@ -60,6 +60,7 @@ function mapCsvType(raw: string): WorkoutType | "SKIP_RACE" | null {
   const t = raw.trim().toLowerCase();
   if (!t) return "Easy";
   if (t === "race") return "SKIP_RACE";
+  /** Not a WorkoutType — accept as alias and store as Easy. */
   if (t === "shakeout") return "Easy";
   if (t === "easy" || t === "recovery") return "Easy";
   if (t === "tempo" || t === "threshold") return "Tempo";
