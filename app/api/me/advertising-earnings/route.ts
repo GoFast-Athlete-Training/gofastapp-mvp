@@ -23,7 +23,6 @@ export async function GET(request: Request) {
       where: { firebaseId: decoded.uid },
       select: {
         id: true,
-        isGoFastContainer: true,
         gofastHandle: true,
         ...athleteConnectStatusSelect,
       },
@@ -33,11 +32,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
     }
 
-    if (!athlete.isGoFastContainer || !athlete.gofastHandle?.trim()) {
+    if (!athlete.gofastHandle?.trim()) {
       return NextResponse.json({
         success: true,
         eligible: false,
-        message: "Publish your GoFast profile container to earn from brand campaigns.",
+        message: "Set your GoFast handle to publish a public page brands can target.",
         earnings: null,
       });
     }

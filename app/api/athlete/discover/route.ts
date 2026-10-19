@@ -81,7 +81,7 @@ function pickDisplayRace(
 
 /**
  * GET /api/athlete/discover
- * Public. Athletes opted into GoFast With Me (isGoFastContainer) with a handle;
+ * Public. Athletes with a GoFast handle on discover;
  * optional filters by race, state, city.
  * Query: page, limit, q, raceId, state, city
  */

@@ -12,19 +12,6 @@ import {
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function requireContainerEnabled(athlete: { isGoFastContainer?: boolean | null }) {
-  if (!athlete.isGoFastContainer) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'GoFast With Me community is not enabled for this athlete',
-      },
-      { status: 403 }
-    );
-  }
-  return null;
-}
-
 /**
  * GET /api/workouts/[id]/community — owner load of community story draft/publish state.
  */
@@ -34,9 +21,6 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     if ('error' in auth) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
     }
-
-    const containerError = requireContainerEnabled(auth.athlete);
-    if (containerError) return containerError;
 
     const { id: workoutId } = await ctx.params;
     if (!workoutId) {
@@ -65,9 +49,6 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     if ('error' in auth) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
     }
-
-    const containerError = requireContainerEnabled(auth.athlete);
-    if (containerError) return containerError;
 
     const { id: workoutId } = await ctx.params;
     if (!workoutId) {

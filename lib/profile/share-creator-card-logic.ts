@@ -77,7 +77,7 @@ function buildProfileCard(profile: ShareHubProfileStatus): ShareCreatorCardModel
   }
 
   const modules: string[] = [];
-  if (profile.isGoFastContainer) modules.push("follower community on");
+  if (profile.hasHandle) modules.push("public page live");
   if (profile.upcomingPublicRuns > 0) {
     modules.push(
       `${profile.upcomingPublicRuns} upcoming public run${profile.upcomingPublicRuns === 1 ? "" : "s"}`

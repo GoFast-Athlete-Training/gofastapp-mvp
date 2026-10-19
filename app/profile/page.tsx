@@ -147,8 +147,6 @@ export default function ProfilePage() {
   const email = athleteProfile.email as string | undefined;
   const fiveKPace = athleteProfile.fiveKPace as string | undefined;
   const athleteId = athleteProfile.id as string | undefined;
-  const isGoFastContainer = !!athleteProfile.isGoFastContainer;
-
   const calculateAge = (b: string | Date | null | undefined) => {
     if (!b) return null;
     const birthDate = new Date(b);
@@ -358,11 +356,7 @@ export default function ProfilePage() {
         </section>
 
         {athleteId ? (
-          <PersonalCommunityCard
-            athleteId={athleteId}
-            gofastHandle={handle || null}
-            initialEnabled={isGoFastContainer}
-          />
+          <PersonalCommunityCard athleteId={athleteId} gofastHandle={handle || null} />
         ) : null}
 
         {/* Goal / training (public API) */}

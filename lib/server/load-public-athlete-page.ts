@@ -332,7 +332,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
 
   const joinableGroupTrainingRaw = await getJoinableCohortForHost(athlete.id);
   const publishedPlanRows = await listPublicPlansForAthlete(athlete.id);
-  const activeSponsorship = athlete.isGoFastContainer
+  const activeSponsorship = athlete.gofastHandle?.trim()
     ? await getActiveCommitmentSnapshotForAthlete(athlete.id, now)
     : null;
   const publishedPlans = publishedPlanRows
@@ -399,7 +399,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
   })();
 
   return {
-    isGoFastContainer: athlete.isGoFastContainer,
+    isGoFastContainer: Boolean(athlete.gofastHandle?.trim()),
     hostAthleteId: athlete.id,
     containerMemberCount,
     containerRecentMembers,

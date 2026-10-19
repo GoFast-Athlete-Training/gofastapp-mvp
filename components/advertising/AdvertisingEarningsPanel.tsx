@@ -7,19 +7,19 @@ import type { AthleteAdvertisingEarnings } from "@/lib/advertising/company-platf
 
 type AdvertisingEarningsPanelProps = {
   athleteId: string;
-  isGoFastContainer: boolean;
+  hasPublicHandle: boolean;
 };
 
 export function AdvertisingEarningsPanel({
   athleteId,
-  isGoFastContainer,
+  hasPublicHandle,
 }: AdvertisingEarningsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [eligible, setEligible] = useState(false);
   const [earnings, setEarnings] = useState<AthleteAdvertisingEarnings | null>(null);
 
   useEffect(() => {
-    if (!isGoFastContainer) {
+    if (!hasPublicHandle) {
       setLoading(false);
       return;
     }
@@ -41,12 +41,12 @@ export function AdvertisingEarningsPanel({
     return () => {
       cancelled = true;
     };
-  }, [athleteId, isGoFastContainer]);
+  }, [athleteId, hasPublicHandle]);
 
-  if (!isGoFastContainer) {
+  if (!hasPublicHandle) {
     return (
       <section className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-5 text-sm text-stone-600">
-        Turn on your GoFast community container to publish a public surface brands can target.
+        Set your GoFast handle so your public page can appear in brand campaigns.
       </section>
     );
   }
@@ -62,8 +62,8 @@ export function AdvertisingEarningsPanel({
   if (!eligible || !earnings) {
     return (
       <section className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-600">
-        Your profile container is live for brand campaigns. Earnings will appear once brands
-        purchase campaigns targeting your page.
+        Your public profile is live for brand campaigns. Earnings will appear once brands purchase
+        campaigns targeting your page.
       </section>
     );
   }

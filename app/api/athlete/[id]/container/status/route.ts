@@ -24,7 +24,9 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
     }
 
-    if (!host.isGoFastContainer) {
+    const communityOpen = Boolean(host.gofastHandle?.trim());
+
+    if (!communityOpen) {
       return NextResponse.json({
         success: true,
         isGoFastContainer: false,

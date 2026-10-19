@@ -124,7 +124,6 @@ export async function ensureSponsorshipCandidateForAthlete(
       lastName: true,
       gofastHandle: true,
       photoURL: true,
-      isGoFastContainer: true,
     },
   });
 
@@ -132,8 +131,8 @@ export async function ensureSponsorshipCandidateForAthlete(
     throw new Error(`Athlete not found: ${athleteId}`);
   }
 
-  if (!athlete.isGoFastContainer) {
-    throw new Error("Athlete is not container-enabled");
+  if (!athlete.gofastHandle?.trim()) {
+    throw new Error("Athlete needs a public GoFast handle");
   }
 
   const publicSlugSnapshot = await resolvePublicSlugSnapshot(athleteId);
@@ -275,14 +274,16 @@ export async function backfillEligibleContainerCandidates(): Promise<{
   skipped: number;
 }> {
   const athletes = await prisma.athlete.findMany({
-    where: { isGoFastContainer: true },
-    select: { id: true },
+    where: { gofastHandle: { not: null } },
+    select: { id: true, gofastHandle: true },
   });
+
+  const eligible = athletes.filter((a) => a.gofastHandle?.trim());
 
   let ensured = 0;
   let skipped = 0;
 
-  for (const athlete of athletes) {
+  for (const athlete of eligible) {
     const existing = await prisma.sponsorship_candidates.findUnique({
       where: { athleteId: athlete.id },
       select: { id: true },
@@ -298,7 +299,7 @@ export async function backfillEligibleContainerCandidates(): Promise<{
   }
 
   return {
-    scanned: athletes.length,
+    scanned: eligible.length,
     ensured,
     skipped,
   };

@@ -423,7 +423,7 @@ export default function GoFastPagePreviewCard({
           </section>
         ) : null}
 
-        {data.isGoFastContainer && athlete.gofastHandle ? (
+        {athlete.gofastHandle ? (
           <section className="rounded-2xl border border-violet-500/35 bg-zinc-900/85 p-5 shadow-lg shadow-violet-950/20">
             <h2 className="text-lg font-semibold text-white mb-1">GoFast with others</h2>
             <p className="text-sm text-zinc-400 mb-4">

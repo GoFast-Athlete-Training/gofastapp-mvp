@@ -4,12 +4,11 @@ import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
-import {
-  ensureSponsorshipCandidateForAthlete,
-  pauseSponsorshipCandidateForAthlete,
-} from '@/lib/sponsorship/candidate-service';
 
-/** POST /api/athlete/[id]/container/toggle — opt in/out of GoFast Container (owner only). Body: { value?: boolean } */
+/**
+ * @deprecated Legacy `isGoFastContainer` flag — community is handle-based; this route only flips the DB column for old clients.
+ * POST /api/athlete/[id]/container/toggle — Body: { value?: boolean }
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -54,12 +53,6 @@ export async function POST(
       where: { id: athleteId },
       data: { isGoFastContainer: next, updatedAt: new Date() },
     });
-
-    if (next) {
-      await ensureSponsorshipCandidateForAthlete(athleteId);
-    } else {
-      await pauseSponsorshipCandidateForAthlete(athleteId);
-    }
 
     return NextResponse.json({ success: true, isGoFastContainer: next });
   } catch (e) {

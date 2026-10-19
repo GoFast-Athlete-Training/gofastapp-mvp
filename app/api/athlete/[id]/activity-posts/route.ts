@@ -30,15 +30,6 @@ async function requireOwnedAthlete(request: Request, athleteId: string) {
   if (athlete.firebaseId !== decodedToken.uid) {
     return { error: NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 }) };
   }
-  if (!athlete.isGoFastContainer) {
-    return {
-      error: NextResponse.json(
-        { success: false, error: 'GoFast With Me community is not enabled for this athlete' },
-        { status: 403 }
-      ),
-    };
-  }
-
   return { athlete };
 }
 

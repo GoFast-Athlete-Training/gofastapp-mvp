@@ -23,7 +23,6 @@ type ContainerMember = {
 type Props = {
   bio: string | null;
   signedUpRaces: SignedUpRace[];
-  isGoFastContainer: boolean;
   containerMemberCount: number;
   containerRecentMembers: ContainerMember[];
   hostHandle: string | null;
@@ -43,7 +42,7 @@ export default function AboutStrip(props: Props) {
   const hasBio = Boolean(props.bio?.trim());
   const futureRaces = props.signedUpRaces.filter((r) => new Date(r.raceDate) >= new Date()).slice(0, 8);
   const hasRaces = futureRaces.length > 0;
-  const hasContainer = props.isGoFastContainer;
+  const hasContainer = Boolean(props.hostHandle?.trim());
 
   if (!hasBio && !hasRaces && !hasContainer) return null;
 

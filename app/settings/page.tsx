@@ -91,7 +91,7 @@ export default function SettingsPage() {
   }, [athlete?.role]);
 
   useEffect(() => {
-    if (!athlete?.isGoFastContainer) return;
+    if (!athlete?.gofastHandle?.trim()) return;
     setGwmLoading(true);
     api
       .get('/me/gofast-with-me')
@@ -106,7 +106,7 @@ export default function SettingsPage() {
         /* optional section */
       })
       .finally(() => setGwmLoading(false));
-  }, [athlete?.isGoFastContainer]);
+  }, [athlete?.gofastHandle]);
 
   const copyPublicProfileUrl = async () => {
     const h = athlete?.gofastHandle;
@@ -237,7 +237,7 @@ export default function SettingsPage() {
           )}
 
           {/* GoFast With Me creator type */}
-          {athlete?.isGoFastContainer ? (
+          {athlete?.gofastHandle?.trim() ? (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-1">GoFast With Me</h2>
               <p className="text-gray-600 text-sm mb-4">

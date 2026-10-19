@@ -13,7 +13,6 @@ export async function loadShareHubStatus(athleteId: string): Promise<ShareHubSta
         where: { id: athleteId },
         select: {
           gofastHandle: true,
-          isGoFastContainer: true,
         },
       }),
       prisma.training_plans.findFirst({
@@ -72,7 +71,7 @@ export async function loadShareHubStatus(athleteId: string): Promise<ShareHubSta
     profile: {
       hasHandle: !!handle,
       gofastHandle: handle,
-      isGoFastContainer: !!athlete?.isGoFastContainer,
+      isGoFastContainer: !!handle,
       publicPageUrl: handle ? runnerPublicLandingUrl(handle) : null,
       upcomingPublicRuns: upcomingHostedRuns,
       publishedPlans: publishedPlans.length,

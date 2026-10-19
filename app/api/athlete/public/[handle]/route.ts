@@ -30,7 +30,7 @@ export async function GET(
       authorDisplay: string;
     }[] = [];
 
-    if (payload.isGoFastContainer && payload.athlete.id) {
+    if (payload.athlete.gofastHandle?.trim() && payload.athlete.id) {
       const msgRows = await prisma.gofast_container_messages.findMany({
         where: { containerAthleteId: payload.athlete.id },
         orderBy: { createdAt: 'desc' },
