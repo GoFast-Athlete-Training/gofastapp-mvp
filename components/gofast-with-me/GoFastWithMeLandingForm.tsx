@@ -496,7 +496,7 @@ export default function GoFastWithMeLandingForm({
                   onClick={onOpenRunnerStory}
                   className="text-xs font-semibold text-orange-700 hover:text-orange-800"
                 >
-                  Edit full runner story →
+                  Edit My run story →
                 </button>
                 {runnerStoryPublicUrl ? (
                   <a

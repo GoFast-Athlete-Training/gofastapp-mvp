@@ -14,3 +14,15 @@ export function runnerPublicLandingUrl(handle: string, baseUrl?: string): string
   const base = (baseUrl ?? getRunnerPublicBaseUrl()).replace(/\/$/, '');
   return `${base}/${encodeURIComponent(slug)}`;
 }
+
+/** Absolute URL for a public subpage: domain/slug/segment (e.g. …/adamgofast/story). */
+export function runnerPublicSegmentUrl(
+  handle: string,
+  segment?: string | null,
+  baseUrl?: string
+): string {
+  const landing = runnerPublicLandingUrl(handle, baseUrl).replace(/\/$/, '');
+  const seg = segment?.trim().replace(/^\/+/, '');
+  if (!seg) return landing;
+  return `${landing}/${encodeURIComponent(seg)}`;
+}

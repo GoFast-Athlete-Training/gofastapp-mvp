@@ -1,8 +1,4 @@
 import { getGoFastAppPublicUrl } from '@/lib/gofast-app-public-url';
-import {
-  goFastWithFrontDoorUrl,
-  resolvePublicSlug,
-} from '@/lib/gofast-with-me/gofast-with-bridge';
 
 export type PublicAction = {
   label: string;
@@ -23,16 +19,7 @@ type ResolvePublicActionsInput = {
 /** Derive join actions from real hydrated modules — no fake CTA config. */
 export function resolvePublicActions(input: ResolvePublicActionsInput): PublicAction[] {
   const appBase = getGoFastAppPublicUrl().replace(/\/$/, '');
-  const fallbackName = input.hostFirstName?.trim() || 'this runner';
   const actions: PublicAction[] = [];
-
-  const slug = resolvePublicSlug(input.gofastSlugSnapshot, input.gofastHandle);
-  if (slug) {
-    actions.push({
-      label: followAthleteHeadline(input.hostFirstName, fallbackName),
-      href: goFastWithFrontDoorUrl(slug, appBase),
-    });
-  }
 
   if (input.upcomingRuns.length > 0) {
     const run = input.upcomingRuns[0];

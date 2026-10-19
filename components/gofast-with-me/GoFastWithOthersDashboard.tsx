@@ -8,7 +8,7 @@ import { LocalStorageAPI } from "@/lib/localstorage";
 import type { GoFastWithMeCreatorType } from "@/lib/gofast-with-me/gofast-with-me-service";
 import type { GoFastWithMeLandingValues } from "@/components/gofast-with-me/GoFastWithMeLandingForm";
 import { normalizeGoFastWithMePhotoType } from "@/lib/gofast-with-me/photo-type";
-import { goFastWithFrontDoorPath } from "@/lib/gofast-with-me/gofast-with-bridge";
+import { runnerPublicSegmentUrl } from "@/lib/gofast-with-me/runner-public-url";
 import { athleteLinksPublicUrl } from "@/lib/content/athlete-links-public-url";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
 import GoFastWithMeRunnerStoryPanel from "@/components/gofast-with-me/GoFastWithMeRunnerStoryPanel";
@@ -267,16 +267,11 @@ export default function GoFastWithOthersDashboard() {
 
   const shellSlug = publicSlug ?? gofastHandle;
   const shellLiveUrl = shellSlug ? runnerPublicLandingUrl(shellSlug) : "";
-  const shellInvitePath = shellSlug ? goFastWithFrontDoorPath(shellSlug) : "";
 
-  const copyInviteLink = async () => {
-    if (!shellInvitePath) return;
-    const inviteUrl =
-      typeof window !== "undefined"
-        ? `${window.location.origin}${shellInvitePath}`
-        : shellInvitePath;
+  const copyLandingLink = async () => {
+    if (!shellLiveUrl) return;
     try {
-      await navigator.clipboard.writeText(inviteUrl);
+      await navigator.clipboard.writeText(shellLiveUrl);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
     } catch {
@@ -305,10 +300,9 @@ export default function GoFastWithOthersDashboard() {
           shellSlug
             ? {
                 landingUrl: shellLiveUrl,
-                inviteUrl: shellInvitePath,
                 communityHubUrl,
-                onShare: () => void copyInviteLink(),
-                shareLabel: shareCopied ? "Copied!" : "Share link",
+                onCopyLandingLink: () => void copyLandingLink(),
+                copyLandingLabel: shareCopied ? "Copied!" : "Copy landing link",
                 linkPageUrl: gofastHandle ? athleteLinksPublicUrl(gofastHandle) : undefined,
               }
             : undefined
@@ -380,7 +374,7 @@ export default function GoFastWithOthersDashboard() {
             onOpenRunnerStory={() => handleViewChange("runnerStory")}
             runnerStoryPublicUrl={
               publicSlug
-                ? `${runnerPublicLandingUrl(publicSlug).replace(/\/$/, "")}/story`
+                ? runnerPublicSegmentUrl(publicSlug, "story")
                 : null
             }
           />

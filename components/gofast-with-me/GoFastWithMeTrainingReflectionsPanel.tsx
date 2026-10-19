@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
 import type { ActivityPostOwnerPayload } from '@/lib/gofast-with-me/activity-posts';
-import { runnerPublicLandingUrl } from '@/lib/gofast-with-me/runner-public-url';
+import { runnerPublicSegmentUrl } from '@/lib/gofast-with-me/runner-public-url';
 
 type Props = {
   publicSlug: string;
@@ -19,7 +19,7 @@ export default function GoFastWithMeTrainingReflectionsPanel({ publicSlug }: Pro
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const publicUrl = `${runnerPublicLandingUrl(publicSlug).replace(/\/$/, '')}/reflections`;
+  const publicUrl = runnerPublicSegmentUrl(publicSlug, 'reflections');
 
   const load = useCallback(async () => {
     setLoading(true);

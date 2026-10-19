@@ -143,10 +143,10 @@ export default function AboutStrip(props: Props) {
               )}
               {props.hostHandle && (
                 <Link
-                  href={`/gofast-with/${props.hostHandle}`}
+                  href={`/u/${encodeURIComponent(props.hostHandle)}/community`}
                   className="text-xs font-semibold text-orange-700 hover:text-orange-800"
                 >
-                  GoFast with them &rarr;
+                  Open community &rarr;
                 </Link>
               )}
             </div>

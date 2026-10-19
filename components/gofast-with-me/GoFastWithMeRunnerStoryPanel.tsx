@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { runnerPublicLandingUrl } from '@/lib/gofast-with-me/runner-public-url';
+import { runnerPublicSegmentUrl } from '@/lib/gofast-with-me/runner-public-url';
 import TipMediaPicker from '@/components/gofast-with-me/TipMediaPicker';
 import type { AthleteTipMediaType } from '@/lib/gofast-with-me/athlete-tips';
 import { STUDIO_RUNNER_STORY_LABEL } from '@/components/gofast-with-me/studio-sections';
@@ -46,7 +46,7 @@ export default function GoFastWithMeRunnerStoryPanel({
     setBody(initialRunnerStory ?? '');
   }, [initialRunnerStory, initialRunnerStoryTitle, initialRunnerStoryPhotoUrl]);
 
-  const storyUrl = `${runnerPublicLandingUrl(publicSlug).replace(/\/$/, '')}/story`;
+  const storyUrl = runnerPublicSegmentUrl(publicSlug, 'story');
   const hasPublishedContent = Boolean(title.trim() || photoUrl?.trim() || body.trim());
 
   const handleSave = useCallback(async () => {

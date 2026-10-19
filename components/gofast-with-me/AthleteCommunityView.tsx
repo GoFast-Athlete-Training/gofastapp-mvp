@@ -8,10 +8,9 @@ import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import type { AthleteCommunityPayload } from '@/lib/gofast-with-me/container-hub-service';
 import {
+  athleteCommunityPath,
   athleteCommunityPreviewPath,
   athletePublicLandingUrl,
-  goFastWithConfirmPath,
-  goFastWithSignupPath,
   parseAthleteCommunitySection,
 } from '@/lib/gofast-with-me/athlete-community-routes';
 import { applyFollowerPreviewMode } from '@/lib/gofast-with-me/athlete-community-access';
@@ -337,10 +336,11 @@ export default function AthleteCommunityView({ handle }: Props) {
                     onClick={() => {
                       const athleteId = LocalStorageAPI.getAthleteId();
                       if (!athleteId) {
-                        router.push(goFastWithSignupPath(handle));
+                        const redirect = encodeURIComponent(athleteCommunityPath(handle));
+                        router.push(`/signup?redirect=${redirect}`);
                         return;
                       }
-                      router.push(goFastWithConfirmPath(handle));
+                      void handleFollow();
                     }}
                     className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
                   >

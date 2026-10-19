@@ -25,7 +25,7 @@ import {
   portraitPhotoImageClass,
   usesWideFeaturePhotoLayout,
 } from "@/lib/gofast-with-me/photo-type";
-import { athleteCommunityPath } from "@/lib/gofast-with-me/athlete-community-routes";
+import { athleteCommunityPath, athletePublicLandingUrl } from "@/lib/gofast-with-me/athlete-community-routes";
 
 export type GoFastPageAthlete = {
   gofastHandle: string | null;
@@ -432,7 +432,9 @@ export default function GoFastPagePreviewCard({
             </p>
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <a
-                href={`${appBase.replace(/\/$/, "")}/gofast-with/${encodeURIComponent(data.gofastWithMe?.gofastSlugSnapshot || athlete.gofastHandle)}`}
+                href={athletePublicLandingUrl(
+                  data.gofastWithMe?.gofastSlugSnapshot || athlete.gofastHandle || ""
+                )}
                 className="inline-flex items-center gap-2 rounded-full bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-400 transition-colors"
               >
                 {headline}

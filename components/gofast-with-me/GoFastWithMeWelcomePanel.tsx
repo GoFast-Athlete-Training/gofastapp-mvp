@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import GoFastWithMeLandingForm, {
   type GoFastWithMeLandingValues,
@@ -29,15 +30,42 @@ export default function GoFastWithMeWelcomePanel({
   onOpenRunnerStory,
   runnerStoryPublicUrl,
 }: Props) {
+  const [copied, setCopied] = useState(false);
+
+  const copyLandingUrl = useCallback(async () => {
+    if (!liveUrl) return;
+    try {
+      await navigator.clipboard.writeText(liveUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }, [liveUrl]);
+
   return (
     <section id="page" className="space-y-6 pb-8 max-w-3xl">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-gray-900">{STUDIO_MY_STORY_LABEL}</h2>
           <p className="text-sm text-gray-600 mt-1">
             Your GoFast handle is your public landing — photo, welcome, and about live at that URL.
             Save when you are ready to share.
           </p>
+          {liveUrl ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <code className="max-w-full truncate rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-800">
+                {liveUrl}
+              </code>
+              <button
+                type="button"
+                onClick={() => void copyLandingUrl()}
+                className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                {copied ? 'Copied!' : 'Copy link'}
+              </button>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           {liveUrl ? (

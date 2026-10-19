@@ -63,22 +63,19 @@ function redirectToFrontDoorIfIntent(router: ReturnType<typeof useRouter>): bool
   return true;
 }
 
-function redirectToGofastWithConfirmIfIntent(
+function redirectToFollowCommunityIfIntent(
   router: ReturnType<typeof useRouter>,
   redirect?: string | null
 ): boolean {
-  if (redirect?.startsWith('/gofast-with/') && redirect.includes('/confirm')) {
-    router.replace(redirect);
-    return true;
+  let slug: string | null = null;
+  if (redirect?.startsWith('/gofast-with/')) {
+    slug = redirect.replace(/^\/gofast-with\//, '').split('/')[0] ?? null;
+  } else if (redirect?.startsWith('/follow/')) {
+    slug = redirect.replace(/^\/follow\//, '').split('/')[0] ?? null;
   }
-  if (redirect?.startsWith('/follow/')) {
-    const slug = redirect.replace(/^\/follow\//, '').split('/')[0];
-    if (slug) {
-      router.replace(`/gofast-with/${encodeURIComponent(slug)}/confirm`);
-      return true;
-    }
-  }
-  return false;
+  if (!slug?.trim()) return false;
+  router.replace(`/u/${encodeURIComponent(slug.trim())}/community`);
+  return true;
 }
 
 function routeAfterAthleteResolved(
@@ -139,7 +136,7 @@ function routeAfterAthleteResolved(
     return;
   }
 
-  if (redirectToGofastWithConfirmIfIntent(router, opts.redirect)) return;
+  if (redirectToFollowCommunityIfIntent(router, opts.redirect)) return;
 
   const redirect = opts.redirect?.trim();
   if (redirect && redirect.startsWith('/')) {

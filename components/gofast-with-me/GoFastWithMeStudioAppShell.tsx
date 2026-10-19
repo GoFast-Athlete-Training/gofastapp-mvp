@@ -7,9 +7,8 @@ import { STUDIO_NAV_LABELS, type StudioSection } from '@/components/gofast-with-
 
 export type StudioChromeActions = {
   landingUrl: string;
-  inviteUrl: string;
-  onShare: () => void;
-  shareLabel?: string;
+  onCopyLandingLink: () => void;
+  copyLandingLabel?: string;
   linkPageUrl?: string;
   communityHubUrl: string;
 };
@@ -75,10 +74,10 @@ export default function GoFastWithMeStudioAppShell({
                 ) : null}
                 <button
                   type="button"
-                  onClick={chromeActions.onShare}
+                  onClick={chromeActions.onCopyLandingLink}
                   className="inline-flex rounded-lg bg-orange-600 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-700"
                 >
-                  {chromeActions.shareLabel ?? 'Share link'}
+                  {chromeActions.copyLandingLabel ?? 'Copy landing link'}
                 </button>
               </>
             ) : null}
