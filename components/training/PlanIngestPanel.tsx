@@ -6,6 +6,20 @@ import type {
   PlanIngestPreviewResult,
   PlanIngestScope,
 } from "@/lib/training/plan-ingest-contract";
+import {
+  PLAN_WEEK_CSV_DOWNLOAD_FILENAME,
+  PLAN_WEEK_CSV_TEMPLATE,
+} from "@/lib/training/plan-week-csv-template";
+
+function downloadPlanWeekCsvTemplate(): void {
+  const blob = new Blob([PLAN_WEEK_CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = PLAN_WEEK_CSV_DOWNLOAD_FILENAME;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 type Props = {
   planId: string;
@@ -133,29 +147,39 @@ export default function PlanIngestPanel({
         <div className="mt-3 space-y-3">
           {description ? <p className="text-sky-900/90">{description}</p> : null}
           {scope === "week" ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="cursor-pointer rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-50">
-                Upload CSV
-                <input
-                  type="file"
-                  accept=".csv,.txt,text/csv,text/plain"
-                  className="sr-only"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    void file.text().then((text) => {
-                      setSourceText(text);
-                      setPreview(null);
-                      setSummary(null);
-                      setError(null);
-                    });
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              <span className="text-xs text-sky-800/80">
-                Date, Workout, Type, Mileage, Pace — or paste day lines below
-              </span>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => downloadPlanWeekCsvTemplate()}
+                  className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-50"
+                >
+                  Download CSV template
+                </button>
+                <label className="cursor-pointer rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-50">
+                  Upload CSV
+                  <input
+                    type="file"
+                    accept=".csv,.txt,text/csv,text/plain"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      void file.text().then((text) => {
+                        setSourceText(text);
+                        setPreview(null);
+                        setSummary(null);
+                        setError(null);
+                      });
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="text-xs text-sky-800/80">
+                Columns: Date, Workout, Type, Mileage, Pace. Use dates in the week you are
+                replacing; goal race day rows are skipped automatically. Or paste day lines below.
+              </p>
             </div>
           ) : null}
           <textarea

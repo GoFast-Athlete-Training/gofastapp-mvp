@@ -12,9 +12,7 @@ import {
   type ParsedPasteWorkout,
 } from "@/lib/training/parse-pasted-workout";
 import type { WeekBounds } from "@/lib/training/plan-schedule";
-
-const CSV_HEADER =
-  /^date\s*,\s*workout\s*,\s*type\s*,\s*mileage\s*,\s*pace\s*$/i;
+import { isPlanWeekCsvHeaderLine } from "@/lib/training/plan-week-csv-template";
 
 export type ParsedPlanWeekCsv = {
   week: PlanWeekSchedule;
@@ -139,7 +137,7 @@ function segmentsFromStructuredPace(
 
 export function looksLikePlanWeekCsv(sourceText: string): boolean {
   const first = sourceText.split(/\r?\n/).map((l) => l.trim()).find(Boolean);
-  return first != null && CSV_HEADER.test(first);
+  return first != null && isPlanWeekCsvHeaderLine(first);
 }
 
 export function tryParsePlanWeekCsvText(params: {
@@ -151,7 +149,7 @@ export function tryParsePlanWeekCsvText(params: {
 }): ParsedPlanWeekCsv | null {
   const lines = params.sourceText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (lines.length < 2) return null;
-  if (!CSV_HEADER.test(lines[0]!)) return null;
+  if (!isPlanWeekCsvHeaderLine(lines[0]!)) return null;
 
   const skippedNotes: string[] = [];
   const outOfWeekNotes: string[] = [];
