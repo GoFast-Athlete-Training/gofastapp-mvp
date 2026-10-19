@@ -138,3 +138,37 @@ test("race-week slots: positive prescribedMiles overwrites miles", () => {
   const mon = schedule[0]!.days.find((d) => d.dow === 1)!;
   assert.equal(mon.miles, 3);
 });
+
+test("race-week slots: race offset stamps Race on goal date", () => {
+  const planStart = new Date("2026-10-19T12:00:00.000Z");
+  const raceDate = new Date("2026-10-25T12:00:00.000Z");
+  const schedule: PlanWeekSchedule[] = [
+    {
+      weekNumber: 1,
+      days: [
+        { dow: 7, workoutType: "Easy", miles: 8, catalogueWorkoutId: "e1", planCycleIndex: null },
+      ],
+    },
+  ];
+
+  applyRaceWeekSlotsFromPreset({
+    planStart,
+    raceDate,
+    schedule,
+    slots: [
+      {
+        offsetFromRace: 0,
+        runName: "Marathon",
+        type: "race",
+        catalogueWorkoutId: null,
+        prescribedMiles: 26.2,
+        shakeoutRunConfigId: null,
+      },
+    ],
+  });
+
+  const sun = schedule[0]!.days.find((d) => d.dow === 7)!;
+  assert.equal(sun.workoutType, "Race");
+  assert.equal(sun.miles, 26.2);
+  assert.equal(sun.catalogueWorkoutId, null);
+});

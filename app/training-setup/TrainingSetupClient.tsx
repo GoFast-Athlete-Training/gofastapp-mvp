@@ -8,7 +8,8 @@ import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
-import { raceCalendarBeforeTodayUtc } from "@/lib/training/plan-utils";
+import { raceCalendarBeforeTodayUtc, utcDateOnly } from "@/lib/training/plan-utils";
+import { weekNumberFromPlanDate } from "@/lib/training/plan-schedule";
 import { isInRaceCloseOutWindow } from "@/lib/training/race-plan-closeout";
 import {
   presetMatchesRaceDistance,
@@ -349,7 +350,9 @@ export default function TrainingSetupClient() {
   /** Presets from prod API; athlete picks one before baseline step. */
   const [prodPresets, setProdPresets] = useState<PresetForWizard[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<PresetForWizard | null>(null);
-  const [presetPickMode, setPresetPickMode] = useState<"choose" | "catalog" | "custom">("choose");
+  const [presetPickMode, setPresetPickMode] = useState<
+    "choose" | "catalog" | "custom" | "weekByWeek"
+  >("choose");
   const [selectedAthletePresetId, setSelectedAthletePresetId] = useState<string | null>(null);
   const [savedAthletePresets, setSavedAthletePresets] = useState<
     {
@@ -820,6 +823,7 @@ export default function TrainingSetupClient() {
     forceReplace?: boolean;
     presetOverride?: PresetForWizard;
     athletePresetOverride?: string;
+    weekByWeekLoad?: boolean;
   }) {
     if (!wizardGoal?.athlete_race?.raceRegistryId) {
       setFormError(null);
@@ -847,7 +851,8 @@ export default function TrainingSetupClient() {
     setReplaceBlockPlan(null);
     if (opts?.forceReplace) setReplaceGoalAcknowledged(true);
 
-    if (!presetForCreate?.id && !athletePresetForCreate) {
+    const weekByWeekLoad = opts?.weekByWeekLoad === true;
+    if (!weekByWeekLoad && !presetForCreate?.id && !athletePresetForCreate) {
       setFormError("Pick a training level before continuing.");
       setCreateFeedback(null);
       setCreateFeedbackMessage(null);
@@ -902,9 +907,11 @@ export default function TrainingSetupClient() {
               ? null
               : Number(baselineWeeklyMileage),
           syncAthleteBaseline: true,
-          ...(athletePresetForCreate
-            ? { athletePresetId: athletePresetForCreate }
-            : { presetId: presetForCreate!.id }),
+          ...(weekByWeekLoad
+            ? { weekByWeekLoad: true }
+            : athletePresetForCreate
+              ? { athletePresetId: athletePresetForCreate }
+              : { presetId: presetForCreate!.id }),
           ...(hasOtherActivePlan || replacingFromAddedRace
             ? {
                 replaceActivePlan: true,
@@ -936,7 +943,15 @@ export default function TrainingSetupClient() {
       }
       if (data.plan?.id) {
         setReplaceGoalAcknowledged(false);
-        router.push(`/training-setup/${data.plan.id}`);
+        if (weekByWeekLoad) {
+          const start = utcDateOnly(new Date(startDate));
+          const weekNum = weekNumberFromPlanDate(start, utcDateOnly(new Date()));
+          router.push(
+            `/training/plan/${data.plan.id}/adjust?weekNumber=${Math.max(1, weekNum)}`
+          );
+        } else {
+          router.push(`/training-setup/${data.plan.id}`);
+        }
       } else {
         setCreateFeedback("generic");
       }
@@ -1241,8 +1256,45 @@ export default function TrainingSetupClient() {
                           size your long-run pool and weekly blueprint.
                         </p>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setPresetPickMode("weekByWeek")}
+                        className="rounded-xl border-2 border-gray-200 bg-gray-50 p-4 text-left hover:border-orange-400 hover:bg-orange-50/50"
+                      >
+                        <p className="font-semibold text-gray-900">Load my weeks</p>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Paste or CSV one week at a time — no preset schedule. Race day stays on
+                          your goal date.
+                        </p>
+                      </button>
                     </div>
                   </>
+                ) : presetPickMode === "weekByWeek" ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
+                      <p className="font-medium text-gray-900">Bring your own schedule</p>
+                      <p className="mt-2 leading-relaxed text-gray-700">
+                        We&apos;ll create your plan shell with race day on the calendar. You load
+                        each week on the adjust screen (paste or CSV), then move on when it looks
+                        right.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setPresetPickMode("choose")}
+                        className="mt-3 text-sm font-medium text-orange-600 hover:text-orange-800"
+                      >
+                        ← Back
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={creating}
+                      onClick={() => void createPlan({ weekByWeekLoad: true })}
+                      className="w-full rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                    >
+                      {creating ? "Creating…" : "Create plan & load this week"}
+                    </button>
+                  </div>
                 ) : presetPickMode === "custom" ? (
                   customBuilderPresetId !== undefined ? (
                   <AthletePresetBuilder

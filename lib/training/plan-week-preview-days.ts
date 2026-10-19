@@ -12,6 +12,18 @@ import { addDaysUtc, utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils"
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+export function formatIngestStructurePreviewLines(steps: WorkoutStep[]): string[] {
+  return steps.map((s) => {
+    const mi =
+      s.durationType === "DISTANCE"
+        ? `${s.durationValue} mi`
+        : s.durationType === "TIME"
+          ? `${Math.round(s.durationValue / 60)} min`
+          : `${s.durationValue}`;
+    return `${s.title} · ${mi}`;
+  });
+}
+
 export function ourDowFromUtcDate(d: Date): number {
   const js = d.getUTCDay();
   return js === 0 ? 7 : js;
@@ -46,6 +58,7 @@ export function buildWeekPreviewDays(params: {
       keepReason = params.raceDateKey === dateKey ? "race" : "completed";
     }
 
+    const segmentSteps = params.daySegmentsByDateKey?.[dateKey];
     out.push({
       dateKey,
       weekdayLabel: WEEKDAY_LABELS[ourDow - 1] ?? "Day",
@@ -53,7 +66,10 @@ export function buildWeekPreviewDays(params: {
       miles: day.miles,
       workoutName: meta?.workoutName ?? null,
       paceNote: meta?.paceNote ?? null,
-      hasCustomSegments: Boolean(params.daySegmentsByDateKey?.[dateKey]?.length),
+      hasCustomSegments: Boolean(segmentSteps?.length),
+      structurePreviewLines: segmentSteps?.length
+        ? formatIngestStructurePreviewLines(segmentSteps)
+        : undefined,
       action: protectedDay ? "keep" : "replace",
       keepReason,
     });

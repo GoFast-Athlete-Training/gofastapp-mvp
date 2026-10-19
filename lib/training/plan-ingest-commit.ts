@@ -28,6 +28,8 @@ import { cleanupFuturePlanWorkoutsAfterRegenerate } from "@/lib/training/plan-re
 import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import type { WorkoutStep } from "@/lib/training/prescription";
 import { applyWeekIngestGuard } from "@/lib/training/plan-week-ingest-guard";
+import { upsertPlannedWorkoutFromIngestDay } from "@/lib/training/plan-ingest-planned-upsert";
+import { WorkoutType as WT } from "@prisma/client";
 
 function workoutStepsToPrescribeInput(steps: WorkoutStep[]): PrescribeSegmentInput[] {
   return steps.map((s, i) => ({
@@ -118,11 +120,29 @@ async function clearPlannedWorkoutsInDateRange(params: {
   return ids.length;
 }
 
+function buildDayTitlesByDateKey(
+  preview: Extract<PlanIngestPreviewResult, { scope: "week" }>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const row of preview.weekIngestRows ?? []) {
+    if (row.status === "import" && row.workoutName.trim()) {
+      out[row.dateKey] = row.workoutName.trim();
+    }
+  }
+  for (const d of preview.weekPreviewDays ?? []) {
+    if (d.action === "replace" && d.workoutName?.trim()) {
+      out[d.dateKey] = d.workoutName.trim();
+    }
+  }
+  return out;
+}
+
 async function rematerializeFutureDaysInWeek(params: {
   plan: AthletePlanContext;
   weekNumber: number;
   protectedDateKeys?: Set<string>;
   daySegmentsByDateKey?: Record<string, WorkoutStep[]>;
+  dayTitlesByDateKey?: Record<string, string>;
 }): Promise<{ materialized: number; errors: string[] }> {
   const todayUtc = utcDateOnly(new Date());
   const bounds = weekBoundsFromPlan(params.plan.startDate, params.weekNumber, {
@@ -148,21 +168,39 @@ async function rematerializeFutureDaysInWeek(params: {
     if (dayDate.getTime() < todayUtc.getTime()) continue;
     if (params.protectedDateKeys?.has(d.dateKey)) continue;
     if (d.title === "Rest") continue;
+    if (d.workoutType === WT.Race) continue;
+
+    const ingestTitle = params.dayTitlesByDateKey?.[d.dateKey]?.trim();
+    const ingestSegments = params.daySegmentsByDateKey?.[d.dateKey];
+    const useIngestPath =
+      Boolean(ingestTitle) ||
+      Boolean(ingestSegments?.length) ||
+      d.catalogueWorkoutId == null;
+
+    if (useIngestPath) {
+      try {
+        const title = ingestTitle || d.title;
+        await upsertPlannedWorkoutFromIngestDay({
+          athleteId: params.plan.athleteId,
+          planId: params.plan.id,
+          day: d,
+          title,
+          segments: ingestSegments,
+        });
+        materialized += 1;
+      } catch (e) {
+        errors.push(`${d.dateKey}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      continue;
+    }
+
     try {
-      const mat = await materializeWorkoutForPlanDay({
+      await materializeWorkoutForPlanDay({
         athleteId: params.plan.athleteId,
         planId: params.plan.id,
         dateParam: d.dateKey,
       });
       materialized += 1;
-      const segments = params.daySegmentsByDateKey?.[d.dateKey];
-      if (segments && segments.length > 0 && mat.plannedWorkoutId) {
-        await replacePrescribeSegmentsForAthlete({
-          id: mat.plannedWorkoutId,
-          athleteId: params.plan.athleteId,
-          normalized: workoutStepsToPrescribeInput(segments),
-        });
-      }
     } catch (e) {
       const msg = e instanceof MaterializeWorkoutError ? e.message : String(e);
       errors.push(`${d.dateKey}: ${msg}`);
@@ -262,11 +300,14 @@ async function commitWeekIngest(params: {
     excludeDateKeys: protectedDateKeys,
   });
 
+  const dayTitlesByDateKey = buildDayTitlesByDateKey(params.preview);
+
   const { materialized, errors } = await rematerializeFutureDaysInWeek({
     plan: params.plan,
     weekNumber,
     protectedDateKeys,
     daySegmentsByDateKey: params.preview.daySegmentsByDateKey,
+    dayTitlesByDateKey,
   });
 
   return { clearedPlanned, materialized, errors };
@@ -322,6 +363,12 @@ export async function commitPlanIngest(params: {
   }
   if (params.preview.scope === "week") {
     const r = await commitWeekIngest({ plan, preview: params.preview });
+    if (r.errors.length > 0) {
+      return {
+        ok: false,
+        error: `Week saved but ${r.errors.length} day(s) failed to regenerate: ${r.errors.join("; ")}`,
+      };
+    }
     return { ok: true, result: r };
   }
   const r = await commitPlanIngestScope({ plan, preview: params.preview });

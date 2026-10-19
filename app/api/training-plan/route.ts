@@ -24,6 +24,8 @@ import {
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
 import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
 import { isAthletePresetBlueprintComplete } from "@/lib/training/athlete-preset-blueprint";
+import { buildWeekByWeekPlanShellSchedule } from "@/lib/training/plan-week-by-week-shell";
+import { Prisma } from "@prisma/client";
 
 /**
  * POST /api/training-plan
@@ -52,6 +54,7 @@ export async function POST(request: NextRequest) {
       athletePresetId: bodyAthletePresetId,
       replaceActivePlan,
       retireActivePlan: bodyRetireActivePlan,
+      weekByWeekLoad,
     } = body;
     const body5k = bodyFiveK ?? bodyLegacy5k;
 
@@ -207,7 +210,9 @@ export async function POST(request: NextRequest) {
         ? name.trim()
         : `Training — ${race.name}`;
 
-    if (bodyPresetId == null && bodyAthletePresetId == null) {
+    const loadWeekByWeek = weekByWeekLoad === true || weekByWeekLoad === "true";
+
+    if (!loadWeekByWeek && bodyPresetId == null && bodyAthletePresetId == null) {
       return NextResponse.json(
         {
           error:
@@ -217,7 +222,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (bodyPresetId != null && bodyAthletePresetId != null) {
+    if (
+      !loadWeekByWeek &&
+      bodyPresetId != null &&
+      bodyAthletePresetId != null
+    ) {
       return NextResponse.json(
         { error: "Provide presetId or athletePresetId, not both" },
         { status: 400 }
@@ -227,7 +236,10 @@ export async function POST(request: NextRequest) {
     let presetIdResolved: string | null = null;
     let athletePresetIdResolved: string | null = null;
 
-    if (bodyAthletePresetId != null && String(bodyAthletePresetId).trim()) {
+    if (loadWeekByWeek) {
+      presetIdResolved = null;
+      athletePresetIdResolved = null;
+    } else if (bodyAthletePresetId != null && String(bodyAthletePresetId).trim()) {
       const apId = String(bodyAthletePresetId).trim();
       const athletePreset = await prisma.athlete_presets.findFirst({
         where: { id: apId, athleteId: athlete.id },
@@ -282,6 +294,15 @@ export async function POST(request: NextRequest) {
       allAthleteRaces,
     });
 
+    const weekByWeekSchedule = loadWeekByWeek
+      ? buildWeekByWeekPlanShellSchedule({
+          planStartDate: startDate,
+          raceDate,
+          totalWeeks,
+          raceDistanceMiles: raceDistanceMilesForPace,
+        })
+      : null;
+
     const now = new Date();
     const plan = await prisma.$transaction(async (tx) => {
       if (existingActive) {
@@ -330,6 +351,11 @@ export async function POST(request: NextRequest) {
           preferredDays,
           presetId: presetIdResolved,
           athletePresetId: athletePresetIdResolved,
+          ...(weekByWeekSchedule
+            ? {
+                planSchedule: weekByWeekSchedule as unknown as Prisma.InputJsonValue,
+              }
+            : {}),
           updatedAt: now,
         },
       });
@@ -375,6 +401,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       plan,
+      weekByWeekLoad: loadWeekByWeek,
       athleteFiveKPace: athleteFiveKPaceAfter,
       secondaryCandidates: secondaryCandidates.map((ar) => ({
         athleteRaceId: ar.id,

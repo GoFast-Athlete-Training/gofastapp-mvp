@@ -325,13 +325,25 @@ export default function TrainingPlanDayPreviewPage() {
       setPlanDetail(plan);
       setRaceResultRow(null);
 
+      const planRaceIso =
+        (plan as PlanDetail).athlete_race?.raceDate ??
+        (plan as PlanDetail).race_registry?.raceDate ??
+        null;
+      const planRaceDateKey = planRaceIso
+        ? ymdFromDate(utcDateOnly(new Date(planRaceIso)))
+        : null;
+      const isPlanRaceDay = planRaceDateKey != null && planRaceDateKey === dateKey;
+
       setWorkoutLoading(true);
       try {
-        const raceSlotRes = await fetch(
-          `/api/training/race-day?planId=${encodeURIComponent(plan.id)}&date=${encodeURIComponent(dateKey)}`,
-          { headers: athleteBearerFetchHeaders(token) }
-        );
-        if (raceSlotRes.ok) {
+        const raceSlotRes =
+          isPlanRaceDay
+            ? await fetch(
+                `/api/training/race-day?planId=${encodeURIComponent(plan.id)}&date=${encodeURIComponent(dateKey)}`,
+                { headers: athleteBearerFetchHeaders(token) }
+              )
+            : null;
+        if (raceSlotRes?.ok) {
           const raceSlot = (await raceSlotRes.json()) as {
             scheduled?: { title?: string; workoutType?: string; weekNumber?: number };
             plannedWorkoutId?: string | null;

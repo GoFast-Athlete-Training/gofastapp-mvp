@@ -10,6 +10,7 @@ import {
 } from "@/lib/training/race-plan-service";
 import { normalizeRacePlanDocument } from "@/lib/races/race-plan-builder";
 import { RaceDayPlanError } from "@/lib/training/save-race-day-planned-workout";
+import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 
 /** GET — race plan for plan race day (resolves athleteRaceId from training plan). */
 export async function GET(request: NextRequest) {
@@ -28,10 +29,22 @@ export async function GET(request: NextRequest) {
 
     const plan = await prisma.training_plans.findFirst({
       where: { id: planId, athleteId: auth.athlete.id },
-      select: { athleteRaceId: true },
+      select: {
+        athleteRaceId: true,
+        athlete_races: { select: { raceDate: true } },
+      },
     });
     if (!plan?.athleteRaceId) {
       return NextResponse.json({ error: "Plan has no linked athlete race" }, { status: 404 });
+    }
+
+    const raceDate = plan.athlete_races?.raceDate;
+    if (!raceDate) {
+      return NextResponse.json({ error: "Plan race date not found" }, { status: 404 });
+    }
+    const raceDateKey = ymdFromDate(utcDateOnly(raceDate));
+    if (raceDateKey !== date) {
+      return NextResponse.json({ error: "Not plan race day" }, { status: 404 });
     }
 
     const state = await getRacePlanForAthleteRace({

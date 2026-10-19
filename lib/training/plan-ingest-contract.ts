@@ -36,6 +36,7 @@ export type PlanWeekPreviewDay = {
   workoutName?: string | null;
   paceNote?: string | null;
   hasCustomSegments: boolean;
+  structurePreviewLines?: string[];
   action: "replace" | "keep";
   keepReason?: "race" | "completed" | null;
 };

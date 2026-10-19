@@ -58,13 +58,15 @@ export function PlanWeekPreviewList({ days, summary, ingestRows }: Props) {
                 </td>
                 <td className="px-3 py-2.5">{d.workoutType}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{d.miles}</td>
-                <td className="max-w-[12rem] truncate px-3 py-2.5 text-gray-700">
-                  {d.hasCustomSegments ? (
-                    <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs font-medium text-sky-900">
-                      Custom structure on save
-                    </span>
+                <td className="max-w-[14rem] px-3 py-2.5 text-gray-700">
+                  {d.structurePreviewLines && d.structurePreviewLines.length > 0 ? (
+                    <ul className="space-y-0.5 text-xs leading-snug">
+                      {d.structurePreviewLines.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
                   ) : d.paceNote?.trim() ? (
-                    d.paceNote
+                    <span className="truncate">{d.paceNote}</span>
                   ) : (
                     "—"
                   )}

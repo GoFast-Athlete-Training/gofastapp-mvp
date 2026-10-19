@@ -100,7 +100,11 @@ export function mergeWeekIngestWithGuard(params: {
       params.skippedNotes.push(`Skipped ${dateKey}: protected (race or already completed)`);
       continue;
     }
-    byDow.set(day.dow, day);
+    byDow.set(day.dow, {
+      ...day,
+      catalogueWorkoutId: null,
+      planCycleIndex: null,
+    });
   }
 
   if (existingWeek) {
