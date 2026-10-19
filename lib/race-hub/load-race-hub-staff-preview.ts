@@ -34,6 +34,8 @@ export type RaceHubStaffPreview = {
     distanceMeters: number | null;
     startTime: string | null;
     courseSlug: string | null;
+    description: string | null;
+    summaryPhrase: string | null;
   };
   announcements: unknown[];
   events: unknown[];

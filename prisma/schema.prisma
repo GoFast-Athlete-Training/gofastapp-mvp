@@ -1422,6 +1422,7 @@ model run_clubs {
   run_club_announcements run_club_announcements[]
   run_club_events       run_club_events[]
   run_club_messages     run_club_messages[]
+  city_run_club_associations city_run_club_associations[]
 
   @@index([brandId])
   @@index([city])
@@ -1885,6 +1886,7 @@ model city_runs {
   plannedWorkout      planned_workouts?    @relation("CityRunPlannedTemplate", fields: [plannedWorkoutId], references: [id], onDelete: SetNull)
   planned_workouts    planned_workouts[]   @relation("CityRunPlannedRows")
   athlete_link_tree_links athlete_link_tree_links[]
+  club_association    city_run_club_associations?
 
   @@index([athleteGeneratedId])
   @@index([citySlug])
@@ -1908,6 +1910,23 @@ model city_runs {
   @@index([cityRunType])
   // Table name is city_runs (migrated from run_crew_runs). Explicit map so deployed builds never use old name.
   @@map("city_runs")
+}
+
+/// Optional club link on athlete-hosted city runs (not owner runClubId).
+model city_run_club_associations {
+  id              String    @id @default(cuid())
+  cityRunId       String    @unique
+  runClubId       String
+  nameSnapshot    String
+  logoUrlSnapshot String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  city_run city_runs  @relation(fields: [cityRunId], references: [id], onDelete: Cascade)
+  run_club run_clubs @relation(fields: [runClubId], references: [id], onDelete: Cascade)
+
+  @@index([runClubId])
+  @@map("city_run_club_associations")
 }
 
 /// Operator-editable in-app notification copy (App Management proxies CRUD here).
