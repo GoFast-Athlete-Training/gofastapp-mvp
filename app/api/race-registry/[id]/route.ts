@@ -69,12 +69,17 @@ export async function GET(
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
 
+    let courseHydrateSkipped: string | undefined;
+
     if (race.course_segments.length === 0) {
-      await hydrateRegistryCourseSegmentsFromRaceManage({
+      const hydrate = await hydrateRegistryCourseSegmentsFromRaceManage({
         raceRegistryId: race.id,
         courseSlug: race.courseSlug,
         raceSlug: race.slug,
       });
+      if (hydrate.skippedReason) {
+        courseHydrateSkipped = hydrate.skippedReason;
+      }
       const refreshed = await prisma.race_registry.findUnique({
         where: { id },
         select: {
@@ -119,11 +124,17 @@ export async function GET(
         },
       });
       if (refreshed) {
-        return NextResponse.json({ race: refreshed });
+        return NextResponse.json({
+          race: refreshed,
+          ...(courseHydrateSkipped ? { courseHydrateSkipped } : {}),
+        });
       }
     }
 
-    return NextResponse.json({ race });
+    return NextResponse.json({
+      race,
+      ...(courseHydrateSkipped ? { courseHydrateSkipped } : {}),
+    });
   } catch (e: unknown) {
     console.error("GET /api/race-registry/[id]", e);
     return NextResponse.json(

@@ -1,3 +1,5 @@
+import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
+import { STAFF_ID_HEADER } from "@/lib/staff-forward-auth";
 import { upsertRaceRegistryFromPayload } from "@/lib/races/upsert-race-registry-from-payload";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -8,7 +10,7 @@ const corsHeaders = {
     process.env.NEXT_PUBLIC_COMPANY_APP_URL ||
     "https://gofasthq.gofastcrushgoals.com",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": `Content-Type, Authorization, ${STAFF_ID_HEADER}`,
 };
 
 export async function OPTIONS() {
@@ -17,9 +19,15 @@ export async function OPTIONS() {
 
 /**
  * POST /api/race-registry/update
- * Legacy Company prodpush + coachplatform stub. Race Manage uses internal route.
+ * Race Manage staff lane — Firebase Bearer + x-gofast-staff-id (race manager id).
  */
 export async function POST(request: NextRequest) {
+  const authError = await assertStaffBearerAuth(request);
+  if (authError) {
+    Object.entries(corsHeaders).forEach(([k, v]) => authError.headers.set(k, v));
+    return authError;
+  }
+
   const body = await request.json().catch(() => ({}));
   const racePayload = (body as { race?: Record<string, unknown> }).race;
   if (!racePayload) {

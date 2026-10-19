@@ -1,11 +1,20 @@
-/** Fields Race Manage compares after prod push. */
+/** Fields Race Manage compares after prod push (parity with sync payload). */
 export const registryMirrorSelect = {
   id: true,
   name: true,
   slug: true,
   raceDate: true,
   companyRaceId: true,
+  companyRegistrationId: true,
+  distanceLabel: true,
+  distanceMeters: true,
+  registrationUrl: true,
+  resultsUrl: true,
+  summaryPhrase: true,
   startTime: true,
+  startLineLabel: true,
+  finishLineLabel: true,
+  isLoop: true,
   packetPickupLocation: true,
   packetPickupDate: true,
   packetPickupTime: true,
@@ -27,7 +36,16 @@ export type RegistryMirrorRow = {
   slug: string | null;
   raceDate: Date;
   companyRaceId: string | null;
+  companyRegistrationId: string | null;
+  distanceLabel: string | null;
+  distanceMeters: number | null;
+  registrationUrl: string | null;
+  resultsUrl: string | null;
+  summaryPhrase: string | null;
   startTime: string | null;
+  startLineLabel: string | null;
+  finishLineLabel: string | null;
+  isLoop: boolean | null;
   packetPickupLocation: string | null;
   packetPickupDate: Date | null;
   packetPickupTime: string | null;
@@ -43,7 +61,20 @@ export type RegistryMirrorRow = {
 export function serializeRegistryMirror(row: RegistryMirrorRow) {
   return {
     registryId: row.id,
+    companyRaceId: row.companyRaceId,
+    companyRegistrationId: row.companyRegistrationId,
+    slug: row.slug,
+    name: row.name,
+    raceDate: row.raceDate?.toISOString() ?? null,
+    distanceLabel: row.distanceLabel,
+    distanceMeters: row.distanceMeters,
+    registrationUrl: row.registrationUrl,
+    resultsUrl: row.resultsUrl,
+    summaryPhrase: row.summaryPhrase,
     startTime: row.startTime,
+    startLineLabel: row.startLineLabel,
+    finishLineLabel: row.finishLineLabel,
+    isLoop: row.isLoop,
     packetPickupLocation: row.packetPickupLocation,
     packetPickupDate: row.packetPickupDate?.toISOString() ?? null,
     packetPickupTime: row.packetPickupTime,
