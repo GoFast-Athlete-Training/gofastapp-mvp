@@ -20,6 +20,14 @@ import { formatPlanDateDisplay, ymdFromDate } from "@/lib/training/plan-utils";
 
 type AdjustLane = IntakeMode | "photo";
 
+/** Fields used from GET /api/training-plan/[id] (fetch returns `plan: unknown`). */
+type AdjustPlanDetail = {
+  name: string;
+  startDate: string;
+  totalWeeks: number;
+  race_registry?: { raceDate?: string | null } | null;
+};
+
 function downloadPlanWeekCsvTemplate(): void {
   const blob = new Blob([PLAN_WEEK_CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -69,8 +77,9 @@ export function AdjustPlanIngestPage({ planId, weekNumber }: Props) {
     void (async () => {
       const token = await getToken();
       if (!token) return;
-      const { plan } = await fetchTrainingPlanDetail(planId, token);
-      if (!plan) return;
+      const { plan: planRaw } = await fetchTrainingPlanDetail(planId, token);
+      const plan = planRaw as AdjustPlanDetail | null | undefined;
+      if (!plan?.name) return;
       setPlanLabel(plan.name);
       if (isWeekScope && weekNumber) {
         const raceDate = plan.race_registry?.raceDate
