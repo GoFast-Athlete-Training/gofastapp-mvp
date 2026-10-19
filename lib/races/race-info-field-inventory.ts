@@ -6,8 +6,8 @@
  * | Packet           | Company source                                      | MVP registry field(s)                    |
  * |------------------|-----------------------------------------------------|------------------------------------------|
  * | registration     | race_registrations.*                                | registrationUrl, registrationOpen*, fee  |
- * | course           | race_courses + race_course_segments                 | courseSlug, courseMapUrl, course_segments|
- * | trainingTips     | segments.runTip + athlete training plan             | course_segments.runTip + training_plans  |
+ * | course           | Race Manage push → registry replace                 | courseSlug, courseMapUrl, course_segments|
+ * | trainingTips     | registry course_segments.runTip + training plan     | course_segments.runTip + training_plans  |
  * | packetPickup     | race_expo (primary) → legacy flat sync              | packetPickup*                            |
  * | arrival          | race_arrival_items (public only today) + flat paste | logisticsInfo, gearDrop, spectatorInfo   |
  * | raceDayGuide     | composite of pickup + arrival + start               | same flat fields + startTime             |
@@ -43,13 +43,13 @@ export const RACE_INFO_FIELD_INVENTORY: RaceInfoFieldSource[] = [
   },
   {
     packet: "course",
-    companyTables: ["race_courses", "race_course_segments"],
+    companyTables: ["Race Manage course push (see gf-racemanage RACE_COURSE_LANES.md)"],
     mvpFields: ["courseSlug", "courseMapUrl", "course_segments", "description", "summaryPhrase"],
     notes: "Scoped to the athlete's registry row (primary distance).",
   },
   {
     packet: "trainingTips",
-    companyTables: ["race_course_segments"],
+    companyTables: ["race_registry_course_segments"],
     mvpFields: ["course_segments.runTip", "training_plans", "athlete_races.goalTime"],
     notes: "Structured tips from segments; plan progress from active training_plans.",
   },

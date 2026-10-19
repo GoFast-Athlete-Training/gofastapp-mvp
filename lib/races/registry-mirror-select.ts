@@ -1,3 +1,8 @@
+import {
+  courseSegmentsFingerprint,
+  normSegmentFromRegistryRow,
+} from "@/lib/races/course-segment-mirror";
+
 /** Fields Race Manage compares after prod push (parity with sync payload). */
 export const registryMirrorSelect = {
   id: true,
@@ -26,7 +31,14 @@ export const registryMirrorSelect = {
   gearDropInstructions: true,
   course_segments: {
     orderBy: { order: "asc" as const },
-    select: { sourceSegmentId: true, order: true },
+    select: {
+      order: true,
+      name: true,
+      mileMarker: true,
+      description: true,
+      runTip: true,
+      sourceSegmentId: true,
+    },
   },
 } as const;
 
@@ -55,7 +67,14 @@ export type RegistryMirrorRow = {
   spectatorInfo: string | null;
   logisticsInfo: string | null;
   gearDropInstructions: string | null;
-  course_segments: Array<{ sourceSegmentId: string; order: number }>;
+  course_segments: Array<{
+    sourceSegmentId: string | null;
+    order: number;
+    name: string;
+    mileMarker: string | null;
+    description: string | null;
+    runTip: string | null;
+  }>;
 };
 
 export function serializeRegistryMirror(row: RegistryMirrorRow) {
@@ -85,6 +104,19 @@ export function serializeRegistryMirror(row: RegistryMirrorRow) {
     logisticsInfo: row.logisticsInfo,
     gearDropInstructions: row.gearDropInstructions,
     segmentCount: row.course_segments.length,
-    sourceSegmentIds: row.course_segments.map((s) => s.sourceSegmentId),
+    sourceSegmentIds: row.course_segments
+      .map((s) => s.sourceSegmentId)
+      .filter((id): id is string => Boolean(id?.trim())),
+    segmentFingerprint: courseSegmentsFingerprint(
+      row.course_segments.map((s) =>
+        normSegmentFromRegistryRow({
+          order: s.order,
+          name: s.name,
+          mileMarker: s.mileMarker,
+          description: s.description,
+          runTip: s.runTip,
+        })
+      )
+    ),
   };
 }

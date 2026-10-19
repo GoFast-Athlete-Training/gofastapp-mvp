@@ -989,8 +989,8 @@ model race_registry {
 model race_registry_course_segments {
   id               String        @id @default(cuid())
   raceRegistryId   String
-  /// Race Manage race_course_segments.id
-  sourceSegmentId  String        @unique
+  /// Optional Race Manage segment id stamp (not used for upsert key — full replace per registry).
+  sourceSegmentId  String?
   order            Int
   name             String
   mileMarker       String?
@@ -1004,7 +1004,9 @@ model race_registry_course_segments {
 
   raceRegistry     race_registry @relation(fields: [raceRegistryId], references: [id], onDelete: Cascade)
 
+  @@unique([raceRegistryId, order])
   @@index([raceRegistryId])
+  @@index([sourceSegmentId])
 }
 
 /// Athlete's claimed race snapshot — working set for training (origin: race_registry).

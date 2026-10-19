@@ -1,3 +1,4 @@
+import { replaceRegistryCourseSegments } from "@/lib/races/replace-registry-course-segments";
 import { prisma } from "@/lib/prisma";
 
 type PublicCourseSegment = {
@@ -28,7 +29,7 @@ function raceManageBaseUrl(): string | null {
 
 /**
  * When prod mirror is empty, copy published course guide segments from Race Manage
- * (same source as the public course page).
+ * (same source as the public course page). Uses full replace for the registry row.
  */
 export async function hydrateRegistryCourseSegmentsFromRaceManage(params: {
   raceRegistryId: string;
@@ -66,63 +67,54 @@ export async function hydrateRegistryCourseSegmentsFromRaceManage(params: {
   const segments = data.course?.segments ?? [];
   if (!data.success || segments.length === 0) return { count: 0 };
 
-  const incomingIds: string[] = [];
-  for (const seg of segments.slice().sort((a, b) => a.order - b.order)) {
-    const name = seg.name?.trim();
-    if (!name) continue;
-    const sourceSegmentId =
-      typeof seg.id === "string" && seg.id.trim() ? seg.id.trim() : "";
-    if (!sourceSegmentId) continue;
-    incomingIds.push(sourceSegmentId);
-    const description =
-      seg.description?.trim() || seg.guideExperience?.trim() || null;
-    const mileMarker =
-      typeof seg.mileMarker === "string" ? seg.mileMarker.trim() || null : null;
-    const runTip =
-      typeof seg.runTip === "string" ? seg.runTip.trim() || null : null;
-    const guideLandmarks =
-      typeof seg.guideLandmarks === "string" ? seg.guideLandmarks.trim() || null : null;
-    const guideWater =
-      typeof seg.guideWater === "string" ? seg.guideWater.trim() || null : null;
-    const guideElevation =
-      typeof seg.guideElevation === "string" ? seg.guideElevation.trim() || null : null;
-
-    await prisma.race_registry_course_segments.upsert({
-      where: { sourceSegmentId },
-      create: {
-        raceRegistryId: params.raceRegistryId,
-        sourceSegmentId,
+  const wire = segments
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((seg) => {
+      const name = seg.name?.trim();
+      if (!name) return null;
+      const description =
+        seg.description?.trim() || seg.guideExperience?.trim() || null;
+      return {
+        sourceSegmentId:
+          typeof seg.id === "string" && seg.id.trim() ? seg.id.trim() : null,
         order: seg.order,
         name,
-        mileMarker,
+        mileMarker:
+          typeof seg.mileMarker === "string" ? seg.mileMarker.trim() || null : null,
         description,
-        runTip,
-        guideLandmarks,
-        guideWater,
-        guideElevation,
-      },
-      update: {
-        raceRegistryId: params.raceRegistryId,
-        order: seg.order,
-        name,
-        mileMarker,
-        description,
-        runTip,
-        guideLandmarks,
-        guideWater,
-        guideElevation,
-      },
-    });
+        runTip:
+          typeof seg.runTip === "string" ? seg.runTip.trim() || null : null,
+        guideLandmarks:
+          typeof seg.guideLandmarks === "string"
+            ? seg.guideLandmarks.trim() || null
+            : null,
+        guideWater:
+          typeof seg.guideWater === "string" ? seg.guideWater.trim() || null : null,
+        guideElevation:
+          typeof seg.guideElevation === "string"
+            ? seg.guideElevation.trim() || null
+            : null,
+      };
+    })
+    .filter((s): s is NonNullable<typeof s> => s != null);
+
+  const count = await replaceRegistryCourseSegments(params.raceRegistryId, {
+    courseSegments: wire,
+  });
+
+  if (count <= 0) {
+    return { count: 0 };
   }
 
-  if (incomingIds.length > 0) {
-    await prisma.race_registry_course_segments.deleteMany({
-      where: {
-        raceRegistryId: params.raceRegistryId,
-        sourceSegmentId: { notIn: incomingIds },
-      },
-    });
-  }
+  return { count };
+}
 
-  return { count: incomingIds.length };
+/** Count segments on a registry row (read-only). */
+export async function countRegistryCourseSegments(
+  raceRegistryId: string
+): Promise<number> {
+  return prisma.race_registry_course_segments.count({
+    where: { raceRegistryId },
+  });
 }
