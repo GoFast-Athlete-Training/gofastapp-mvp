@@ -26,6 +26,8 @@ type RacePlanContext = {
 type Props = {
   racePlanContext: RacePlanContext;
   raceTitle: string;
+  /** Hide top chrome when nested in My Race plan fork. */
+  embedded?: boolean;
 };
 
 function newBlock(index: number, prevEnd = 0): RacePlanBlock {
@@ -97,7 +99,7 @@ function applyPaceEdits(block: RacePlanBlock, lowMin: string, lowSec: string, hi
   return { ...block, paceLow, paceHigh };
 }
 
-export function RacePaceTargetsSection({ racePlanContext, raceTitle }: Props) {
+export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }: Props) {
   const [plan, setPlan] = useState<RacePlanDocument>({ ...EMPTY_RACE_PLAN });
   const [racePlanId, setRacePlanId] = useState<string | null>(null);
   const [loadingState, setLoadingState] = useState(false);
@@ -282,15 +284,17 @@ export function RacePaceTargetsSection({ racePlanContext, raceTitle }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-bold uppercase tracking-wide text-violet-900">
-          Create Race Pace Targets
-        </h3>
-        <p className="mt-1 text-sm text-gray-600">
-          Paste a full race plan with blocks (mile range, pace band, effort, instruction, cue). Each
-          block becomes a Garmin work step on race day.
-        </p>
-      </div>
+      {embedded ? null : (
+        <div>
+          <h3 className="text-sm font-bold uppercase tracking-wide text-violet-900">
+            Create Race Pace Targets
+          </h3>
+          <p className="mt-1 text-sm text-gray-600">
+            Paste a full race plan with blocks (mile range, pace band, effort, instruction, cue).
+            Each block becomes a Garmin work step on race day.
+          </p>
+        </div>
+      )}
 
       {!hasBlocks ? (
         <div className="rounded-lg border border-gray-200 bg-white/80 p-4">

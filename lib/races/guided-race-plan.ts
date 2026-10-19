@@ -13,6 +13,10 @@ export type GuidedRaceStretch = {
   paceBandLabel: string;
   effortNote: string;
   courseNote: string | null;
+  mileStart: number;
+  mileEnd: number;
+  paceSecLow: number;
+  paceSecHigh: number;
 };
 
 function formatSecPerMile(sec: number): string {
@@ -57,16 +61,49 @@ function mileRangeLabel(
   return raw || `Segment ${index + 1}`;
 }
 
+function mileRangeBounds(
+  seg: CourseSegmentInput,
+  index: number,
+  sorted: CourseSegmentInput[],
+  totalMiles: number
+): { mileStart: number; mileEnd: number } {
+  const raw = seg.mileMarker?.trim();
+  const embeddedRange = raw?.match(/^(\d+(?:\.\d+)?)\s*[–-]\s*(\d+(?:\.\d+)?)$/);
+  if (embeddedRange) {
+    return {
+      mileStart: parseFloat(embeddedRange[1]!),
+      mileEnd: parseFloat(embeddedRange[2]!),
+    };
+  }
+  const mileAt = parseMileMarker(seg.mileMarker);
+  const nextMile = parseMileMarker(sorted[index + 1]?.mileMarker ?? null);
+  if (mileAt != null && nextMile != null && nextMile > mileAt) {
+    return { mileStart: mileAt, mileEnd: nextMile };
+  }
+  if (mileAt != null) {
+    return { mileStart: mileAt, mileEnd: totalMiles };
+  }
+  const prevEnd =
+    index > 0
+      ? mileRangeBounds(sorted[index - 1]!, index - 1, sorted, totalMiles).mileEnd
+      : 0;
+  const slice = totalMiles / sorted.length;
+  return { mileStart: prevEnd, mileEnd: Math.min(totalMiles, prevEnd + slice) };
+}
+
 /** Map course segments + goal pace into a race-week guide (course segments only). */
 export function buildGuidedRaceStretches(params: {
   segments: CourseSegmentInput[];
   totalMiles: number;
   goalPaceSecPerMi: number;
+  /** When false and segments are empty, returns [] instead of one row per mile. */
+  evenPaceFallback?: boolean;
 }): GuidedRaceStretch[] {
   const { segments, goalPaceSecPerMi } = params;
   const sorted = segments.slice().sort((a, b) => a.order - b.order);
 
   if (sorted.length === 0) {
+    if (params.evenPaceFallback === false) return [];
     return buildEvenPaceMileStretches(params.totalMiles, goalPaceSecPerMi);
   }
 
@@ -80,6 +117,7 @@ export function buildGuidedRaceStretches(params: {
     const low = Math.round(goalPaceSecPerMi * (isFirst ? settleFactor : 0.99));
     const high = Math.round(goalPaceSecPerMi * (isFirst ? settleFactor + 0.02 : 1.01));
 
+    const { mileStart, mileEnd } = mileRangeBounds(seg, i, sorted, params.totalMiles);
     stretches.push({
       key: `seg-${seg.order}-${i}`,
       title: seg.name,
@@ -87,6 +125,10 @@ export function buildGuidedRaceStretches(params: {
       paceBandLabel: formatPaceBand(low, high),
       effortNote: isFirst ? "Ease in, then settle at goal effort." : "Hold your goal pace band.",
       courseNote: seg.runTip?.trim() || seg.description?.trim() || null,
+      mileStart,
+      mileEnd,
+      paceSecLow: low,
+      paceSecHigh: high,
     });
   }
   return stretches;
@@ -115,6 +157,8 @@ export function buildEvenPaceMileStretches(
         : `Mile ${mileNum}`;
     const low = Math.round(goalPaceSecPerMi * 0.99);
     const high = Math.round(goalPaceSecPerMi * 1.01);
+    const mileStart = offset;
+    const mileEnd = offset + len;
     stretches.push({
       key: `even-${mileNum}`,
       title: label,
@@ -122,6 +166,10 @@ export function buildEvenPaceMileStretches(
       paceBandLabel: formatPaceBand(low, high),
       effortNote: "Hold steady at goal effort.",
       courseNote: null,
+      mileStart,
+      mileEnd,
+      paceSecLow: low,
+      paceSecHigh: high,
     });
     offset += len;
   }

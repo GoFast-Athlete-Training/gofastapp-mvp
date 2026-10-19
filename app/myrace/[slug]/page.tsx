@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { formatRaceListDate, daysUntilRace } from "@/lib/races-display";
 import { RacePaceHubTabs } from "@/components/races/RacePaceHubTabs";
-import { InlineGoalForm } from "@/components/races/InlineGoalForm";
 import {
   getPublicCoursePageUrl,
   getPublicRacePageUrl,
@@ -585,48 +584,20 @@ export default function MyRacePage() {
 
           {raceForGoal ? (
             <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white p-5 shadow-sm space-y-5">
-              <div>
-                <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-900 flex items-center gap-2">
-                  <Zap className="w-4 h-4" />
-                  Plan for it
-                </h2>
-                <p className="mt-1 text-sm text-gray-600">
-                  Set your goal time, build a race-day pacing plan, and optionally add a training plan.
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-white p-4">
-                <h3 className="text-xs font-bold uppercase tracking-wide text-orange-900">
-                  My race goal
-                </h3>
-                <p className="mt-1 text-sm text-gray-600">Finish time — updates your pace below.</p>
-                <div className="mt-3">
-                  <InlineGoalForm
-                    race={raceForGoal}
-                    goal={effectiveGoal}
-                    onSaved={(g) => {
-                      setGoal(g);
-                      setSignup((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              goalTime: g.goalTime ?? prev.goalTime,
-                              goalRacePace: g.goalRacePace ?? prev.goalRacePace,
-                              goalPace5K: g.goalPace5K ?? prev.goalPace5K,
-                            }
-                          : prev
-                      );
-                    }}
-                    alwaysShowForm
-                  />
-                </div>
-              </div>
-
               <div
                 ref={paceSectionRef}
                 id="your-pace"
-                className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-4 scroll-mt-4"
+                className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-4 scroll-mt-4 space-y-4"
               >
+                <div>
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-violet-900 flex items-center gap-2">
+                    <Zap className="w-4 h-4" />
+                    Plan your race
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Goal, pace to hit, and optional mile targets for race day.
+                  </p>
+                </div>
                 <RacePaceHubTabs
                   raceForGoal={raceForGoal}
                   goal={effectiveGoal}
