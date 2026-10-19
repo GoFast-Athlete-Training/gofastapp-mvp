@@ -25,8 +25,9 @@ import {
   type PrescribeSegmentInput,
 } from "@/lib/training/workout-or-planned-resolve";
 import { cleanupFuturePlanWorkoutsAfterRegenerate } from "@/lib/training/plan-regenerate-cleanup";
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import type { WorkoutStep } from "@/lib/training/prescription";
+import { applyWeekIngestGuard } from "@/lib/training/plan-week-ingest-guard";
 
 function workoutStepsToPrescribeInput(steps: WorkoutStep[]): PrescribeSegmentInput[] {
   return steps.map((s, i) => ({
@@ -91,6 +92,7 @@ async function clearPlannedWorkoutsInDateRange(params: {
   athleteId: string;
   fromDateInclusive: Date;
   toDateInclusive: Date;
+  excludeDateKeys?: Set<string>;
 }): Promise<number> {
   const planned = await prisma.planned_workouts.findMany({
     where: {
@@ -98,10 +100,17 @@ async function clearPlannedWorkoutsInDateRange(params: {
       athleteId: params.athleteId,
       date: { gte: params.fromDateInclusive, lte: params.toDateInclusive },
     },
-    select: { id: true },
+    select: { id: true, date: true },
   });
   if (planned.length === 0) return 0;
-  const ids = planned.map((p) => p.id);
+  const ids = planned
+    .filter((p) => {
+      if (!params.excludeDateKeys?.size) return true;
+      const key = ymdFromDate(utcDateOnly(p.date));
+      return !params.excludeDateKeys.has(key);
+    })
+    .map((p) => p.id);
+  if (ids.length === 0) return 0;
   await prisma.$transaction(async (tx) => {
     await tx.planned_workout_segments.deleteMany({ where: { plannedWorkoutId: { in: ids } } });
     await tx.planned_workouts.deleteMany({ where: { id: { in: ids } } });
@@ -112,6 +121,8 @@ async function clearPlannedWorkoutsInDateRange(params: {
 async function rematerializeFutureDaysInWeek(params: {
   plan: AthletePlanContext;
   weekNumber: number;
+  protectedDateKeys?: Set<string>;
+  daySegmentsByDateKey?: Record<string, WorkoutStep[]>;
 }): Promise<{ materialized: number; errors: string[] }> {
   const todayUtc = utcDateOnly(new Date());
   const bounds = weekBoundsFromPlan(params.plan.startDate, params.weekNumber, {
@@ -135,14 +146,23 @@ async function rematerializeFutureDaysInWeek(params: {
   for (const d of days) {
     const dayDate = utcDateOnly(d.date);
     if (dayDate.getTime() < todayUtc.getTime()) continue;
+    if (params.protectedDateKeys?.has(d.dateKey)) continue;
     if (d.title === "Rest") continue;
     try {
-      await materializeWorkoutForPlanDay({
+      const mat = await materializeWorkoutForPlanDay({
         athleteId: params.plan.athleteId,
         planId: params.plan.id,
         dateParam: d.dateKey,
       });
       materialized += 1;
+      const segments = params.daySegmentsByDateKey?.[d.dateKey];
+      if (segments && segments.length > 0 && mat.plannedWorkoutId) {
+        await replacePrescribeSegmentsForAthlete({
+          id: mat.plannedWorkoutId,
+          athleteId: params.plan.athleteId,
+          normalized: workoutStepsToPrescribeInput(segments),
+        });
+      }
     } catch (e) {
       const msg = e instanceof MaterializeWorkoutError ? e.message : String(e);
       errors.push(`${d.dateKey}: ${msg}`);
@@ -214,7 +234,13 @@ async function commitWeekIngest(params: {
   plan: AthletePlanContext;
   preview: Extract<PlanIngestPreviewResult, { scope: "week" }>;
 }): Promise<{ clearedPlanned: number; materialized: number; errors: string[] }> {
-  const { weekNumber, week } = params.preview.week;
+  const weekNumber = params.preview.week.weekNumber;
+  const { week, protectedDateKeys } = await applyWeekIngestGuard({
+    plan: params.plan,
+    weekNumber,
+    incomingWeek: params.preview.week.week,
+  });
+
   const weeks = ensureStructuredSchedule(params.plan.planSchedule);
   const nextSchedule = spliceWeek(weeks, { ...week, weekNumber });
   await persistPlanSchedule(params.plan.id, nextSchedule);
@@ -233,11 +259,14 @@ async function commitWeekIngest(params: {
     athleteId: params.plan.athleteId,
     fromDateInclusive: from,
     toDateInclusive: bounds.weekEnd,
+    excludeDateKeys: protectedDateKeys,
   });
 
   const { materialized, errors } = await rematerializeFutureDaysInWeek({
     plan: params.plan,
     weekNumber,
+    protectedDateKeys,
+    daySegmentsByDateKey: params.preview.daySegmentsByDateKey,
   });
 
   return { clearedPlanned, materialized, errors };

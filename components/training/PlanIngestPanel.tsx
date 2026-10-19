@@ -132,6 +132,32 @@ export default function PlanIngestPanel({
       {open ? (
         <div className="mt-3 space-y-3">
           {description ? <p className="text-sky-900/90">{description}</p> : null}
+          {scope === "week" ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="cursor-pointer rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-50">
+                Upload CSV
+                <input
+                  type="file"
+                  accept=".csv,.txt,text/csv,text/plain"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    void file.text().then((text) => {
+                      setSourceText(text);
+                      setPreview(null);
+                      setSummary(null);
+                      setError(null);
+                    });
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <span className="text-xs text-sky-800/80">
+                Date, Workout, Type, Mileage, Pace — or paste day lines below
+              </span>
+            </div>
+          ) : null}
           <textarea
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}

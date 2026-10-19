@@ -20,6 +20,17 @@ import {
   loadAthletePlanContext,
   weekNumberForPlanDate,
 } from "@/lib/training/plan-ingest-plan-context";
+import {
+  appendSkippedToSummary,
+  applyWeekIngestGuard,
+} from "@/lib/training/plan-week-ingest-guard";
+import {
+  looksLikePlanWeekCsv,
+  tryParsePlanWeekCsvText,
+} from "@/lib/training/parse-plan-week-csv";
+import { weekBoundsFromPlan } from "@/lib/training/plan-schedule";
+import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
+import type { WorkoutStep } from "@/lib/training/prescription";
 
 const WORKOUT_TYPES = new Set<string>(["Easy", "Tempo", "Intervals", "LongRun", "Race"]);
 
@@ -222,37 +233,80 @@ export async function previewPlanIngest(params: {
       params.weekNumber ??
       (params.dateKey ? weekNumberForPlanDate(plan, params.dateKey) : 1);
 
-    const deterministic = tryParsePastedWeekScheduleText(text, weekNumber);
-    if (deterministic) {
-      const totalMi = deterministic.days.reduce((a, d) => a + d.miles, 0);
-      return {
-        ok: true,
-        preview: {
-          scope: "week",
-          parseSource: "deterministic",
-          week: { weekNumber, week: deterministic },
-          summary: `Week ${weekNumber}: ${deterministic.days.length} days, ~${Math.round(totalMi)} mi`,
-        },
-      };
+    const bounds = weekBoundsFromPlan(plan.startDate, weekNumber, {
+      raceDate: plan.raceCtx.raceDate,
+      totalWeeks: plan.totalWeeks,
+    });
+    const raceDateKey = plan.raceCtx.raceDate
+      ? ymdFromDate(utcDateOnly(plan.raceCtx.raceDate))
+      : null;
+
+    let parseSource: "deterministic" | "openai" = "deterministic";
+    let incomingWeek: PlanWeekSchedule | null = null;
+    let daySegmentsByDateKey: Record<string, WorkoutStep[]> | undefined;
+    const preGuardNotes: string[] = [];
+
+    if (looksLikePlanWeekCsv(text)) {
+      const csv = tryParsePlanWeekCsvText({
+        sourceText: text,
+        weekNumber,
+        weekBounds: bounds,
+        fiveKPace: plan.currentFiveKPace,
+        raceDateKey,
+      });
+      if (!csv) {
+        return {
+          ok: false,
+          error: "Could not parse CSV — need Date, Workout, Type, Mileage, Pace columns",
+        };
+      }
+      incomingWeek = csv.week;
+      daySegmentsByDateKey =
+        Object.keys(csv.daySegmentsByDateKey).length > 0
+          ? csv.daySegmentsByDateKey
+          : undefined;
+      preGuardNotes.push(...csv.skippedNotes, ...csv.outOfWeekNotes);
+    } else {
+      const deterministic = tryParsePastedWeekScheduleText(text, weekNumber);
+      if (deterministic) {
+        incomingWeek = deterministic;
+      } else {
+        parseSource = "openai";
+        const ai = await openAiParseWeekOrPlan({ scope: "week", sourceText: text, weekNumber });
+        const week = ai?.weeks[0];
+        if (!week) {
+          return {
+            ok: false,
+            error: "Could not parse this week — use lines like Mon easy 5, Wed tempo 6, or upload CSV",
+          };
+        }
+        week.weekNumber = weekNumber;
+        incomingWeek = week;
+      }
     }
 
-    const ai = await openAiParseWeekOrPlan({ scope: "week", sourceText: text, weekNumber });
-    const week = ai?.weeks[0];
-    if (!week) {
-      return {
-        ok: false,
-        error: "Could not parse this week — use lines like Mon easy 5, Wed tempo 6",
-      };
+    if (!incomingWeek) {
+      return { ok: false, error: "Could not parse this week" };
     }
-    week.weekNumber = weekNumber;
-    const totalMi = week.days.reduce((a, d) => a + d.miles, 0);
+
+    const { week: guardedWeek, skippedNotes } = await applyWeekIngestGuard({
+      plan,
+      weekNumber,
+      incomingWeek,
+    });
+
+    const totalMi = guardedWeek.days.reduce((a, d) => a + d.miles, 0);
+    let summary = `Week ${weekNumber}: ${guardedWeek.days.length} days, ~${Math.round(totalMi)} mi`;
+    summary = appendSkippedToSummary(summary, [...preGuardNotes, ...skippedNotes]);
+
     return {
       ok: true,
       preview: {
         scope: "week",
-        parseSource: "openai",
-        week: { weekNumber, week },
-        summary: ai.summary ?? `Week ${weekNumber}: ~${Math.round(totalMi)} mi`,
+        parseSource,
+        week: { weekNumber, week: guardedWeek },
+        summary,
+        daySegmentsByDateKey,
       },
     };
   }

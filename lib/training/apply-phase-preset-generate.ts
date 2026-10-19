@@ -265,14 +265,19 @@ export function applyRaceWeekSlotsFromPreset(input: {
     const wt = workoutTypeForRaceWeekSlot(slot.type);
     if (!wt) continue;
 
-    const miles = round1(slot.prescribedMiles ?? 0);
+    const explicitMiles =
+      slot.prescribedMiles != null && slot.prescribedMiles > 0
+        ? round1(slot.prescribedMiles)
+        : null;
     const located = findWeekDayForDateKey(input.planStart, input.schedule, dateKey);
 
     if (located) {
       const day = located.week.days[located.dayIndex]!;
       if (day.workoutType === WT.Race) continue;
       day.workoutType = wt;
-      day.miles = miles;
+      if (explicitMiles != null) {
+        day.miles = explicitMiles;
+      }
       day.catalogueWorkoutId = slot.catalogueWorkoutId;
       day.planCycleIndex = null;
       continue;
@@ -285,7 +290,7 @@ export function applyRaceWeekSlotsFromPreset(input: {
         week.days.push({
           dow,
           workoutType: wt,
-          miles,
+          miles: explicitMiles ?? round1(4),
           catalogueWorkoutId: slot.catalogueWorkoutId,
           planCycleIndex: null,
         });

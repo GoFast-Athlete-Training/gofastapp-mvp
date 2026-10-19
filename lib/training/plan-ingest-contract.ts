@@ -40,6 +40,7 @@ export type PlanIngestPreviewResult =
       parseSource: "deterministic" | "openai";
       week: PlanIngestWeekPayload;
       summary: string;
+      daySegmentsByDateKey?: Record<string, WorkoutStep[]>;
     }
   | {
       scope: "plan";
