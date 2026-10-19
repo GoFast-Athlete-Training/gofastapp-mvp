@@ -21,6 +21,15 @@ export type ParsedPlanWeekCsv = {
   daySegmentsByDateKey: Record<string, WorkoutStep[]>;
 };
 
+/** Ignore # instruction lines from the downloadable template. */
+export function planWeekCsvNonCommentLines(sourceText: string): string[] {
+  return sourceText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .filter((l) => !l.startsWith("#"));
+}
+
 function parseCsvRow(line: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -136,7 +145,7 @@ function segmentsFromStructuredPace(
 }
 
 export function looksLikePlanWeekCsv(sourceText: string): boolean {
-  const first = sourceText.split(/\r?\n/).map((l) => l.trim()).find(Boolean);
+  const first = planWeekCsvNonCommentLines(sourceText)[0];
   return first != null && isPlanWeekCsvHeaderLine(first);
 }
 
@@ -147,7 +156,7 @@ export function tryParsePlanWeekCsvText(params: {
   fiveKPace: string | null;
   raceDateKey: string | null;
 }): ParsedPlanWeekCsv | null {
-  const lines = params.sourceText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = planWeekCsvNonCommentLines(params.sourceText);
   if (lines.length < 2) return null;
   if (!isPlanWeekCsvHeaderLine(lines[0]!)) return null;
 

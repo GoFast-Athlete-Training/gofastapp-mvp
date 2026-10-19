@@ -177,8 +177,8 @@ export default function PlanIngestPanel({
                 </label>
               </div>
               <p className="text-xs text-sky-800/80">
-                Columns: Date, Workout, Type, Mileage, Pace. Use dates in the week you are
-                replacing; goal race day rows are skipped automatically. Or paste day lines below.
+                Template explains the columns. Do not put goal race day in the CSV — only the
+                training days you want to replace. Or paste day lines below.
               </p>
             </div>
           ) : null}
