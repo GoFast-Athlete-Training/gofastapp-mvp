@@ -8,11 +8,11 @@ import {
   assertStaffBearerAuth,
   getForwardedStaffId,
 } from "@/lib/training/training-engine-auth";
+import { stampCityRunStartsAtOnCreateData } from "@/lib/city-run/stamp-city-run-write";
 import {
   citySlugFromRegistry,
   generateCityRunId,
   serializeHubShakeout,
-  utcTo12h,
 } from "@/lib/race-hub-shakeout-utils";
 
 /** GET — paired city_runs for this registry (editorial + hand-written) */
@@ -57,7 +57,10 @@ export async function GET(
     return NextResponse.json({
       success: true,
       raceRegistryId: race.id,
-      shakeouts: runs.map((r) => serializeHubShakeout(r)),
+      shakeouts: runs.map((r) => ({
+        ...serializeHubShakeout(r),
+        staffNotes: r.staffNotes,
+      })),
     });
   } catch (err) {
     console.error("internal company shakeouts GET:", err);
@@ -145,15 +148,15 @@ export async function POST(
       typeof body.startTimePeriod === "string" && body.startTimePeriod.trim()
         ? body.startTimePeriod.trim()
         : null;
-    const fromUtc = utcTo12h(runAt);
-    const hour = bodyHour ?? fromUtc.hour;
-    const minute = bodyMinute ?? fromUtc.minute;
-    const period = bodyPeriod ?? fromUtc.period;
+    const hasStartClock =
+      bodyHour != null && bodyHour >= 1 && bodyHour <= 12;
+    const hour = hasStartClock ? bodyHour : null;
+    const minute = hasStartClock ? (bodyMinute ?? 0) : null;
+    const period = hasStartClock ? (bodyPeriod ?? "AM") : null;
 
     const id = generateCityRunId();
 
-    const run = await prisma.city_runs.create({
-      data: {
+    const createData: Record<string, unknown> = {
         id,
         title,
         date: runAt,
@@ -268,7 +271,14 @@ export async function POST(
         partnerExtras,
         cityRunType: "RACE_SHAKEOUT",
         updatedAt: new Date(),
-      },
+    };
+
+    if (hasStartClock) {
+      stampCityRunStartsAtOnCreateData(createData);
+    }
+
+    const run = await prisma.city_runs.create({
+      data: createData as Parameters<typeof prisma.city_runs.create>[0]["data"],
       include: {
         city_run_rsvps: true,
         runClub: { select: { id: true, name: true, slug: true } },

@@ -28,8 +28,13 @@ export async function GET(
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
+    const publishedOnly = access.mode !== "staff";
     const runs = await prisma.city_runs.findMany({
-      where: { raceRegistryId: race.id, cityRunType: "RACE_SHAKEOUT" },
+      where: {
+        raceRegistryId: race.id,
+        cityRunType: "RACE_SHAKEOUT",
+        ...(publishedOnly ? { published: true } : {}),
+      },
       orderBy: { date: "asc" },
       include: {
         city_run_rsvps: true,
