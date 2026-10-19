@@ -1090,6 +1090,7 @@ export default function TrainingSetupClient() {
       !showChangeRaceFork &&
       !hasBlueprintSelected &&
       (presetPickMode === "choose" ||
+        presetPickMode === "weekByWeek" ||
         (presetPickMode === "catalog" && !selectedPreset) ||
         (presetPickMode === "custom" && !selectedAthletePresetId));
 
