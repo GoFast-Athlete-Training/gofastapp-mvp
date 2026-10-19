@@ -13,12 +13,15 @@ import {
 } from "@/lib/training/parse-pasted-workout";
 import type { WeekBounds } from "@/lib/training/plan-schedule";
 import { isPlanWeekCsvHeaderLine } from "@/lib/training/plan-week-csv-template";
+import type { PlanWeekIngestRow } from "@/lib/training/plan-ingest-contract";
 
 export type ParsedPlanWeekCsv = {
   week: PlanWeekSchedule;
   skippedNotes: string[];
   outOfWeekNotes: string[];
   daySegmentsByDateKey: Record<string, WorkoutStep[]>;
+  metaByDateKey: Record<string, { workoutName: string; paceNote: string }>;
+  weekIngestRows: PlanWeekIngestRow[];
 };
 
 /** Ignore # instruction lines from the downloadable template. */
@@ -164,15 +167,41 @@ export function tryParsePlanWeekCsvText(params: {
   const skippedNotes: string[] = [];
   const outOfWeekNotes: string[] = [];
   const daySegmentsByDateKey: Record<string, WorkoutStep[]> = {};
+  const metaByDateKey: Record<string, { workoutName: string; paceNote: string }> = {};
+  const weekIngestRows: PlanWeekIngestRow[] = [];
   const byDow = new Map<number, PlanDaySchedule>();
 
   for (let i = 1; i < lines.length; i++) {
     const cols = parseCsvRow(lines[i]!);
-    if (cols.length < 4) continue;
+    const workoutName = (cols[1] ?? "").trim();
+    const typeRaw = (cols[2] ?? "").trim();
+    const pace = (cols[4] ?? "").trim();
+
+    if (cols.length < 4) {
+      weekIngestRows.push({
+        dateKey: "",
+        workoutName,
+        type: typeRaw,
+        miles: null,
+        pace,
+        status: "invalid",
+        detail: `Row ${i + 1}: need Date, Workout, Type, Mileage columns`,
+      });
+      continue;
+    }
 
     const dateKey = normalizeDateKey(cols[0] ?? "");
     if (!dateKey) {
       outOfWeekNotes.push(`Row ${i + 1}: invalid date`);
+      weekIngestRows.push({
+        dateKey: "",
+        workoutName,
+        type: typeRaw,
+        miles: null,
+        pace,
+        status: "invalid",
+        detail: `Row ${i + 1}: invalid date`,
+      });
       continue;
     }
 
@@ -180,13 +209,30 @@ export function tryParsePlanWeekCsvText(params: {
       !dateKeyInWeekBounds(dateKey, params.weekBounds.weekStart, params.weekBounds.weekEnd)
     ) {
       outOfWeekNotes.push(`Row ${i + 1} (${dateKey}): outside selected week`);
+      weekIngestRows.push({
+        dateKey,
+        workoutName,
+        type: typeRaw,
+        miles: null,
+        pace,
+        status: "out_of_week",
+        detail: "Outside selected week",
+      });
       continue;
     }
 
-    const workoutName = (cols[1] ?? "").trim();
     const mapped = mapCsvType(cols[2] ?? "");
     if (mapped === "SKIP_RACE" || params.raceDateKey === dateKey) {
       skippedNotes.push(`Skipped ${dateKey}: race day`);
+      weekIngestRows.push({
+        dateKey,
+        workoutName,
+        type: typeRaw || "Race",
+        miles: null,
+        pace,
+        status: "skipped_race",
+        detail: "Goal race day — omit from CSV",
+      });
       continue;
     }
 
@@ -204,15 +250,22 @@ export function tryParsePlanWeekCsvText(params: {
       planCycleIndex: null,
     });
 
-    const pace = (cols[4] ?? "").trim();
+    metaByDateKey[dateKey] = { workoutName, paceNote: pace };
+    weekIngestRows.push({
+      dateKey,
+      workoutName,
+      type: workoutType,
+      miles,
+      pace,
+      status: "import",
+    });
+
     if (pace && paceHasStructure(pace)) {
       const segments = segmentsFromStructuredPace(pace, workoutType, params.fiveKPace);
       if (segments && segments.length > 0) {
         daySegmentsByDateKey[dateKey] = segments;
       }
     }
-
-    void workoutName;
   }
 
   if (byDow.size === 0 && skippedNotes.length === 0 && outOfWeekNotes.length > 0) {
@@ -224,6 +277,8 @@ export function tryParsePlanWeekCsvText(params: {
       skippedNotes,
       outOfWeekNotes,
       daySegmentsByDateKey,
+      metaByDateKey,
+      weekIngestRows,
     };
   }
   if (byDow.size === 0) return null;
@@ -234,5 +289,7 @@ export function tryParsePlanWeekCsvText(params: {
     skippedNotes,
     outOfWeekNotes,
     daySegmentsByDateKey,
+    metaByDateKey,
+    weekIngestRows,
   };
 }

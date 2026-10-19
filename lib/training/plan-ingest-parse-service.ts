@@ -24,6 +24,8 @@ import {
   appendSkippedToSummary,
   applyWeekIngestGuard,
 } from "@/lib/training/plan-week-ingest-guard";
+import { buildWeekPreviewDays } from "@/lib/training/plan-week-preview-days";
+import type { PlanWeekIngestRow } from "@/lib/training/plan-ingest-contract";
 import {
   looksLikePlanWeekCsv,
   tryParsePlanWeekCsvText,
@@ -33,6 +35,24 @@ import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import type { WorkoutStep } from "@/lib/training/prescription";
 
 const WORKOUT_TYPES = new Set<string>(["Easy", "Tempo", "Intervals", "LongRun", "Race"]);
+
+function refreshWeekIngestRowsAfterGuard(
+  rows: PlanWeekIngestRow[] | undefined,
+  protectedDateKeys: Set<string>
+): PlanWeekIngestRow[] | undefined {
+  if (!rows?.length) return rows;
+  return rows.map((row) => {
+    if (row.status !== "import") return row;
+    if (protectedDateKeys.has(row.dateKey)) {
+      return {
+        ...row,
+        status: "skipped_protected" as const,
+        detail: "Protected (race or already completed)",
+      };
+    }
+    return row;
+  });
+}
 
 function extractJsonObject(text: string): unknown {
   const start = text.indexOf("{");
@@ -244,6 +264,8 @@ export async function previewPlanIngest(params: {
     let parseSource: "deterministic" | "openai" = "deterministic";
     let incomingWeek: PlanWeekSchedule | null = null;
     let daySegmentsByDateKey: Record<string, WorkoutStep[]> | undefined;
+    let metaByDateKey: Record<string, { workoutName?: string; paceNote?: string }> | undefined;
+    let weekIngestRows: PlanWeekIngestRow[] | undefined;
     const preGuardNotes: string[] = [];
 
     if (looksLikePlanWeekCsv(text)) {
@@ -265,6 +287,9 @@ export async function previewPlanIngest(params: {
         Object.keys(csv.daySegmentsByDateKey).length > 0
           ? csv.daySegmentsByDateKey
           : undefined;
+      metaByDateKey =
+        Object.keys(csv.metaByDateKey).length > 0 ? csv.metaByDateKey : undefined;
+      weekIngestRows = csv.weekIngestRows;
       preGuardNotes.push(...csv.skippedNotes, ...csv.outOfWeekNotes);
     } else {
       const deterministic = tryParsePastedWeekScheduleText(text, weekNumber);
@@ -289,10 +314,22 @@ export async function previewPlanIngest(params: {
       return { ok: false, error: "Could not parse this week" };
     }
 
-    const { week: guardedWeek, skippedNotes } = await applyWeekIngestGuard({
+    const { week: guardedWeek, skippedNotes, protectedDateKeys } = await applyWeekIngestGuard({
       plan,
       weekNumber,
       incomingWeek,
+    });
+
+    weekIngestRows = refreshWeekIngestRowsAfterGuard(weekIngestRows, protectedDateKeys);
+
+    const weekPreviewDays = buildWeekPreviewDays({
+      weekStart: bounds.weekStart,
+      weekEnd: bounds.weekEnd,
+      guardedWeek,
+      protectedDateKeys,
+      raceDateKey,
+      metaByDateKey,
+      daySegmentsByDateKey,
     });
 
     const totalMi = guardedWeek.days.reduce((a, d) => a + d.miles, 0);
@@ -307,6 +344,8 @@ export async function previewPlanIngest(params: {
         week: { weekNumber, week: guardedWeek },
         summary,
         daySegmentsByDateKey,
+        weekPreviewDays,
+        weekIngestRows,
       },
     };
   }

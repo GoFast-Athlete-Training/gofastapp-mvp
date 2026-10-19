@@ -1049,8 +1049,6 @@ export default function TrainingHubPage() {
                   <TrainingHubEditPlanGear
                     planId={planDetail.id}
                     planSchedule={planDetail.planSchedule}
-                    weekNumber={weekNumber}
-                    weekDays={weekDays}
                     sharePlan={shareHubPlan}
                     landingSlug={planShareLandingSlug}
                     firstName={planShareFirstName}
@@ -1104,12 +1102,6 @@ export default function TrainingHubPage() {
                   <TrainingHubWeekGear
                     planId={planDetail.id}
                     weekNumber={weekNumber}
-                    weekDays={weekDays}
-                    getToken={getHubToken}
-                    onCommitted={() => {
-                      void loadHub();
-                      void fetchWeekDays(weekNumber);
-                    }}
                   />
                 }
               />

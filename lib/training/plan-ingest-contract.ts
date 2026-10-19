@@ -28,6 +28,35 @@ export type PlanIngestPlanPayload = {
   weeks: PlanWeekSchedule[];
 };
 
+export type PlanWeekPreviewDay = {
+  dateKey: string;
+  weekdayLabel: string;
+  workoutType: string;
+  miles: number;
+  workoutName?: string | null;
+  paceNote?: string | null;
+  hasCustomSegments: boolean;
+  action: "replace" | "keep";
+  keepReason?: "race" | "completed" | null;
+};
+
+export type PlanWeekIngestRowStatus =
+  | "import"
+  | "skipped_race"
+  | "skipped_protected"
+  | "out_of_week"
+  | "invalid";
+
+export type PlanWeekIngestRow = {
+  dateKey: string;
+  workoutName: string;
+  type: string;
+  miles: number | null;
+  pace: string;
+  status: PlanWeekIngestRowStatus;
+  detail?: string;
+};
+
 export type PlanIngestPreviewResult =
   | {
       scope: "workout";
@@ -41,6 +70,8 @@ export type PlanIngestPreviewResult =
       week: PlanIngestWeekPayload;
       summary: string;
       daySegmentsByDateKey?: Record<string, WorkoutStep[]>;
+      weekPreviewDays?: PlanWeekPreviewDay[];
+      weekIngestRows?: PlanWeekIngestRow[];
     }
   | {
       scope: "plan";

@@ -15,6 +15,8 @@ type Props = {
   onChange: (mode: IntakeMode) => void;
   className?: string;
   descriptions?: Partial<Record<IntakeMode, string>>;
+  /** Subset of modes to show (default: manual, paste, csv). */
+  modes?: IntakeMode[];
 };
 
 const DEFAULT_DESCRIPTIONS: Record<IntakeMode, string> = {
@@ -42,11 +44,12 @@ export default function IntakeModePicker({
   onChange,
   className = "",
   descriptions = {},
+  modes = MODES,
 }: Props) {
   if (mode === null) {
     return (
       <div className={`grid gap-3 sm:grid-cols-3 ${className}`}>
-        {MODES.map((id) => {
+        {modes.map((id) => {
           const { label, icon: Icon, description } = modeMeta(id, descriptions);
           return (
             <button
@@ -69,7 +72,7 @@ export default function IntakeModePicker({
 
   return (
     <div className={`flex flex-wrap gap-2 ${className}`}>
-      {MODES.map((id) => {
+      {modes.map((id) => {
         const { label, icon: Icon } = modeMeta(id, descriptions);
         const active = mode === id;
         return (

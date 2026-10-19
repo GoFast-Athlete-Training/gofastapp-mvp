@@ -7,16 +7,11 @@ import type { ShareHubPlanStatus } from "@/lib/profile/share-creator-card-logic"
 import { planScheduleLooksStructured } from "@/lib/training/plan-schedule-schema";
 import { RegeneratePlanScheduleButton } from "@/components/training/RegeneratePlanScheduleButton";
 import { TrainingHubPlanShareControls } from "@/components/training/hub/TrainingHubPlanShareControls";
-import { TrainingHubIngestScopeFlow } from "@/components/training/hub/TrainingHubIngestScopeFlow";
-import type { PlanDayCard } from "@/lib/training/fetch-plan-week-client";
-
-type Panel = null | "replacePlan" | "details" | "miles";
+type Panel = null | "details" | "miles";
 
 type Props = {
   planId: string;
   planSchedule: unknown;
-  weekNumber: number;
-  weekDays: PlanDayCard[];
   sharePlan: ShareHubPlanStatus | null;
   landingSlug: string;
   firstName: string | null;
@@ -40,8 +35,6 @@ type Props = {
 export function TrainingHubEditPlanGear({
   planId,
   planSchedule,
-  weekNumber,
-  weekDays,
   sharePlan,
   landingSlug,
   firstName,
@@ -115,13 +108,13 @@ export function TrainingHubEditPlanGear({
               </button>
             ) : null}
             {structured ? (
-              <button
-                type="button"
-                onClick={() => openPanel("replacePlan")}
+              <Link
+                href={`/training/plan/${encodeURIComponent(planId)}/adjust`}
+                onClick={closeAll}
                 className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
               >
                 Replace with my plan
-              </button>
+              </Link>
             ) : null}
             <button
               type="button"
@@ -192,11 +185,7 @@ export function TrainingHubEditPlanGear({
           <div className="fixed inset-x-4 top-20 z-50 mx-auto max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-5 shadow-xl sm:inset-x-auto sm:right-6 sm:left-auto sm:w-full">
             <div className="flex items-center justify-between gap-2 mb-4">
               <h3 className="text-sm font-bold text-gray-900">
-                {panel === "replacePlan"
-                  ? "Replace with my plan"
-                  : panel === "details"
-                    ? descriptionMenuLabel
-                    : "Weekly miles"}
+                {panel === "details" ? descriptionMenuLabel : "Weekly miles"}
               </h3>
               <button
                 type="button"
@@ -206,22 +195,6 @@ export function TrainingHubEditPlanGear({
                 Close
               </button>
             </div>
-
-            {panel === "replacePlan" && structured ? (
-              <TrainingHubIngestScopeFlow
-                planId={planId}
-                weekNumber={weekNumber}
-                weekDays={weekDays}
-                getToken={getToken}
-                allowedScopes={["plan"]}
-                onCommitted={() => {
-                  void onRefreshHub();
-                  onRefreshWeek();
-                  closeAll();
-                }}
-                onClose={closeAll}
-              />
-            ) : null}
 
             {panel === "details" && sharePlan ? (
               <TrainingHubPlanShareControls

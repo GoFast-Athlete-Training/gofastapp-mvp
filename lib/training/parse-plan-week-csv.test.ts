@@ -33,6 +33,23 @@ test("CSV week parse skips race row and maps shakeout to Easy", () => {
   assert.equal(shake?.miles, 3);
 });
 
+test("CSV weekIngestRows mark race skip and import rows", () => {
+  const parsed = tryParsePlanWeekCsvText({
+    sourceText: MCM_CSV,
+    weekNumber,
+    weekBounds: bounds,
+    fiveKPace: "7:30/mi",
+    raceDateKey: "2026-10-25",
+  });
+  assert.ok(parsed);
+  const raceRow = parsed!.weekIngestRows.find((r) => r.dateKey === "2026-10-25");
+  assert.equal(raceRow?.status, "skipped_race");
+  const tempo = parsed!.weekIngestRows.find((r) => r.workoutName === "Controlled Tempo");
+  assert.equal(tempo?.status, "import");
+  assert.equal(tempo?.miles, 6);
+  assert.equal(parsed!.metaByDateKey["2026-10-24"]?.workoutName, "MCM Shakeout");
+});
+
 test("CSV structured tempo pace yields preview segments for that date", () => {
   const parsed = tryParsePlanWeekCsvText({
     sourceText: MCM_CSV,

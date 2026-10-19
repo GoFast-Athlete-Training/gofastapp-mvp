@@ -1,25 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
-import type {
-  PlanIngestPreviewResult,
-  PlanIngestScope,
-} from "@/lib/training/plan-ingest-contract";
-import {
-  PLAN_WEEK_CSV_DOWNLOAD_FILENAME,
-  PLAN_WEEK_CSV_TEMPLATE,
-} from "@/lib/training/plan-week-csv-template";
-
-function downloadPlanWeekCsvTemplate(): void {
-  const blob = new Blob([PLAN_WEEK_CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = PLAN_WEEK_CSV_DOWNLOAD_FILENAME;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
+import type { PlanIngestScope } from "@/lib/training/plan-ingest-contract";
+import { usePlanIngestPreviewCommit } from "@/lib/training/use-plan-ingest-preview-commit";
 
 type Props = {
   planId: string;
@@ -48,90 +31,36 @@ export default function PlanIngestPanel({
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
   const [sourceText, setSourceText] = useState("");
-  const [preview, setPreview] = useState<PlanIngestPreviewResult | null>(null);
-  const [summary, setSummary] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [committing, setCommitting] = useState(false);
 
-  const runPreview = useCallback(async () => {
-    setError(null);
-    setPreview(null);
-    setSummary(null);
-    const token = await getToken();
-    if (!token) {
-      setError("Sign in to continue");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/training/plan/ingest/preview", {
-        method: "POST",
-        headers: {
-          ...athleteBearerFetchHeaders(token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          planId,
-          scope,
-          sourceText,
-          dateKey,
-          weekNumber,
-        }),
-      });
-      const data = (await res.json()) as {
-        error?: string;
-        preview?: PlanIngestPreviewResult;
-      };
-      if (!res.ok) {
-        setError(data.error ?? "Preview failed");
-        return;
-      }
-      if (data.preview) {
-        setPreview(data.preview);
-        setSummary(data.preview.summary);
-      }
-    } catch {
-      setError("Preview failed");
-    } finally {
-      setLoading(false);
-    }
-  }, [getToken, planId, scope, sourceText, dateKey, weekNumber]);
+  const { preview, error, loading, committing, runPreview, runCommit, resetPreview } =
+    usePlanIngestPreviewCommit({
+      planId,
+      scope,
+      getToken,
+      dateKey,
+      weekNumber,
+    });
 
-  const runCommit = useCallback(async () => {
-    if (!preview) return;
-    setError(null);
-    const token = await getToken();
-    if (!token) {
-      setError("Sign in to continue");
-      return;
-    }
-    setCommitting(true);
-    try {
-      const res = await fetch("/api/training/plan/ingest/commit", {
-        method: "POST",
-        headers: {
-          ...athleteBearerFetchHeaders(token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ planId, preview }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setError(data.error ?? "Could not save");
-        return;
-      }
+  const onPreview = useCallback(() => {
+    void runPreview(sourceText);
+  }, [runPreview, sourceText]);
+
+  const onCommit = useCallback(async () => {
+    const ok = await runCommit();
+    if (ok) {
       setSourceText("");
-      setPreview(null);
-      setSummary(null);
+      resetPreview();
       setOpen(false);
       onCommitted?.();
-    } catch {
-      setError("Could not save");
-    } finally {
-      setCommitting(false);
     }
-  }, [getToken, planId, preview, onCommitted]);
+  }, [runCommit, onCommitted, resetPreview]);
+
+  if (scope === "week") {
+    return null;
+  }
+
+  const summary =
+    preview && preview.scope !== "week" ? preview.summary : null;
 
   return (
     <div className="rounded-xl border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm">
@@ -146,53 +75,18 @@ export default function PlanIngestPanel({
       {open ? (
         <div className="mt-3 space-y-3">
           {description ? <p className="text-sky-900/90">{description}</p> : null}
-          {scope === "week" ? (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => downloadPlanWeekCsvTemplate()}
-                  className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-50"
-                >
-                  Download CSV template
-                </button>
-                <label className="cursor-pointer rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-50">
-                  Upload CSV
-                  <input
-                    type="file"
-                    accept=".csv,.txt,text/csv,text/plain"
-                    className="sr-only"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      void file.text().then((text) => {
-                        setSourceText(text);
-                        setPreview(null);
-                        setSummary(null);
-                        setError(null);
-                      });
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-              </div>
-              <p className="text-xs text-sky-800/80">
-                Template explains the columns. Do not put goal race day in the CSV — only the
-                training days you want to replace. Or paste day lines below.
-              </p>
-            </div>
-          ) : null}
           <textarea
             value={sourceText}
-            onChange={(e) => setSourceText(e.target.value)}
-            rows={scope === "plan" ? 8 : scope === "week" ? 6 : 4}
+            onChange={(e) => {
+              setSourceText(e.target.value);
+              resetPreview();
+            }}
+            rows={scope === "plan" ? 8 : 4}
             placeholder={
               placeholder ??
-              (scope === "week"
-                ? "Mon easy 5\nWed tempo 6\nSat long 14"
-                : scope === "plan"
-                  ? "Week 8\nMon easy 4\n...\nWeek 9\n..."
-                  : "Paste today's workout (reps, miles, pace cues)")
+              (scope === "plan"
+                ? "Week 8\nMon easy 4\n...\nWeek 9\n..."
+                : "Paste today's workout (reps, miles, pace cues)")
             }
             className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-400"
           />
@@ -200,7 +94,7 @@ export default function PlanIngestPanel({
             <button
               type="button"
               disabled={loading || !sourceText.trim()}
-              onClick={() => void runPreview()}
+              onClick={onPreview}
               className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
             >
               {loading ? "Parsing…" : "Preview"}
@@ -209,7 +103,7 @@ export default function PlanIngestPanel({
               <button
                 type="button"
                 disabled={committing}
-                onClick={() => void runCommit()}
+                onClick={() => void onCommit()}
                 className="rounded-lg border border-sky-600 bg-white px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-100 disabled:opacity-50"
               >
                 {committing ? "Saving…" : "Confirm & apply"}
