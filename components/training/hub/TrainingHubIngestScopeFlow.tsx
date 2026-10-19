@@ -19,6 +19,11 @@ type Props = {
   onClose: () => void;
 };
 
+function initialIngestChoice(allowedScopes: IngestScopeChoice[]): IngestScopeChoice | null {
+  if (allowedScopes.length === 1) return allowedScopes[0] ?? null;
+  return null;
+}
+
 export function TrainingHubIngestScopeFlow({
   planId,
   weekNumber,
@@ -28,8 +33,11 @@ export function TrainingHubIngestScopeFlow({
   onCommitted,
   onClose,
 }: Props) {
-  const [choice, setChoice] = useState<IngestScopeChoice | null>(null);
+  const [choice, setChoice] = useState<IngestScopeChoice | null>(() =>
+    initialIngestChoice(allowedScopes)
+  );
   const [workoutDateKey, setWorkoutDateKey] = useState<string | null>(null);
+  const singleScope = allowedScopes.length === 1;
 
   const activeScope: PlanIngestScope | null =
     choice === "plan"
@@ -43,12 +51,17 @@ export function TrainingHubIngestScopeFlow({
   if (activeScope === "plan") {
     return (
       <div className="space-y-3">
-        <ScopeHeader onBack={() => setChoice(null)} onClose={onClose} label="Change the whole plan" />
+        <ScopeHeader
+          onBack={singleScope ? onClose : () => setChoice(null)}
+          onClose={onClose}
+          label="Replace with my plan"
+          showBack={!singleScope}
+        />
         <PlanIngestPanel
           planId={planId}
           scope="plan"
           getToken={getToken}
-          title="Paste full plan"
+          title="Replace with my plan"
           description="Future weeks only — completed weeks stay as-is."
           defaultOpen
           onCommitted={onCommitted}
@@ -60,7 +73,12 @@ export function TrainingHubIngestScopeFlow({
   if (activeScope === "week") {
     return (
       <div className="space-y-3">
-        <ScopeHeader onBack={() => setChoice(null)} onClose={onClose} label="Change this week" />
+        <ScopeHeader
+          onBack={singleScope ? onClose : () => setChoice(null)}
+          onClose={onClose}
+          label="Replace this week"
+          showBack={!singleScope}
+        />
         <PlanIngestPanel
           planId={planId}
           scope="week"
@@ -162,16 +180,22 @@ function ScopeHeader({
   label,
   onBack,
   onClose,
+  showBack = true,
 }: {
   label: string;
   onBack: () => void;
   onClose: () => void;
+  showBack?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <button type="button" onClick={onBack} className="text-sm font-semibold text-sky-800 hover:underline">
-        ← Back
-      </button>
+      {showBack ? (
+        <button type="button" onClick={onBack} className="text-sm font-semibold text-sky-800 hover:underline">
+          ← Back
+        </button>
+      ) : (
+        <span className="w-12" aria-hidden />
+      )}
       <span className="text-sm font-medium text-gray-900">{label}</span>
       <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-800">
         Close

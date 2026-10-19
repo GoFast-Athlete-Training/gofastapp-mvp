@@ -7,13 +7,10 @@ import type { ShareHubPlanStatus } from "@/lib/profile/share-creator-card-logic"
 import { planScheduleLooksStructured } from "@/lib/training/plan-schedule-schema";
 import { RegeneratePlanScheduleButton } from "@/components/training/RegeneratePlanScheduleButton";
 import { TrainingHubPlanShareControls } from "@/components/training/hub/TrainingHubPlanShareControls";
-import {
-  TrainingHubIngestScopeFlow,
-  type IngestScopeChoice,
-} from "@/components/training/hub/TrainingHubIngestScopeFlow";
+import { TrainingHubIngestScopeFlow } from "@/components/training/hub/TrainingHubIngestScopeFlow";
 import type { PlanDayCard } from "@/lib/training/fetch-plan-week-client";
 
-type Panel = null | "changes" | "details" | "miles";
+type Panel = null | "replacePlan" | "details" | "miles";
 
 type Props = {
   planId: string;
@@ -68,9 +65,10 @@ export function TrainingHubEditPlanGear({
   const [panel, setPanel] = useState<Panel>(null);
 
   const structured = planScheduleLooksStructured(planSchedule);
-  const ingestScopes: IngestScopeChoice[] = structured
-    ? ["plan", "week", "workout"]
-    : [];
+  const hasPublicDescription = Boolean(sharePlan?.publicDescription?.trim());
+  const descriptionMenuLabel = hasPublicDescription
+    ? "Title and description"
+    : "Add description";
 
   const closeAll = () => {
     setMenuOpen(false);
@@ -107,22 +105,22 @@ export function TrainingHubEditPlanGear({
             <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
               Edit my plan
             </p>
-            {ingestScopes.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => openPanel("changes")}
-                className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
-              >
-                Changes
-              </button>
-            ) : null}
             {sharePlan ? (
               <button
                 type="button"
                 onClick={() => openPanel("details")}
                 className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
               >
-                Details
+                {descriptionMenuLabel}
+              </button>
+            ) : null}
+            {structured ? (
+              <button
+                type="button"
+                onClick={() => openPanel("replacePlan")}
+                className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
+              >
+                Replace with my plan
               </button>
             ) : null}
             <button
@@ -130,7 +128,7 @@ export function TrainingHubEditPlanGear({
               onClick={() => openPanel("miles")}
               className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
             >
-              Miles per week
+              Weekly miles
             </button>
             <div className="my-1 border-t border-gray-100" />
             <button
@@ -194,11 +192,11 @@ export function TrainingHubEditPlanGear({
           <div className="fixed inset-x-4 top-20 z-50 mx-auto max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-5 shadow-xl sm:inset-x-auto sm:right-6 sm:left-auto sm:w-full">
             <div className="flex items-center justify-between gap-2 mb-4">
               <h3 className="text-sm font-bold text-gray-900">
-                {panel === "changes"
-                  ? "Changes"
+                {panel === "replacePlan"
+                  ? "Replace with my plan"
                   : panel === "details"
-                    ? "Details"
-                    : "Miles per week"}
+                    ? descriptionMenuLabel
+                    : "Weekly miles"}
               </h3>
               <button
                 type="button"
@@ -209,13 +207,13 @@ export function TrainingHubEditPlanGear({
               </button>
             </div>
 
-            {panel === "changes" && ingestScopes.length > 0 ? (
+            {panel === "replacePlan" && structured ? (
               <TrainingHubIngestScopeFlow
                 planId={planId}
                 weekNumber={weekNumber}
                 weekDays={weekDays}
                 getToken={getToken}
-                allowedScopes={ingestScopes}
+                allowedScopes={["plan"]}
                 onCommitted={() => {
                   void onRefreshHub();
                   onRefreshWeek();

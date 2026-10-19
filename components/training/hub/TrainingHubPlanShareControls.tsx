@@ -147,6 +147,10 @@ export function TrainingHubPlanShareControls({
     if (!plan.planId || busy) return;
     if (nextPublic) {
       if (!hasBeenPublishedBefore) {
+        if (visibilityOnly) {
+          void publishPlan(planTitle, description.trim());
+          return;
+        }
         setReviewTitle(planTitle);
         setEditingReviewTitle(false);
         setPublishReviewOpen(true);
@@ -208,35 +212,21 @@ export function TrainingHubPlanShareControls({
   if (visibilityOnly) {
     if (!publishable) return null;
     return (
-      <>
+      <div className="flex flex-col items-end gap-1">
         <PlanVisibilityToggle
           isPublic={isPublic}
           disabled={busy}
           onChange={(next) => void persistVisibility(next)}
         />
-        {error || saveSuccess || (publishReviewOpen && !isPublic) ? (
-          <div className="w-full basis-full space-y-2">
-            {saveSuccess ? (
-              <p className="text-sm text-emerald-800">{saveSuccess}</p>
-            ) : null}
-            {error ? <p className="text-sm text-red-700">{error}</p> : null}
-            {publishReviewOpen && !isPublic ? (
-              <PublishReviewPanel
-                reviewTitle={reviewTitle}
-                editingTitle={editingReviewTitle}
-                description={description}
-                summaryParts={summaryParts}
-                busy={busy}
-                onReviewTitleChange={setReviewTitle}
-                onToggleEditTitle={() => setEditingReviewTitle((v) => !v)}
-                onDescriptionChange={setDescription}
-                onCancel={() => setPublishReviewOpen(false)}
-                onConfirm={() => void publishPlan(reviewTitle, description.trim())}
-              />
-            ) : null}
-          </div>
+        {saveSuccess ? (
+          <p className="max-w-[14rem] text-right text-xs text-emerald-800">{saveSuccess}</p>
         ) : null}
-      </>
+        {error ? (
+          <p className="max-w-[14rem] text-right text-xs text-red-700" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
     );
   }
 
