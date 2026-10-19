@@ -101,7 +101,6 @@ export async function GET(request: Request) {
     const baseWhere = {
       gofastHandle: { not: null },
       NOT: { gofastHandle: '' },
-      isGoFastContainer: true,
     };
 
     const andParts: object[] = [];

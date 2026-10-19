@@ -37,12 +37,6 @@ export async function POST(
     if (!host) {
       return NextResponse.json({ success: false, error: 'Container not found' }, { status: 404 });
     }
-    if (!host.isGoFastContainer) {
-      return NextResponse.json(
-        { success: false, error: 'This page is not a GoFast Container' },
-        { status: 400 }
-      );
-    }
     if (member.id === host.id) {
       return NextResponse.json(
         { success: false, error: 'Host is already the owner of this container' },

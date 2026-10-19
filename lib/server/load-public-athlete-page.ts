@@ -4,8 +4,9 @@ import { getJoinableCohortForHost } from '@/lib/training/cohort-service';
 import { listPublicPlansForAthlete, mapPublishedPlanCard } from '@/lib/training/public-plan-service';
 import {
   ensureGoFastWithMeForAthlete,
-  getGoFastWithMeBySlug,
+  getGoFastWithMeForAthlete,
   normalizeGoFastWithMeSlug,
+  resolveAthleteByPublicHandle,
 } from '@/lib/gofast-with-me/gofast-with-me-service';
 import { resolvePublicActions } from '@/lib/gofast-with-me/resolve-public-actions';
 import { listPublishedAthleteTips } from '@/lib/gofast-with-me/athlete-tips';
@@ -68,25 +69,27 @@ export async function loadPublicAthletePage(rawHandle: string) {
   const handle = normalizeHandle(rawHandle || '');
   if (!handle) return null;
 
-  let gwmRow = await getGoFastWithMeBySlug(handle);
-  if (!gwmRow) {
-    const legacyAthlete = await prisma.athlete.findFirst({
-      where: { gofastHandle: { equals: handle, mode: 'insensitive' } },
-    });
-    if (!legacyAthlete?.gofastHandle?.trim()) return null;
-    await ensureGoFastWithMeForAthlete(legacyAthlete.id, legacyAthlete.gofastHandle, {
-      seedBioFromAthlete: legacyAthlete.bio,
-      seedPhotoFromAthlete: legacyAthlete.myBestRunPhotoURL,
-    });
-    gwmRow = await getGoFastWithMeBySlug(handle);
-    if (!gwmRow) return null;
-  }
+  const athlete = await resolveAthleteByPublicHandle(handle);
+  if (!athlete?.gofastHandle?.trim()) return null;
 
-  const athlete = gwmRow.athlete;
+  let gwmRow = await getGoFastWithMeForAthlete(athlete.id);
+  if (!gwmRow) {
+    await ensureGoFastWithMeForAthlete(athlete.id, athlete.gofastHandle, {
+      seedBioFromAthlete: athlete.bio,
+      seedPhotoFromAthlete: athlete.myBestRunPhotoURL,
+    });
+    gwmRow = await getGoFastWithMeForAthlete(athlete.id);
+  }
+  if (!gwmRow) return null;
+
+  const publicSlug =
+    gwmRow.slugUsesHandle !== false
+      ? normalizeGoFastWithMeSlug(athlete.gofastHandle)
+      : gwmRow.gofastSlugSnapshot;
 
   const gofastWithMe = {
     id: gwmRow.id,
-    gofastSlugSnapshot: gwmRow.gofastSlugSnapshot,
+    gofastSlugSnapshot: publicSlug ?? gwmRow.gofastSlugSnapshot,
     welcome: gwmRow.welcome,
     gofastWithMeBio: gwmRow.gofastWithMeBio,
     whatYoullSeeHere: gwmRow.whatYoullSeeHere,
@@ -295,47 +298,34 @@ export async function loadPublicAthletePage(rawHandle: string) {
   const weeklyMeters = weeklyAggregate?._sum?.distance ?? 0;
   const weeklyMilesThisWeek = weeklyMeters > 0 ? weeklyMeters / METERS_PER_MILE : 0;
 
-  // Container preview (only when athlete has opted in)
-  let containerMemberCount = 0;
-  let containerRecentMembers: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    photoURL: string | null;
-    gofastHandle: string | null;
-  }[] = [];
-
-  if (athlete.isGoFastContainer) {
-    const [count, memberRows] = await Promise.all([
-      prisma.gfwm_athlete.count({
-        where: { athleteId: athlete.id },
-      }),
-      prisma.gfwm_athlete.findMany({
-        where: { athleteId: athlete.id },
-        orderBy: { joinedAt: 'desc' },
-        take: 6,
-        include: {
-          memberAthlete: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              photoURL: true,
-              gofastHandle: true,
-            },
+  const [containerMemberCount, memberRows] = await Promise.all([
+    prisma.gfwm_athlete.count({
+      where: { athleteId: athlete.id },
+    }),
+    prisma.gfwm_athlete.findMany({
+      where: { athleteId: athlete.id },
+      orderBy: { joinedAt: 'desc' },
+      take: 6,
+      include: {
+        memberAthlete: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            photoURL: true,
+            gofastHandle: true,
           },
         },
-      }),
-    ]);
-    containerMemberCount = count;
-    containerRecentMembers = memberRows.map((r) => ({
-      id: r.memberAthlete.id,
-      firstName: r.memberAthlete.firstName,
-      lastName: r.memberAthlete.lastName,
-      photoURL: r.memberAthlete.photoURL,
-      gofastHandle: r.memberAthlete.gofastHandle,
-    }));
-  }
+      },
+    }),
+  ]);
+  const containerRecentMembers = memberRows.map((r) => ({
+    id: r.memberAthlete.id,
+    firstName: r.memberAthlete.firstName,
+    lastName: r.memberAthlete.lastName,
+    photoURL: r.memberAthlete.photoURL,
+    gofastHandle: r.memberAthlete.gofastHandle,
+  }));
 
   const athleteCompanyRow = await getAthleteCompanyForAthlete(athlete.id);
   const athleteCompany = toPublicAthleteCompany(athleteCompanyRow);
@@ -410,7 +400,7 @@ export async function loadPublicAthletePage(rawHandle: string) {
 
   return {
     isGoFastContainer: athlete.isGoFastContainer,
-    hostAthleteId: athlete.isGoFastContainer ? athlete.id : null,
+    hostAthleteId: athlete.id,
     containerMemberCount,
     containerRecentMembers,
     joinableGroupTraining,

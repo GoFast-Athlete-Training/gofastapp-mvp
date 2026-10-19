@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { getAthleteById } from '@/lib/domain-athlete';
 import {
-  getGoFastWithMeBySlug,
   normalizeGoFastWithMeSlug,
+  resolveAthleteByPublicHandle,
 } from '@/lib/gofast-with-me/gofast-with-me-service';
 
 export type FollowTarget = {
@@ -13,27 +13,19 @@ export type FollowTarget = {
   gofastHandle: string | null;
 };
 
-/** Enable follower surface for owner when someone follows (legacy: isGoFastContainer). */
-export async function ensureFollowSurfaceForOwner(hostAthleteId: string): Promise<void> {
-  await prisma.athlete.update({
-    where: { id: hostAthleteId },
-    data: { isGoFastContainer: true, updatedAt: new Date() },
-  });
-}
-
 export async function resolveFollowTargetBySlug(rawHandle: string): Promise<FollowTarget | null> {
   const slug = normalizeGoFastWithMeSlug(rawHandle);
   if (!slug) return null;
 
-  const gwm = await getGoFastWithMeBySlug(slug);
-  if (!gwm?.athlete) return null;
+  const athlete = await resolveAthleteByPublicHandle(slug);
+  if (!athlete?.gofastHandle?.trim()) return null;
 
   return {
-    hostAthleteId: gwm.athlete.id,
-    gofastSlugSnapshot: gwm.gofastSlugSnapshot,
-    firstName: gwm.athlete.firstName,
-    lastName: gwm.athlete.lastName,
-    gofastHandle: gwm.athlete.gofastHandle,
+    hostAthleteId: athlete.id,
+    gofastSlugSnapshot: normalizeGoFastWithMeSlug(athlete.gofastHandle) ?? slug,
+    firstName: athlete.firstName,
+    lastName: athlete.lastName,
+    gofastHandle: athlete.gofastHandle,
   };
 }
 
@@ -54,8 +46,6 @@ export async function followAthleteBySlug(
   if (target.hostAthleteId === memberAthleteId) {
     throw new Error('You cannot follow yourself');
   }
-
-  await ensureFollowSurfaceForOwner(target.hostAthleteId);
 
   await prisma.gfwm_athlete.upsert({
     where: {

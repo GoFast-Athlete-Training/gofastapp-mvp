@@ -48,7 +48,6 @@ export async function GET() {
     const baseAthlete = {
       gofastHandle: { not: null },
       NOT: { gofastHandle: '' },
-      isGoFastContainer: true,
     };
 
     const [fromPlans, fromRaces] = await Promise.all([

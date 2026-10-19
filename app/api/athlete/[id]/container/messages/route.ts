@@ -29,8 +29,8 @@ export async function GET(
     }
 
     const host = await getAthleteById(hostAthleteId);
-    if (!host?.isGoFastContainer) {
-      return NextResponse.json({ success: false, error: 'Not a container' }, { status: 404 });
+    if (!host) {
+      return NextResponse.json({ success: false, error: 'Athlete not found' }, { status: 404 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -98,8 +98,8 @@ export async function POST(
     }
 
     const host = await getAthleteById(hostAthleteId);
-    if (!host?.isGoFastContainer) {
-      return NextResponse.json({ success: false, error: 'Not a container' }, { status: 404 });
+    if (!host) {
+      return NextResponse.json({ success: false, error: 'Athlete not found' }, { status: 404 });
     }
 
     const ok = await canAccessGoFastContainer(host.id, caller.id);

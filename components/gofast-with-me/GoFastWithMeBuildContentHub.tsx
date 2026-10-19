@@ -11,7 +11,6 @@ import {
 } from "@/components/gofast-with-me/studio-sections";
 
 type Props = {
-  landingNeedsAction?: boolean;
   onOpen: (section: StudioSection, focus?: ContentEditorFocus) => void;
 };
 
@@ -35,13 +34,14 @@ function cardDescription(section: StudioSection, focus?: ContentEditorFocus): st
   return STUDIO_BIN_DESCRIPTIONS[section];
 }
 
-export default function GoFastWithMeBuildContentHub({ landingNeedsAction, onOpen }: Props) {
+export default function GoFastWithMeBuildContentHub({ onOpen }: Props) {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Build content</h1>
         <p className="mt-1 text-sm text-gray-600">
-          What shows on your public landing and follower hub. Your link page is under{" "}
+          Ways to share your story on your handle. What you build shows up on your public pages; leave
+          a section empty and it stays off the site. Custom links live under{" "}
           <span className="font-medium">GoFast Links</span> in the app nav.
         </p>
       </div>
@@ -49,7 +49,6 @@ export default function GoFastWithMeBuildContentHub({ landingNeedsAction, onOpen
       <div className="grid gap-3 sm:grid-cols-2">
         {STUDIO_CONTENT_NAV_ORDER.map((item) => {
           const Icon = CARD_ICONS[cardKey(item.section, item.focus)] ?? PenLine;
-          const needsAction = item.section === "page" && landingNeedsAction;
           return (
             <button
               key={`${item.section}-${item.focus ?? "default"}-${item.label}`}
@@ -64,9 +63,6 @@ export default function GoFastWithMeBuildContentHub({ landingNeedsAction, onOpen
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="font-semibold text-gray-900">{item.label}</span>
-                    {needsAction ? (
-                      <span className="h-2 w-2 rounded-full bg-amber-500" aria-label="Needs attention" />
-                    ) : null}
                   </span>
                   <span className="mt-1 block text-sm text-gray-600">
                     {cardDescription(item.section, item.focus)}

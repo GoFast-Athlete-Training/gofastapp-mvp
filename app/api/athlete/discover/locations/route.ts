@@ -13,7 +13,6 @@ export async function GET() {
       where: {
         gofastHandle: { not: null },
         NOT: { gofastHandle: '' },
-        isGoFastContainer: true,
         state: { not: null },
       },
       select: {

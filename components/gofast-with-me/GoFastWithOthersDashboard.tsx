@@ -10,7 +10,6 @@ import type { GoFastWithMeLandingValues } from "@/components/gofast-with-me/GoFa
 import { normalizeGoFastWithMePhotoType } from "@/lib/gofast-with-me/photo-type";
 import { goFastWithFrontDoorPath } from "@/lib/gofast-with-me/gofast-with-bridge";
 import { athleteLinksPublicUrl } from "@/lib/content/athlete-links-public-url";
-import GoFastWithMeHubOnboarding from "@/components/gofast-with-me/GoFastWithMeHubOnboarding";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
 import GoFastWithMeRunnerStoryPanel from "@/components/gofast-with-me/GoFastWithMeRunnerStoryPanel";
 import GoFastWithMeTrainingReflectionsPanel from "@/components/gofast-with-me/GoFastWithMeTrainingReflectionsPanel";
@@ -19,24 +18,12 @@ import GoFastWithMeTipsPanel from "@/components/gofast-with-me/GoFastWithMeTipsP
 import GoFastWithMeRoutesPanel from "@/components/gofast-with-me/GoFastWithMeRoutesPanel";
 import GoFastWithMeBuildContentHub from "@/components/gofast-with-me/GoFastWithMeBuildContentHub";
 import GoFastWithMeStudioAppShell from "@/components/gofast-with-me/GoFastWithMeStudioAppShell";
-import GoFastWithMeStudioExplainer from "@/components/gofast-with-me/GoFastWithMeStudioExplainer";
-import GoFastWithMeProgramGate from "@/components/gofast-with-me/GoFastWithMeProgramGate";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import {
   COMMUNITY_HUB_PATH,
   studioContentPath,
 } from "@/lib/athlete/community-nav";
 import {
-  dismissStudioIntro,
-  readStudioIntroDismissed,
-  shouldShowStudioExplainer,
-} from "@/lib/gofast-with-me/studio-intro";
-import {
-  markStudioReady,
-  readStudioReady,
-} from "@/lib/gofast-with-me/studio-ready";
-import {
-  isWelcomeContentComplete,
   type ContentEditorFocus,
   type StudioSection,
   type StudioView,
@@ -102,26 +89,19 @@ export default function GoFastWithOthersDashboard() {
   const searchParams = useSearchParams();
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [gofastHandle, setGofastHandle] = useState<string | null>(null);
-  const [firstName, setFirstName] = useState<string | null>(null);
   const [profileBio, setProfileBio] = useState<string | null>(null);
   const [profilePhotoURL, setProfilePhotoURL] = useState<string | null>(null);
   const [ownerGwm, setOwnerGwm] = useState<OwnerGwmRow | null>(null);
-  const [publicSlug, setPublicSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [gateLoading, setGateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noHandle, setNoHandle] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeView, setActiveView] = useState<StudioView>("page");
   const [contentFocus, setContentFocus] = useState<ContentEditorFocus | null>(null);
   const [followerCount, setFollowerCount] = useState<number | null>(null);
-  const [introDismissed, setIntroDismissed] = useState(() => readStudioIntroDismissed());
-  const [studioReady, setStudioReady] = useState(() => readStudioReady());
   const [shareCopied, setShareCopied] = useState(false);
 
   const landingValues = ownerRowToLanding(ownerGwm);
-  const isWelcomeComplete = isWelcomeContentComplete(landingValues);
-  const showStudioExplainer = shouldShowStudioExplainer(ownerGwm, introDismissed);
+  const publicSlug = gofastHandle;
 
   const handleViewChange = useCallback(
     (view: StudioView, options?: { contentFocus?: ContentEditorFocus }) => {
@@ -141,10 +121,6 @@ export default function GoFastWithOthersDashboard() {
     },
     [router]
   );
-
-  useEffect(() => {
-    setIntroDismissed(readStudioIntroDismissed());
-  }, []);
 
   useEffect(() => {
     const view = searchParams.get("view");
@@ -195,22 +171,15 @@ export default function GoFastWithOthersDashboard() {
           return;
         }
         setGofastHandle(handle);
-        setFirstName(athlete?.firstName ?? null);
         setProfileBio(athlete?.bio ?? null);
         setProfilePhotoURL(athlete?.photoURL ?? null);
         const gwm = gwmRes.data?.gofastWithMe as OwnerGwmRow | null;
         setOwnerGwm(gwm);
-        const slug = gwm?.gofastSlugSnapshot ?? handle;
-        setPublicSlug(slug);
-        setShowOnboarding(!gwm?.creatorType);
 
         if (membersRes?.data?.success) {
           setFollowerCount(membersRes.data.count ?? 0);
-        } else if (athlete?.isGoFastContainer) {
-          setFollowerCount(0);
         }
 
-        const landing = ownerRowToLanding(gwm);
         if (!cancelled) {
           if (searchParams.get("view") === "linkTree") {
             router.replace("/links");
@@ -236,7 +205,7 @@ export default function GoFastWithOthersDashboard() {
         }
       } catch {
         if (!cancelled) {
-          setError("Something went wrong loading GoFastWithMe Studio.");
+          setError("Something went wrong loading your content.");
           setLoading(false);
         }
       }
@@ -246,17 +215,6 @@ export default function GoFastWithOthersDashboard() {
       cancelled = true;
     };
   }, [router, searchParams]);
-
-  const handleDismissStudioIntro = useCallback(() => {
-    dismissStudioIntro();
-    setIntroDismissed(true);
-  }, []);
-
-  const handleProgramReady = useCallback(() => {
-    markStudioReady();
-    setStudioReady(true);
-    setError(null);
-  }, []);
 
   if (loading) {
     return (
@@ -268,7 +226,7 @@ export default function GoFastWithOthersDashboard() {
     );
   }
 
-  if (activeView === 'payouts' && athleteId) {
+  if (activeView === "payouts" && athleteId) {
     return (
       <AthleteAppShell>
         <main className="px-4 sm:px-6 py-6">
@@ -291,7 +249,7 @@ export default function GoFastWithOthersDashboard() {
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <div className="max-w-lg mx-auto px-4 py-10 space-y-4">
           <p className="text-gray-700 text-sm">
-            Set your GoFast handle first — then you can join the GoFast With Me program.
+            Set your GoFast handle first — your public pages live at that URL.
           </p>
           <Link
             href="/athlete-edit-profile?tab=profile-info"
@@ -304,24 +262,14 @@ export default function GoFastWithOthersDashboard() {
     );
   }
 
-  if (!studioReady) {
-    return (
-      <GoFastWithMeProgramGate
-        loading={gateLoading}
-        error={error}
-        onReady={() => handleProgramReady()}
-      />
-    );
-  }
-
   const shellSlug = publicSlug ?? gofastHandle;
-  const shellLiveUrl = shellSlug ? runnerPublicLandingUrl(shellSlug) : '';
-  const shellInvitePath = shellSlug ? goFastWithFrontDoorPath(shellSlug) : '';
+  const shellLiveUrl = shellSlug ? runnerPublicLandingUrl(shellSlug) : "";
+  const shellInvitePath = shellSlug ? goFastWithFrontDoorPath(shellSlug) : "";
 
   const copyInviteLink = async () => {
     if (!shellInvitePath) return;
     const inviteUrl =
-      typeof window !== 'undefined'
+      typeof window !== "undefined"
         ? `${window.location.origin}${shellInvitePath}`
         : shellInvitePath;
     try {
@@ -368,39 +316,6 @@ export default function GoFastWithOthersDashboard() {
     </AthleteAppShell>
   );
 
-  if (showOnboarding) {
-    return (
-      <AthleteAppShell>
-        <main className="px-4 sm:px-6 py-6 max-w-3xl mx-auto">
-        <GoFastWithMeHubOnboarding
-          onComplete={({ creatorType, coachSpecialty }) => {
-            setOwnerGwm((prev) =>
-              prev
-                ? { ...prev, creatorType, coachSpecialty }
-                : {
-                    welcome: null,
-                    gofastWithMeBio: null,
-                    whatYoullSeeHere: null,
-                    sportFocus: null,
-                    modelFocus: null,
-                    myAchievements: null,
-                    gofastWithMePhotoUrl: null,
-                    gofastWithMePhotoFocusX: null,
-                    gofastWithMePhotoFocusY: null,
-                    gofastWithMePhotoZoom: null,
-                    gofastWithMePhotoType: null,
-                    creatorType,
-                    coachSpecialty,
-                  }
-            );
-            setShowOnboarding(false);
-          }}
-        />
-        </main>
-      </AthleteAppShell>
-    );
-  }
-
   if (!gofastHandle || !publicSlug || !athleteId) {
     return (
       <AthleteAppShell>
@@ -422,12 +337,9 @@ export default function GoFastWithOthersDashboard() {
               {error}
             </div>
           ) : null}
-          {showStudioExplainer ? (
-            <GoFastWithMeStudioExplainer onDismiss={handleDismissStudioIntro} />
-          ) : null}
           {followerCount != null ? (
             <p className="text-sm text-gray-600">
-              {followerCount} follower{followerCount === 1 ? "" : "s"} on your hub — open{" "}
+              {followerCount} follower{followerCount === 1 ? "" : "s"} — open{" "}
               <Link href={communityHubUrl} className="font-semibold text-sky-700 hover:underline">
                 Manage Community
               </Link>
@@ -435,8 +347,9 @@ export default function GoFastWithOthersDashboard() {
             </p>
           ) : null}
           <GoFastWithMeBuildContentHub
-            landingNeedsAction={!isWelcomeComplete}
-            onOpen={(section, focus) => handleViewChange(section, focus ? { contentFocus: focus } : undefined)}
+            onOpen={(section, focus) =>
+              handleViewChange(section, focus ? { contentFocus: focus } : undefined)
+            }
           />
         </main>
       </AthleteAppShell>
@@ -482,7 +395,7 @@ export default function GoFastWithOthersDashboard() {
       case "reflections":
         return <GoFastWithMeTrainingReflectionsPanel publicSlug={publicSlug} />;
       case "content":
-        return contentFocus === 'route' ? (
+        return contentFocus === "route" ? (
           <GoFastWithMeRoutesPanel athleteId={athleteId} />
         ) : (
           <GoFastWithMeTipsPanel athleteId={athleteId} liveUrl={liveUrl} />
@@ -499,12 +412,9 @@ export default function GoFastWithOthersDashboard() {
           {error}
         </div>
       ) : null}
-      {showStudioExplainer ? (
-        <GoFastWithMeStudioExplainer onDismiss={handleDismissStudioIntro} />
-      ) : null}
       {followerCount != null ? (
         <p className="text-sm text-gray-600">
-          {followerCount} follower{followerCount === 1 ? "" : "s"} on your hub — open{" "}
+          {followerCount} follower{followerCount === 1 ? "" : "s"} — open{" "}
           <Link href={communityHubUrl} className="font-semibold text-sky-700 hover:underline">
             Manage Community
           </Link>

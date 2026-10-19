@@ -313,7 +313,7 @@ export async function loadAthleteCommunityForHost(
   options?: { messageTopic?: string; messageLimit?: number }
 ): Promise<ContainerHubPayload | null> {
   const host = await getAthleteById(hostAthleteId);
-  if (!host?.isGoFastContainer) return null;
+  if (!host) return null;
 
   const relationship = await resolveFollowRelationship(host.id, callerAthleteId);
 
@@ -417,7 +417,7 @@ export async function loadAthleteCommunityByHandle(
   options?: { messageTopic?: string; messageLimit?: number }
 ): Promise<AthleteCommunityPayload | null> {
   const publicPage = await loadPublicAthletePage(rawHandle);
-  if (!publicPage?.isGoFastContainer || !publicPage.athlete.id) return null;
+  if (!publicPage?.athlete.id) return null;
 
   const payload = await loadAthleteCommunityForHost(
     publicPage.athlete.id,

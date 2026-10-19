@@ -34,7 +34,7 @@ export async function DELETE(
     }
 
     const host = await getAthleteById(hostAthleteId);
-    if (!host?.isGoFastContainer || host.id !== caller.id) {
+    if (!host || host.id !== caller.id) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 

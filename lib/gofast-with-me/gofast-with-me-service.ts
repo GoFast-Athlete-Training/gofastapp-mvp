@@ -171,12 +171,32 @@ export async function ensureGoFastWithMeForAthlete(
   return toGoFastWithMeRecord(created);
 }
 
+/** @deprecated Public routes resolve Athlete by gofastHandle first; use getGoFastWithMeForAthlete. */
 export async function getGoFastWithMeBySlug(slug: string) {
   const normalized = normalizeGoFastWithMeSlug(slug);
   if (!normalized) return null;
-  return prisma.gofast_with_me.findUnique({
-    where: { gofastSlugSnapshot: normalized },
-    include: { athlete: true },
+  const athlete = await prisma.athlete.findFirst({
+    where: { gofastHandle: { equals: normalized, mode: 'insensitive' } },
+  });
+  if (!athlete) {
+    return prisma.gofast_with_me.findUnique({
+      where: { gofastSlugSnapshot: normalized },
+      include: { athlete: true },
+    });
+  }
+  const row = await prisma.gofast_with_me.findUnique({
+    where: { athleteId: athlete.id },
+  });
+  if (!row) return null;
+  return { ...row, athlete };
+}
+
+/** Resolve owner athlete from public URL handle (canonical entry for public reads). */
+export async function resolveAthleteByPublicHandle(rawHandle: string) {
+  const handle = normalizeGoFastWithMeSlug(rawHandle);
+  if (!handle) return null;
+  return prisma.athlete.findFirst({
+    where: { gofastHandle: { equals: handle, mode: 'insensitive' } },
   });
 }
 
@@ -253,19 +273,10 @@ export async function updateGoFastWithMeIntro(
     data.runnerStory = trimOrNull(input.runnerStory);
   }
 
-  const updated = await prisma.gofast_with_me.update({
+  return prisma.gofast_with_me.update({
     where: { athleteId },
     data,
   });
-
-  if (input.welcome !== undefined && trimOrNull(input.welcome)) {
-    await prisma.athlete.update({
-      where: { id: athleteId },
-      data: { isGoFastContainer: true },
-    });
-  }
-
-  return updated;
 }
 
 /** Set a custom GoFast With Me URL slug (disables handle sync). */

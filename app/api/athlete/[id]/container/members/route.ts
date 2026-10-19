@@ -19,12 +19,8 @@ export async function GET(
     }
 
     const host = await getAthleteById(hostAthleteId);
-    if (!host?.isGoFastContainer) {
-      return NextResponse.json({
-        success: true,
-        count: 0,
-        members: [],
-      });
+    if (!host) {
+      return NextResponse.json({ success: false, error: 'Athlete not found' }, { status: 404 });
     }
 
     const count = await prisma.gfwm_athlete.count({
