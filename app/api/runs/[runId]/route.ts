@@ -814,6 +814,24 @@ export async function PUT(
     if (body.igPostGraphic !== undefined) {
       updateData.igPostGraphic = body.igPostGraphic === null || body.igPostGraphic === '' ? null : String(body.igPostGraphic).trim();
     }
+    if (body.instagramPostUrl !== undefined) {
+      updateData.instagramPostUrl =
+        body.instagramPostUrl === null || body.instagramPostUrl === ''
+          ? null
+          : String(body.instagramPostUrl).trim();
+    }
+    if (body.organizerName !== undefined) {
+      updateData.organizerName =
+        body.organizerName === null || body.organizerName === ''
+          ? null
+          : String(body.organizerName).trim();
+    }
+    if (body.organizerType !== undefined) {
+      updateData.organizerType =
+        body.organizerType === null || body.organizerType === ''
+          ? null
+          : String(body.organizerType).trim().toLowerCase();
+    }
     if (body.clubReviewStatus !== undefined && body.clubReviewStatus !== null) {
       const nextReview = String(body.clubReviewStatus);
       if (!isClubReviewStatus(nextReview)) {

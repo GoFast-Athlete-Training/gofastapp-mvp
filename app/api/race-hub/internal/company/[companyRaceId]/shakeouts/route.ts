@@ -58,10 +58,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       raceRegistryId: race.id,
-      shakeouts: runs.map((r) => ({
-        ...serializeHubShakeout(r),
-        staffNotes: r.staffNotes,
-      })),
+      shakeouts: runs.map((r) => serializeHubShakeout(r)),
     });
   } catch (err) {
     console.error("internal company shakeouts GET:", err);
@@ -269,6 +266,18 @@ export async function POST(
         staffNotes:
           body.staffNotes != null && String(body.staffNotes).trim()
             ? String(body.staffNotes).trim()
+            : null,
+        instagramPostUrl:
+          body.instagramPostUrl != null && String(body.instagramPostUrl).trim()
+            ? String(body.instagramPostUrl).trim()
+            : null,
+        organizerName:
+          body.organizerName != null && String(body.organizerName).trim()
+            ? String(body.organizerName).trim()
+            : null,
+        organizerType:
+          body.organizerType != null && String(body.organizerType).trim()
+            ? String(body.organizerType).trim().toLowerCase()
             : null,
         routeNeighborhood:
           body.routeNeighborhood != null && String(body.routeNeighborhood).trim()

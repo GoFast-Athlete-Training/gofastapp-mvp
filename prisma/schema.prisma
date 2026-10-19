@@ -1817,6 +1817,9 @@ model city_runs {
   webText             String?              // Raw text blob from web (copy/paste)
   igPostText          String?              // Instagram post text (copy/paste)
   igPostGraphic       String?              // Instagram post image URL (uploaded blob)
+  instagramPostUrl    String?              // Instagram post URL (staff source link)
+  organizerName       String?              // Shakeout organizer label (string; card is club/brand/store id)
+  organizerType       String?              // club | brand | store — which Associate ingest to show
   createdAt           DateTime             @default(now())
   updatedAt           DateTime
   startTimeHour       Int?
