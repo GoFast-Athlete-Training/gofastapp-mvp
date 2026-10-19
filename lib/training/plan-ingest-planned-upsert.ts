@@ -42,7 +42,6 @@ function fallbackStepsForDay(day: PlanScheduleDay, title: string): WorkoutStep[]
       title: stepTitle,
       durationType: "DISTANCE",
       durationValue: mi,
-      targets: null,
     },
   ];
 }
