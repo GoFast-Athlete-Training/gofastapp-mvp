@@ -70,6 +70,8 @@ const INTRO_FIELDS = [
   'coachSpecialty',
   'instagramDescription',
   'runnerStory',
+  'runnerStoryTitle',
+  'runnerStoryPhotoUrl',
 ] as const;
 
 /** PATCH /api/me/gofast-with-me — update intro fields and/or URL settings */

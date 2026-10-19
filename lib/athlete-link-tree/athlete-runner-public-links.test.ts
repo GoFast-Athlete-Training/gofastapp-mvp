@@ -9,7 +9,7 @@ import {
 test("presetLinkForId builds runner landing subpaths", () => {
   const story = presetLinkForId("story", "adamcole");
   assert.match(story.url, /adamcole\/story$/);
-  assert.equal(story.title, "Runner story");
+  assert.equal(story.title, "My run story");
 });
 
 test("normalizeLinkUrlForCompare strips trailing slash", () => {

@@ -30,6 +30,8 @@ export type GoFastWithMeRecord = {
   coachSpecialty: string | null;
   instagramDescription: string | null;
   runnerStory: string | null;
+  runnerStoryTitle: string | null;
+  runnerStoryPhotoUrl: string | null;
 };
 
 export type GoFastWithMeIntroInput = {
@@ -48,6 +50,8 @@ export type GoFastWithMeIntroInput = {
   coachSpecialty?: string | null;
   instagramDescription?: string | null;
   runnerStory?: string | null;
+  runnerStoryTitle?: string | null;
+  runnerStoryPhotoUrl?: string | null;
 };
 
 function trimOrNull(value: string | null | undefined): string | null {
@@ -82,14 +86,22 @@ type GoFastWithMeRow = {
   coachSpecialty: string | null;
   instagramDescription: string | null;
   runnerStory: string | null;
+  runnerStoryTitle: string | null;
+  runnerStoryPhotoUrl: string | null;
 };
 
 function toGoFastWithMeRecord(
-  row: Omit<GoFastWithMeRow, 'runnerStory'> & { runnerStory?: string | null }
+  row: Omit<GoFastWithMeRow, 'runnerStory' | 'runnerStoryTitle' | 'runnerStoryPhotoUrl'> & {
+    runnerStory?: string | null;
+    runnerStoryTitle?: string | null;
+    runnerStoryPhotoUrl?: string | null;
+  }
 ): GoFastWithMeRecord {
   return {
     ...row,
     runnerStory: row.runnerStory ?? null,
+    runnerStoryTitle: row.runnerStoryTitle ?? null,
+    runnerStoryPhotoUrl: row.runnerStoryPhotoUrl ?? null,
     creatorType: normalizeCreatorType(row.creatorType),
   };
 }
@@ -271,6 +283,12 @@ export async function updateGoFastWithMeIntro(
   }
   if (input.runnerStory !== undefined) {
     data.runnerStory = trimOrNull(input.runnerStory);
+  }
+  if (input.runnerStoryTitle !== undefined) {
+    data.runnerStoryTitle = trimOrNull(input.runnerStoryTitle);
+  }
+  if (input.runnerStoryPhotoUrl !== undefined) {
+    data.runnerStoryPhotoUrl = trimOrNull(input.runnerStoryPhotoUrl);
   }
 
   return prisma.gofast_with_me.update({

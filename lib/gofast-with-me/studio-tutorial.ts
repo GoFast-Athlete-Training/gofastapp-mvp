@@ -18,19 +18,19 @@ export const STUDIO_TUTORIAL_FALLBACK: StudioTutorialPayload = {
   slug: GOFAST_WITH_ME_STUDIO_TUTORIAL_SLUG,
   name: 'GoFast With Me Studio',
   summary:
-    'Build content opens the page where you pick My Story, runner story, routes, reflections, and think pieces. Manage Community opens your follower hub. Plan sharing lives on Training. Host runs from Run; logged work under Activity.',
+    'Content builder is where you pick Public Welcome, My run story, routes, reflections, and think pieces. Manage Community opens your follower hub. Plan sharing lives on Training. Host runs from Run; logged work under Activity.',
   steps: [
     {
       id: 'page',
-      title: 'My Story — public landing',
+      title: 'Public Welcome — handle landing',
       instruction:
-        'Photo, welcome, and about — what strangers see before they follow.',
+        'Photo, welcome, and about at your GoFast handle — what strangers see before they follow.',
       sortOrder: 0,
     },
     {
       id: 'runnerStory',
-      title: 'Runner story',
-      instruction: 'Long-form story linked from the short About me on your landing.',
+      title: 'My run story',
+      instruction: 'Blog post at yourhandle/story — photo, title, and body linked from About me.',
       sortOrder: 1,
     },
     {

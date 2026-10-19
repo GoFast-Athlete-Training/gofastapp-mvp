@@ -468,7 +468,7 @@ export default function GoFastWithMeLandingForm({
           <label className="block">
             <span className="text-sm font-semibold text-gray-900">About me</span>
             <span className="block text-xs text-gray-500 mt-0.5">
-              Keep this short — your full life story lives in Runner story under Landing.
+              Keep this short — your full post lives in My run story (your handle/story).
             </span>
             <textarea
               value={values.gofastWithMeBio}

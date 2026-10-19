@@ -31,8 +31,8 @@ export type StudioView = StudioChromeView | StudioPayoutsView | StudioSection;
 /** Scroll target inside Think Pieces workspace or Runs/Training split. */
 export type ContentEditorFocus = 'tip' | 'route' | 'runs' | 'training';
 
-export const STUDIO_MY_STORY_LABEL = 'My Story';
-export const STUDIO_RUNNER_STORY_LABEL = 'Runner story';
+export const STUDIO_MY_STORY_LABEL = 'Public Welcome';
+export const STUDIO_RUNNER_STORY_LABEL = 'My run story';
 
 export const STUDIO_CHROME_VIEWS: StudioChromeView[] = ['landingView', 'communityHome'];
 
@@ -105,8 +105,8 @@ export const STUDIO_BIN_LABELS: Record<StudioSection, string> = {
 };
 
 export const STUDIO_BIN_DESCRIPTIONS: Record<StudioSection, string> = {
-  page: 'Photo, welcome, and short about — your public landing',
-  runnerStory: 'Full life story linked from About me',
+  page: 'Photo, welcome, and about — front of your GoFast handle landing',
+  runnerStory: 'Blog post at yourhandle/story — photo, title, and body',
   reflections: 'Training reflections for your feed — optional activity link',
   workouts: 'Host join-me runs followers can RSVP to',
   content: 'Essays and riffs — think pieces on your landing and feed',

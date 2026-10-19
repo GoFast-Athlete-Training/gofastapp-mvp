@@ -40,8 +40,8 @@ export default function GoFastWithMeBuildContentHub({ onOpen }: Props) {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Content builder</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Ways to share your story on your handle. What you build shows up on your public pages; leave
-          a section empty and it stays off the site. Custom links live under{" "}
+          You get a public landing at your GoFast handle; each section below adds another page or block
+          on that site. Leave a section empty and it stays off the site. Custom links live under{" "}
           <span className="font-medium">GoFast Links</span> in the app nav.
         </p>
       </div>

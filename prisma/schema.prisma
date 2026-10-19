@@ -480,6 +480,10 @@ model gofast_with_me {
   instagramDescription String? @db.Text
   /// Long-form life story linked from short About me on public landing.
   runnerStory          String?  @db.Text
+  /// Optional headline on the public /story page.
+  runnerStoryTitle     String?
+  /// Optional hero image on the public /story page.
+  runnerStoryPhotoUrl  String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   athlete            Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)

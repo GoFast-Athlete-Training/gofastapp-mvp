@@ -31,7 +31,7 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
     title: "My GoFast Hub",
     hint: "GoFast With Me door — add at Top (no section heading)",
   },
-  { id: "story", title: "Runner story", hint: "Add your published story under a section" },
+  { id: "story", title: "My run story", hint: "Add your published story under a section" },
   {
     id: "reflections",
     title: "Training reflections",
@@ -74,7 +74,7 @@ export function presetLinkForId(
       };
     case "story":
       return {
-        title: "Runner story",
+        title: "My run story",
         url: athleteRunnerPublicUrl(publicSlug, "story"),
         emoji: PRESET_EMOJI.story,
       };

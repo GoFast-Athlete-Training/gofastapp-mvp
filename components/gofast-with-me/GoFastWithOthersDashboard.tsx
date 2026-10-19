@@ -65,6 +65,8 @@ type OwnerGwmRow = {
   creatorType: GoFastWithMeCreatorType | null;
   coachSpecialty: string | null;
   runnerStory?: string | null;
+  runnerStoryTitle?: string | null;
+  runnerStoryPhotoUrl?: string | null;
   gofastSlugSnapshot?: string;
   slugUsesHandle?: boolean;
 };
@@ -388,8 +390,10 @@ export default function GoFastWithOthersDashboard() {
           <GoFastWithMeRunnerStoryPanel
             publicSlug={publicSlug}
             initialRunnerStory={ownerGwm?.runnerStory ?? null}
-            onSaved={(runnerStory) => {
-              setOwnerGwm((prev) => (prev ? { ...prev, runnerStory } : prev));
+            initialRunnerStoryTitle={ownerGwm?.runnerStoryTitle ?? null}
+            initialRunnerStoryPhotoUrl={ownerGwm?.runnerStoryPhotoUrl ?? null}
+            onSaved={(values) => {
+              setOwnerGwm((prev) => (prev ? { ...prev, ...values } : prev));
             }}
           />
         );

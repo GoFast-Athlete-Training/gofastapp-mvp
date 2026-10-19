@@ -108,6 +108,8 @@ export async function loadPublicAthletePage(rawHandle: string) {
     coachSpecialty: gwmRow.coachSpecialty,
     instagramDescription: gwmRow.instagramDescription,
     runnerStory: gwmRow.runnerStory,
+    runnerStoryTitle: gwmRow.runnerStoryTitle,
+    runnerStoryPhotoUrl: gwmRow.runnerStoryPhotoUrl,
   };
 
   const now = new Date();

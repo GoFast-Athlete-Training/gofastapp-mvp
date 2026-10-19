@@ -4,7 +4,6 @@ import { ExternalLink } from 'lucide-react';
 import GoFastWithMeLandingForm, {
   type GoFastWithMeLandingValues,
 } from '@/components/gofast-with-me/GoFastWithMeLandingForm';
-import GoFastWithMeCompanyPanel from '@/components/gofast-with-me/GoFastWithMeCompanyPanel';
 import { STUDIO_MY_STORY_LABEL } from '@/components/gofast-with-me/studio-sections';
 
 type Props = {
@@ -36,7 +35,8 @@ export default function GoFastWithMeWelcomePanel({
         <div>
           <h2 className="text-lg font-bold text-gray-900">{STUDIO_MY_STORY_LABEL}</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Photo, welcome, and about you on your public landing. Save when you are ready to share.
+            Your GoFast handle is your public landing — photo, welcome, and about live at that URL.
+            Save when you are ready to share.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -64,8 +64,6 @@ export default function GoFastWithMeWelcomePanel({
         onOpenRunnerStory={onOpenRunnerStory}
         runnerStoryPublicUrl={runnerStoryPublicUrl}
       />
-
-      <GoFastWithMeCompanyPanel />
     </section>
   );
 }

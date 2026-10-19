@@ -369,8 +369,8 @@ export function AthleteLinkTreeLinkSources({
     const url = athletePublicStoryUrl(publicSlug);
     if (urlAlreadyOnPage(url) || !activeSectionId) return;
     await onAddLink({
-      name: "Runner story",
-      publicLabel: "Runner story",
+      name: "My run story",
+      publicLabel: "My run story",
       url,
       emoji: "📖",
     });

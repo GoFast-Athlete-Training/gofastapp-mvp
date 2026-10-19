@@ -138,7 +138,7 @@ export default function ShareWithCommunityPage() {
           href="/gofast-contentbuilder"
           className="mt-3 inline-flex text-sm font-semibold text-orange-700 hover:text-orange-800"
         >
-          Open GoFast with Others →
+          Open Content builder →
         </Link>
       </section>
 

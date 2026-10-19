@@ -70,7 +70,7 @@ export function GoFastWithTargetCard({
         </div>
       )}
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">
-        GoFast with Others
+        Content builder
       </p>
       <h1 className="text-2xl font-bold text-gray-900 mt-2">{headline}</h1>
       {target.gofastHandle ? (
