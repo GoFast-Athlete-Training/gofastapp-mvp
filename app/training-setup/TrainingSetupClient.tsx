@@ -25,6 +25,12 @@ import {
   athleteRaceDistanceReady,
 } from "@/components/races/AthleteRaceDistanceField";
 import { fetchTrainingPlanDetail } from "@/lib/training/fetch-plan-week-client";
+import { WeekByWeekSetupPanel } from "@/components/training/WeekByWeekSetupPanel";
+import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
+import {
+  planWeekPhaseForNumber,
+  planWeekPhaseUxLabel,
+} from "@/lib/training/plan-week-phase-key";
 
 type RaceRegistryLite = {
   id: string;
@@ -824,6 +830,7 @@ export default function TrainingSetupClient() {
     presetOverride?: PresetForWizard;
     athletePresetOverride?: string;
     weekByWeekLoad?: boolean;
+    weekByWeekRedirect?: "week" | "plan";
   }) {
     if (!wizardGoal?.athlete_race?.raceRegistryId) {
       setFormError(null);
@@ -946,9 +953,13 @@ export default function TrainingSetupClient() {
         if (weekByWeekLoad) {
           const start = utcDateOnly(new Date(startDate));
           const weekNum = weekNumberFromPlanDate(start, utcDateOnly(new Date()));
-          router.push(
-            `/training/plan/${data.plan.id}/adjust?weekNumber=${Math.max(1, weekNum)}`
-          );
+          if (opts?.weekByWeekRedirect === "plan") {
+            router.push(`/training/plan/${data.plan.id}/adjust?lane=csv`);
+          } else {
+            router.push(
+              `/training/plan/${data.plan.id}/adjust?weekNumber=${Math.max(1, weekNum)}`
+            );
+          }
         } else {
           router.push(`/training-setup/${data.plan.id}`);
         }
@@ -1106,6 +1117,21 @@ export default function TrainingSetupClient() {
 
     const inAthletePresetBuildFlow =
       stepChoosePreset && presetPickMode === "custom";
+
+    const loadWeekContext = (() => {
+      if (!startDate || !rr.raceDate) {
+        return { weekNum: 1, phaseLabel: planWeekPhaseUxLabel("B") };
+      }
+      const start = utcDateOnly(new Date(startDate));
+      const race = utcDateOnly(new Date(rr.raceDate));
+      const totalWeeks = calendarTrainingWeekCount(start, race);
+      const weekNum = Math.max(
+        1,
+        weekNumberFromPlanDate(start, utcDateOnly(new Date()))
+      );
+      const phase = planWeekPhaseForNumber(totalWeeks, weekNum);
+      return { weekNum, phaseLabel: planWeekPhaseUxLabel(phase) };
+    })();
 
     async function getTokenForIngest() {
       const u = auth.currentUser;
@@ -1271,31 +1297,47 @@ export default function TrainingSetupClient() {
                     </div>
                   </>
                 ) : presetPickMode === "weekByWeek" ? (
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
-                      <p className="font-medium text-gray-900">Bring your own schedule</p>
-                      <p className="mt-2 leading-relaxed text-gray-700">
-                        We&apos;ll create your plan shell with race day on the calendar. You load
-                        each week on the adjust screen (paste or CSV), then move on when it looks
-                        right.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setPresetPickMode("choose")}
-                        className="mt-3 text-sm font-medium text-orange-600 hover:text-orange-800"
-                      >
-                        ← Back
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={creating}
-                      onClick={() => void createPlan({ weekByWeekLoad: true })}
-                      className="w-full rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
-                    >
-                      {creating ? "Creating…" : "Create plan & load this week"}
-                    </button>
-                  </div>
+                  <WeekByWeekSetupPanel
+                    planName={planName}
+                    onPlanNameChange={(v) => {
+                      setPlanNameTouched(true);
+                      setPlanName(v);
+                      setFormError(null);
+                    }}
+                    startDate={startDate}
+                    onStartDateChange={(v) => {
+                      setStartDate(v);
+                      setFormError(null);
+                    }}
+                    paceMin={paceMin}
+                    paceSec={paceSec}
+                    onPaceMinChange={setPaceMin}
+                    onPaceSecChange={setPaceSec}
+                    currentWeekNumber={loadWeekContext.weekNum}
+                    currentWeekPhaseLabel={loadWeekContext.phaseLabel}
+                    formError={formError}
+                    replaceBlockPlan={replaceBlockPlan}
+                    createFeedback={createFeedback}
+                    createFeedbackMessage={createFeedbackMessage}
+                    creating={creating}
+                    onBack={() => setPresetPickMode("choose")}
+                    onOpenExistingPlan={(id) => router.push(`/training-setup/${id}`)}
+                    onLoadThisWeek={() =>
+                      void createPlan({ weekByWeekLoad: true, weekByWeekRedirect: "week" })
+                    }
+                    onLoadFullPlan={() =>
+                      void createPlan({ weekByWeekLoad: true, weekByWeekRedirect: "plan" })
+                    }
+                    onForceReplace={(redirect) =>
+                      void createPlan({
+                        forceReplace: true,
+                        weekByWeekLoad: true,
+                        weekByWeekRedirect: redirect,
+                      })
+                    }
+                    onDismissFeedback={() => setCreateFeedback(null)}
+                    onRefreshGoals={() => void refreshGoalsAndExitWizard()}
+                  />
                 ) : presetPickMode === "custom" ? (
                   customBuilderPresetId !== undefined ? (
                   <AthletePresetBuilder

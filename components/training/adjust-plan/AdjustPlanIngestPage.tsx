@@ -13,6 +13,10 @@ import {
   PLAN_WEEK_CSV_DOWNLOAD_FILENAME,
   PLAN_WEEK_CSV_TEMPLATE,
 } from "@/lib/training/plan-week-csv-template";
+import {
+  PLAN_MULTI_WEEK_CSV_DOWNLOAD_FILENAME,
+  PLAN_MULTI_WEEK_CSV_TEMPLATE,
+} from "@/lib/training/plan-multi-week-csv-template";
 import { usePlanIngestPreviewCommit } from "@/lib/training/use-plan-ingest-preview-commit";
 import { fetchTrainingPlanDetail } from "@/lib/training/fetch-plan-week-client";
 import { weekBoundsFromPlan } from "@/lib/training/plan-schedule";
@@ -28,12 +32,12 @@ type AdjustPlanDetail = {
   race_registry?: { raceDate?: string | null } | null;
 };
 
-function downloadPlanWeekCsvTemplate(): void {
-  const blob = new Blob([PLAN_WEEK_CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
+function downloadCsvTemplate(contents: string, filename: string): void {
+  const blob = new Blob([contents], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = PLAN_WEEK_CSV_DOWNLOAD_FILENAME;
+  anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -41,14 +45,15 @@ function downloadPlanWeekCsvTemplate(): void {
 type Props = {
   planId: string;
   weekNumber: number | null;
+  initialLane?: "paste" | "csv" | null;
 };
 
-export function AdjustPlanIngestPage({ planId, weekNumber }: Props) {
+export function AdjustPlanIngestPage({ planId, weekNumber, initialLane = null }: Props) {
   const router = useRouter();
   const isWeekScope = weekNumber != null && weekNumber > 0;
   const scope = isWeekScope ? "week" : "plan";
 
-  const [lane, setLane] = useState<AdjustLane | null>(null);
+  const [lane, setLane] = useState<AdjustLane | null>(initialLane ?? null);
   const [pasteText, setPasteText] = useState("");
   const [planLabel, setPlanLabel] = useState<string | null>(null);
   const [weekRangeLabel, setWeekRangeLabel] = useState<string | null>(null);
@@ -103,10 +108,7 @@ export function AdjustPlanIngestPage({ planId, weekNumber }: Props) {
     })();
   }, [authReady, getToken, isWeekScope, planId, weekNumber]);
 
-  const intakeModes: IntakeMode[] = useMemo(
-    () => (isWeekScope ? ["paste", "csv"] : ["paste"]),
-    [isWeekScope]
-  );
+  const intakeModes: IntakeMode[] = useMemo(() => ["paste", "csv"], []);
 
   const pickerMode: IntakeMode | null =
     lane === "paste" || lane === "csv" ? lane : lane === null ? null : "paste";
@@ -149,7 +151,7 @@ export function AdjustPlanIngestPage({ planId, weekNumber }: Props) {
           <p className="mt-2 text-sm text-gray-700">
             {isWeekScope
               ? "Replace workouts in this calendar week. We match each day to the closest workout catalogue entry — it may not be exact. If you do not see the right catalogue, tell staff and we will build it. Do not include goal race day in CSV."
-              : "Replace future weeks from your paste. Completed weeks stay as-is."}
+              : "Load your full plan from the multi-week CSV template or paste Week 1 / Week 2 blocks. Completed past weeks stay as-is."}
           </p>
         </header>
 
@@ -168,26 +170,21 @@ export function AdjustPlanIngestPage({ planId, weekNumber }: Props) {
                 Freeform lines like Mon easy 5, Wed tempo 6 — preview each workout before saving.
               </p>
             </button>
-            {isWeekScope ? (
-              <button
-                type="button"
-                onClick={() => setLane("csv")}
-                className="rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-sky-300 hover:bg-sky-50/50"
-              >
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <FileUp className="h-4 w-4 shrink-0 text-sky-600" />
-                  CSV upload
-                </span>
-                <p className="mt-2 text-sm text-slate-600">
-                  Download the template, fill training days only, upload — we parse rows and match
-                  catalogue workouts (not homemade segments).
-                </p>
-              </button>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-500">
-                CSV is for single-week replace. Use paste for the full plan.
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => setLane("csv")}
+              className="rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-sky-300 hover:bg-sky-50/50"
+            >
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <FileUp className="h-4 w-4 shrink-0 text-sky-600" />
+                {isWeekScope ? "CSV upload" : "Full plan CSV"}
+              </span>
+              <p className="mt-2 text-sm text-slate-600">
+                {isWeekScope
+                  ? "Download the week template, fill training days, upload — catalogue matching on save."
+                  : "Download the multi-week template (Week column), fill all days, upload once."}
+              </p>
+            </button>
             <div
               className="rounded-2xl border border-slate-200 bg-slate-50 p-4 opacity-70"
               aria-disabled
@@ -232,15 +229,22 @@ export function AdjustPlanIngestPage({ planId, weekNumber }: Props) {
               ) : null}
             </div>
 
-            {lane === "csv" && isWeekScope ? (
+            {lane === "csv" ? (
               <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => downloadPlanWeekCsvTemplate()}
+                    onClick={() =>
+                      downloadCsvTemplate(
+                        isWeekScope ? PLAN_WEEK_CSV_TEMPLATE : PLAN_MULTI_WEEK_CSV_TEMPLATE,
+                        isWeekScope
+                          ? PLAN_WEEK_CSV_DOWNLOAD_FILENAME
+                          : PLAN_MULTI_WEEK_CSV_DOWNLOAD_FILENAME
+                      )
+                    }
                     className="rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-50"
                   >
-                    Download CSV template
+                    {isWeekScope ? "Download week CSV template" : "Download full-plan CSV template"}
                   </button>
                   <label className="cursor-pointer rounded-lg border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-50">
                     {loading ? "Parsing…" : "Upload CSV"}
@@ -258,7 +262,9 @@ export function AdjustPlanIngestPage({ planId, weekNumber }: Props) {
                   </label>
                 </div>
                 <p className="text-xs text-gray-600">
-                  Types: Easy, Tempo, Intervals, LongRun only. Shakeout → Easy. Race day omitted.
+                  {isWeekScope
+                    ? "Types: Easy, Tempo, Intervals, LongRun only. Shakeout → Easy. Race day omitted."
+                    : "Include a Week number (1 = first week of your plan). Same types as week CSV. Race day omitted."}
                 </p>
               </div>
             ) : null}

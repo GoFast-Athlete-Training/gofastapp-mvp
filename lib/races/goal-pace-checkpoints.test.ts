@@ -14,7 +14,7 @@ test("goalPaceCheckpoints: marathon finish equals goal clock", () => {
     totalMeters: MARATHON_METERS,
   });
   const labels = cps.map((c) => c.label);
-  assert.deepEqual(labels, ["10K", "Half", "Finish"]);
+  assert.deepEqual(labels, ["10K", "20K", "Half", "30K", "40K", "Finish"]);
   const finish = cps.find((c) => c.label === "Finish");
   assert.equal(Math.round(finish!.elapsedSec), MARATHON_GOAL_SEC);
 });
@@ -29,6 +29,8 @@ test("goalPaceCheckpoints: marathon splits are even slices of goal", () => {
   const half = cps.find((c) => c.label === "Half")!;
   assert.equal(Math.round(tenK.elapsedSec), Math.round((MARATHON_GOAL_SEC * 10_000) / MARATHON_METERS));
   assert.equal(Math.round(half.elapsedSec), Math.round((MARATHON_GOAL_SEC * 21_097.5) / MARATHON_METERS));
+  const twentyK = cps.find((c) => c.label === "20K")!;
+  assert.equal(Math.round(twentyK.elapsedSec), Math.round((MARATHON_GOAL_SEC * 20_000) / MARATHON_METERS));
 });
 
 test("goalPaceCheckpoints: 10K uses 5K and finish", () => {

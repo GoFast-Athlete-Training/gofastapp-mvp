@@ -260,7 +260,7 @@ export function RacePaceHubTabs({
               <p className="px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Checkpoints (even pace)
               </p>
-              <div className="grid grid-cols-3 gap-px bg-gray-100 mt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-gray-100 mt-2">
                 {checkpoints.map((cp) => (
                   <div key={cp.label} className="bg-white px-3 py-3 text-center">
                     <p className="text-xs font-semibold text-gray-500">{cp.label}</p>

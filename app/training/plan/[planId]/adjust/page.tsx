@@ -17,5 +17,14 @@ export default function TrainingPlanAdjustPage() {
     );
   }
 
-  return <AdjustPlanIngestPage planId={planId} weekNumber={weekNumber} />;
+  const laneRaw = searchParams.get("lane");
+  const initialLane = laneRaw === "csv" ? "csv" : null;
+
+  return (
+    <AdjustPlanIngestPage
+      planId={planId}
+      weekNumber={weekNumber}
+      initialLane={initialLane}
+    />
+  );
 }

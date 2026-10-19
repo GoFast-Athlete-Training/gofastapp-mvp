@@ -30,6 +30,10 @@ import {
   looksLikePlanWeekCsv,
   tryParsePlanWeekCsvText,
 } from "@/lib/training/parse-plan-week-csv";
+import {
+  looksLikePlanMultiWeekCsv,
+  tryParsePlanMultiWeekCsvWithMeta,
+} from "@/lib/training/parse-plan-multi-week-csv";
 import { weekBoundsFromPlan } from "@/lib/training/plan-schedule";
 import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import type { WorkoutStep } from "@/lib/training/prescription";
@@ -436,6 +440,51 @@ export async function previewPlanIngest(params: {
       out.push(enriched.week);
     }
     return out.sort((a, b) => a.weekNumber - b.weekNumber);
+  }
+
+  const raceDateKey = planCtx.raceCtx.raceDate
+    ? ymdFromDate(utcDateOnly(planCtx.raceCtx.raceDate))
+    : null;
+
+  if (looksLikePlanMultiWeekCsv(text)) {
+    const parsed = tryParsePlanMultiWeekCsvWithMeta({ sourceText: text, raceDateKey });
+    if (!parsed || parsed.weeks.length === 0) {
+      return {
+        ok: false,
+        error:
+          "Could not parse multi-week CSV — need Week, Date, Workout, Type, Mileage columns",
+      };
+    }
+    const weeksOut: PlanWeekSchedule[] = [];
+    for (const w of parsed.weeks) {
+      const wn = w.weekNumber;
+      const stamped = {
+        ...w,
+        phase: planWeekPhaseForNumber(planCtx.totalWeeks, wn),
+      };
+      const meta = parsed.metaByWeekNumber[wn] ?? {};
+      const enriched = await enrichWeekDaysWithCatalogue({
+        week: stamped,
+        weekNumber: wn,
+        planStartDate: planCtx.startDate,
+        metaByDateKey: meta,
+        catalogue: catalogueRows,
+      });
+      weeksOut.push(enriched.week);
+    }
+    let summary = `${weeksOut.length} week(s) from CSV with catalogue matching`;
+    if (parsed.skippedNotes.length > 0) {
+      summary = appendSkippedToSummary(summary, parsed.skippedNotes);
+    }
+    return {
+      ok: true,
+      preview: {
+        scope: "plan",
+        parseSource: "deterministic",
+        plan: { weeks: weeksOut },
+        summary,
+      },
+    };
   }
 
   const deterministicWeeks = tryParsePastedFullPlanText(text);
