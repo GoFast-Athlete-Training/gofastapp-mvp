@@ -31,14 +31,14 @@ export async function GET(request: NextRequest) {
       where: { id: planId, athleteId: auth.athlete.id },
       select: {
         athleteRaceId: true,
-        athlete_races: { select: { raceDate: true } },
+        athlete_race: { select: { raceDate: true } },
       },
     });
     if (!plan?.athleteRaceId) {
       return NextResponse.json({ error: "Plan has no linked athlete race" }, { status: 404 });
     }
 
-    const raceDate = plan.athlete_races?.raceDate;
+    const raceDate = plan.athlete_race?.raceDate;
     if (!raceDate) {
       return NextResponse.json({ error: "Plan race date not found" }, { status: 404 });
     }
