@@ -9,6 +9,7 @@ import {
   getForwardedStaffId,
 } from "@/lib/training/training-engine-auth";
 import { stampCityRunStartsAtOnCreateData } from "@/lib/city-run/stamp-city-run-write";
+import { normalizeRunType } from "@/lib/runTypes";
 import {
   citySlugFromRegistry,
   generateCityRunId,
@@ -154,6 +155,23 @@ export async function POST(
     const minute = hasStartClock ? (bodyMinute ?? 0) : null;
     const period = hasStartClock ? (bodyPeriod ?? "AM") : null;
 
+    const runTypeRaw =
+      body.runType != null && String(body.runType).trim() ? String(body.runType).trim() : "";
+    let runType: string | null = null;
+    if (runTypeRaw) {
+      const normalized = normalizeRunType(runTypeRaw);
+      if (!normalized) {
+        return NextResponse.json(
+          {
+            error:
+              "runType must be track, trail, neighborhood, or park (aliases: urban, road, etc.)",
+          },
+          { status: 400 },
+        );
+      }
+      runType = normalized;
+    }
+
     const id = generateCityRunId();
 
     const createData: Record<string, unknown> = {
@@ -214,8 +232,7 @@ export async function POST(
           body.dayOfWeek != null && String(body.dayOfWeek).trim()
             ? String(body.dayOfWeek).trim()
             : null,
-        runType:
-          body.runType != null && String(body.runType).trim() ? String(body.runType).trim() : null,
+        runType,
         workoutDescription:
           body.workoutDescription != null && String(body.workoutDescription).trim()
             ? String(body.workoutDescription).trim()
