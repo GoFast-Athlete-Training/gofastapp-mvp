@@ -46,7 +46,11 @@ import {
   pickClosestCatalogueEntry,
 } from "@/lib/training/plan-ingest-catalogue-match";
 import { planWeekPhaseForNumber } from "@/lib/training/plan-week-phase-key";
-import { buildDaySegmentsByDateKeyFromWeekMeta } from "@/lib/training/plan-week-csv-segments";
+import {
+  buildDaySegmentsByDateKeyFromWeekMeta,
+  segmentsFromWeekCsvPaceNote,
+} from "@/lib/training/plan-week-csv-segments";
+import { buildScheduleNativeWorkoutSteps } from "@/lib/training/schedule-native-workout-steps";
 
 const WORKOUT_TYPES = new Set<string>(["Easy", "Tempo", "Intervals", "LongRun", "Race"]);
 
@@ -226,13 +230,20 @@ export async function previewPlanIngest(params: {
       return { ok: false, error: "dateKey (YYYY-MM-DD) is required for workout scope" };
     }
 
-    const parsed = tryParsePastedWorkoutText(text);
+    const lower = text.toLowerCase();
+    let workoutTypeHint: WorkoutType = "Easy";
+    if (/\btempo\b|\bthreshold\b/.test(lower)) workoutTypeHint = "Tempo";
+    else if (/\binterval|\bspeed\b/.test(lower)) workoutTypeHint = "Intervals";
+    else if (/\blong\b/.test(lower)) workoutTypeHint = "LongRun";
+    else if (/\brace\b/.test(lower)) workoutTypeHint = "Race";
+
+    const parsed = tryParsePastedWorkoutText(text, workoutTypeHint);
     let parseSource: "deterministic" | "openai" = "deterministic";
     let segments = parsed
       ? parsedPasteToAiGenerateResponse(parsed, plan.currentFiveKPace).segments
       : [];
 
-    let workoutType: WorkoutType = "Easy";
+    let workoutType: WorkoutType = workoutTypeHint;
     let miles = 0;
     if (parsed) {
       const totalMi = parsed.segments.reduce((acc, s) => {
@@ -240,12 +251,31 @@ export async function previewPlanIngest(params: {
         return acc;
       }, 0);
       miles = totalMi > 0 ? Math.round(totalMi * 100) / 100 : 5;
-      const lower = text.toLowerCase();
-      if (/\btempo\b|\bthreshold\b/.test(lower)) workoutType = "Tempo";
-      else if (/\binterval|\bspeed\b/.test(lower)) workoutType = "Intervals";
-      else if (/\blong\b/.test(lower)) workoutType = "LongRun";
-      else if (/\brace\b/.test(lower)) workoutType = "Race";
-    } else {
+      const lowerParsed = text.toLowerCase();
+      if (/\btempo\b|\bthreshold\b/.test(lowerParsed)) workoutType = "Tempo";
+      else if (/\binterval|\bspeed\b/.test(lowerParsed)) workoutType = "Intervals";
+      else if (/\blong\b/.test(lowerParsed)) workoutType = "LongRun";
+      else if (/\brace\b/.test(lowerParsed)) workoutType = "Race";
+    } else if (segments.length === 0) {
+      const fromPaceNote = segmentsFromWeekCsvPaceNote({
+        paceNote: text,
+        workoutType: workoutTypeHint,
+        miles: 0,
+        fiveKPace: plan.currentFiveKPace,
+      });
+      if (fromPaceNote?.length) {
+        segments = fromPaceNote;
+        miles =
+          Math.round(
+            fromPaceNote.reduce(
+              (acc, s) => (s.durationType === "DISTANCE" ? acc + s.durationValue : acc),
+              0
+            ) * 100
+          ) / 100;
+      }
+    }
+
+    if (segments.length === 0) {
       parseSource = "openai";
       const ai = await openAiParseWeekOrPlan({ scope: "week", sourceText: text, weekNumber: 1 });
       const day = ai?.weeks[0]?.days[0];
@@ -254,31 +284,28 @@ export async function previewPlanIngest(params: {
       }
       workoutType = day.workoutType;
       miles = day.miles;
-      segments = [];
+      segments =
+        buildScheduleNativeWorkoutSteps({
+          workoutType: day.workoutType,
+          miles: day.miles,
+          fiveKPace: plan.currentFiveKPace,
+        }) ?? [];
+      parseSource = segments.length > 0 ? "deterministic" : parseSource;
     }
 
-    const catalogueRows = await loadCompanyCatalogueForIngest();
-    const catalogueMatch =
-      segments.length > 0
-        ? { catalogueWorkoutId: null, catalogueName: null, approximateMatch: false }
-        : pickClosestCatalogueEntry({
-            workoutType,
-            miles,
-            hintText: text,
-            catalogue: catalogueRows,
-          });
+    if (segments.length === 0 && miles > 0) {
+      segments = buildScheduleNativeWorkoutSteps({
+        workoutType,
+        miles,
+        fiveKPace: plan.currentFiveKPace,
+      });
+    }
 
     let summary = parsed?.suggestedTitle ?? `${workoutType} · ${miles} mi on ${dateKey}`;
     if (segments.length > 0) {
-      summary += " · Structure from your paste (pace targets on save)";
-    } else if (catalogueMatch.catalogueName) {
-      summary += ` · Catalogue: ${catalogueMatch.catalogueName}`;
-      if (catalogueMatch.approximateMatch) {
-        summary += " (closest match)";
-      }
-    } else if (!segments.length) {
-      summary +=
-        " · No catalogue match — tell staff if you need a new workout catalogue entry.";
+      summary += " · Built from schedule / paste (Work + pace from your 5K)";
+    } else {
+      summary += " · Could not build workout — add miles and type or paste pace structure";
     }
 
     return {
@@ -290,8 +317,7 @@ export async function previewPlanIngest(params: {
           dateKey,
           workoutType,
           miles,
-          catalogueWorkoutId:
-            segments.length > 0 ? null : catalogueMatch.catalogueWorkoutId,
+          catalogueWorkoutId: null,
           segments: segments.length > 0 ? segments : undefined,
           suggestedTitle: parsed?.suggestedTitle,
           suggestedDescription: parsed?.suggestedDescription,

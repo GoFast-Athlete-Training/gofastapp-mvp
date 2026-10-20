@@ -25,6 +25,7 @@ import {
   athleteContextFromRow,
   prescribeCatalogueEntry,
 } from "./standalone-catalogue-prescription";
+import { buildScheduleNativeWorkoutSteps } from "./schedule-native-workout-steps";
 
 export class MaterializeWorkoutError extends Error {
   constructor(message: string) {
@@ -226,15 +227,30 @@ async function buildPrescriptionSteps(params: {
 
   const miles = scheduled.estimatedDistanceInMeters / 1609.34;
 
-  if (scheduled.workoutType === "Easy" && !scheduled.catalogueWorkoutId?.trim()) {
-    throw new MaterializeWorkoutError(EASY_RUN_NOT_CONFIGURED);
-  }
-
-  if (!catalogueEntryForDay || !athleteFiveKPace) {
+  if (!catalogueEntryForDay) {
+    if (!athleteFiveKPace) {
+      throw new MaterializeWorkoutError(
+        "Athlete.fiveKPace is missing; set 5K pace on your profile."
+      );
+    }
+    const nativeSteps = buildScheduleNativeWorkoutSteps({
+      workoutType: scheduled.workoutType,
+      miles,
+      fiveKPace: athleteFiveKPace,
+    });
+    if (nativeSteps.length > 0) {
+      return { steps: nativeSteps, goalRacePaceSecPerMile: null };
+    }
     if (scheduled.workoutType === "Easy") {
       throw new MaterializeWorkoutError(EASY_RUN_NOT_CONFIGURED);
     }
     return { steps: [], goalRacePaceSecPerMile: null };
+  }
+
+  if (!athleteFiveKPace) {
+    throw new MaterializeWorkoutError(
+      "Athlete.fiveKPace is missing; set 5K pace on your profile."
+    );
   }
 
   const prescribed = prescribeCatalogueEntry({

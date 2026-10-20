@@ -196,12 +196,10 @@ export async function publishPublicTrainingPlan(input: PublishPublicPlanInput) {
   if (!sourcePlan) {
     throw new Error("Training plan not found");
   }
-  if (!sourcePlan.presetId) {
-    throw new Error("Plan must be generated from a preset before publishing");
-  }
-  if (!sourcePlan.planSchedule) {
-    throw new Error("Generate your schedule before publishing a public plan");
-  }
+  const { assertTrainingPlanPublishable } = await import(
+    "@/lib/training/public-plan-publish-gate"
+  );
+  assertTrainingPlanPublishable(sourcePlan);
 
   const customWorkouts = includeCustomWorkouts
     ? await prisma.plan_custom_workouts.findMany({

@@ -3184,7 +3184,7 @@ export default function WorkoutDetailPage() {
                             Prescribed
                           </dt>
                           <dd className="space-y-2">
-                            {segment.targets.map((target, idx) => {
+                            {(segment.targets ?? []).map((target, idx) => {
                               const t = (target.type || "").toUpperCase();
                               if (!isLogged && t === "PACE" && hasEditablePace) {
                                 return (

@@ -1,7 +1,6 @@
 import type { PlanDaySchedule, PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
 import {
   loadCompanyCatalogueForIngest,
-  pickClosestCatalogueEntry,
   type IngestCataloguePick,
 } from "@/lib/training/plan-ingest-catalogue-match";
 import { dateKeyForWeekDay } from "@/lib/training/plan-week-ingest-guard";
@@ -31,15 +30,11 @@ export async function enrichWeekDaysWithCatalogue(params: {
   const catalogue = params.catalogue ?? (await loadCompanyCatalogueForIngest());
   const byDateKey: Record<string, DayCataloguePreview> = {};
   const summaryNotes: string[] = [];
-  let approximateCount = 0;
-  let missingCount = 0;
-
   const days: PlanDaySchedule[] = [];
+  let builderDayCount = 0;
   for (const day of params.week.days) {
     const dateKey = dateKeyForWeekDay(params.planStartDate, params.weekNumber, day.dow);
     const meta = params.metaByDateKey?.[dateKey];
-    const hint = [meta?.workoutName, meta?.paceNote].filter(Boolean).join(" · ");
-
     if (params.dateKeysWithParsedSegments?.has(dateKey)) {
       byDateKey[dateKey] = {
         catalogueWorkoutId: null,
@@ -67,46 +62,23 @@ export async function enrichWeekDaysWithCatalogue(params: {
       continue;
     }
 
-    const match = pickClosestCatalogueEntry({
-      workoutType: day.workoutType,
-      miles: day.miles,
-      hintText: hint,
-      catalogue,
-    });
-
-    if (!match.catalogueWorkoutId) {
-      missingCount += 1;
-      byDateKey[dateKey] = {
-        catalogueWorkoutId: null,
-        catalogueName: null,
-        approximateMatch: false,
-        missingCatalogue: true,
-      };
-      days.push(day);
-      continue;
-    }
-
-    if (match.approximateMatch) approximateCount += 1;
+    builderDayCount += 1;
     byDateKey[dateKey] = {
-      catalogueWorkoutId: match.catalogueWorkoutId,
-      catalogueName: match.catalogueName,
-      approximateMatch: match.approximateMatch,
+      catalogueWorkoutId: null,
+      catalogueName: "Built from schedule",
+      approximateMatch: false,
       missingCatalogue: false,
     };
     days.push({
       ...day,
-      catalogueWorkoutId: match.catalogueWorkoutId,
+      catalogueWorkoutId: null,
+      planCycleIndex: null,
     });
   }
 
-  if (approximateCount > 0) {
+  if (builderDayCount > 0) {
     summaryNotes.push(
-      `${approximateCount} day(s) use the closest catalogue match — pace structure may not be exact.`,
-    );
-  }
-  if (missingCount > 0) {
-    summaryNotes.push(
-      `${missingCount} day(s) have no catalogue match. If you do not see the right workout, tell staff and we will build it.`,
+      `${builderDayCount} day(s) built from schedule (Work + pace from your 5K), not catalogue closest-match.`,
     );
   }
 

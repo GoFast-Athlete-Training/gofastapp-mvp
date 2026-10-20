@@ -27,6 +27,7 @@ import {
 import { cleanupFuturePlanWorkoutsAfterRegenerate } from "@/lib/training/plan-regenerate-cleanup";
 import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import type { WorkoutStep } from "@/lib/training/prescription";
+import { buildScheduleNativeWorkoutSteps } from "@/lib/training/schedule-native-workout-steps";
 import { applyWeekIngestGuard, dateKeyForWeekDay } from "@/lib/training/plan-week-ingest-guard";
 import { upsertPlannedWorkoutFromIngestDay } from "@/lib/training/plan-ingest-planned-upsert";
 import { planWeekPhaseForNumber } from "@/lib/training/plan-week-phase-key";
@@ -228,9 +229,29 @@ async function rematerializeFutureDaysInWeek(params: {
       continue;
     }
 
-    errors.push(
-      `${d.dateKey}: no catalogue workout matched — tell staff if you need a new catalogue entry`,
-    );
+    const nativeSteps = buildScheduleNativeWorkoutSteps({
+      workoutType: d.workoutType,
+      miles: d.estimatedDistanceInMeters / 1609.34,
+      fiveKPace: params.plan.currentFiveKPace,
+    });
+    if (nativeSteps.length > 0) {
+      try {
+        const title = params.dayTitlesByDateKey?.[d.dateKey]?.trim() || d.title;
+        await upsertPlannedWorkoutFromIngestDay({
+          athleteId: params.plan.athleteId,
+          planId: params.plan.id,
+          day: d,
+          title,
+          segments: nativeSteps,
+        });
+        materialized += 1;
+      } catch (e) {
+        errors.push(`${d.dateKey}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      continue;
+    }
+
+    errors.push(`${d.dateKey}: could not build workout from schedule`);
   }
 
   return { materialized, errors };
@@ -304,6 +325,40 @@ async function commitWorkoutIngest(params: {
       });
     } catch (e) {
       warnings.push(e instanceof Error ? e.message : String(e));
+    }
+    return { plannedWorkoutId, warnings };
+  }
+
+  const nativeSteps = buildScheduleNativeWorkoutSteps({
+    workoutType: workout.workoutType,
+    miles: workout.miles,
+    fiveKPace: params.plan.currentFiveKPace,
+  });
+  if (nativeSteps.length > 0) {
+    const days = expandWeekSchedule({
+      planStartDate: params.plan.startDate,
+      planSchedule: params.plan.planSchedule,
+      weekNumber,
+      raceDate: params.plan.raceCtx.raceDate,
+      raceName: params.plan.raceCtx.raceName,
+      raceDistanceMiles: params.plan.raceCtx.raceDistanceMiles,
+      totalWeeks: params.plan.totalWeeks,
+    });
+    const expanded = days.find((d) => d.dateKey === workout.dateKey);
+    if (expanded) {
+      try {
+        plannedWorkoutId = await upsertPlannedWorkoutFromIngestDay({
+          athleteId: params.plan.athleteId,
+          planId: params.plan.id,
+          day: expanded,
+          title: titleOverride || expanded.title,
+          segments: nativeSteps,
+        });
+      } catch (e) {
+        warnings.push(e instanceof Error ? e.message : String(e));
+      }
+    } else {
+      warnings.push("Could not expand plan day for schedule-native workout");
     }
     return { plannedWorkoutId, warnings };
   }

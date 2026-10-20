@@ -23,6 +23,7 @@ import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
 import { upsertRaceMembershipFromSignup } from "@/lib/race-container-membership";
 import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
 import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
+import { assertTrainingPlanPublishable } from "@/lib/training/public-plan-publish-gate";
 
 export { slugifyPlanSlug } from "@/lib/training/public-plan-slug";
 
@@ -188,14 +189,8 @@ export async function promoteTrainingPlanPublic(input: PromotePublicPlanInput) {
   });
 
   if (!plan) throw new Error("Training plan not found");
-  if (!plan.presetId) {
-    throw new Error("Plan must be generated from a preset before publishing");
-  }
-  if (!plan.planSchedule) {
-    throw new Error("Generate your schedule before publishing a public plan");
-  }
-  const planName = plan.name?.trim();
-  if (!planName) throw new Error("Plan must have a name before publishing");
+  assertTrainingPlanPublishable(plan);
+  const planName = plan.name!.trim();
 
   const now = new Date();
   const publicPublishedAt =
@@ -491,12 +486,10 @@ export async function adoptPublishedPlanBySlug(
   ) {
     throw new Error("Public training plan not found or not adoptable");
   }
-  if (!sourcePlan.presetId) {
-    throw new Error("Public training plan not found or not adoptable");
-  }
   if (!sourcePlan.planSchedule) {
     throw new Error("Published plan has no schedule to adopt");
   }
+  assertTrainingPlanPublishable(sourcePlan);
   if (sourcePlan.athleteId === input.athleteId) {
     throw new Error("You cannot adopt your own published plan");
   }
@@ -636,6 +629,9 @@ export async function adoptPublishedPlanBySlug(
         preferredTempoDow: sourcePlan.preferredTempoDow,
         preferredIntervalDow: sourcePlan.preferredIntervalDow,
         presetId: sourcePlan.presetId,
+        athletePresetId: sourcePlan.athletePresetId,
+        planSchedule: sourcePlan.planSchedule as Prisma.InputJsonValue,
+        totalWeeks: sourcePlan.totalWeeks ?? totalWeeks,
         updatedAt: now,
       },
     });
@@ -685,29 +681,28 @@ export async function adoptPublishedPlanBySlug(
   const { catalogPresetSummaryForApi } = await import(
     "@/lib/training/hydrate-catalog-preset-from-training-manage"
   );
-  const preset = sourcePlan.presetId
-    ? await catalogPresetSummaryForApi(sourcePlan.presetId)
-    : null;
-
-  const weeklyMileageTarget = prefs?.weeklyMileageTarget ?? 45;
-  await executePlanGenerate({
-    athleteId: input.athleteId,
-    athleteFiveKPace: fiveKPace,
-    athleteWeeklyMileage: weeklyResolved,
-    plan: {
-      id: result.plan.id,
-      presetId: sourcePlan.presetId!,
-      startDate: result.plan.startDate,
-      preferredDays: result.plan.preferredDays ?? [],
-      preferredLongRunDow: result.plan.preferredLongRunDow ?? null,
-      preferredTempoDow: result.plan.preferredTempoDow ?? null,
-      preferredIntervalDow: result.plan.preferredIntervalDow ?? null,
-      currentFiveKPace: result.plan.currentFiveKPace,
-      weeklyMileageTarget: result.plan.weeklyMileageTarget,
-    },
-    weeklyMileageTarget,
-    minWeeklyMiles: preset?.minWeeklyMiles ?? 40,
-  });
+  if (sourcePlan.presetId) {
+    const preset = await catalogPresetSummaryForApi(sourcePlan.presetId);
+    const weeklyMileageTarget = prefs?.weeklyMileageTarget ?? 45;
+    await executePlanGenerate({
+      athleteId: input.athleteId,
+      athleteFiveKPace: fiveKPace,
+      athleteWeeklyMileage: weeklyResolved,
+      plan: {
+        id: result.plan.id,
+        presetId: sourcePlan.presetId,
+        startDate: result.plan.startDate,
+        preferredDays: result.plan.preferredDays ?? [],
+        preferredLongRunDow: result.plan.preferredLongRunDow ?? null,
+        preferredTempoDow: result.plan.preferredTempoDow ?? null,
+        preferredIntervalDow: result.plan.preferredIntervalDow ?? null,
+        currentFiveKPace: result.plan.currentFiveKPace,
+        weeklyMileageTarget: result.plan.weeklyMileageTarget,
+      },
+      weeklyMileageTarget,
+      minWeeklyMiles: preset?.minWeeklyMiles ?? 40,
+    });
+  }
 
   return {
     trainingPlanId: result.plan.id,
