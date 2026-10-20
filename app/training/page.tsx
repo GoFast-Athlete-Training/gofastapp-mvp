@@ -715,6 +715,12 @@ export default function TrainingHubPage() {
     router.push(`/training/day/${encodeURIComponent(day.dateKey)}?source=hub`);
   }
 
+  function openDayReplace(day: PlanDayCard) {
+    router.push(
+      `/training/day/${encodeURIComponent(day.dateKey)}?source=hub&replace=1`
+    );
+  }
+
   return (
     <AthleteAppShell>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
@@ -1137,6 +1143,7 @@ export default function TrainingHubPage() {
                 sectionLabel={null}
                 showCalendarRangeLabel={false}
                 onOpenDayDetails={openDayDetails}
+                onOpenDayReplace={openDayReplace}
                 headerActions={
                   <TrainingHubWeekGear
                     planId={planDetail.id}

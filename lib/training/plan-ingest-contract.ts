@@ -87,6 +87,7 @@ export type PlanIngestPreviewResult =
       summary: string;
       /** CSV/paste workout names keyed by dateKey for display titles after catalogue materialize. */
       dayTitlesByDateKey?: Record<string, string>;
+      daySegmentsByDateKey?: Record<string, WorkoutStep[]>;
     };
 
 export type PlanIngestCommitBody = {

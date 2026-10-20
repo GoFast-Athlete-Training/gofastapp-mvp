@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from "lucide-react";
@@ -194,6 +194,8 @@ export default function TrainingPlanDayPreviewPage() {
   const planIdFromQuery = searchParams.get("planId")?.trim() || null;
   const sourceSetup = searchParams.get("source") === "setup";
   const sourceHome = searchParams.get("source") === "home";
+  const replaceMode = searchParams.get("replace") === "1";
+  const replacePanelRef = useRef<HTMLDivElement | null>(null);
 
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -504,6 +506,11 @@ export default function TrainingPlanDayPreviewPage() {
     void load();
   }, [authReady, dateKey, load]);
 
+  useEffect(() => {
+    if (!replaceMode || loading || workoutLoading) return;
+    replacePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [replaceMode, loading, workoutLoading]);
+
   const isRaceDay = workout?.workoutType === "Race" || raceDayOnSchedule;
   const title = workout?.title?.trim() || "Workout";
   const typeDisplay = formatPreviewWorkoutTypeLabel(
@@ -544,7 +551,7 @@ export default function TrainingPlanDayPreviewPage() {
           : new Date(planRace.raceDate)
       )
     : dateKey ?? "";
-  const canOpenWorkout = workoutId != null;
+  const canOpenWorkout = !workoutLoading && !workoutError;
   const canMatchWorkout =
     workoutId != null && !workoutLoading && !workoutError && garminDetailActivityId == null;
   const isLogged = garminDetailActivityId != null;
@@ -766,16 +773,21 @@ export default function TrainingPlanDayPreviewPage() {
                 />
               ) : null}
               {!isLogged && planDetail?.id && dateKey ? (
-                <PlanIngestPanel
-                  planId={planDetail.id}
-                  scope="workout"
-                  dateKey={dateKey}
-                  weekNumber={weekNumberNumeric}
-                  getToken={getDayToken}
-                  title="Change this workout"
-                  description="Paste a replacement for this day only — preview, then confirm."
-                  onCommitted={() => void load()}
-                />
+                <div
+                  ref={replacePanelRef}
+                  className={replaceMode ? "rounded-xl ring-2 ring-sky-300 ring-offset-2" : undefined}
+                >
+                  <PlanIngestPanel
+                    planId={planDetail.id}
+                    scope="workout"
+                    dateKey={dateKey}
+                    weekNumber={weekNumberNumeric}
+                    getToken={getDayToken}
+                    title="Change this workout"
+                    description="Paste a replacement for this day only — preview, then confirm."
+                    onCommitted={() => void load()}
+                  />
+                </div>
               ) : null}
               {isLogged ? (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-gray-800 space-y-1">

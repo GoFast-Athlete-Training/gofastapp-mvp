@@ -82,6 +82,10 @@ function plannedNeedsRematerialize(params: {
   if (params.existing.segmentCount === 0) return true;
   const scheduledCat = params.scheduled.catalogueWorkoutId?.trim() ?? null;
   const existingCat = params.existing.catalogueWorkoutId?.trim() ?? null;
+  // Week/day ingest writes explicit segments with catalogueWorkoutId cleared — never replace with catalogue prescribe.
+  if (params.existing.segmentCount > 0 && existingCat === null) {
+    return false;
+  }
   if (scheduledCat !== existingCat) return true;
   const scheduledMeters = params.scheduled.estimatedDistanceInMeters;
   const existingMeters = params.existing.estimatedDistanceInMeters;

@@ -74,7 +74,13 @@ export function PlanWeekPreviewList({ days, summary, ingestRows }: Props) {
                   )}
                 </td>
                 <td className="max-w-[14rem] px-3 py-2.5 text-gray-700">
-                  {d.paceNote?.trim() ? (
+                  {d.structurePreviewLines && d.structurePreviewLines.length > 0 ? (
+                    <ul className="space-y-0.5 text-xs leading-snug">
+                      {d.structurePreviewLines.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : d.paceNote?.trim() ? (
                     <span className="truncate">{d.paceNote}</span>
                   ) : (
                     "—"

@@ -25,6 +25,8 @@ export async function enrichWeekDaysWithCatalogue(params: {
   planStartDate: Date;
   metaByDateKey?: Record<string, { workoutName?: string; paceNote?: string }>;
   catalogue?: IngestCataloguePick[];
+  /** Days with parsed pace-column segments — do not stamp catalogue ids. */
+  dateKeysWithParsedSegments?: Set<string>;
 }): Promise<EnrichWeekCatalogueResult> {
   const catalogue = params.catalogue ?? (await loadCompanyCatalogueForIngest());
   const byDateKey: Record<string, DayCataloguePreview> = {};
@@ -37,6 +39,21 @@ export async function enrichWeekDaysWithCatalogue(params: {
     const dateKey = dateKeyForWeekDay(params.planStartDate, params.weekNumber, day.dow);
     const meta = params.metaByDateKey?.[dateKey];
     const hint = [meta?.workoutName, meta?.paceNote].filter(Boolean).join(" · ");
+
+    if (params.dateKeysWithParsedSegments?.has(dateKey)) {
+      byDateKey[dateKey] = {
+        catalogueWorkoutId: null,
+        catalogueName: "From your pace column",
+        approximateMatch: false,
+        missingCatalogue: false,
+      };
+      days.push({
+        ...day,
+        catalogueWorkoutId: null,
+        planCycleIndex: null,
+      });
+      continue;
+    }
 
     if (day.catalogueWorkoutId) {
       const row = catalogue.find((c) => c.id === day.catalogueWorkoutId);

@@ -41,6 +41,8 @@ type Props = {
   headerActions?: ReactNode;
   /** Opens the day screen instead of inline selected-day panel. */
   onOpenDayDetails?: (day: PlanDayCard) => void;
+  /** Opens day screen focused on replace / paste panel. */
+  onOpenDayReplace?: (day: PlanDayCard) => void;
 };
 
 export default function PlanWeekViewer({
@@ -61,6 +63,7 @@ export default function PlanWeekViewer({
   showCalendarRangeLabel = true,
   headerActions,
   onOpenDayDetails,
+  onOpenDayReplace,
 }: Props) {
   const atFirstWeek = weekNumber <= 1;
   const atLastWeek = weekNumber >= totalWeeks;
@@ -210,15 +213,26 @@ export default function PlanWeekViewer({
                       </div>
                     </div>
                   </button>
-                  {onOpenDayDetails ? (
-                    <div className="border-t border-gray-100 px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => onOpenDayDetails(w)}
-                        className="text-sm font-semibold text-gray-800 hover:text-gray-950 hover:underline"
-                      >
-                        Details
-                      </button>
+                  {onOpenDayDetails || onOpenDayReplace ? (
+                    <div className="flex gap-4 border-t border-gray-100 px-4 py-2">
+                      {onOpenDayDetails ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenDayDetails(w)}
+                          className="text-sm font-semibold text-gray-800 hover:text-gray-950 hover:underline"
+                        >
+                          Details
+                        </button>
+                      ) : null}
+                      {onOpenDayReplace ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenDayReplace(w)}
+                          className="text-sm font-semibold text-sky-800 hover:text-sky-950 hover:underline"
+                        >
+                          Replace
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

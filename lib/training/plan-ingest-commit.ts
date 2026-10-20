@@ -27,7 +27,7 @@ import {
 import { cleanupFuturePlanWorkoutsAfterRegenerate } from "@/lib/training/plan-regenerate-cleanup";
 import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import type { WorkoutStep } from "@/lib/training/prescription";
-import { applyWeekIngestGuard } from "@/lib/training/plan-week-ingest-guard";
+import { applyWeekIngestGuard, dateKeyForWeekDay } from "@/lib/training/plan-week-ingest-guard";
 import { upsertPlannedWorkoutFromIngestDay } from "@/lib/training/plan-ingest-planned-upsert";
 import { planWeekPhaseForNumber } from "@/lib/training/plan-week-phase-key";
 import { WorkoutType as WT } from "@prisma/client";
@@ -196,21 +196,6 @@ async function rematerializeFutureDaysInWeek(params: {
 
     const ingestSegments = params.daySegmentsByDateKey?.[d.dateKey];
 
-    if (d.catalogueWorkoutId) {
-      try {
-        await materializeWorkoutForPlanDay({
-          athleteId: params.plan.athleteId,
-          planId: params.plan.id,
-          dateParam: d.dateKey,
-        });
-        materialized += 1;
-      } catch (e) {
-        const msg = e instanceof MaterializeWorkoutError ? e.message : String(e);
-        errors.push(`${d.dateKey}: ${msg}`);
-      }
-      continue;
-    }
-
     if (ingestSegments?.length) {
       try {
         const title = params.dayTitlesByDateKey?.[d.dateKey]?.trim() || d.title;
@@ -224,6 +209,21 @@ async function rematerializeFutureDaysInWeek(params: {
         materialized += 1;
       } catch (e) {
         errors.push(`${d.dateKey}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      continue;
+    }
+
+    if (d.catalogueWorkoutId) {
+      try {
+        await materializeWorkoutForPlanDay({
+          athleteId: params.plan.athleteId,
+          planId: params.plan.id,
+          dateParam: d.dateKey,
+        });
+        materialized += 1;
+      } catch (e) {
+        const msg = e instanceof MaterializeWorkoutError ? e.message : String(e);
+        errors.push(`${d.dateKey}: ${msg}`);
       }
       continue;
     }
@@ -252,6 +252,8 @@ async function commitWorkoutIngest(params: {
     week = { weekNumber, days: [] };
   }
 
+  const hasParsedSegments = (workout.segments?.length ?? 0) > 0;
+
   const daySlot: PlanDaySchedule = {
     dow: (() => {
       const d = new Date(`${workout.dateKey}T12:00:00.000Z`);
@@ -260,7 +262,7 @@ async function commitWorkoutIngest(params: {
     })(),
     workoutType: workout.workoutType,
     miles: workout.miles,
-    catalogueWorkoutId: workout.catalogueWorkoutId ?? null,
+    catalogueWorkoutId: hasParsedSegments ? null : (workout.catalogueWorkoutId ?? null),
     planCycleIndex: workout.planCycleIndex ?? null,
   };
 
@@ -271,6 +273,40 @@ async function commitWorkoutIngest(params: {
 
   const warnings: string[] = [];
   let plannedWorkoutId: string | null = null;
+
+  const titleOverride =
+    workout.suggestedTitle?.trim() ||
+    params.preview.summary.split("·")[0]?.trim() ||
+    undefined;
+
+  if (hasParsedSegments && workout.segments) {
+    const days = expandWeekSchedule({
+      planStartDate: params.plan.startDate,
+      planSchedule: params.plan.planSchedule,
+      weekNumber,
+      raceDate: params.plan.raceCtx.raceDate,
+      raceName: params.plan.raceCtx.raceName,
+      raceDistanceMiles: params.plan.raceCtx.raceDistanceMiles,
+      totalWeeks: params.plan.totalWeeks,
+    });
+    const expanded = days.find((d) => d.dateKey === workout.dateKey);
+    if (!expanded) {
+      warnings.push("Could not expand plan day for ingest");
+      return { plannedWorkoutId: null, warnings };
+    }
+    try {
+      plannedWorkoutId = await upsertPlannedWorkoutFromIngestDay({
+        athleteId: params.plan.athleteId,
+        planId: params.plan.id,
+        day: expanded,
+        title: titleOverride || expanded.title,
+        segments: workout.segments,
+      });
+    } catch (e) {
+      warnings.push(e instanceof Error ? e.message : String(e));
+    }
+    return { plannedWorkoutId, warnings };
+  }
 
   try {
     const mat = await materializeWorkoutForPlanDay({
@@ -283,21 +319,12 @@ async function commitWorkoutIngest(params: {
     warnings.push(e instanceof MaterializeWorkoutError ? e.message : String(e));
   }
 
-  const titleOverride = workout.suggestedTitle?.trim();
   if (titleOverride && plannedWorkoutId) {
     await applyPlannedWorkoutTitleOverride({
       athleteId: params.plan.athleteId,
       planId: params.plan.id,
       dateKey: workout.dateKey,
       title: titleOverride,
-    });
-  }
-
-  if (workout.segments && workout.segments.length > 0 && plannedWorkoutId) {
-    await replacePrescribeSegmentsForAthlete({
-      id: plannedWorkoutId,
-      athleteId: params.plan.athleteId,
-      normalized: workoutStepsToPrescribeInput(workout.segments),
     });
   }
 
@@ -317,10 +344,18 @@ async function commitWeekIngest(params: {
 
   const weeks = ensureStructuredSchedule(params.plan.planSchedule);
   const existingWeek = weeks.find((w) => w.weekNumber === weekNumber);
+  const segmentDateKeys = new Set(
+    Object.keys(params.preview.daySegmentsByDateKey ?? {}),
+  );
   const phasedWeek = {
     ...week,
     weekNumber,
     phase: existingWeek?.phase ?? planWeekPhaseForNumber(params.plan.totalWeeks, weekNumber),
+    days: week.days.map((day) => {
+      const dk = dateKeyForWeekDay(params.plan.startDate, weekNumber, day.dow);
+      if (!segmentDateKeys.has(dk)) return day;
+      return { ...day, catalogueWorkoutId: null, planCycleIndex: null };
+    }),
   };
   const nextSchedule = spliceWeek(weeks, phasedWeek);
   await persistPlanSchedule(params.plan.id, nextSchedule);
@@ -349,6 +384,7 @@ async function commitWeekIngest(params: {
     weekNumber,
     protectedDateKeys,
     dayTitlesByDateKey,
+    daySegmentsByDateKey: params.preview.daySegmentsByDateKey,
   });
 
   return { clearedPlanned, materialized, errors };
@@ -367,13 +403,23 @@ async function commitPlanIngestScope(params: {
   const existing = ensureStructuredSchedule(params.plan.planSchedule);
   const incoming = params.preview.plan.weeks.filter((w) => w.weekNumber >= currentWeek);
 
+  const segmentDateKeys = new Set(
+    Object.keys(params.preview.daySegmentsByDateKey ?? {}),
+  );
+
   let next = [...existing.filter((w) => w.weekNumber < currentWeek)];
   for (const w of incoming) {
+    const wn = w.weekNumber;
     const phased = {
       ...w,
       phase:
         w.phase ??
-        planWeekPhaseForNumber(params.plan.totalWeeks, w.weekNumber),
+        planWeekPhaseForNumber(params.plan.totalWeeks, wn),
+      days: w.days.map((day) => {
+        const dk = dateKeyForWeekDay(params.plan.startDate, wn, day.dow);
+        if (!segmentDateKeys.has(dk)) return day;
+        return { ...day, catalogueWorkoutId: null, planCycleIndex: null };
+      }),
     };
     next = spliceWeek(next, phased);
   }
@@ -393,6 +439,7 @@ async function commitPlanIngestScope(params: {
       plan: params.plan,
       weekNumber: w.weekNumber,
       dayTitlesByDateKey,
+      daySegmentsByDateKey: params.preview.daySegmentsByDateKey,
     });
   }
 

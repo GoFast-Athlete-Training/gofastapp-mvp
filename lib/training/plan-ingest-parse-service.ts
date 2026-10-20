@@ -46,6 +46,7 @@ import {
   pickClosestCatalogueEntry,
 } from "@/lib/training/plan-ingest-catalogue-match";
 import { planWeekPhaseForNumber } from "@/lib/training/plan-week-phase-key";
+import { buildDaySegmentsByDateKeyFromWeekMeta } from "@/lib/training/plan-week-csv-segments";
 
 const WORKOUT_TYPES = new Set<string>(["Easy", "Tempo", "Intervals", "LongRun", "Race"]);
 
@@ -257,15 +258,20 @@ export async function previewPlanIngest(params: {
     }
 
     const catalogueRows = await loadCompanyCatalogueForIngest();
-    const catalogueMatch = pickClosestCatalogueEntry({
-      workoutType,
-      miles,
-      hintText: text,
-      catalogue: catalogueRows,
-    });
+    const catalogueMatch =
+      segments.length > 0
+        ? { catalogueWorkoutId: null, catalogueName: null, approximateMatch: false }
+        : pickClosestCatalogueEntry({
+            workoutType,
+            miles,
+            hintText: text,
+            catalogue: catalogueRows,
+          });
 
     let summary = parsed?.suggestedTitle ?? `${workoutType} · ${miles} mi on ${dateKey}`;
-    if (catalogueMatch.catalogueName) {
+    if (segments.length > 0) {
+      summary += " · Structure from your paste (pace targets on save)";
+    } else if (catalogueMatch.catalogueName) {
       summary += ` · Catalogue: ${catalogueMatch.catalogueName}`;
       if (catalogueMatch.approximateMatch) {
         summary += " (closest match)";
@@ -284,7 +290,8 @@ export async function previewPlanIngest(params: {
           dateKey,
           workoutType,
           miles,
-          catalogueWorkoutId: catalogueMatch.catalogueWorkoutId,
+          catalogueWorkoutId:
+            segments.length > 0 ? null : catalogueMatch.catalogueWorkoutId,
           segments: segments.length > 0 ? segments : undefined,
           suggestedTitle: parsed?.suggestedTitle,
           suggestedDescription: parsed?.suggestedDescription,
@@ -367,12 +374,26 @@ export async function previewPlanIngest(params: {
       phase: planWeekPhaseForNumber(plan.totalWeeks, weekNumber),
     };
 
+    const daySegmentsByDateKey =
+      metaByDateKey && Object.keys(metaByDateKey).length > 0
+        ? buildDaySegmentsByDateKeyFromWeekMeta({
+            metaByDateKey,
+            week: incomingWeek,
+            planStartDate: plan.startDate,
+            weekNumber,
+            fiveKPace: plan.currentFiveKPace,
+          })
+        : {};
+
+    const dateKeysWithParsedSegments = new Set(Object.keys(daySegmentsByDateKey));
+
     const enriched = await enrichWeekDaysWithCatalogue({
       week: incomingWeek,
       weekNumber,
       planStartDate: plan.startDate,
       metaByDateKey,
       catalogue: catalogueRows,
+      dateKeysWithParsedSegments,
     });
     incomingWeek = enriched.week;
 
@@ -391,6 +412,7 @@ export async function previewPlanIngest(params: {
       protectedDateKeys,
       raceDateKey,
       metaByDateKey,
+      daySegmentsByDateKey,
       catalogueByDateKey: enriched.byDateKey,
     });
 
@@ -410,6 +432,8 @@ export async function previewPlanIngest(params: {
         summary,
         weekPreviewDays,
         weekIngestRows,
+        daySegmentsByDateKey:
+          Object.keys(daySegmentsByDateKey).length > 0 ? daySegmentsByDateKey : undefined,
         catalogueNotes: enriched.summaryNotes,
       },
     };
@@ -455,6 +479,23 @@ export async function previewPlanIngest(params: {
           "Could not parse multi-week CSV — need Week, Date, Workout, Type, Mileage columns",
       };
     }
+    const daySegmentsByDateKey: Record<string, WorkoutStep[]> = {};
+    for (const w of parsed.weeks) {
+      const wn = w.weekNumber;
+      const meta = parsed.metaByWeekNumber[wn] ?? {};
+      if (Object.keys(meta).length > 0) {
+        const weekSegs = buildDaySegmentsByDateKeyFromWeekMeta({
+          metaByDateKey: meta,
+          week: w,
+          planStartDate: planCtx.startDate,
+          weekNumber: wn,
+          fiveKPace: planCtx.currentFiveKPace,
+        });
+        Object.assign(daySegmentsByDateKey, weekSegs);
+      }
+    }
+    const dateKeysWithParsedSegments = new Set(Object.keys(daySegmentsByDateKey));
+
     const weeksOut: PlanWeekSchedule[] = [];
     for (const w of parsed.weeks) {
       const wn = w.weekNumber;
@@ -469,6 +510,7 @@ export async function previewPlanIngest(params: {
         planStartDate: planCtx.startDate,
         metaByDateKey: meta,
         catalogue: catalogueRows,
+        dateKeysWithParsedSegments,
       });
       weeksOut.push(enriched.week);
     }
@@ -480,6 +522,9 @@ export async function previewPlanIngest(params: {
       }
     }
     let summary = `${weeksOut.length} week(s) from CSV with catalogue matching`;
+    if (dateKeysWithParsedSegments.size > 0) {
+      summary = `${summary}; ${dateKeysWithParsedSegments.size} day(s) use your Pace column structure`;
+    }
     if (parsed.skippedNotes.length > 0) {
       summary = appendSkippedToSummary(summary, parsed.skippedNotes);
     }
@@ -491,6 +536,8 @@ export async function previewPlanIngest(params: {
         plan: { weeks: weeksOut },
         summary,
         dayTitlesByDateKey,
+        daySegmentsByDateKey:
+          Object.keys(daySegmentsByDateKey).length > 0 ? daySegmentsByDateKey : undefined,
       },
     };
   }

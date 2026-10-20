@@ -125,7 +125,10 @@ export function AdjustPlanIngestPage({ planId, weekNumber, initialLane = null }:
 
   const onConfirm = useCallback(async () => {
     const ok = await runCommit();
-    if (ok) router.push("/training");
+    if (ok) {
+      router.push("/training");
+      router.refresh();
+    }
   }, [runCommit, router]);
 
   const title = isWeekScope ? "Adjust this week" : "Adjust plan";
