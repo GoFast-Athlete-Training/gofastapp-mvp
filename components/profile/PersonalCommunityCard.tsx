@@ -24,8 +24,8 @@ export default function PersonalCommunityCard({
       return;
     }
     api
-      .get(`/athlete/${athleteId}/container/members`)
-      .then((r) => setMemberCount(r.data?.count ?? 0))
+      .get(`/athlete/public/${encodeURIComponent(gofastHandle.trim())}/community`)
+      .then((r) => setMemberCount(r.data?.community?.memberCount ?? 0))
       .catch(() => {});
   }, [athleteId, gofastHandle]);
 

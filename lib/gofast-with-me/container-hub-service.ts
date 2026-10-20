@@ -16,11 +16,7 @@ import type { PublicPlanWeek } from '@/lib/training/public-plan-service';
 import {
   athleteCommunityRelationship,
 } from '@/lib/gofast-with-me/athlete-community-access';
-import {
-  containerMessageInclude,
-  mapContainerMessageRow,
-  type MappedContainerMessage,
-} from '@/lib/gofast-with-me/container-message-map';
+import type { MappedContainerMessage } from '@/lib/gofast-with-me/container-message-map';
 import {
   listPublishedAthleteTips,
   type AthleteTipPayload,
@@ -29,18 +25,9 @@ import {
   listPublishedAthleteRunRoutes,
   type AthleteRunRoutePayload,
 } from '@/lib/gofast-with-me/athlete-run-routes';
-import {
-  listPublishedActivityPosts,
-  type ActivityPostPayload,
-} from '@/lib/gofast-with-me/activity-posts';
-import {
-  listPublishedWorkoutStories,
-  type WorkoutStoryPayload,
-} from '@/lib/gofast-with-me/workout-stories';
-import {
-  listRecentAthleteActivities,
-  type RecentAthleteActivityPayload,
-} from '@/lib/gofast-with-me/recent-athlete-activities';
+import type { ActivityPostPayload } from '@/lib/gofast-with-me/activity-posts';
+import type { WorkoutStoryPayload } from '@/lib/gofast-with-me/workout-stories';
+import type { RecentAthleteActivityPayload } from '@/lib/gofast-with-me/recent-athlete-activities';
 import { parseAthleteRaceMainSnap } from '@/lib/training/plan-race-snapshots';
 import {
   listPublicInstagramMedia,
@@ -51,10 +38,7 @@ import type {
   GoFastWithMeTrainingFor,
   GoFastWithMeTrainingSummary,
 } from '@/lib/gofast-with-me/training-for-types';
-import {
-  listAttendedClubRunsForHost,
-  type AttendedClubRunPayload,
-} from '@/lib/gofast-with-me/attended-club-runs';
+import type { AttendedClubRunPayload } from '@/lib/gofast-with-me/attended-club-runs';
 
 export type ContainerHubMessage = MappedContainerMessage;
 export type { GoFastWithMeChasingGoal, GoFastWithMeTrainingFor, GoFastWithMeTrainingSummary };
@@ -116,6 +100,21 @@ export type ContainerHubPayload = {
   activityPosts: ActivityPostPayload[];
   recentActivities: RecentAthleteActivityPayload[];
   attendedClubRuns: AttendedClubRunPayload[];
+  /** Next scheduled workout to emulate (from public athlete page). */
+  nextWorkout: {
+    id: string;
+    title: string;
+    workoutType: string;
+    date: string | null;
+  } | null;
+  /** Latest published training reflection preview. */
+  reflectionPreview: {
+    id: string;
+    caption: string | null;
+    publishedAt: string;
+  } | null;
+  nextRace: PublicAthletePayload['nextRace'];
+  hostBio: string | null;
 };
 
 export type AthleteCommunityPayload = ContainerHubPayload & {
@@ -340,55 +339,39 @@ export async function loadAthleteCommunityForHost(
   const handle = host.gofastHandle?.trim();
   const publicPage = handle ? await loadPublicAthletePage(handle) : null;
 
-  const [
-    memberRows,
-    memberCount,
-    publishedPlan,
-    messageRows,
-    tips,
-    runRoutes,
-    instagramMedia,
-    workoutStories,
-    activityPosts,
-    recentActivities,
-    attendedClubRuns,
-  ] =
+  const [memberRows, memberCount, publishedPlan, tips, runRoutes, instagramMedia] =
     await Promise.all([
-    prisma.gfwm_athlete.findMany({
-      where: { athleteId: host.id },
-      orderBy: { joinedAt: 'desc' },
-      take: 24,
-      include: {
-        memberAthlete: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            photoURL: true,
-            gofastHandle: true,
+      prisma.gfwm_athlete.findMany({
+        where: { athleteId: host.id },
+        orderBy: { joinedAt: 'desc' },
+        take: 24,
+        include: {
+          memberAthlete: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              photoURL: true,
+              gofastHandle: true,
+            },
           },
         },
-      },
-    }),
-    prisma.gfwm_athlete.count({ where: { athleteId: host.id } }),
-    loadHubPlanStrip(host.id, relationship.isOwner),
-    prisma.gofast_container_messages.findMany({
-      where: {
-        containerAthleteId: host.id,
-        ...(options?.messageTopic ? { topic: options.messageTopic } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: options?.messageLimit ?? 40,
-      include: containerMessageInclude,
-    }),
-    listPublishedAthleteTips(host.id, 6, 'feed'),
-    listPublishedAthleteRunRoutes(host.id),
-    listPublicInstagramMedia(host.id, 5),
-    listPublishedWorkoutStories(host.id, 20),
-    listPublishedActivityPosts(host.id, 20),
-    listRecentAthleteActivities(host.id, 5),
-    listAttendedClubRunsForHost(host.id, 20),
-  ]);
+      }),
+      prisma.gfwm_athlete.count({ where: { athleteId: host.id } }),
+      loadHubPlanStrip(host.id, relationship.isOwner),
+      listPublishedAthleteTips(host.id, 6, 'feed'),
+      listPublishedAthleteRunRoutes(host.id),
+      listPublicInstagramMedia(host.id, 5),
+    ]);
+
+  const firstReflection = publicPage?.trainingReflections?.[0];
+  const firstWorkout = publicPage?.upcomingWorkouts?.[0];
+  const hostBio =
+    publicPage?.gofastWithMe?.gofastWithMeBio?.trim() ||
+    publicPage?.athlete.bio?.trim() ||
+    null;
+
+  void options;
 
   return {
     isOwner: relationship.isOwner,
@@ -420,14 +403,31 @@ export async function loadAthleteCommunityForHost(
       trainingSummary: publicPage?.trainingSummary ?? null,
       primaryChasingGoal: publicPage?.primaryChasingGoal ?? null,
     },
-    messages: messageRows.map(mapContainerMessageRow),
+    messages: [],
     tips,
     runRoutes,
     instagramMedia,
-    workoutStories,
-    activityPosts,
-    recentActivities,
-    attendedClubRuns,
+    workoutStories: [],
+    activityPosts: [],
+    recentActivities: [],
+    attendedClubRuns: [],
+    nextWorkout: firstWorkout
+      ? {
+          id: firstWorkout.id,
+          title: firstWorkout.title,
+          workoutType: firstWorkout.workoutType,
+          date: firstWorkout.date,
+        }
+      : null,
+    reflectionPreview: firstReflection
+      ? {
+          id: firstReflection.id,
+          caption: firstReflection.caption,
+          publishedAt: firstReflection.publishedAt,
+        }
+      : null,
+    nextRace: publicPage?.nextRace ?? null,
+    hostBio,
   };
 }
 

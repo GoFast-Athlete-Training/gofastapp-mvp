@@ -65,6 +65,25 @@ export async function followAthleteBySlug(
   return { hostAthleteId: target.hostAthleteId, slug: target.gofastSlugSnapshot };
 }
 
+export async function unfollowAthleteBySlug(
+  rawHandle: string,
+  memberAthleteId: string
+): Promise<{ hostAthleteId: string }> {
+  const target = await resolveFollowTargetBySlug(rawHandle);
+  if (!target) {
+    throw new Error('GoFastWithMe page not found');
+  }
+
+  await prisma.gfwm_athlete.deleteMany({
+    where: {
+      athleteId: target.hostAthleteId,
+      memberAthleteId,
+    },
+  });
+
+  return { hostAthleteId: target.hostAthleteId };
+}
+
 export async function isFollowingHost(
   hostAthleteId: string,
   memberAthleteId: string

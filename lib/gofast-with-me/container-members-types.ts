@@ -1,4 +1,4 @@
-/** Row from GET /api/athlete/[id]/container/members (gfwm_athlete junction). */
+/** Follower row on public community payload (gfwm_athlete junction). */
 export type ContainerMemberRow = {
   id: string;
   firstName: string | null;

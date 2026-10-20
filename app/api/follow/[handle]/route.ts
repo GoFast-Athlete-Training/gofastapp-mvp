@@ -6,6 +6,7 @@ import {
   followAthleteBySlug,
   isFollowingHost,
   resolveFollowTargetBySlug,
+  unfollowAthleteBySlug,
 } from '@/lib/gofast-with-me/follow-service';
 
 type RouteParams = { handle: string };
@@ -79,6 +80,32 @@ export async function POST(
     console.error('POST /api/follow/[handle]', e);
     const status =
       msg.includes('not found') || msg.includes('Not found') ? 404 : msg.includes('yourself') ? 400 : 400;
+    return NextResponse.json({ success: false, error: msg }, { status });
+  }
+}
+
+/** DELETE /api/follow/[handle] — authenticated unfollow */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<RouteParams> }
+) {
+  try {
+    const auth = await requireAthleteFromBearer(request);
+    if ('error' in auth) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
+
+    const { handle } = await params;
+    const result = await unfollowAthleteBySlug(handle, auth.athlete.id);
+
+    return NextResponse.json({
+      success: true,
+      hostAthleteId: result.hostAthleteId,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Server error';
+    console.error('DELETE /api/follow/[handle]', e);
+    const status = msg.includes('not found') || msg.includes('Not found') ? 404 : 400;
     return NextResponse.json({ success: false, error: msg }, { status });
   }
 }

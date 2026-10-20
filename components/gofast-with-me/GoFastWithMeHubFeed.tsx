@@ -16,6 +16,8 @@ import type {
 
 type Props = {
   hostId: string;
+  /** Public handle for authed community chatter API (replaces container/messages). */
+  publicHandle?: string;
   isHost: boolean;
   canAccessFeed: boolean;
   upcomingRuns?: ContainerHubPayload['upcomingRuns'];
@@ -69,6 +71,7 @@ function RunInviteCard({ run }: { run: NonNullable<ContainerHubMessage['cityRun'
 
 export default function GoFastWithMeHubFeed({
   hostId,
+  publicHandle,
   isHost,
   canAccessFeed,
   upcomingRuns = [],
@@ -79,6 +82,7 @@ export default function GoFastWithMeHubFeed({
   variant = 'default',
   showHeading = true,
 }: Props) {
+  void hostId;
   const isMobileHub = variant === 'mobile-hub';
   const [filter, setFilter] = useState<FeedFilter>(
     announcementsMode ? 'updates' : chatterMode ? 'chatter' : 'all'
@@ -103,14 +107,16 @@ export default function GoFastWithMeHubFeed({
       ((!announcementsMode && (chatterMode || filter === 'chatter')) &&
         canMemberPostToTopic('chatter')));
 
-  const loadMessages = useCallback(async (activeFilter: FeedFilter) => {
+  const loadMessages = useCallback(async (_activeFilter: FeedFilter) => {
     setLoading(true);
     setError(null);
     try {
-      const topicQuery =
-        activeFilter === 'all' ? '' : `&topic=${encodeURIComponent(activeFilter)}`;
+      if (!chatterMode || !publicHandle?.trim()) {
+        setMessages([]);
+        return;
+      }
       const res = await api.get(
-        `/athlete/${hostId}/container/messages?limit=40${topicQuery}`
+        `/athlete/public/${encodeURIComponent(publicHandle.trim())}/community/chatter?limit=40`
       );
       if (res.data?.messages) {
         setMessages(res.data.messages);
@@ -121,7 +127,7 @@ export default function GoFastWithMeHubFeed({
     } finally {
       setLoading(false);
     }
-  }, [hostId]);
+  }, [chatterMode, publicHandle]);
 
   useEffect(() => {
     if (chatterMode) {
@@ -137,11 +143,13 @@ export default function GoFastWithMeHubFeed({
     setPosting(true);
     setError(null);
     try {
-      await api.post(`/athlete/${hostId}/container/messages`, {
-        body: composer.trim(),
-        topic: postTopic,
-        ...(isHost && attachRunId ? { cityRunId: attachRunId } : {}),
-      });
+      if (!chatterMode || !publicHandle?.trim()) {
+        throw new Error('Chatter requires a public handle.');
+      }
+      await api.post(
+        `/athlete/public/${encodeURIComponent(publicHandle.trim())}/community/chatter`,
+        { body: composer.trim() }
+      );
       setComposer('');
       setAttachRunId('');
       await loadMessages(chatterMode ? 'chatter' : filter);
@@ -156,7 +164,12 @@ export default function GoFastWithMeHubFeed({
   const handleDelete = async (messageId: string) => {
     if (!isHost || !confirm('Delete this post?')) return;
     try {
-      await api.delete(`/athlete/${hostId}/container/messages/${messageId}`);
+      if (!publicHandle?.trim()) {
+        throw new Error('Chatter requires a public handle.');
+      }
+      await api.delete(
+        `/athlete/public/${encodeURIComponent(publicHandle.trim())}/community/chatter/${messageId}`
+      );
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
     } catch {
       setError('Could not delete post.');
@@ -165,12 +178,32 @@ export default function GoFastWithMeHubFeed({
 
   const sectionTitle = announcementsMode ? 'Daily log' : chatterMode ? 'Chatter' : 'Feed';
 
-  if (!canAccessFeed && !chatterMode && !announcementsMode) {
+  if (announcementsMode) {
+    return (
+      <section className="rounded-2xl border border-dashed border-gray-200 bg-white p-5">
+        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Daily log</h2>
+        <p className="mt-2 text-sm text-gray-600">
+          Daily log is paused until we ship a real log flow. Use Chatter for now.
+        </p>
+      </section>
+    );
+  }
+
+  if (!chatterMode && !announcementsMode) {
     return (
       <section className="rounded-2xl border border-gray-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{sectionTitle}</h2>
+        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Feed</h2>
+        <p className="mt-2 text-sm text-gray-600">The activity feed has moved off this page.</p>
+      </section>
+    );
+  }
+
+  if (!canAccessFeed && chatterMode) {
+    return (
+      <section className="rounded-2xl border border-gray-200 bg-white p-5">
+        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Chatter</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Follow to read daily logs from this GoFast athlete.
+          Follow {publicHandle ? `@${publicHandle}` : 'this athlete'} to read and post in Chatter.
         </p>
       </section>
     );

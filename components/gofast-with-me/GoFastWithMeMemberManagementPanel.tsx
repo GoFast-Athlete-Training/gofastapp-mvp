@@ -64,10 +64,13 @@ export default function GoFastWithMeMemberManagementPanel({
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(`/athlete/${athleteId}/container/members`);
-      if (res.data?.success) {
-        setMemberCount(res.data.count ?? 0);
-        setMembers((res.data.members ?? []) as ContainerMemberRow[]);
+      const res = await api.get(
+        `/athlete/public/${encodeURIComponent(publicSlug)}/community`
+      );
+      if (res.data?.success && res.data.community) {
+        const community = res.data.community as ContainerHubPayload;
+        setMemberCount(community.memberCount ?? 0);
+        setMembers((community.members ?? []) as ContainerMemberRow[]);
       } else {
         throw new Error(res.data?.error || 'Could not load followers');
       }
@@ -77,7 +80,7 @@ export default function GoFastWithMeMemberManagementPanel({
     } finally {
       setLoading(false);
     }
-  }, [athleteId, onMembersRefresh]);
+  }, [publicSlug, onMembersRefresh]);
 
   useEffect(() => {
     if (memberCountProp != null) setMemberCount(memberCountProp);

@@ -16,7 +16,7 @@ import {
 import { applyFollowerPreviewMode } from '@/lib/gofast-with-me/athlete-community-access';
 import TopNav from '@/components/shared/TopNav';
 import AthleteAppShell from '@/components/athlete/AthleteAppShell';
-import AthleteCommunitySections from '@/components/gofast-with-me/AthleteCommunitySections';
+import PublicContainerPreview from '@/components/gofast-with-me/PublicContainerPreview';
 import AthleteCommunityProfilePanel from '@/components/gofast-with-me/AthleteCommunityProfilePanel';
 import GoFastWithMeHubFeed from '@/components/gofast-with-me/GoFastWithMeHubFeed';
 
@@ -124,7 +124,7 @@ export default function AthleteCommunityView({ handle }: Props) {
     setActionLoading(true);
     setError(null);
     try {
-      await api.post(`/athlete/${community.host.id}/container/leave`);
+      await api.delete(`/follow/${encodeURIComponent(handle)}`);
       await loadCommunity();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -304,20 +304,35 @@ export default function AthleteCommunityView({ handle }: Props) {
               canAccessFeed={canParticipate}
               upcomingRuns={community.upcomingRuns}
               publishedPlan={community.publishedPlan}
-              initialMessages={community.messages.filter((m) => m.topic === 'chatter')}
+              publicHandle={handle}
+              initialMessages={[]}
               chatterMode
               showHeading={false}
             />
           </div>
         ) : (
           <div className="space-y-6">
-            <AthleteCommunitySections
+            <PublicContainerPreview
               community={community}
+              handle={handle}
               firstName={firstName}
-              displayAsOwner={displayAsOwner}
-              previewFollower={previewFollower}
-              hasTrainingFor={hasTrainingFor}
             />
+
+            <section className="mx-auto w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold text-gray-900">Chatter</h2>
+              <p className="mt-1 text-sm text-gray-500 mb-4">
+                Talk with {firstName} and other followers.
+              </p>
+              <GoFastWithMeHubFeed
+                hostId={community.host.id}
+                publicHandle={handle}
+                isHost={displayAsOwner}
+                canAccessFeed={canParticipate}
+                chatterMode
+                showHeading={false}
+                variant="mobile-hub"
+              />
+            </section>
 
             {!displayAsOwner && !displayAsFollower && !previewFollower ? (
               <section className="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">

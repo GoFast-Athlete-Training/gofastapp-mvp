@@ -17,6 +17,7 @@ type Props = {
 
 export default function GoFastWithMeRunsPanel({
   athleteId,
+  publicSlug,
   embedded = false,
   showNoPlanFallback = false,
 }: Props) {
@@ -28,9 +29,11 @@ export default function GoFastWithMeRunsPanel({
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(`/athlete/${athleteId}/container/hub`);
-      if (res.data?.success && res.data.hub) {
-        setHub(res.data.hub as ContainerHubPayload);
+      const slug = publicSlug.trim();
+      if (!slug) throw new Error('Missing public slug');
+      const res = await api.get(`/athlete/public/${encodeURIComponent(slug)}/community`);
+      if (res.data?.success && res.data.community) {
+        setHub(res.data.community as ContainerHubPayload);
       } else {
         throw new Error(res.data?.error || 'Could not load runs');
       }
@@ -40,7 +43,9 @@ export default function GoFastWithMeRunsPanel({
     } finally {
       setLoading(false);
     }
-  }, [athleteId]);
+  }, [publicSlug]);
+
+  void athleteId;
 
   useEffect(() => {
     void loadHub();

@@ -159,10 +159,9 @@ export default function GoFastWithOthersDashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const [profileRes, gwmRes, membersRes] = await Promise.all([
+        const [profileRes, gwmRes] = await Promise.all([
           api.get(`/athlete/${id}`),
           api.get("/me/gofast-with-me"),
-          api.get(`/athlete/${id}/container/members`).catch(() => null),
         ]);
         const athlete = profileRes.data?.athlete;
         const handle = athlete?.gofastHandle?.trim();
@@ -179,8 +178,11 @@ export default function GoFastWithOthersDashboard() {
         const gwm = gwmRes.data?.gofastWithMe as OwnerGwmRow | null;
         setOwnerGwm(gwm);
 
-        if (membersRes?.data?.success) {
-          setFollowerCount(membersRes.data.count ?? 0);
+        const communityRes = await api
+          .get(`/athlete/public/${encodeURIComponent(handle)}/community`)
+          .catch(() => null);
+        if (communityRes?.data?.community?.memberCount != null && !cancelled) {
+          setFollowerCount(communityRes.data.community.memberCount);
         }
 
         if (!cancelled) {
