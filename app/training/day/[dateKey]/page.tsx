@@ -40,7 +40,11 @@ import {
   pickWorkoutPayload,
   type PreviewWorkout,
 } from "@/lib/training/workout-preview-payload";
-import { stashWorkoutDayNav, TRAINING_HUB_BACK_PATH } from "@/lib/training/workout-day-nav";
+import { TRAINING_HUB_BACK_PATH } from "@/lib/training/workout-day-nav";
+import {
+  DayPlanPaceSplitsPanel,
+  type DayPlanPaceSplitsPanelHandle,
+} from "@/components/training/DayPlanPaceSplitsPanel";
 import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
 import { buildRaceDayBuilderHref } from "@/lib/training/race-day-builder-href";
 import LogRaceResultSheet from "@/components/races/LogRaceResultSheet";
@@ -209,11 +213,12 @@ export default function TrainingPlanDayPreviewPage() {
   /** Workout exists but full detail/segments failed — user can still open workout */
   const [workoutDetailError, setWorkoutDetailError] = useState<string | null>(null);
   const [workout, setWorkout] = useState<PreviewWorkout | null>(null);
-  const [openingWorkout, setOpeningWorkout] = useState(false);
+  const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
+  const [workoutProfileFiveKPace, setWorkoutProfileFiveKPace] = useState<string | null>(null);
+  const [showPaceSplits, setShowPaceSplits] = useState(false);
+  const paceSplitsRef = useRef<DayPlanPaceSplitsPanelHandle | null>(null);
   const [pushingGarmin, setPushingGarmin] = useState(false);
   const [garminPushMessage, setGarminPushMessage] = useState<string | null>(null);
-  /** e.g. navigate to /workouts/[id] failed — does not mean the day is unscheduled */
-  const [openWorkoutError, setOpenWorkoutError] = useState<string | null>(null);
   const [raceResultRow, setRaceResultRow] = useState<{
     id: string;
     officialFinishTime: string | null;
@@ -288,8 +293,8 @@ export default function TrainingPlanDayPreviewPage() {
     setWorkoutId(null);
     setWorkoutError(null);
     setWorkoutDetailError(null);
-    setOpenWorkoutError(null);
     setGarminPushMessage(null);
+    setShowPaceSplits(false);
     setMatchedActivityId(null);
     setLoggedActualDistanceMeters(null);
     setLoggedActualPaceSecPerMile(null);
@@ -317,7 +322,11 @@ export default function TrainingPlanDayPreviewPage() {
         planId = (listData.plans[0] as { id: string }).id;
       }
 
-      const { plan: raw } = await fetchTrainingPlanDetail(planId!, token);
+      const { plan: raw, athleteFiveKPace: planAthleteFiveK } = await fetchTrainingPlanDetail(
+        planId!,
+        token
+      );
+      setAthleteFiveKPace(planAthleteFiveK?.trim() || null);
       const plan = raw as PlanDetail;
       if (!hasSchedule(plan)) {
         setError("This plan has no schedule yet.");
@@ -416,6 +425,16 @@ export default function TrainingPlanDayPreviewPage() {
           raceDayPayload = pickWorkoutPayload(rawW);
           setWorkout(raceDayPayload);
           const rawRecord = rawW as Record<string, unknown>;
+          const profilePace = rawRecord.profileFiveKPace;
+          const planFiveK = (rawRecord.training_plans as { currentFiveKPace?: string } | null)
+            ?.currentFiveKPace;
+          setWorkoutProfileFiveKPace(
+            (typeof profilePace === "string" && profilePace.trim()
+              ? profilePace.trim()
+              : typeof planFiveK === "string" && planFiveK.trim()
+                ? planFiveK.trim()
+                : null) ?? null
+          );
           const mid = rawRecord.garminDetailActivityId;
           setMatchedActivityId(typeof mid === "string" && mid.trim() ? mid.trim() : null);
           const skip = rawRecord.skippedAt;
@@ -514,6 +533,20 @@ export default function TrainingPlanDayPreviewPage() {
     });
   }, []);
 
+  const refreshWorkoutDetail = useCallback(async () => {
+    if (!workoutId) return;
+    const u = auth.currentUser;
+    if (!u) return;
+    const token = await u.getIdToken();
+    try {
+      const { workout: rawW } = await fetchTrainingWorkoutDetail(workoutId, token);
+      setWorkout(pickWorkoutPayload(rawW));
+      setWorkoutDetailError(null);
+    } catch (e) {
+      setWorkoutDetailError(e instanceof Error ? e.message : "Could not refresh workout");
+    }
+  }, [workoutId]);
+
   useEffect(() => {
     if (replaceMode) setReplacePanelOpen(true);
   }, [replaceMode]);
@@ -563,10 +596,12 @@ export default function TrainingPlanDayPreviewPage() {
           : new Date(planRace.raceDate)
       )
     : dateKey ?? "";
-  const canOpenWorkout = !workoutLoading && !workoutError;
+  const isLogged = garminDetailActivityId != null;
+  const profileFiveKPace = workoutProfileFiveKPace?.trim() || athleteFiveKPace?.trim() || null;
+  const canShowPaceSplits =
+    !isLogged && workoutId != null && workout != null && workout.segments.length > 0 && !isRaceDay;
   const canMatchWorkout =
     workoutId != null && !workoutLoading && !workoutError && garminDetailActivityId == null;
-  const isLogged = garminDetailActivityId != null;
   const dayStatus =
     dateKey != null
       ? deriveSessionStatus({
@@ -653,8 +688,14 @@ export default function TrainingPlanDayPreviewPage() {
     if (!u) return;
     setPushingGarmin(true);
     setGarminPushMessage(null);
-    setOpenWorkoutError(null);
     try {
+      if (showPaceSplits && paceSplitsRef.current) {
+        const saved = await paceSplitsRef.current.saveIfDirty();
+        if (!saved) {
+          setGarminPushMessage("Save pace splits before sending to Garmin.");
+          return;
+        }
+      }
       const token = await u.getIdToken();
       const wid =
         workoutId ?? (await resolveWorkoutForPlanDay(planDetail.id, dateKey, token));
@@ -671,33 +712,6 @@ export default function TrainingPlanDayPreviewPage() {
       setGarminPushMessage(e instanceof Error ? e.message : "Could not send to Garmin");
     } finally {
       setPushingGarmin(false);
-    }
-  }
-
-  async function handleDoThisWorkout() {
-    if (!planDetail || !dateKey) return;
-    const u = auth.currentUser;
-    if (!u) return;
-    setOpeningWorkout(true);
-    setOpenWorkoutError(null);
-    try {
-      const token = await u.getIdToken();
-      const wid =
-        workoutId ?? (await resolveWorkoutForPlanDay(planDetail.id, dateKey, token));
-      stashWorkoutDayNav(wid, {
-        source: "training-hub",
-        backPath:
-          sourceSetup && planDetail
-            ? `/training-setup/${planDetail.id}`
-            : sourceHome
-              ? "/athlete-home"
-              : TRAINING_HUB_BACK_PATH,
-      });
-      router.push(`/workouts/${wid}`);
-    } catch (e) {
-      setOpenWorkoutError(e instanceof Error ? e.message : "Could not open workout");
-    } finally {
-      setOpeningWorkout(false);
     }
   }
 
@@ -853,12 +867,7 @@ export default function TrainingPlanDayPreviewPage() {
               )}
               {workoutDetailError && workoutId && (
                 <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2" role="status">
-                  {workoutDetailError} — you can still open the full workout.
-                </p>
-              )}
-              {openWorkoutError && (
-                <p className="text-sm text-red-600" role="alert">
-                  {openWorkoutError}
+                  {workoutDetailError}
                 </p>
               )}
               {garminPushMessage && (
@@ -886,8 +895,8 @@ export default function TrainingPlanDayPreviewPage() {
                 workout.segments.length === 0 &&
                 !isRaceDay && (
                 <p className="text-sm text-gray-600">
-                  No structured steps yet for this workout type. You can still open the full workout
-                  to set up your run or see more detail.
+                  No structured steps yet for this workout type. Use Replace to pick a different day
+                  template if needed.
                 </p>
               )}
               {!isLogged && !workoutLoading && workout && workout.segments.length > 0 && (
@@ -965,6 +974,27 @@ export default function TrainingPlanDayPreviewPage() {
                       );
                     })}
                   </ul>
+                  {canShowPaceSplits ? (
+                    <div className="mt-4 space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowPaceSplits((open) => !open)}
+                        className="w-full rounded-xl border border-orange-200 bg-orange-50 py-2.5 text-sm font-semibold text-orange-800 hover:bg-orange-100"
+                      >
+                        {showPaceSplits ? "Hide pace splits" : "See pace splits"}
+                      </button>
+                      {showPaceSplits && workoutId ? (
+                        <DayPlanPaceSplitsPanel
+                          ref={paceSplitsRef}
+                          workoutId={workoutId}
+                          workoutType={workout.workoutType}
+                          segments={workout.segments}
+                          profileFiveKPace={profileFiveKPace}
+                          onSaved={refreshWorkoutDetail}
+                        />
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -1044,40 +1074,18 @@ export default function TrainingPlanDayPreviewPage() {
                   type="button"
                   onClick={() => void handlePushToGarmin()}
                   disabled={pushingGarmin || workoutLoading || !!workoutError}
-                  className="w-full rounded-xl border border-orange-200 bg-white py-3 text-sm font-semibold text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+                  className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
                 >
-                  {pushingGarmin ? "Adding to calendar…" : "Add to Garmin calendar"}
+                  {pushingGarmin ? "Getting it ready…" : "Looks good, I'm ready"}
                 </button>
               ) : null}
-              {!isLogged && !isRaceDay ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => void handleDoThisWorkout()}
-                    disabled={openingWorkout || !canOpenWorkout || workoutLoading || workoutError}
-                    className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-                  >
-                    {openingWorkout ? "Opening…" : "Open full workout"}
-                  </button>
-                  {planDetail?.id && dateKey ? (
-                    <button
-                      type="button"
-                      onClick={focusReplacePanel}
-                      className="w-full rounded-xl border border-sky-200 bg-white py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
-                    >
-                      Replace
-                    </button>
-                  ) : null}
-                </>
-              ) : null}
-              {!isLogged && isRaceDay && workoutId ? (
+              {!isLogged && !isRaceDay && planDetail?.id && dateKey ? (
                 <button
                   type="button"
-                  onClick={() => void handleDoThisWorkout()}
-                  disabled={openingWorkout || workoutLoading}
-                  className="w-full rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                  onClick={focusReplacePanel}
+                  className="w-full rounded-xl border border-sky-200 bg-white py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
                 >
-                  {openingWorkout ? "Opening…" : "Open race plan"}
+                  Replace
                 </button>
               ) : null}
               {!isLogged && workoutId && dateKey ? (

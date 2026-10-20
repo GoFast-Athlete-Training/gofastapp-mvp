@@ -9,6 +9,10 @@ export type PreviewSegment = {
   durationType: "DISTANCE" | "TIME";
   durationValue: number;
   repeatCount?: number | null;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
+  notes?: string | null;
+  paceTargetEncodingVersion?: number | null;
   targets?: Array<{
     type: string;
     valueLow?: number;
@@ -81,6 +85,23 @@ export function pickWorkoutPayload(raw: unknown): PreviewWorkout | null {
       const targets = Array.isArray(o.targets)
         ? (o.targets as PreviewSegment["targets"])
         : undefined;
+      const recoveryDurationType =
+        typeof o.recoveryDurationType === "string" ? o.recoveryDurationType : null;
+      const recoveryDurationValueRaw = o.recoveryDurationValue;
+      const recoveryDurationValue =
+        recoveryDurationValueRaw == null
+          ? null
+          : typeof recoveryDurationValueRaw === "number"
+            ? recoveryDurationValueRaw
+            : Number(recoveryDurationValueRaw);
+      const notes = typeof o.notes === "string" ? o.notes : null;
+      const paceEncRaw = o.paceTargetEncodingVersion;
+      const paceTargetEncodingVersion =
+        paceEncRaw == null
+          ? null
+          : typeof paceEncRaw === "number"
+            ? paceEncRaw
+            : Number(paceEncRaw);
       segments.push({
         id,
         stepOrder,
@@ -91,6 +112,16 @@ export function pickWorkoutPayload(raw: unknown): PreviewWorkout | null {
           repeatCount != null && Number.isFinite(repeatCount)
             ? repeatCount
             : undefined,
+        recoveryDurationType,
+        recoveryDurationValue:
+          recoveryDurationValue != null && Number.isFinite(recoveryDurationValue)
+            ? recoveryDurationValue
+            : null,
+        notes,
+        paceTargetEncodingVersion:
+          paceTargetEncodingVersion != null && Number.isFinite(paceTargetEncodingVersion)
+            ? paceTargetEncodingVersion
+            : null,
         targets,
       });
     }
