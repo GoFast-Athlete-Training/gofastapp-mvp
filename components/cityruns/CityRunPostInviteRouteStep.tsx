@@ -82,6 +82,7 @@ export default function CityRunPostInviteRouteStep({
         } else {
           setAttachedName(name);
           setMode("choose");
+          onAttached?.();
         }
       } catch (e: unknown) {
         const err = e as {

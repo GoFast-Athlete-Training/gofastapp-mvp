@@ -146,6 +146,7 @@ export interface CreateCityRunFormProps {
   /** When set, stamps planned_workouts.cityRunId for this plan day. */
   plannedWorkoutId?: string | null;
   initialRouteId?: string | null;
+  onInviteCreated?: () => void;
 }
 
 export default function CreateCityRunForm({
@@ -158,6 +159,7 @@ export default function CreateCityRunForm({
   onWorkoutChange,
   plannedWorkoutId = null,
   initialRouteId = null,
+  onInviteCreated,
 }: CreateCityRunFormProps) {
   const [meetupDate, setMeetupDate] = useState("");
   const [startHour, setStartHour] = useState("");
@@ -425,8 +427,8 @@ export default function CreateCityRunForm({
         startTimePeriod: startPeriod,
       });
       if (data?.cityRunId && data?.path) {
-        markLastHostedRunForBuildPage(data.cityRunId);
         setSuccess(data);
+        onInviteCreated?.();
         setRouteStepDismissed(false);
       } else {
         setError("Unexpected response from server.");
@@ -569,7 +571,11 @@ export default function CreateCityRunForm({
             cityRunId={success.cityRunId}
             cityRunRouteNeighborhood={routeNeighborhood.trim() || null}
             suggestedRouteId={initialRouteId}
-            onSkip={() => setRouteStepDismissed(true)}
+            onSkip={() => {
+              markLastHostedRunForBuildPage(success.cityRunId);
+              setRouteStepDismissed(true);
+            }}
+            onAttached={() => markLastHostedRunForBuildPage(success.cityRunId)}
           />
         ) : null}
         <button

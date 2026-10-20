@@ -56,6 +56,9 @@ function HostARunPageInner() {
   const [template, setTemplate] = useState<CityRunMeetupTemplate | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(workoutIdParam || fromRunIdParam));
+  const [inviteReady, setInviteReady] = useState(false);
+
+  const showCreateLanding = !createStarted && !workoutIdParam && !inviteReady;
 
   const ensureHostWorkout = useCallback(async () => {
     if (fromRunIdParam) {
@@ -149,9 +152,13 @@ function HostARunPageInner() {
                 <Users className="w-6 h-6 text-orange-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Create a run</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {inviteReady ? "Invite ready" : "Create a run"}
+                </h1>
                 <p className="mt-1 text-gray-600 max-w-xl">
-                  Run home — build the meetup, share the invite, and manage execution after run day.
+                  {inviteReady
+                    ? "Share the link, attach a route if you want, then manage the run from your dashboard."
+                    : "Run home — build the meetup, share the invite, and manage execution after run day."}
                 </p>
                 <p className="mt-2 text-sm text-gray-600">
                   <Link href="/gorun" className="font-semibold text-orange-700 hover:underline">
@@ -161,15 +168,20 @@ function HostARunPageInner() {
               </div>
             </div>
 
-            <HostedRunInvitesPanel />
-
-            {!createStarted && !workoutIdParam ? (
-              <HostRunCreateFork
-                onChooseNew={() => setCreateStarted(true)}
-                onChooseFromPrevious={(runId) => {
-                  router.replace(`/host-a-run?fromRunId=${encodeURIComponent(runId)}`);
-                }}
-              />
+            {showCreateLanding ? (
+              <>
+                <HostRunCreateFork
+                  onChooseNew={() => {
+                    setInviteReady(false);
+                    setCreateStarted(true);
+                  }}
+                  onChooseFromPrevious={(runId) => {
+                    setInviteReady(false);
+                    router.replace(`/host-a-run?fromRunId=${encodeURIComponent(runId)}`);
+                  }}
+                />
+                <HostedRunInvitesPanel collapsible />
+              </>
             ) : null}
 
             {loading ? (
@@ -181,12 +193,17 @@ function HostARunPageInner() {
                 <p>{loadError || "Something went wrong"}</p>
               </div>
             ) : workout ? (
-              <CreateCityRunForm workout={workout} initialRouteId={routeIdParam} />
+              <CreateCityRunForm
+                workout={workout}
+                initialRouteId={routeIdParam}
+                onInviteCreated={() => setInviteReady(true)}
+              />
             ) : createStarted ? (
               <CityRunMeetupOnlyForm
                 initialRouteId={routeIdParam}
                 initialTemplate={template}
                 key={fromRunIdParam ?? "new"}
+                onInviteCreated={() => setInviteReady(true)}
               />
             ) : null}
           </div>

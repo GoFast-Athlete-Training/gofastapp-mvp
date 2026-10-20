@@ -66,11 +66,13 @@ function hasValidStartTime(hour: string, minute: string, period: "AM" | "PM"): b
 type Props = {
   initialRouteId?: string | null;
   initialTemplate?: CityRunMeetupTemplate | null;
+  onInviteCreated?: () => void;
 };
 
 export default function CityRunMeetupOnlyForm({
   initialRouteId = null,
   initialTemplate = null,
+  onInviteCreated,
 }: Props) {
 
   const [meetupTitle, setMeetupTitle] = useState(initialTemplate?.title ?? "");
@@ -203,8 +205,8 @@ export default function CityRunMeetupOnlyForm({
         routeId: initialRouteId ?? undefined,
       });
       if (data?.cityRunId && data?.path) {
-        markLastHostedRunForBuildPage(data.cityRunId);
         setSuccess(data);
+        onInviteCreated?.();
         setRouteStepDismissed(false);
       } else {
         setError("Unexpected response from server.");
@@ -262,7 +264,11 @@ export default function CityRunMeetupOnlyForm({
             cityRunId={success.cityRunId}
             cityRunRouteNeighborhood={routeNeighborhood.trim() || null}
             suggestedRouteId={initialRouteId}
-            onSkip={() => setRouteStepDismissed(true)}
+            onSkip={() => {
+              markLastHostedRunForBuildPage(success.cityRunId);
+              setRouteStepDismissed(true);
+            }}
+            onAttached={() => markLastHostedRunForBuildPage(success.cityRunId)}
           />
         ) : null}
       </div>

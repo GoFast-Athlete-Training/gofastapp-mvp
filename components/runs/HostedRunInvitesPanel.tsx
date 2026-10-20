@@ -20,6 +20,11 @@ type HostedInvite = {
   isUpcoming: boolean;
 };
 
+type Props = {
+  /** When true, panel starts collapsed behind “See past runs”. */
+  collapsible?: boolean;
+};
+
 function formatRunDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -43,13 +48,14 @@ export function markLastHostedRunForBuildPage(cityRunId: string): void {
   }
 }
 
-export default function HostedRunInvitesPanel() {
+export default function HostedRunInvitesPanel({ collapsible = false }: Props) {
   const [invites, setInvites] = useState<HostedInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(!collapsible);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,17 +119,41 @@ export default function HostedRunInvitesPanel() {
     }
   }
 
+  if (collapsible && !expanded) {
+    return (
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="text-sm font-semibold text-orange-700 hover:underline"
+        >
+          See past runs
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <section className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-white p-6 shadow-sm">
+    <section className="mt-6 rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-white p-6 shadow-sm">
       <div className="flex items-start gap-3 mb-4">
         <div className="rounded-xl bg-orange-100 p-2.5 shrink-0">
           <Share2 className="h-6 w-6 text-orange-700" />
         </div>
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Runs I created</h2>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h2 className="text-lg font-semibold text-gray-900">Runs I created</h2>
+            {collapsible ? (
+              <button
+                type="button"
+                onClick={() => setExpanded(false)}
+                className="text-sm font-medium text-gray-600 hover:text-gray-900 shrink-0"
+              >
+                Hide
+              </button>
+            ) : null}
+          </div>
           <p className="text-sm text-gray-600 mt-1">
-            Hosted invites you can share, edit, or delete. Plan workouts live under
-            Your workouts below — not here.
+            Hosted invites you can share, edit, or delete.
           </p>
         </div>
       </div>
@@ -142,11 +172,7 @@ export default function HostedRunInvitesPanel() {
 
       {!loading && !error && invites.length === 0 ? (
         <p className="text-sm text-gray-600 py-2">
-          No run invites yet. Use{" "}
-          <Link href="/host-a-run" className="font-semibold text-orange-700 hover:underline">
-            Create a run
-          </Link>{" "}
-          — it will show up here newest first.
+          No run invites yet. Create one above — it will show up here newest first.
         </p>
       ) : null}
 

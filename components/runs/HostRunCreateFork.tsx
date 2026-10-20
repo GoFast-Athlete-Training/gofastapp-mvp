@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import type { AthleteHostedRunInvite } from "@/lib/city-run/list-athlete-hosted-invites";
 
+const cardClass =
+  "rounded-xl border-2 border-orange-200 bg-orange-50 p-5 text-left hover:border-orange-400 w-full";
+
 type Props = {
   onChooseNew: () => void;
   onChooseFromPrevious: (runId: string) => void;
@@ -12,6 +15,7 @@ type Props = {
 export default function HostRunCreateFork({ onChooseNew, onChooseFromPrevious }: Props) {
   const [invites, setInvites] = useState<AthleteHostedRunInvite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [usedPickerOpen, setUsedPickerOpen] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -32,40 +36,49 @@ export default function HostRunCreateFork({ onChooseNew, onChooseFromPrevious }:
     <div className="mb-8 space-y-4">
       <p className="text-sm font-semibold text-gray-900">How do you want to start?</p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={onChooseNew}
-          className="rounded-xl border-2 border-orange-200 bg-orange-50 p-5 text-left hover:border-orange-400"
-        >
+        <button type="button" onClick={onChooseNew} className={cardClass}>
           <p className="font-bold text-gray-900">New</p>
           <p className="mt-1 text-sm text-gray-600">Blank meetup and invite.</p>
         </button>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="font-bold text-gray-900">From previous</p>
-          <p className="mt-1 text-sm text-gray-600 mb-3">
+        <button
+          type="button"
+          onClick={() => setUsedPickerOpen(true)}
+          className={`${cardClass} ${usedPickerOpen ? "border-orange-400 ring-2 ring-orange-200" : ""}`}
+        >
+          <p className="font-bold text-gray-900">Used</p>
+          <p className="mt-1 text-sm text-gray-600">
             Copy title, description, time, and meetup from an earlier run.
           </p>
+        </button>
+      </div>
+
+      {usedPickerOpen ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <p className="text-sm font-semibold text-gray-900 mb-2">Pick a prior run</p>
           {loading ? (
             <p className="text-sm text-gray-500">Loading…</p>
           ) : invites.length === 0 ? (
             <p className="text-sm text-gray-500">No prior runs yet — start with New.</p>
           ) : (
-            <ul className="max-h-40 overflow-y-auto space-y-1">
+            <ul className="max-h-48 overflow-y-auto space-y-1">
               {invites.map((inv) => (
                 <li key={inv.id}>
                   <button
                     type="button"
                     onClick={() => onChooseFromPrevious(inv.id)}
-                    className="w-full text-left rounded-lg px-2 py-1.5 text-sm hover:bg-gray-50"
+                    className="w-full text-left rounded-lg px-2 py-2 text-sm hover:bg-orange-50 border border-transparent hover:border-orange-100"
                   >
                     <span className="font-medium text-gray-900">{inv.title}</span>
+                    {!inv.isUpcoming ? (
+                      <span className="ml-2 text-xs text-gray-400">Past</span>
+                    ) : null}
                   </button>
                 </li>
               ))}
             </ul>
           )}
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
