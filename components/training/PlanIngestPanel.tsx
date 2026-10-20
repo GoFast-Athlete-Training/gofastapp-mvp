@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { PlanIngestScope } from "@/lib/training/plan-ingest-contract";
 import { usePlanIngestPreviewCommit } from "@/lib/training/use-plan-ingest-preview-commit";
 
@@ -15,6 +15,9 @@ type Props = {
   placeholder?: string;
   onCommitted?: () => void;
   defaultOpen?: boolean;
+  /** Controlled expand (e.g. hub Replace → day page). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 export default function PlanIngestPanel({
@@ -28,8 +31,26 @@ export default function PlanIngestPanel({
   placeholder,
   onCommitted,
   defaultOpen = false,
+  open: openControlled,
+  onOpenChange,
 }: Props) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [openInternal, setOpenInternal] = useState(defaultOpen);
+  const isControlled = openControlled !== undefined;
+  const open = isControlled ? openControlled : openInternal;
+
+  const setOpen = useCallback(
+    (next: boolean | ((prev: boolean) => boolean)) => {
+      const resolved = typeof next === "function" ? next(open) : next;
+      if (isControlled) onOpenChange?.(resolved);
+      else setOpenInternal(resolved);
+    },
+    [isControlled, onOpenChange, open]
+  );
+
+  useEffect(() => {
+    if (!isControlled && defaultOpen) setOpenInternal(true);
+  }, [defaultOpen, isControlled]);
+
   const [sourceText, setSourceText] = useState("");
 
   const { preview, error, loading, committing, runPreview, runCommit, resetPreview } =

@@ -196,6 +196,7 @@ export default function TrainingPlanDayPreviewPage() {
   const sourceHome = searchParams.get("source") === "home";
   const replaceMode = searchParams.get("replace") === "1";
   const replacePanelRef = useRef<HTMLDivElement | null>(null);
+  const [replacePanelOpen, setReplacePanelOpen] = useState(replaceMode);
 
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -506,10 +507,21 @@ export default function TrainingPlanDayPreviewPage() {
     void load();
   }, [authReady, dateKey, load]);
 
+  const focusReplacePanel = useCallback(() => {
+    setReplacePanelOpen(true);
+    requestAnimationFrame(() => {
+      replacePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (replaceMode) setReplacePanelOpen(true);
+  }, [replaceMode]);
+
   useEffect(() => {
     if (!replaceMode || loading || workoutLoading) return;
-    replacePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [replaceMode, loading, workoutLoading]);
+    focusReplacePanel();
+  }, [replaceMode, loading, workoutLoading, focusReplacePanel]);
 
   const isRaceDay = workout?.workoutType === "Race" || raceDayOnSchedule;
   const title = workout?.title?.trim() || "Workout";
@@ -761,6 +773,17 @@ export default function TrainingPlanDayPreviewPage() {
               {workout?.description?.trim() ? (
                 <p className="mt-2 text-sm text-gray-600 leading-relaxed">{workout.description}</p>
               ) : null}
+              {!isLogged && planDetail?.id && dateKey ? (
+                <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-gray-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={focusReplacePanel}
+                    className="text-sm font-semibold text-sky-800 hover:text-sky-950 hover:underline"
+                  >
+                    Replace
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             <div className="px-5 py-4 space-y-4">
@@ -783,7 +806,9 @@ export default function TrainingPlanDayPreviewPage() {
                     dateKey={dateKey}
                     weekNumber={weekNumberNumeric}
                     getToken={getDayToken}
-                    title="Change this workout"
+                    open={replacePanelOpen}
+                    onOpenChange={setReplacePanelOpen}
+                    title="Replace this workout"
                     description="Paste a replacement for this day only — preview, then confirm."
                     onCommitted={() => void load()}
                   />
@@ -1025,14 +1050,25 @@ export default function TrainingPlanDayPreviewPage() {
                 </button>
               ) : null}
               {!isLogged && !isRaceDay ? (
-                <button
-                  type="button"
-                  onClick={() => void handleDoThisWorkout()}
-                  disabled={openingWorkout || !canOpenWorkout || workoutLoading || !!workoutError}
-                  className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-                >
-                  {openingWorkout ? "Opening…" : "Details"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void handleDoThisWorkout()}
+                    disabled={openingWorkout || !canOpenWorkout || workoutLoading || workoutError}
+                    className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    {openingWorkout ? "Opening…" : "Open full workout"}
+                  </button>
+                  {planDetail?.id && dateKey ? (
+                    <button
+                      type="button"
+                      onClick={focusReplacePanel}
+                      className="w-full rounded-xl border border-sky-200 bg-white py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
+                    >
+                      Replace
+                    </button>
+                  ) : null}
+                </>
               ) : null}
               {!isLogged && isRaceDay && workoutId ? (
                 <button

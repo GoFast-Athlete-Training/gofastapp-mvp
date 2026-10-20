@@ -1426,6 +1426,23 @@ export default function WorkoutDetailPage() {
       const qStr = quickPaceDisplayStrings(seg, o);
       let lowSec: number;
       let highSec: number;
+      const hasQuickPace =
+        qStr.lowMin.trim() !== "" &&
+        qStr.lowSec.trim() !== "" &&
+        !Number.isNaN(parseInt(qStr.lowMin, 10));
+
+      if (!hasQuickPace) {
+        const center = Math.max(1, Math.round(fiveKAnchorSec + newOffset));
+        const lo = secPerMileToSplitStrings(center);
+        patchQuickSegmentOverride(segmentId, {
+          quickPaceLowMin: lo.min,
+          quickPaceLowSec: lo.sec,
+          quickPaceHighMin: lo.min,
+          quickPaceHighSec: lo.sec,
+        });
+        return;
+      }
+
       try {
         lowSec = parseSplitPaceToSecPerMile(
           qStr.lowMin,
@@ -2799,6 +2816,9 @@ export default function WorkoutDetailPage() {
                 const qStr = quickPaceDisplayStrings(segment, o);
                 const hasPaceTarget = baseLow != null || baseHigh != null;
                 const quickEditable = mergedQuickEditable(segment, o);
+                const hasEditablePace =
+                  hasPaceTarget ||
+                  (qStr.lowMin.trim() !== "" && qStr.lowSec.trim() !== "");
                 const recoveryQuickEditable = recoverySeg
                   ? mergedQuickEditable(recoverySeg, segmentOverrides[recoverySeg.id])
                   : null;
@@ -2811,6 +2831,11 @@ export default function WorkoutDetailPage() {
                     hasPaceTarget,
                     conversational: !!conversationalPaceBySegmentId[segment.id],
                   });
+                const showPaceEditorSection =
+                  !isLogged &&
+                  !isEditing &&
+                  !conversationalPaceBySegmentId[segment.id] &&
+                  (hasEditablePace || showPaceOffsetControls);
                 let blockOffsetSecPerMile: number | null = null;
                 if (showPaceOffsetControls) {
                   try {
@@ -3100,9 +3125,7 @@ export default function WorkoutDetailPage() {
                         </div>
                       ) : null}
 
-                      {segment.targets &&
-                        segment.targets.length > 0 &&
-                        !conversationalPaceBySegmentId[segment.id] && (
+                      {showPaceEditorSection && (
                         <div>
                           {showPaceOffsetControls ? (
                             <div className="mb-4 rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-3 space-y-3">
@@ -3163,7 +3186,7 @@ export default function WorkoutDetailPage() {
                           <dd className="space-y-2">
                             {segment.targets.map((target, idx) => {
                               const t = (target.type || "").toUpperCase();
-                              if (!isLogged && t === "PACE" && hasPaceTarget) {
+                              if (!isLogged && t === "PACE" && hasEditablePace) {
                                 return (
                                   <div key={idx} className="space-y-2">
                                     <span className="text-gray-600 text-sm block">

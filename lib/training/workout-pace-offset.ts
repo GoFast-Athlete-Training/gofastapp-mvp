@@ -51,12 +51,26 @@ export function shiftPaceBandSecPerMile(
   };
 }
 
+function isWorkBlockTitle(title: string): boolean {
+  const t = (title || "").toLowerCase();
+  if (t.includes("warm") || t.includes("cool")) return false;
+  if (/\brecovery\b|\bjog\b/.test(t)) return false;
+  return (
+    t.includes("tempo") ||
+    t.includes("interval") ||
+    /\bwork\b/.test(t) ||
+    t.includes("main")
+  );
+}
+
 export function isWorkBlockEligibleForPaceOffset(params: {
   title: string;
   hasPaceTarget: boolean;
   conversational: boolean;
 }): boolean {
-  if (params.conversational || !params.hasPaceTarget) return false;
+  if (params.conversational) return false;
+  if (isWorkBlockTitle(params.title)) return true;
+  if (!params.hasPaceTarget) return false;
   const t = (params.title || "").toLowerCase();
   if (t.includes("warm") || t.includes("cool")) return false;
   if (/\brecovery\b|\bjog\b/.test(t)) return false;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   inferOffsetSecPerMileFromPace,
+  isWorkBlockEligibleForPaceOffset,
   presetIdForWorkoutOffset,
   shiftPaceBandSecPerMile,
 } from "@/lib/training/workout-pace-offset";
@@ -17,4 +18,23 @@ test("shiftPaceBandSecPerMile preserves band width", () => {
 test("presetIdForWorkoutOffset maps known offsets", () => {
   assert.equal(presetIdForWorkoutOffset(15), "10k");
   assert.equal(presetIdForWorkoutOffset(20), "custom");
+});
+
+test("tempo work blocks get pace offset controls even without stored PACE targets", () => {
+  assert.equal(
+    isWorkBlockEligibleForPaceOffset({
+      title: "Tempo",
+      hasPaceTarget: false,
+      conversational: false,
+    }),
+    true
+  );
+  assert.equal(
+    isWorkBlockEligibleForPaceOffset({
+      title: "Warm-up",
+      hasPaceTarget: false,
+      conversational: false,
+    }),
+    false
+  );
 });
