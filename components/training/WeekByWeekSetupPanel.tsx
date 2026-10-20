@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 
 type CreateFeedbackKind = "goals" | "dates" | "distanceMismatch" | "incompletePreset" | "generic";
 
@@ -20,6 +21,8 @@ type Props = {
   onPaceSecChange: (v: string) => void;
   currentWeekNumber: number;
   currentWeekPhaseLabel: string;
+  totalWeeks: number;
+  raceDateLabel: string | null;
   formError: string | null;
   replaceBlockPlan: ActivePlanLite | null;
   createFeedback: CreateFeedbackKind | null;
@@ -45,6 +48,8 @@ export function WeekByWeekSetupPanel({
   onPaceSecChange,
   currentWeekNumber,
   currentWeekPhaseLabel,
+  totalWeeks,
+  raceDateLabel,
   formError,
   replaceBlockPlan,
   createFeedback,
@@ -58,13 +63,27 @@ export function WeekByWeekSetupPanel({
   onDismissFeedback,
   onRefreshGoals,
 }: Props) {
+  const shortCalendarHint =
+    totalWeeks <= 2 && raceDateLabel ? (
+      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        {totalWeeks} calendar week{totalWeeks === 1 ? "" : "s"} from your start date to race day (
+        {raceDateLabel}). Move the start date earlier if you want a longer build — right now
+        you&apos;re in <span className="font-medium">{currentWeekPhaseLabel}</span> on the calendar.
+      </p>
+    ) : raceDateLabel ? (
+      <p className="text-sm text-gray-600">
+        {totalWeeks} calendar week{totalWeeks === 1 ? "" : "s"} from start to race ({raceDateLabel}
+        ).
+      </p>
+    ) : null;
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-4 text-sm text-gray-800">
-        <p className="font-medium text-gray-900">Load your schedule</p>
+        <p className="font-medium text-gray-900">Load your workouts onto the calendar</p>
         <p className="mt-2 leading-relaxed text-gray-700">
-          We open a calendar shell with race day stamped. You load workouts as JSON on the plan —
-          not a generated preset. Pick one week or upload the full multi-week template.
+          We stamp race day on your plan shell — this is your schedule, not a GoFast preset. Load one
+          week or upload the full multi-week template.
         </p>
         <button
           type="button"
@@ -94,6 +113,7 @@ export function WeekByWeekSetupPanel({
             value={startDate}
             onChange={(e) => onStartDateChange(e.target.value)}
           />
+          {shortCalendarHint}
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-700">
@@ -201,30 +221,36 @@ export function WeekByWeekSetupPanel({
         <p className="text-xs text-gray-600">{createFeedbackMessage}</p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-3">
         <button
           type="button"
           disabled={creating}
           onClick={onLoadThisWeek}
-          className="rounded-xl border-2 border-orange-200 bg-white p-4 text-left hover:border-orange-400 hover:bg-orange-50/40 disabled:opacity-60"
+          className="flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-700 active:bg-orange-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <p className="font-semibold text-gray-900">Just this week</p>
-          <p className="mt-1 text-sm text-gray-600">
-            Week {currentWeekNumber} · {currentWeekPhaseLabel} phase — paste or week CSV on the
-            next screen.
-          </p>
+          {creating ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              Opening…
+            </>
+          ) : (
+            `Load up week ${currentWeekNumber}`
+          )}
         </button>
+        <p className="text-center text-sm text-gray-600">
+          Week {currentWeekNumber} · {currentWeekPhaseLabel} — paste or week CSV on the next screen.
+        </p>
         <button
           type="button"
           disabled={creating}
           onClick={onLoadFullPlan}
-          className="rounded-xl border-2 border-sky-200 bg-white p-4 text-left hover:border-sky-400 hover:bg-sky-50/40 disabled:opacity-60"
+          className="min-h-[48px] w-full cursor-pointer rounded-xl border-2 border-sky-200 bg-white px-4 py-3 text-sm font-semibold text-sky-900 transition hover:border-sky-400 hover:bg-sky-50/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <p className="font-semibold text-gray-900">Full multi-week plan</p>
-          <p className="mt-1 text-sm text-gray-600">
-            Download the template with a Week column, fill all training days, upload once.
-          </p>
+          Upload full plan (CSV template)
         </button>
+        <p className="text-center text-xs text-gray-500">
+          Multi-week template with a Week column — fill all training days, upload once.
+        </p>
       </div>
     </div>
   );

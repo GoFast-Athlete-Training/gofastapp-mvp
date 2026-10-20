@@ -1120,7 +1120,18 @@ export default function TrainingSetupClient() {
 
     const loadWeekContext = (() => {
       if (!startDate || !rr.raceDate) {
-        return { weekNum: 1, phaseLabel: planWeekPhaseUxLabel("B") };
+        return {
+          weekNum: 1,
+          phaseLabel: planWeekPhaseUxLabel("B"),
+          totalWeeks: 1,
+          raceDateLabel: rr.raceDate
+            ? new Date(rr.raceDate).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })
+            : null,
+        };
       }
       const start = utcDateOnly(new Date(startDate));
       const race = utcDateOnly(new Date(rr.raceDate));
@@ -1130,7 +1141,16 @@ export default function TrainingSetupClient() {
         weekNumberFromPlanDate(start, utcDateOnly(new Date()))
       );
       const phase = planWeekPhaseForNumber(totalWeeks, weekNum);
-      return { weekNum, phaseLabel: planWeekPhaseUxLabel(phase) };
+      return {
+        weekNum,
+        phaseLabel: planWeekPhaseUxLabel(phase),
+        totalWeeks,
+        raceDateLabel: race.toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+      };
     })();
 
     async function getTokenForIngest() {
@@ -1315,6 +1335,8 @@ export default function TrainingSetupClient() {
                     onPaceSecChange={setPaceSec}
                     currentWeekNumber={loadWeekContext.weekNum}
                     currentWeekPhaseLabel={loadWeekContext.phaseLabel}
+                    totalWeeks={loadWeekContext.totalWeeks}
+                    raceDateLabel={loadWeekContext.raceDateLabel}
                     formError={formError}
                     replaceBlockPlan={replaceBlockPlan}
                     createFeedback={createFeedback}

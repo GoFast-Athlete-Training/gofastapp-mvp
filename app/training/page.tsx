@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, CalendarClock, MessageCircle, Users } from "lucide-react";
+import { BookOpen, CalendarClock, ExternalLink, MessageCircle, Users } from "lucide-react";
 import api from "@/lib/api";
 import type { ScheduledRunJson } from "@/app/api/training/schedule-run/route";
 import { onAuthStateChanged } from "firebase/auth";
@@ -42,6 +42,8 @@ import { RaceDayGoalBanner } from "@/components/races/RaceDayGoalBanner";
 import type { ShareHubPlanStatus } from "@/lib/profile/share-creator-card-logic";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { TrainingHubPlanShareControls } from "@/components/training/hub/TrainingHubPlanShareControls";
+import { isPlanPublic, publicPlanPagePath } from "@/lib/gofast-with-me/plan-sharing-utils";
+import { athleteMyPlanPath } from "@/lib/gofast-with-me/athlete-community-routes";
 import { TrainingHubEditPlanGear } from "@/components/training/hub/TrainingHubEditPlanGear";
 import { TrainingHubWeekGear } from "@/components/training/hub/TrainingHubWeekGear";
 
@@ -1034,6 +1036,43 @@ export default function TrainingHubPage() {
                       Current 5K pace:{" "}
                       <span className="font-mono tabular-nums text-gray-900">{paceDisplay}</span>
                     </p>
+                  ) : null}
+                  {shareHubPlan && !shareHubPlanLoading && isPlanPublic(shareHubPlan) ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      {planShareLandingSlug.trim() ? (
+                        <>
+                          <Link
+                            href={athleteMyPlanPath(planShareLandingSlug)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-orange-700 hover:underline"
+                          >
+                            View my training
+                            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                          </Link>
+                          <Link
+                            href={athleteMyPlanPath(planShareLandingSlug, "race")}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:underline"
+                          >
+                            Race week slice
+                            <ExternalLink className="h-3 w-3" aria-hidden />
+                          </Link>
+                        </>
+                      ) : null}
+                      {shareHubPlan.publicSlug ? (
+                        <Link
+                          href={publicPlanPagePath(shareHubPlan.publicSlug)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:underline"
+                        >
+                          Full plan page
+                          <ExternalLink className="h-3 w-3" aria-hidden />
+                        </Link>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
                 {shareHubPlan && !shareHubPlanLoading ? (

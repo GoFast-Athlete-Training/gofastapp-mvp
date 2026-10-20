@@ -85,6 +85,8 @@ export type PlanIngestPreviewResult =
       parseSource: "deterministic" | "openai";
       plan: PlanIngestPlanPayload;
       summary: string;
+      /** CSV/paste workout names keyed by dateKey for display titles after catalogue materialize. */
+      dayTitlesByDateKey?: Record<string, string>;
     };
 
 export type PlanIngestCommitBody = {

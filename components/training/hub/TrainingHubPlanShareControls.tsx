@@ -13,6 +13,7 @@ import {
   isPlanPublic,
   publicPlanPagePath,
 } from "@/lib/gofast-with-me/plan-sharing-utils";
+import { athleteMyPlanPath } from "@/lib/gofast-with-me/athlete-community-routes";
 import {
   normalizePlanTitleInput,
   planTitleFallback,
@@ -313,6 +314,21 @@ export function TrainingHubPlanShareControls({
         />
       ) : null}
       {detailsForm}
+      {isPublic && landingSlug.trim() ? (
+        <Link
+          href={athleteMyPlanPath(landingSlug)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-orange-700 hover:underline"
+        >
+          View my training
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+        </Link>
+      ) : publishable ? (
+        <p className="text-xs text-gray-600">
+          Turn the plan public above to get a shareable View my training link.
+        </p>
+      ) : null}
       {isPublic && landingSlug.trim() ? (
         <Link
           href={hubPlanStripPath(landingSlug)}

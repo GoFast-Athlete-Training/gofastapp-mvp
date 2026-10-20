@@ -122,9 +122,18 @@ export function buildWeekSummary(params: {
     chips.push(`${easyDays.length} easy ${easyDays.length === 1 ? "day" : "days"}`);
   }
 
+  const HIGH_VOLUME_ONE_WEEK_MI = 14;
+
   let narrative: string;
   if (weekNumber === totalWeeks && hasRace) {
-    narrative = "Race week — keep the week light and trust the work you've already banked.";
+    if (totalWeeks === 1 && totalMiles >= HIGH_VOLUME_ONE_WEEK_MI) {
+      narrative =
+        "Final week before race — you're still loading real training days. Stay sharp, then trust the taper into race day.";
+    } else if (totalWeeks === 1) {
+      narrative = "Race week — one calendar week to the start line. Keep it controlled and trust your prep.";
+    } else {
+      narrative = "Race week — keep the week light and trust the work you've already banked.";
+    }
   } else if (deload) {
     narrative =
       longRuns.length > 0

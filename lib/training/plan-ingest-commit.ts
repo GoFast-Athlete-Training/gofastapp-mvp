@@ -121,9 +121,11 @@ async function clearPlannedWorkoutsInDateRange(params: {
   return ids.length;
 }
 
-function buildDayTitlesByDateKey(
-  preview: Extract<PlanIngestPreviewResult, { scope: "week" }>,
-): Record<string, string> {
+function buildDayTitlesByDateKey(preview: PlanIngestPreviewResult): Record<string, string> {
+  if (preview.scope === "plan") {
+    return preview.dayTitlesByDateKey ?? {};
+  }
+  if (preview.scope !== "week") return {};
   const out: Record<string, string> = {};
   for (const row of preview.weekIngestRows ?? []) {
     if (row.status === "import" && row.workoutName.trim()) {
@@ -136,6 +138,27 @@ function buildDayTitlesByDateKey(
     }
   }
   return out;
+}
+
+async function applyPlannedWorkoutTitleOverride(params: {
+  athleteId: string;
+  planId: string;
+  dateKey: string;
+  title: string;
+}): Promise<void> {
+  const day = utcDateOnly(new Date(`${params.dateKey}T12:00:00.000Z`));
+  const gte = new Date(day);
+  gte.setUTCHours(0, 0, 0, 0);
+  const lte = new Date(day);
+  lte.setUTCHours(23, 59, 59, 999);
+  await prisma.planned_workouts.updateMany({
+    where: {
+      athleteId: params.athleteId,
+      planId: params.planId,
+      date: { gte, lte },
+    },
+    data: { title: params.title, updatedAt: new Date() },
+  });
 }
 
 async function rematerializeFutureDaysInWeek(params: {
@@ -260,6 +283,16 @@ async function commitWorkoutIngest(params: {
     warnings.push(e instanceof MaterializeWorkoutError ? e.message : String(e));
   }
 
+  const titleOverride = workout.suggestedTitle?.trim();
+  if (titleOverride && plannedWorkoutId) {
+    await applyPlannedWorkoutTitleOverride({
+      athleteId: params.plan.athleteId,
+      planId: params.plan.id,
+      dateKey: workout.dateKey,
+      title: titleOverride,
+    });
+  }
+
   if (workout.segments && workout.segments.length > 0 && plannedWorkoutId) {
     await replacePrescribeSegmentsForAthlete({
       id: plannedWorkoutId,
@@ -353,8 +386,14 @@ async function commitPlanIngestScope(params: {
     athleteId: params.plan.athleteId,
   });
 
+  const dayTitlesByDateKey = buildDayTitlesByDateKey(params.preview);
+
   for (const w of incoming) {
-    await rematerializeFutureDaysInWeek({ plan: params.plan, weekNumber: w.weekNumber });
+    await rematerializeFutureDaysInWeek({
+      plan: params.plan,
+      weekNumber: w.weekNumber,
+      dayTitlesByDateKey,
+    });
   }
 
   return { replacedWeeks: incoming.length, cleanup };

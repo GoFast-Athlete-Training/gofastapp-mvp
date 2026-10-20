@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   athleteCommunityPath,
+  athleteMyPlanPath,
   athleteCommunityPreviewPath,
   athleteCommunitySectionToHubTab,
   athletePublicLandingUrl,
@@ -17,6 +18,9 @@ test('builds canonical community URLs', () => {
   assert.equal(athleteCommunityPath('adam'), '/u/adam/community');
   assert.equal(athleteCommunityPath('adam', 'plan'), '/u/adam/community#plan');
   assert.equal(athleteCommunityPreviewPath('adam'), '/u/adam/community?preview=follower');
+  assert.equal(athleteMyPlanPath('adam'), '/u/adam/myplan');
+  assert.equal(athleteMyPlanPath('adam', 3), '/u/adam/myplan?week=3');
+  assert.equal(athleteMyPlanPath('adam', 'race'), '/u/adam/myplan?week=race');
 });
 
 test('maps legacy hashes to community sections', () => {

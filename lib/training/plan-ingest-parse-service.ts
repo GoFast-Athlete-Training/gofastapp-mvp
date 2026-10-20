@@ -472,6 +472,13 @@ export async function previewPlanIngest(params: {
       });
       weeksOut.push(enriched.week);
     }
+    const dayTitlesByDateKey: Record<string, string> = {};
+    for (const meta of Object.values(parsed.metaByWeekNumber)) {
+      for (const [dateKey, row] of Object.entries(meta)) {
+        const name = row.workoutName?.trim();
+        if (name) dayTitlesByDateKey[dateKey] = name;
+      }
+    }
     let summary = `${weeksOut.length} week(s) from CSV with catalogue matching`;
     if (parsed.skippedNotes.length > 0) {
       summary = appendSkippedToSummary(summary, parsed.skippedNotes);
@@ -483,6 +490,7 @@ export async function previewPlanIngest(params: {
         parseSource: "deterministic",
         plan: { weeks: weeksOut },
         summary,
+        dayTitlesByDateKey,
       },
     };
   }

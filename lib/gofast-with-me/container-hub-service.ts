@@ -166,7 +166,7 @@ function raceForPlanWeeks(plan: {
   return plan.race_registry;
 }
 
-async function buildPlanStripFromTrainingPlan(plan: {
+export async function buildPlanStripFromTrainingPlan(plan: {
   id: string;
   athleteId: string;
   name: string;
@@ -216,6 +216,26 @@ async function buildPlanStripFromTrainingPlan(plan: {
     distanceMeters: race?.distanceMeters ?? null,
     sourceAuthorAthleteId: plan.athleteId,
   };
+}
+
+/** First PUBLIC published plan strip for an athlete (no owner-only preview). */
+export async function loadPublicPublishedPlanStrip(
+  hostAthleteId: string
+): Promise<HubPlanStrip | null> {
+  const publicRows = await listPublicPlansForAthlete(hostAthleteId);
+  const firstPublic = publicRows.find((p) => p.publicSlug?.trim());
+  if (!firstPublic?.publicSlug) return null;
+  const plan = await getPublicPlanBySlug(firstPublic.publicSlug);
+  if (
+    !plan ||
+    plan.publicVisibility !== PublicTrainingPlanVisibility.PUBLIC ||
+    !plan.planSchedule
+  ) {
+    return null;
+  }
+  const strip = await buildPlanStripFromTrainingPlan(plan);
+  if (!strip?.isPublic) return null;
+  return strip;
 }
 
 /** Public published plan for followers; owner also sees active plan weeks when not published yet. */

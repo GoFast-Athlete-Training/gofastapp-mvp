@@ -102,6 +102,18 @@ export function athleteCommunityPath(
   return section ? `${base}#${section}` : base;
 }
 
+/** Public training week view at `/u/{handle}/myplan`. */
+export function athleteMyPlanPath(
+  handle: string,
+  week?: number | "race"
+): string {
+  const base = `${athletePublicPagePath(handle)}/myplan`;
+  if (week === undefined) return base;
+  const q =
+    week === "race" ? "race" : Number.isFinite(week) && week >= 1 ? String(Math.floor(week)) : null;
+  return q ? `${base}?week=${encodeURIComponent(q)}` : base;
+}
+
 export function athleteCommunityPreviewPath(handle: string): string {
   return `${athleteCommunityPath(handle)}?preview=follower`;
 }
