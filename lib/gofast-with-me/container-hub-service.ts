@@ -113,7 +113,7 @@ export type ContainerHubPayload = {
     caption: string | null;
     publishedAt: string;
   } | null;
-  nextRace: PublicAthletePayload['nextRace'];
+  nextRace: NonNullable<PublicAthletePayload>['nextRace'];
   hostBio: string | null;
 };
 
