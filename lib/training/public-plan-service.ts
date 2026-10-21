@@ -617,7 +617,6 @@ export async function adoptPublishedPlanBySlug(
         athleteRaceId: athleteRaceRow.id,
         name: planName,
         startDate,
-        totalWeeks,
         currentWeeklyMileage: weeklyResolved,
         weeklyMileageTarget: prefs?.weeklyMileageTarget ?? null,
         currentFiveKPace: fiveKPace,
