@@ -12,7 +12,11 @@ import {
   User,
 } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
-import { runManageCreatePath, runManageTypePath } from "@/lib/runmanage/paths";
+import {
+  RUN_MANAGE_SERIES_PATH,
+  runManageCreatePath,
+  runManageTypePath,
+} from "@/lib/runmanage/paths";
 import {
   COCKPIT_BUCKET_META,
   COCKPIT_BUCKET_ORDER,
@@ -171,13 +175,21 @@ export function RunManageDashboardHome() {
           <h1 className="text-3xl font-bold text-gray-900">Run Manage</h1>
           <p className="mt-1 text-gray-600">What&apos;s happening this week.</p>
         </div>
-        <Link
-          href={runManageCreatePath()}
-          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
-        >
-          <Plus className="h-4 w-4" />
-          Create run
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={RUN_MANAGE_SERIES_PATH}
+            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+          >
+            Manage recurring runs
+          </Link>
+          <Link
+            href={runManageCreatePath()}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+          >
+            <Plus className="h-4 w-4" />
+            Create run
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -225,8 +237,12 @@ export function RunManageDashboardHome() {
         ) : weekListRuns.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500">
             Nothing this week.{" "}
+            <Link href={RUN_MANAGE_SERIES_PATH} className="font-medium text-sky-700 hover:underline">
+              Manage recurring runs
+            </Link>
+            {" or "}
             <Link href={runManageCreatePath()} className="font-medium text-sky-700 hover:underline">
-              Create a run
+              create a one-off run
             </Link>
             .
           </p>

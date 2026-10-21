@@ -59,7 +59,7 @@ export function RunManageShell({ children }: { children: ReactNode }) {
                     : "text-gray-600 hover:text-gray-900"
                 }
               >
-                All series
+                Recurring runs
               </Link>
               <Link
                 href={RUN_MANAGE_CLUBS_PATH}
