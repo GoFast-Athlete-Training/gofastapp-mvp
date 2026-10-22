@@ -1,14 +1,15 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import TopNav from '@/components/shared/TopNav';
 import CityRunRsvpGroup from '@/components/runs/CityRunRsvpGroup';
 import CityRunRsvpSuccessScreen from '@/components/runs/CityRunRsvpSuccessScreen';
 import { useCityRunPageLoad } from '@/components/runs/useCityRunPageLoad';
 import { athleteHasCityRunMembership } from '@/lib/city-run/rsvp-attendance';
-import { cityRunTogetherPath, runRsvpPath } from '@/lib/city-run/run-nav-paths';
+import { cityRunTogetherPath } from '@/lib/city-run/run-nav-paths';
 import { LocalStorageAPI } from '@/lib/localstorage';
+import api from '@/lib/api';
 import { auth } from '@/lib/firebase';
 
 function CityRunTogetherPageContent() {
@@ -18,22 +19,29 @@ function CityRunTogetherPageContent() {
   const runId = params.runId as string;
   const showSuccess = searchParams.get('rsvp') === 'success';
   const { run, loading, error, isGuestSession, fetchAll } = useCityRunPageLoad(runId);
-
-  useEffect(() => {
-    if (loading || !run) return;
-    const athleteId = LocalStorageAPI.getAthleteId();
-    const hasMembership = athleteHasCityRunMembership(run, athleteId);
-    const guest = isGuestSession || !auth.currentUser;
-
-    if (guest || !hasMembership) {
-      const qs = showSuccess ? '?rsvp=success' : '';
-      router.replace(`${runRsvpPath(run.slug?.trim() || run.id)}${qs}`);
-    }
-  }, [loading, run, isGuestSession, router, showSuccess]);
+  const [rsvpLoading, setRsvpLoading] = useState(false);
 
   const dismissSuccess = () => {
     if (!run) return;
     router.replace(cityRunTogetherPath(run.slug?.trim() || run.id));
+  };
+
+  const handleJoinRun = async () => {
+    if (!run) return;
+    if (isGuestSession || !auth.currentUser) {
+      router.push(`/join/run/${encodeURIComponent(run.slug ?? run.id)}/signup`);
+      return;
+    }
+    setRsvpLoading(true);
+    try {
+      await api.post(`/runs/${run.id}/rsvp`, { status: 'going' });
+      await fetchAll(false);
+      router.replace(`${cityRunTogetherPath(run.slug?.trim() || run.id)}?rsvp=success`);
+    } catch (err) {
+      console.error('RSVP error:', err);
+    } finally {
+      setRsvpLoading(false);
+    }
   };
 
   if (loading) {
@@ -63,17 +71,11 @@ function CityRunTogetherPageContent() {
   }
 
   const athleteId = LocalStorageAPI.getAthleteId();
-  const hasMembership = athleteHasCityRunMembership(run, athleteId);
-
-  if (isGuestSession || !hasMembership) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
-      </div>
-    );
-  }
-
-  if (showSuccess) {
+  if (
+    showSuccess &&
+    !isGuestSession &&
+    athleteHasCityRunMembership(run, athleteId)
+  ) {
     return (
       <>
         <TopNav />
@@ -83,10 +85,18 @@ function CityRunTogetherPageContent() {
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <TopNav />
-      <CityRunRsvpGroup run={run} onLeave={() => void fetchAll(false)} backHref="/gorun" backLabel="Run" />
-    </>
+      <CityRunRsvpGroup
+        run={run}
+        onLeave={() => void fetchAll(false)}
+        isGuestSession={isGuestSession}
+        onJoinRun={() => void handleJoinRun()}
+        rsvpLoading={rsvpLoading}
+        backHref="/gorun"
+        backLabel="Run"
+      />
+    </div>
   );
 }
 

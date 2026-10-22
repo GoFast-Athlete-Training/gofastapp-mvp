@@ -1,6 +1,6 @@
-/** Guest / pre-membership read + RSVP; prefer cityRunTogetherPath for members. */
+/** Alias — redirects to cityRunTogetherPath. */
 export function runRsvpPath(slugOrId: string): string {
-  return `/runrsvp/${encodeURIComponent(slugOrId)}`;
+  return cityRunTogetherPath(slugOrId);
 }
 
 /** Member run hub (details, people, chatter) after RSVP. */
