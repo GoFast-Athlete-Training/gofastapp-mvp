@@ -184,9 +184,12 @@ export default function RunInstanceWizard({
       values.routeNeighborhood.trim()
   );
 
+  const isEasySimpleWorkout =
+    values.clubWorkoutType === "Easy" && !values.plannedWorkoutId.trim();
   const workoutStepComplete =
     Boolean(values.plannedWorkoutId.trim() && values.attachedWorkoutTitle.trim()) ||
-    !values.trackWorkoutDescription.trim();
+    !values.trackWorkoutDescription.trim() ||
+    (isEasySimpleWorkout && Boolean(values.trackWorkoutDescription.trim()));
 
   const descriptionStepComplete = Boolean(values.description.trim());
 
@@ -887,6 +890,7 @@ export default function RunInstanceWizard({
                   trackWorkoutDescription: values.trackWorkoutDescription,
                   plannedWorkoutId: values.plannedWorkoutId,
                   attachedWorkoutTitle: values.attachedWorkoutTitle,
+                  clubWorkoutType: values.clubWorkoutType,
                 }}
                 initialSegments={context.plannedWorkoutSegments ?? null}
                 initialWorkoutTitle={context.plannedWorkoutTitle ?? null}

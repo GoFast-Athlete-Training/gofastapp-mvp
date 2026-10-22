@@ -13,6 +13,7 @@ export type AthleteHostedInviteDetail = {
   meetUpPlaceId: string | null;
   meetUpLat: number | null;
   meetUpLng: number | null;
+  meetUpNote: string | null;
   description: string | null;
   routeId: string | null;
   stravaMapUrl: string | null;
@@ -86,6 +87,8 @@ export function wizardValuesFromHostedInvite(
     mapImageUrl: inv.mapImageUrl?.trim() || "",
     routeNeighborhood: inv.routeNeighborhood?.trim() || "",
     routeDescription: inv.workoutDescription?.trim() || "",
+    trackWorkoutDescription: inv.meetUpNote?.trim() || "",
+    clubWorkoutType: inv.plannedWorkoutId?.trim() ? "Intervals" : "Easy",
     plannedWorkoutId: inv.plannedWorkoutId?.trim() || "",
     workoutId: inv.workoutId?.trim() || "",
     profileEmoji: inv.profileEmoji?.trim() || "",
@@ -221,6 +224,9 @@ export function buildHostedInvitePatchBody(
     meetUpLat: Number.isFinite(lat) ? lat : null,
     meetUpLng: Number.isFinite(lng) ? lng : null,
     description: values.description.trim() || null,
+    ...(values.clubWorkoutType === "Easy" && !values.plannedWorkoutId.trim()
+      ? { meetUpNote: values.trackWorkoutDescription.trim() || null }
+      : {}),
     workoutDescription: values.routeDescription.trim() || null,
     directionsText: values.directionsText.trim() || null,
     stravaMapUrl: values.stravaMapUrl.trim() || null,

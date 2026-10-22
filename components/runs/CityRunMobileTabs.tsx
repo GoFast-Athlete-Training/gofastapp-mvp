@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ImagePlus, Info, MessageCircle, Users } from 'lucide-react';
 import MobileHubTabs from '@/components/shared/MobileHubTabs';
-import CityRunChatSection from '@/components/runs/CityRunChatSection';
+import CityRunChatSection, { type CityRunChatLock } from '@/components/runs/CityRunChatSection';
 import CityRunDetailsSection, {
   CityRunGoingBanner,
   CityRunRsvpPanel,
@@ -37,7 +37,6 @@ type PreRsvpMobileProps = {
   allowCheckin?: boolean;
   publicRsvpPage?: boolean;
   alreadyRsvped?: boolean;
-  hubHref?: string | null;
 };
 
 type GoingMobileProps = {
@@ -50,6 +49,13 @@ type GoingMobileProps = {
   allowCheckin?: boolean;
   viewerRsvpRole?: string | null;
   hideWorkoutPrescribe?: boolean;
+  chatLock?: CityRunChatLock;
+  joinRunHref?: string;
+  onJoinRun?: () => void;
+  joinLoading?: boolean;
+  showJoinPanel?: boolean;
+  showPastCheckinPanel?: boolean;
+  hasMembership?: boolean;
 };
 
 type PostRunMobileProps = {
@@ -145,7 +151,6 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
               allowCheckin={props.allowCheckin ?? true}
               publicRsvpPage={props.publicRsvpPage}
               alreadyRsvped={props.alreadyRsvped}
-              hubHref={props.hubHref}
             />
           </div>
         ) : null}
@@ -171,12 +176,22 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
       <MobileHubTabs tabs={[...GOING_TABS]} activeTab={activeTab} onTabChange={setActiveTab}>
         {activeTab === 'chatter' ? (
           <div className="flex min-h-[calc(100dvh-11rem)] flex-col space-y-3">
-            <CityRunGoingBanner rsvpRole={viewerRsvpRole} />
+            {props.hasMembership !== false ? (
+              <CityRunGoingBanner rsvpRole={viewerRsvpRole} />
+            ) : null}
             {isHost ? <CityRunHostActions cityRunId={props.run.id} /> : null}
             {isHost && isIndividual ? (
               <HostRunExecutionPanel cityRunId={props.run.id} />
             ) : null}
-            <CityRunChatSection runId={props.run.id} variant="mobile-hub" showHeading={false} />
+            <CityRunChatSection
+              runId={props.run.id}
+              variant="mobile-hub"
+              showHeading={false}
+              chatLock={props.chatLock ?? null}
+              joinRunHref={props.joinRunHref}
+              onJoinRun={props.onJoinRun}
+              joinLoading={props.joinLoading}
+            />
           </div>
         ) : null}
         {activeTab === 'details' ? (
@@ -194,6 +209,20 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
               />
             ) : null}
             <CityRunDetailsSection run={props.run} compact />
+            {props.showJoinPanel || props.showPastCheckinPanel ? (
+              <CityRunRsvpPanel
+                runIsPast={props.runIsPast}
+                rsvpLoading={props.joinLoading ?? props.checkingIn}
+                onRsvp={() => props.onJoinRun?.()}
+                onCheckin={props.onCheckin}
+                runClub={props.run.runClub}
+                cityRunType={props.run.cityRunType}
+                runTitle={props.run.title}
+                allowCheckin={props.allowCheckin ?? true}
+                publicRsvpPage={props.showJoinPanel}
+                alreadyRsvped={props.hasMembership}
+              />
+            ) : null}
           </div>
         ) : null}
         {activeTab === 'people' ? (

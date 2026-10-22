@@ -55,6 +55,7 @@ export function cityRunToWizardValues(run: CityRunData): RunInstanceWizardValues
     runType: run.runType || "",
     routeDescription: isTrack ? "" : run.workoutDescription || "",
     trackWorkoutDescription: isTrack ? run.workoutDescription || "" : "",
+    clubWorkoutType: run.plannedWorkout?.workoutType?.trim() || "Easy",
     totalMiles:
       run.totalMiles?.toString() ||
       (run.route?.distanceMiles != null ? String(run.route.distanceMiles) : ""),

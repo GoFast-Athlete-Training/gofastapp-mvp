@@ -8,7 +8,7 @@ import { formatRunTime } from '@/utils/formatTime';
 import type { RunnerAgendaItem } from '@/lib/runner/runner-agenda';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
 import { companyRunLinkSliceUrl } from '@/lib/city-run-public-card-url';
-import { runCompletePath } from '@/lib/city-run/run-nav-paths';
+import { runCompletePath, runRsvpPath } from '@/lib/city-run/run-nav-paths';
 import api from '@/lib/api';
 
 type RunnerAgendaCardProps = {
@@ -47,7 +47,7 @@ export default function RunnerAgendaCard({
   });
 
   const runSegment = run.slug?.trim() || run.id;
-  const runHref = `/cityruntogether/${encodeURIComponent(runSegment)}`;
+  const runHref = runRsvpPath(runSegment);
   const recapHref = runCompletePath(runSegment);
   const showRecapCta = run.isPast || run.cityRunExecutionStatus === 'RAN';
 

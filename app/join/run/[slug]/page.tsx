@@ -6,13 +6,14 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
+import { runRsvpPath } from '@/lib/city-run/run-nav-paths';
 
 /**
  * /join/run/[slug]
  *
  * Unsigned auth gate only. No public run card — that lives on gofastlinks /run/{slug}.
  *
- * - Already signed in → RSVP going → /cityruntogether/{slug}
+ * - Already signed in → RSVP going → /runrsvp/{slug}
  * - Not signed in → create account / sign in → signup flow returns here, then same hop
  */
 export default function JoinRunPage() {
@@ -78,8 +79,7 @@ export default function JoinRunPage() {
     };
   }, []);
 
-  const hubPath = () =>
-    `/cityruntogether/${encodeURIComponent(runSlug ?? runId ?? slug)}`;
+  const runPagePath = () => runRsvpPath(runSlug ?? runId ?? slug);
 
   const completeGoingRsvp = async () => {
     if (!runId) return;
@@ -87,7 +87,7 @@ export default function JoinRunPage() {
     setRsvpError(null);
     try {
       await api.post(`/runs/${runId}/rsvp`, { status: 'going' });
-      router.replace(hubPath());
+      router.replace(runPagePath());
     } catch (err: unknown) {
       console.error('RSVP error:', err);
       setRsvpError('Could not save your RSVP. Please try again.');

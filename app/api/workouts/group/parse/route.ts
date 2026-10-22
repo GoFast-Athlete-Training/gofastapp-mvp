@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
+import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { parseGroupWorkoutText } from "@/lib/group-workouts/parse-group-workout-text";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
-async function verifyStaffBearer(request: NextRequest): Promise<boolean> {
+async function verifyFirebaseBearer(request: NextRequest): Promise<boolean> {
   const authHeader = request.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) return false;
   try {
@@ -28,8 +29,14 @@ async function verifyStaffBearer(request: NextRequest): Promise<boolean> {
 /** POST /api/workouts/group/parse */
 export async function POST(request: NextRequest) {
   try {
-    if (!(await verifyStaffBearer(request))) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401, headers: corsHeaders });
+    const athleteAuth = await requireAthleteFromBearer(request);
+    const authed =
+      !("error" in athleteAuth) || (await verifyFirebaseBearer(request));
+    if (!authed) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401, headers: corsHeaders },
+      );
     }
 
     const body = (await request.json().catch(() => ({}))) as {
@@ -44,7 +51,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await parseGroupWorkoutText(sourceText, body.workoutType || "Intervals");
+    const workoutType = body.workoutType?.trim() || "Intervals";
+    if (workoutType === "Easy") {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Easy runs do not need parse — use the easy note field, or switch to Intervals/Tempo for structure.",
+        },
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const result = await parseGroupWorkoutText(sourceText, workoutType);
     return NextResponse.json({ success: true, ...result }, { headers: corsHeaders });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Parse failed";

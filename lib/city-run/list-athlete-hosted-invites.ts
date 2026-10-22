@@ -67,6 +67,7 @@ const inviteSelect = {
   workoutId: true,
   description: true,
   workout: { select: { planId: true, title: true } },
+  plannedWorkout: { select: { planId: true, title: true, workoutType: true } },
   planned_workouts: { select: { planId: true } },
   route: { select: { routeDescription: true } },
   runClub: { select: { name: true } },

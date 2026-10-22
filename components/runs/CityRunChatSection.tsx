@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Send } from 'lucide-react';
 import api from '@/lib/api';
@@ -35,16 +36,26 @@ function Avatar({
 const CHAT_HINT =
   "Let others know you're coming, or use this for questions.";
 
+export type CityRunChatLock = 'sign-in' | 'rsvp' | null;
+
 type CityRunChatSectionProps = {
   runId: string;
   variant?: 'default' | 'mobile-hub' | 'sidebar-square';
   showHeading?: boolean;
+  chatLock?: CityRunChatLock;
+  joinRunHref?: string;
+  onJoinRun?: () => void;
+  joinLoading?: boolean;
 };
 
 export default function CityRunChatSection({
   runId,
   variant = 'default',
   showHeading = true,
+  chatLock = null,
+  joinRunHref,
+  onJoinRun,
+  joinLoading = false,
 }: CityRunChatSectionProps) {
   const athleteId = LocalStorageAPI.getAthleteId();
   const [messages, setMessages] = useState<CityRunMessage[]>([]);
@@ -54,10 +65,16 @@ export default function CityRunChatSection({
 
   const isMobileHub = variant === 'mobile-hub';
   const isSidebarSquare = variant === 'sidebar-square';
+  const chatLive = chatLock == null;
 
   useEffect(() => {
+    if (!chatLive) {
+      setMessages([]);
+      return;
+    }
     void fetchMessages();
-  }, [runId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when run or access changes
+  }, [runId, chatLive]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -73,7 +90,7 @@ export default function CityRunChatSection({
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || sendingMessage) return;
+    if (!chatLive || !newMessage.trim() || sendingMessage) return;
     setSendingMessage(true);
     try {
       const res = await api.post(`/runs/${runId}/messages`, {
@@ -106,6 +123,13 @@ export default function CityRunChatSection({
       ? 'bg-white rounded-xl shadow-sm flex flex-col aspect-square w-full max-w-md'
       : 'bg-white rounded-xl shadow-sm flex flex-col';
 
+  const lockMessage =
+    chatLock === 'sign-in'
+      ? 'Sign in to read and post run chatter.'
+      : chatLock === 'rsvp'
+        ? 'RSVP to this run to join the conversation.'
+        : null;
+
   return (
     <section className={shellClass}>
       {showHeading ? (
@@ -132,7 +156,29 @@ export default function CityRunChatSection({
               : 'px-6 py-4'
         } ${isMobileHub || isSidebarSquare ? 'min-h-0' : ''}`}
       >
-        {messages.length === 0 ? (
+        {chatLock ? (
+          <div className="flex flex-col items-center justify-center py-8 px-4 text-center space-y-3">
+            <p className="text-sm text-gray-600">{lockMessage}</p>
+            {chatLock === 'sign-in' && joinRunHref ? (
+              <Link
+                href={joinRunHref}
+                className="inline-flex rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+              >
+                Sign in to join
+              </Link>
+            ) : null}
+            {chatLock === 'rsvp' && onJoinRun ? (
+              <button
+                type="button"
+                onClick={onJoinRun}
+                disabled={joinLoading}
+                className="inline-flex rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+              >
+                {joinLoading ? 'Saving…' : 'Join this run'}
+              </button>
+            ) : null}
+          </div>
+        ) : messages.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6">{CHAT_HINT}</p>
         ) : (
           messages.map((msg) => {
@@ -164,44 +210,46 @@ export default function CityRunChatSection({
         <div ref={messagesEndRef} />
       </div>
 
-      <div
-        className={`flex gap-2 shrink-0 ${
-          isMobileHub
-            ? 'sticky bottom-20 z-30 mt-3 border-t border-gray-200 bg-gray-50 pt-3'
-            : isSidebarSquare
-              ? 'px-3 py-3 border-t border-gray-100'
-              : 'px-4 py-3 border-t border-gray-100'
-        }`}
-      >
-        <input
-          type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && void handleSendMessage()}
-          placeholder="Write a message…"
-          className={`flex-1 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 ${
-            isMobileHub || isSidebarSquare
-              ? 'border border-gray-300 rounded-lg bg-white'
-              : 'bg-gray-100 rounded-full'
-          }`}
-        />
-        <button
-          type="button"
-          onClick={() => void handleSendMessage()}
-          disabled={!newMessage.trim() || sendingMessage}
-          className={`bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40 transition shrink-0 ${
-            isMobileHub || isSidebarSquare
-              ? 'px-3 py-2 rounded-lg text-sm font-semibold'
-              : 'p-2 rounded-full'
+      {chatLive ? (
+        <div
+          className={`flex gap-2 shrink-0 ${
+            isMobileHub
+              ? 'sticky bottom-20 z-30 mt-3 border-t border-gray-200 bg-gray-50 pt-3'
+              : isSidebarSquare
+                ? 'px-3 py-3 border-t border-gray-100'
+                : 'px-4 py-3 border-t border-gray-100'
           }`}
         >
-          {isMobileHub || isSidebarSquare ? (
-            sendingMessage ? '…' : 'Send'
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-        </button>
-      </div>
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && void handleSendMessage()}
+            placeholder="Write a message…"
+            className={`flex-1 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 ${
+              isMobileHub || isSidebarSquare
+                ? 'border border-gray-300 rounded-lg bg-white'
+                : 'bg-gray-100 rounded-full'
+            }`}
+          />
+          <button
+            type="button"
+            onClick={() => void handleSendMessage()}
+            disabled={!newMessage.trim() || sendingMessage}
+            className={`bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40 transition shrink-0 ${
+              isMobileHub || isSidebarSquare
+                ? 'px-3 py-2 rounded-lg text-sm font-semibold'
+                : 'p-2 rounded-full'
+            }`}
+          >
+            {isMobileHub || isSidebarSquare ? (
+              sendingMessage ? '…' : 'Send'
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -5,8 +5,11 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
-import CityRunChatSection from '@/components/runs/CityRunChatSection';
-import CityRunDetailsSection, { CityRunGoingBanner } from '@/components/runs/CityRunDetailsSection';
+import CityRunChatSection, { type CityRunChatLock } from '@/components/runs/CityRunChatSection';
+import CityRunDetailsSection, {
+  CityRunGoingBanner,
+  CityRunRsvpPanel,
+} from '@/components/runs/CityRunDetailsSection';
 import CityRunMobileTabs from '@/components/runs/CityRunMobileTabs';
 import CityRunPeopleSection from '@/components/runs/CityRunPeopleSection';
 import {
@@ -15,6 +18,7 @@ import {
   type CityRunRsvp,
 } from '@/components/runs/city-run-types';
 import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
+import { athleteHasCityRunMembership } from '@/lib/city-run/rsvp-attendance';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
 import { resolveViewerRsvpRole } from '@/lib/city-run/viewer-run-role';
 import CityRunHostActions from '@/components/runs/CityRunHostActions';
@@ -23,9 +27,22 @@ import HostRunExecutionPanel from '@/components/runs/HostRunExecutionPanel';
 interface Props {
   run: CityRunDetails;
   onLeave: () => void;
+  isGuestSession?: boolean;
+  onJoinRun?: () => void;
+  rsvpLoading?: boolean;
+  backHref?: string;
+  backLabel?: string;
 }
 
-export default function CityRunRsvpGroup({ run, onLeave }: Props) {
+export default function CityRunRsvpGroup({
+  run,
+  onLeave,
+  isGuestSession = false,
+  onJoinRun,
+  rsvpLoading = false,
+  backHref = '/gorun',
+  backLabel = 'Run',
+}: Props) {
   const [rsvps, setRsvps] = useState<CityRunRsvp[]>(run.rsvps || []);
   const [checkingIn, setCheckingIn] = useState(false);
   const [runIsPast, setRunIsPast] = useState(false);
@@ -33,7 +50,7 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
 
   useEffect(() => {
     setAthleteId(LocalStorageAPI.getAthleteId());
-  }, []);
+  }, [run.currentRSVPRole, run.id]);
 
   useEffect(() => {
     setRsvps(run.rsvps || []);
@@ -50,15 +67,27 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
     );
   }, [run.date, run.startTimeHour, run.startTimeMinute, run.startTimePeriod, run.timezone]);
 
+  const hasMembership = athleteHasCityRunMembership(run, athleteId);
+
   const viewerRsvpRole = useMemo(
     () => resolveViewerRsvpRole(run, athleteId),
     [run, athleteId]
   );
   const isHost = isHostRsvpRole(viewerRsvpRole);
   const isIndividual = run.cityRunType === 'INDIVIDUAL';
-  const backHref = isHost ? '/gorun' : '/myruns';
-  const backLabel = isHost ? 'Run' : 'My Runs';
   const socialRun = hasSocialRunLifecycle(run);
+
+  const joinRunHref = `/join/run/${encodeURIComponent(run.slug?.trim() || run.id)}`;
+
+  const chatLock: CityRunChatLock = useMemo(() => {
+    if (hasMembership) return null;
+    if (isGuestSession || !athleteId) return 'sign-in';
+    return 'rsvp';
+  }, [hasMembership, isGuestSession, athleteId]);
+
+  const showJoinPanel = !hasMembership;
+  const showPastCheckinPanel =
+    hasMembership && runIsPast && !isHost && socialRun;
 
   const handleCheckin = async () => {
     if (!socialRun || isHost) return;
@@ -74,6 +103,21 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
   };
 
   const shellMax = isIndividual ? 'max-w-4xl' : 'max-w-6xl';
+
+  const rsvpPanel = (
+    <CityRunRsvpPanel
+      runIsPast={runIsPast}
+      rsvpLoading={rsvpLoading || checkingIn}
+      onRsvp={() => onJoinRun?.()}
+      onCheckin={() => void handleCheckin()}
+      runClub={run.runClub}
+      cityRunType={run.cityRunType}
+      runTitle={run.title}
+      allowCheckin={!isHost && socialRun}
+      publicRsvpPage={showJoinPanel}
+      alreadyRsvped={hasMembership}
+    />
+  );
 
   return (
     <div className="min-h-screen bg-gray-100 overflow-x-hidden">
@@ -96,10 +140,17 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
           viewerRsvpRole={viewerRsvpRole}
           allowCheckin={!isHost && socialRun}
           hideWorkoutPrescribe
+          chatLock={chatLock}
+          joinRunHref={joinRunHref}
+          onJoinRun={onJoinRun}
+          joinLoading={rsvpLoading}
+          showJoinPanel={showJoinPanel}
+          showPastCheckinPanel={showPastCheckinPanel}
+          hasMembership={hasMembership}
         />
 
         <div className="hidden lg:block space-y-3">
-          <CityRunGoingBanner rsvpRole={viewerRsvpRole} />
+          {hasMembership ? <CityRunGoingBanner rsvpRole={viewerRsvpRole} /> : null}
           {isHost ? <CityRunHostActions cityRunId={run.id} /> : null}
           {isHost && isIndividual ? <HostRunExecutionPanel cityRunId={run.id} /> : null}
 
@@ -112,10 +163,18 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
           >
             <div className={isIndividual ? 'space-y-3 min-w-0' : 'col-span-2 space-y-3'}>
               <CityRunDetailsSection run={run} />
+              {showJoinPanel || showPastCheckinPanel ? rsvpPanel : null}
             </div>
             <div className="space-y-3">
               <CityRunPeopleSection rsvps={rsvps} sticky />
-              <CityRunChatSection runId={run.id} variant="sidebar-square" />
+              <CityRunChatSection
+                runId={run.id}
+                variant="sidebar-square"
+                chatLock={chatLock}
+                joinRunHref={joinRunHref}
+                onJoinRun={onJoinRun}
+                joinLoading={rsvpLoading}
+              />
             </div>
           </div>
         </div>

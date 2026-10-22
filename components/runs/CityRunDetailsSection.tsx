@@ -370,7 +370,6 @@ export function CityRunRsvpPanel({
   allowCheckin = true,
   publicRsvpPage = false,
   alreadyRsvped = false,
-  hubHref,
 }: {
   runIsPast: boolean;
   rsvpLoading: boolean;
@@ -380,27 +379,16 @@ export function CityRunRsvpPanel({
   cityRunType?: string | null;
   runTitle?: string | null;
   allowCheckin?: boolean;
-  /** Public `/runrsvp` — no time-based check-in CTA. */
+  /** Join copy for visitors who are not on the run yet. */
   publicRsvpPage?: boolean;
   alreadyRsvped?: boolean;
-  hubHref?: string | null;
 }) {
   const socialCtx = { cityRunType, runClub, title: runTitle };
   const pastCopy = resolveRunPastCheckinCopy(socialCtx);
   const rsvpCopy = resolveRunRsvpCopy(socialCtx);
 
-  if (alreadyRsvped && hubHref) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-        <p className="text-sm font-semibold text-gray-900">You RSVPed</p>
-        <a
-          href={hubHref}
-          className="flex w-full items-center justify-center rounded-xl bg-sky-600 py-3 text-center font-semibold text-white transition hover:bg-sky-700"
-        >
-          Go to this run&apos;s hub
-        </a>
-      </div>
-    );
+  if (alreadyRsvped && !runIsPast) {
+    return null;
   }
 
   if (runIsPast && !publicRsvpPage) {

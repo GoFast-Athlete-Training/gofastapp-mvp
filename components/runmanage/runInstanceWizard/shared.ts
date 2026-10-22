@@ -139,6 +139,8 @@ export type RunInstanceWizardValues = {
   igPostText: string;
   /** Track workout text (track runs only). */
   trackWorkoutDescription: string;
+  /** Club / invite workout type — Easy is default for social runs. */
+  clubWorkoutType: string;
   /** Linked Product planned workout id (optional scheduled-run prescription). */
   plannedWorkoutId: string;
   /** @deprecated join-my-workout only — scheduled runs use plannedWorkoutId */
@@ -274,6 +276,7 @@ export function emptyWizardValues(defaultDate?: string): RunInstanceWizardValues
     webText: "",
     igPostText: "",
     trackWorkoutDescription: "",
+    clubWorkoutType: "Easy",
     plannedWorkoutId: "",
     workoutId: "",
     attachedWorkoutTitle: "",

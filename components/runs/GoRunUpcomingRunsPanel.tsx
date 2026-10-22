@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import RunnerAgendaCard from "@/components/runner/RunnerAgendaCard";
 import api from "@/lib/api";
+import { runRsvpPath } from "@/lib/city-run/run-nav-paths";
 import type { RunnerAgendaItem, RunnerAgendaPayload } from "@/lib/runner/runner-agenda";
 
 type Props = {
@@ -42,8 +43,7 @@ export default function GoRunUpcomingRunsPanel({ mode = "home" }: Props) {
     try {
       await api.post(`/runs/${runId}/checkin`, {});
       if (run?.slug || run?.id) {
-        const segment = encodeURIComponent(run.slug?.trim() || run.id);
-        router.push(`/cityruntogether/${segment}`);
+        router.push(runRsvpPath(run.slug?.trim() || run.id));
         return;
       }
       await load();

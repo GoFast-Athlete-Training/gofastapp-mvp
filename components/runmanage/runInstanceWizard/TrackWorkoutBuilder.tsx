@@ -21,6 +21,7 @@ export type TrackWorkoutBuilderValues = {
   trackWorkoutDescription: string;
   plannedWorkoutId: string;
   attachedWorkoutTitle: string;
+  clubWorkoutType: string;
 };
 
 export type PendingClubPlannedWorkout = {
@@ -33,6 +34,17 @@ export const CLUB_WORKOUT_TYPES = ["Easy", "Tempo", "Intervals", "LongRun", "Rac
 export type ClubWorkoutType = (typeof CLUB_WORKOUT_TYPES)[number];
 
 type WorkoutBuildMode = "ai" | "manual";
+
+function resolveClubWorkoutType(
+  value: string | null | undefined,
+  fallback: ClubWorkoutType = "Easy",
+): ClubWorkoutType {
+  const t = value?.trim();
+  if (t && (CLUB_WORKOUT_TYPES as readonly string[]).includes(t)) {
+    return t as ClubWorkoutType;
+  }
+  return fallback;
+}
 
 export type TrackWorkoutBuilderProps = {
   clubId: string;
@@ -78,14 +90,16 @@ export default function TrackWorkoutBuilder({
   initialWorkoutTitle,
   initialWorkoutType,
 }: TrackWorkoutBuilderProps) {
-  const [buildMode, setBuildMode] = useState<WorkoutBuildMode>("ai");
-  const [workoutType, setWorkoutType] = useState<ClubWorkoutType>(() => {
-    const t = initialWorkoutType?.trim();
-    if (t && (CLUB_WORKOUT_TYPES as readonly string[]).includes(t)) {
-      return t as ClubWorkoutType;
-    }
-    return "Intervals";
-  });
+  const workoutType = resolveClubWorkoutType(
+    values.clubWorkoutType || initialWorkoutType,
+    "Easy",
+  );
+  const isEasy = workoutType === "Easy";
+  const [buildMode, setBuildMode] = useState<WorkoutBuildMode>(() =>
+    isEasy ? "manual" : "ai",
+  );
+  const [showStructuredForEasy, setShowStructuredForEasy] = useState(false);
+
   const [editableSegments, setEditableSegments] = useState<EditableWorkoutSegment[]>([]);
   const [structuredWorkoutTitle, setStructuredWorkoutTitle] = useState("");
   const [structuringWorkout, setStructuringWorkout] = useState(false);
@@ -93,6 +107,8 @@ export default function TrackWorkoutBuilder({
   const [editingAttached, setEditingAttached] = useState(false);
 
   const { trackWorkoutDescription, plannedWorkoutId, attachedWorkoutTitle } = values;
+
+  const structuredMode = !isEasy || showStructuredForEasy || editableSegments.length > 0;
 
   const previewSegments = useMemo(() => {
     if (editableSegments.length > 0) {
@@ -110,6 +126,21 @@ export default function TrackWorkoutBuilder({
     attachedWorkoutTitle,
   ]);
 
+  function setWorkoutType(next: ClubWorkoutType) {
+    onChange({ clubWorkoutType: next });
+    if (next === "Easy") {
+      setShowStructuredForEasy(false);
+      setBuildMode("manual");
+      if (!plannedWorkoutId) {
+        clearStructuredDraft();
+        setEditingAttached(false);
+      }
+    } else {
+      setShowStructuredForEasy(true);
+      setBuildMode("ai");
+    }
+  }
+
   function clearStructuredDraft() {
     setEditableSegments([]);
     setStructuredWorkoutTitle("");
@@ -118,6 +149,7 @@ export default function TrackWorkoutBuilder({
 
   function startEditingAttached() {
     setEditingAttached(true);
+    setShowStructuredForEasy(true);
     setBuildMode("manual");
     if (initialSegments?.length) {
       setEditableSegments(initialSegments.map((seg, i) => apiSegmentToEditable(seg, i)));
@@ -134,10 +166,15 @@ export default function TrackWorkoutBuilder({
     });
     clearStructuredDraft();
     setEditingAttached(false);
-    onPendingPlannedWorkout?.(null);
   }
 
   const handleStructureWorkout = async () => {
+    if (workoutType === "Easy") {
+      onError?.(
+        "Easy runs use the note field — no parse needed. Switch type to Intervals or Tempo for structure.",
+      );
+      return;
+    }
     const text = trackWorkoutDescription.trim();
     if (!text) {
       onError?.("Paste workout text first.");
@@ -163,6 +200,7 @@ export default function TrackWorkoutBuilder({
       setEditableSegments(data.segments.map((seg, i) => apiSegmentToEditable(seg, i)));
       setStructuredWorkoutTitle(data.suggestedTitle?.trim() || "Workout");
       setEditingAttached(true);
+      setShowStructuredForEasy(true);
       if (data.suggestedDescription?.trim()) {
         onChange({ trackWorkoutDescription: data.suggestedDescription.trim() });
       }
@@ -303,31 +341,62 @@ export default function TrackWorkoutBuilder({
             ))}
           </select>
         </div>
-        <div className="flex rounded-lg border border-gray-200 p-0.5">
-          <button
-            type="button"
-            onClick={() => setBuildMode("ai")}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-              buildMode === "ai" ? "bg-violet-100 text-violet-900" : "text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            AI builder
-          </button>
-          <button
-            type="button"
-            onClick={() => setBuildMode("manual")}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-              buildMode === "manual"
-                ? "bg-violet-100 text-violet-900"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            Manual
-          </button>
-        </div>
+        {structuredMode ? (
+          <div className="flex rounded-lg border border-gray-200 p-0.5">
+            <button
+              type="button"
+              onClick={() => setBuildMode("ai")}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                buildMode === "ai" ? "bg-violet-100 text-violet-900" : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              AI builder
+            </button>
+            <button
+              type="button"
+              onClick={() => setBuildMode("manual")}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                buildMode === "manual"
+                  ? "bg-violet-100 text-violet-900"
+                  : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              Manual
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      {buildMode === "ai" ? (
+      {isEasy && !structuredMode ? (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-900">Easy run note</label>
+          <p className="mb-2 text-xs text-gray-600">
+            Optional — pace window, effort, or leave blank. Most birthday and social runs only need
+            pace on Core details.
+          </p>
+          <textarea
+            value={trackWorkoutDescription}
+            onChange={(e) => {
+              onChange({ trackWorkoutDescription: e.target.value });
+            }}
+            rows={2}
+            placeholder="e.g. 8:45–9:15 easy pace"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setShowStructuredForEasy(true);
+              setWorkoutType("Intervals");
+            }}
+            className="mt-2 text-xs font-medium text-violet-700 hover:text-violet-900"
+          >
+            Need intervals or structure instead?
+          </button>
+        </div>
+      ) : null}
+
+      {structuredMode && buildMode === "ai" ? (
         <div>
           <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
             <label className="block text-sm font-medium text-gray-900">Workout text</label>
@@ -357,7 +426,7 @@ export default function TrackWorkoutBuilder({
         </div>
       ) : null}
 
-      {(buildMode === "manual" || editableSegments.length > 0) ? (
+      {structuredMode && (buildMode === "manual" || editableSegments.length > 0) ? (
         <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-gray-900">Structured workout</p>

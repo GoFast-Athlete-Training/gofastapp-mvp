@@ -12,6 +12,7 @@ import {
 import { auth } from '@/lib/firebase';
 import { signInWithGoogle } from '@/lib/auth';
 import api from '@/lib/api';
+import { runRsvpPath } from '@/lib/city-run/run-nav-paths';
 import { Calendar, Clock, MapPin } from 'lucide-react';
 
 /**
@@ -20,7 +21,7 @@ import { Calendar, Clock, MapPin } from 'lucide-react';
  * Run-join-specific auth page. Signs up (or signs in) AND RSVPs the run
  * in a single sweep — no bounce back, no confirm loop.
  *
- * Flow: auth → hydrate/create athlete → RSVP → /gorun/[runId]
+ * Flow: auth → hydrate/create athlete → RSVP → /runrsvp/[slug]
  *
  * ?mode=signin → starts in sign-in mode
  */
@@ -86,8 +87,7 @@ function JoinRunSignupContent() {
         // RSVP failed — still navigate, they can RSVP from the run page
         console.warn('RSVP failed after signup, continuing:', err?.response?.status);
       }
-      const segment = encodeURIComponent(r.slug?.trim() || r.id);
-      router.replace(`/cityruntogether/${segment}`);
+      router.replace(runRsvpPath(r.slug?.trim() || r.id));
     } else {
       router.replace(`/gorun`);
     }
