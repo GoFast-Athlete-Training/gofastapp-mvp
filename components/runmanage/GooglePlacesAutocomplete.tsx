@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import type { GoogleAddressComponent } from '@/lib/parse-google-address';
 
 const loaderCache: Record<string, Promise<any>> = {};
 
@@ -33,16 +34,19 @@ const loadGoogleMaps = (apiKey: string): Promise<any> => {
   return loaderCache[apiKey];
 };
 
+export type RunManagePlaceSelectedData = {
+  address: string;
+  name: string;
+  placeId: string;
+  lat: number;
+  lng: number;
+  addressComponents?: GoogleAddressComponent[];
+};
+
 interface GooglePlacesAutocompleteProps {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onPlaceSelected?: (placeData: {
-    address: string;
-    name: string;
-    placeId: string;
-    lat: number;
-    lng: number;
-  }) => void;
+  onPlaceSelected?: (placeData: RunManagePlaceSelectedData) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -60,8 +64,16 @@ export default function GooglePlacesAutocomplete({
   const autocompleteRef = useRef<any>(null);
   const [inputValue, setInputValue] = useState(value);
   const isPlaceSelectedRef = useRef(false);
+  const onChangeRef = useRef(onChange);
+  const onPlaceSelectedRef = useRef(onPlaceSelected);
 
-  // Sync local inputValue with prop value when it changes externally
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+  useEffect(() => {
+    onPlaceSelectedRef.current = onPlaceSelected;
+  }, [onPlaceSelected]);
+
   useEffect(() => {
     if (!isPlaceSelectedRef.current) {
       setInputValue(value);
@@ -69,7 +81,6 @@ export default function GooglePlacesAutocomplete({
     isPlaceSelectedRef.current = false;
   }, [value]);
 
-  // Initialize Google Places Autocomplete exactly once
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
@@ -78,7 +89,7 @@ export default function GooglePlacesAutocomplete({
     }
 
     if (!inputRef.current || autocompleteRef.current) {
-      return; // Already initialized or no input element
+      return;
     }
 
     let isMounted = true;
@@ -90,7 +101,13 @@ export default function GooglePlacesAutocomplete({
         try {
           autocompleteRef.current = new maps.places.Autocomplete(inputRef.current, {
             types: ['geocode', 'establishment'],
-            fields: ['formatted_address', 'geometry', 'name', 'place_id'],
+            fields: [
+              'formatted_address',
+              'geometry',
+              'name',
+              'place_id',
+              'address_components',
+            ],
           });
 
           autocompleteRef.current.addListener('place_changed', () => {
@@ -98,38 +115,31 @@ export default function GooglePlacesAutocomplete({
 
             const place = autocompleteRef.current.getPlace();
 
-            // Only process if place has geometry (valid selection)
             if (place && place.geometry && place.formatted_address) {
-              const placeData = {
+              const placeData: RunManagePlaceSelectedData = {
                 address: place.formatted_address,
                 name: place.name || place.formatted_address,
                 placeId: place.place_id || '',
                 lat: place.geometry.location.lat(),
                 lng: place.geometry.location.lng(),
+                addressComponents: place.address_components ?? undefined,
               };
 
-              // Update local input value to show the place name
-              const displayValue = placeData.name;
+              const displayValue = placeData.name.trim() || placeData.address.split(',')[0]?.trim() || '';
               setInputValue(displayValue);
               isPlaceSelectedRef.current = true;
 
-              // Update parent state via onChange (for controlled input sync)
-              if (inputRef.current) {
-                const syntheticEvent = {
-                  target: { value: displayValue },
-                } as React.ChangeEvent<HTMLInputElement>;
-                onChange(syntheticEvent);
-              }
+              const syntheticEvent = {
+                target: { value: displayValue },
+              } as React.ChangeEvent<HTMLInputElement>;
+              onChangeRef.current(syntheticEvent);
 
-              // Call onPlaceSelected callback with full place data
-              if (onPlaceSelected) {
-                onPlaceSelected(placeData);
-              }
+              onPlaceSelectedRef.current?.(placeData);
             }
           });
-
-        } catch (error: any) {
-          console.warn('Failed to initialize Google Places Autocomplete:', error?.message || error);
+        } catch (error: unknown) {
+          const e = error as { message?: string };
+          console.warn('Failed to initialize Google Places Autocomplete:', e?.message || error);
         }
       })
       .catch((error) => {
@@ -143,20 +153,16 @@ export default function GooglePlacesAutocomplete({
           (window as any).google?.maps?.event?.clearInstanceListeners(
             autocompleteRef.current
           );
-        } catch (e) {
-          // Ignore cleanup errors
+        } catch {
+          /* ignore */
         }
         autocompleteRef.current = null;
       }
     };
-  }, []); // Empty deps - initialize once
+  }, []);
 
-  // Handle manual typing - only update local state
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setInputValue(newValue);
-    
-    // Update parent state for controlled input sync
+    setInputValue(e.target.value);
     onChange(e);
   };
 

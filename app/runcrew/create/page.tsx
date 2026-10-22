@@ -27,6 +27,7 @@ import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import GooglePlacesAutocomplete from '@/components/RunCrew/GooglePlacesAutocomplete';
 import TopNav from '@/components/shared/TopNav';
+import { RUNNING_EMOJIS } from '@/lib/run-profile-emoji-presets';
 
 // US States + DC for dropdown
 const US_STATES = [
@@ -81,16 +82,6 @@ const US_STATES = [
   { value: 'WV', label: 'West Virginia' },
   { value: 'WI', label: 'Wisconsin' },
   { value: 'WY', label: 'Wyoming' },
-];
-
-// Common running emojis for quick selection
-const RUNNING_EMOJIS = [
-  '🏃', '🏃‍♀️', '🏃‍♂️', '🏔️', '⛰️', '🌄', '🌅', '🌆',
-  '🔥', '⚡', '💪', '🏆', '🎯', '🚀', '⭐', '🌟',
-  '🌲', '🌳', '🌿', '🌊', '☀️', '🌙', '💫', '🌈',
-  '👟', '🎽', '🏅', '🥇', '🥈', '🥉', '🎖️', '🏵️',
-  '🌴', '🏖️', '⚽', '🌶️', '🍩', '🥾', '🌭', '🚀',
-  '🍣', '🏆', '😍', '🐬', '⛵', '🦄', '🏄', '🏃‍♀️'
 ];
 
 export default function CreateCrewPage() {

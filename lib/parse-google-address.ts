@@ -70,7 +70,7 @@ export function parseGoogleAddressFromComponents(
   const fallback = parseGoogleAddress(formattedAddress);
 
   return {
-    streetAddress: streetFromParts || fallback.streetAddress || formattedAddress,
+    streetAddress: streetFromParts || fallback.streetAddress || "",
     city: normalized.city || fallback.city,
     state: normalized.state ?? fallback.state,
     zip: postalCode || fallback.zip,

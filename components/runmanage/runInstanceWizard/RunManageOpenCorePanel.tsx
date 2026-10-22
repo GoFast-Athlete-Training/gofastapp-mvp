@@ -1,7 +1,7 @@
 "use client";
 
 import GooglePlacesAutocomplete from "@/components/runmanage/GooglePlacesAutocomplete";
-import { parseGoogleAddress } from "@/lib/utils/parseAddress";
+import { parseGoogleAddressFromComponents } from "@/lib/parse-google-address";
 import { formatDayLabel } from "@/lib/runmanage/format-day-label";
 import {
   DEFAULT_PACE_OPTION,
@@ -79,17 +79,16 @@ export default function RunManageOpenCorePanel({
                 placeholder="Friday morning shakeout"
               />
             </div>
-            {context.onProfileEmojiChange && context.onCoverPhotoUrlChange ? (
-              <CityRunProfileMetaFields
-                profileEmoji={context.profileEmoji ?? ""}
-                onProfileEmojiChange={context.onProfileEmojiChange}
-                coverPhotoUrl={context.coverPhotoUrl ?? ""}
-                onCoverPhotoUrlChange={context.onCoverPhotoUrlChange}
-                onUploadError={onErrorChange}
-              />
-            ) : null}
           </>
         ) : null}
+
+        <CityRunProfileMetaFields
+          profileEmoji={values.profileEmoji}
+          onProfileEmojiChange={(v) => patch({ profileEmoji: v })}
+          coverPhotoUrl={values.coverPhotoUrl}
+          onCoverPhotoUrlChange={(v) => patch({ coverPhotoUrl: v })}
+          onUploadError={onErrorChange}
+        />
 
         {!isSeries && !isAthleteHosted ? (
           <div>
@@ -173,11 +172,18 @@ export default function RunManageOpenCorePanel({
             value={values.meetUpPoint}
             onChange={(e) => patch({ meetUpPoint: e.target.value })}
             onPlaceSelected={(placeData) => {
-              const parsed = parseGoogleAddress(placeData.address);
+              const parsed = parseGoogleAddressFromComponents(
+                placeData.address,
+                placeData.addressComponents,
+              );
+              const placeName =
+                placeData.name?.trim() ||
+                placeData.address.split(",")[0]?.trim() ||
+                "";
               onChange({
                 ...values,
-                meetUpPoint: placeData.name || placeData.address,
-                meetUpStreetAddress: parsed.streetAddress || "",
+                meetUpPoint: placeName,
+                meetUpStreetAddress: parsed.streetAddress.trim(),
                 meetUpCity: parsed.city || "",
                 meetUpState: parsed.state || "",
                 meetUpZip: parsed.zip || "",
@@ -185,16 +191,23 @@ export default function RunManageOpenCorePanel({
                 meetUpLat: String(placeData.lat),
                 meetUpLng: String(placeData.lng),
               });
+              onErrorChange?.(null);
             }}
             placeholder="Search for meet-up…"
             className="mb-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
+          {values.meetUpPlaceId.trim() && !values.meetUpStreetAddress.trim() ? (
+            <p className="mb-2 text-xs text-amber-800">
+              No street number from Google — type the address (e.g. 3299 K St NW) in Street below so
+              runners pick the right location.
+            </p>
+          ) : null}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <input
               type="text"
               value={values.meetUpStreetAddress}
               onChange={(e) => patch({ meetUpStreetAddress: e.target.value })}
-              placeholder="Street"
+              placeholder="Street number and name"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
             <input
@@ -230,7 +243,10 @@ export default function RunManageOpenCorePanel({
                 value={values.endPoint}
                 onChange={(e) => patch({ endPoint: e.target.value })}
                 onPlaceSelected={(placeData) => {
-                  const parsed = parseGoogleAddress(placeData.address);
+                  const parsed = parseGoogleAddressFromComponents(
+                    placeData.address,
+                    placeData.addressComponents,
+                  );
                   onChange({
                     ...values,
                     endPoint: placeData.name || placeData.address,

@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, MapPin, Route } from "lucide-react";
 import GooglePlacesAutocomplete, {
   type GooglePlaceSelectedData,
@@ -85,8 +84,6 @@ function dateInputFromIso(iso: string): string {
 type Props = { cityRunId: string };
 
 export default function CityRunMeetupEditForm({ cityRunId }: Props) {
-  const router = useRouter();
-  const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [meetupTitle, setMeetupTitle] = useState("");
@@ -116,12 +113,6 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  useEffect(() => {
-    return () => {
-      if (redirectTimer.current) clearTimeout(redirectTimer.current);
-    };
-  }, []);
 
   const applyInvite = useCallback((inv: InviteDetail) => {
     setMeetupTitle(inv.title);
@@ -250,10 +241,6 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
         coverPhotoUrl: coverPhotoUrl.trim() || null,
       });
       setSaveSuccess(true);
-      const path = gorunPath;
-      redirectTimer.current = setTimeout(() => {
-        router.push(path);
-      }, 800);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };
       setError(err.response?.data?.error || "Could not save.");

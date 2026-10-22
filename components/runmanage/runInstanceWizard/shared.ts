@@ -145,6 +145,8 @@ export type RunInstanceWizardValues = {
   workoutId: string;
   /** Display title for attached workout. */
   attachedWorkoutTitle: string;
+  profileEmoji: string;
+  coverPhotoUrl: string;
 };
 
 export type SeriesBaseline = {
@@ -275,5 +277,7 @@ export function emptyWizardValues(defaultDate?: string): RunInstanceWizardValues
     plannedWorkoutId: "",
     workoutId: "",
     attachedWorkoutTitle: "",
+    profileEmoji: "",
+    coverPhotoUrl: "",
   };
 }

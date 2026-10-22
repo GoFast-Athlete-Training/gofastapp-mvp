@@ -88,6 +88,8 @@ export function wizardValuesFromHostedInvite(
     routeDescription: inv.workoutDescription?.trim() || "",
     plannedWorkoutId: inv.plannedWorkoutId?.trim() || "",
     workoutId: inv.workoutId?.trim() || "",
+    profileEmoji: inv.profileEmoji?.trim() || "",
+    coverPhotoUrl: inv.coverPhotoUrl?.trim() || "",
   };
 }
 
@@ -141,8 +143,6 @@ export function parseWizardStartTime(values: RunInstanceWizardValues): {
 export function buildFromWorkoutCreateBody(
   values: RunInstanceWizardValues,
   opts: {
-    profileEmoji: string;
-    coverPhotoUrl: string;
     plannedWorkoutId?: string | null;
     workoutId?: string | null;
     routeId?: string | null;
@@ -170,7 +170,7 @@ export function buildFromWorkoutCreateBody(
     state: values.meetUpState.trim() || undefined,
     date: values.date.trim(),
     meetUpPoint: values.meetUpPoint.trim(),
-    meetUpStreetAddress: values.meetUpStreetAddress.trim() || values.meetUpPoint.trim(),
+    meetUpStreetAddress: values.meetUpStreetAddress.trim() || undefined,
     meetUpCity: values.meetUpCity.trim(),
     meetUpState: values.meetUpState.trim() || undefined,
     meetUpZip: values.meetUpZip.trim() || undefined,
@@ -188,8 +188,8 @@ export function buildFromWorkoutCreateBody(
       (opts.plannedWorkoutId ?? values.plannedWorkoutId.trim()) || undefined,
     workoutId: (opts.workoutId ?? values.workoutId.trim()) || undefined,
     routeId: (opts.routeId ?? values.routeId.trim()) || undefined,
-    profileEmoji: opts.profileEmoji.trim() || undefined,
-    coverPhotoUrl: opts.coverPhotoUrl.trim() || undefined,
+    profileEmoji: values.profileEmoji.trim() || undefined,
+    coverPhotoUrl: values.coverPhotoUrl.trim() || undefined,
     stravaMapUrl: values.stravaMapUrl.trim() || undefined,
     mapImageUrl: values.mapImageUrl.trim() || undefined,
     directionsText: values.directionsText.trim() || undefined,
@@ -198,8 +198,6 @@ export function buildFromWorkoutCreateBody(
 
 export function buildHostedInvitePatchBody(
   values: RunInstanceWizardValues,
-  profileEmoji: string,
-  coverPhotoUrl: string,
 ): Record<string, unknown> | { error: string } {
   if (!values.title.trim()) return { error: "Add a title." };
   if (!values.meetUpPoint.trim()) return { error: "Meet-up is required." };
@@ -215,7 +213,7 @@ export function buildHostedInvitePatchBody(
     title: values.title.trim(),
     date: values.date.trim(),
     meetUpPoint: values.meetUpPoint.trim(),
-    meetUpStreetAddress: values.meetUpStreetAddress.trim() || values.meetUpPoint.trim(),
+    meetUpStreetAddress: values.meetUpStreetAddress.trim() || undefined,
     meetUpCity: values.meetUpCity.trim(),
     meetUpState: values.meetUpState.trim() || undefined,
     meetUpZip: values.meetUpZip.trim() || undefined,
@@ -232,7 +230,7 @@ export function buildHostedInvitePatchBody(
     startTimeHour: time.hourNum,
     startTimeMinute: time.minuteNum,
     startTimePeriod: time.period,
-    profileEmoji: profileEmoji.trim() || null,
-    coverPhotoUrl: coverPhotoUrl.trim() || null,
+    profileEmoji: values.profileEmoji.trim() || null,
+    coverPhotoUrl: values.coverPhotoUrl.trim() || null,
   };
 }

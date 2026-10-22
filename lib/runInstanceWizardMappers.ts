@@ -6,6 +6,7 @@ import {
 import { isTrackRun, normalizeRunType, nullRouteFieldsForTrackRun } from "@/lib/runTypes";
 import { parseRunTotalMiles } from "@/lib/parse-run-total-miles";
 import { postRunBrandPickFromRunStamp } from "@/lib/runmanage/post-run-brand-stamp";
+import { normalizeProfileEmoji } from "@/lib/city-run/run-profile-visual";
 import type { AffiliationPick } from "@/components/runmanage/RunManageRunAffiliations";
 
 function routeMapFields(run: CityRunData) {
@@ -73,6 +74,8 @@ export function cityRunToWizardValues(run: CityRunData): RunInstanceWizardValues
     workoutId: "",
     plannedWorkoutId: run.plannedWorkoutId || "",
     attachedWorkoutTitle: run.plannedWorkout?.title?.trim() || "",
+    profileEmoji: run.profileEmoji?.trim() || "",
+    coverPhotoUrl: run.coverPhotoUrl?.trim() || "",
   };
 }
 
@@ -146,6 +149,8 @@ export function wizardValuesToSavePayload(
     webText: values.webText.trim() || null,
     igPostText: values.igPostText.trim() || null,
     workoutId: null,
+    profileEmoji: normalizeProfileEmoji(values.profileEmoji) ?? null,
+    coverPhotoUrl: values.coverPhotoUrl.trim() || null,
     ...extras,
   };
 }

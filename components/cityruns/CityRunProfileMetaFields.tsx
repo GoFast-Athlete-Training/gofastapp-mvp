@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import CityRunCoverPhotoUploadField from '@/components/cityruns/CityRunCoverPhotoUploadField';
+import { RUNNING_EMOJIS } from '@/lib/run-profile-emoji-presets';
 
 export const RUN_PROFILE_EMOJI_PRESETS = [
   '🏃',
@@ -29,6 +31,7 @@ export default function CityRunProfileMetaFields({
   onUploadError,
 }: Props) {
   const selected = profileEmoji.trim();
+  const [gridOpen, setGridOpen] = useState(false);
 
   return (
     <div className="space-y-4 rounded-lg border border-sky-100 bg-gradient-to-b from-sky-50/80 to-white p-4">
@@ -67,7 +70,33 @@ export default function CityRunProfileMetaFields({
               {emoji}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setGridOpen((v) => !v)}
+            className="flex h-10 items-center justify-center rounded-full border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:border-gray-300"
+          >
+            {gridOpen ? 'Hide more' : 'More emojis'}
+          </button>
         </div>
+        {gridOpen ? (
+          <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <div className="grid grid-cols-8 gap-1.5 max-h-48 overflow-y-auto">
+              {RUNNING_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onProfileEmojiChange(emoji)}
+                  className={`flex h-10 w-full items-center justify-center rounded-lg text-2xl transition hover:bg-white hover:scale-105 ${
+                    selected === emoji ? 'bg-sky-100 ring-2 ring-sky-300' : ''
+                  }`}
+                  aria-label={`Use ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <label className="mt-3 block">
           <span className="text-xs font-medium text-gray-700">Custom emoji</span>
           <input

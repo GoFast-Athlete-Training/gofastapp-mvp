@@ -41,7 +41,7 @@ import {
   postRunBrandStampFromProdBrand,
 } from '@/lib/runmanage/post-run-brand-stamp';
 import { maybeStampCityRunStartsAtOnUpdate } from '@/lib/city-run/stamp-city-run-write';
-import { resolveHostPhotoUrlFromRsvps } from '@/lib/city-run/run-profile-visual';
+import { normalizeProfileEmoji, resolveHostPhotoUrlFromRsvps } from '@/lib/city-run/run-profile-visual';
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
   process.env.RENDER_GIT_COMMIT ||
@@ -821,6 +821,18 @@ export async function PUT(
     }
     if (body.igPostText !== undefined) {
       updateData.igPostText = body.igPostText === null || body.igPostText === '' ? null : String(body.igPostText).trim();
+    }
+    if (body.profileEmoji !== undefined) {
+      updateData.profileEmoji =
+        body.profileEmoji === null || body.profileEmoji === ''
+          ? null
+          : normalizeProfileEmoji(String(body.profileEmoji));
+    }
+    if (body.coverPhotoUrl !== undefined) {
+      updateData.coverPhotoUrl =
+        body.coverPhotoUrl === null || body.coverPhotoUrl === ''
+          ? null
+          : String(body.coverPhotoUrl).trim();
     }
     if (body.igPostGraphic !== undefined) {
       updateData.igPostGraphic = body.igPostGraphic === null || body.igPostGraphic === '' ? null : String(body.igPostGraphic).trim();

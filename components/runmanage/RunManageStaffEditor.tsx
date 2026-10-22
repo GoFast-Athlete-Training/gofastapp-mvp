@@ -185,6 +185,8 @@ export interface CityRunData {
     workoutType?: string | null;
     description?: string | null;
   } | null;
+  profileEmoji?: string | null;
+  coverPhotoUrl?: string | null;
   plannedWorkout?: {
     id: string;
     title?: string | null;

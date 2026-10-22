@@ -91,6 +91,7 @@ export async function PUT(
             mapImageUrl: true,
             distanceMiles: true,
             routeNeighborhood: true,
+            routeDescription: true,
             runType: true,
             routePhotos: true,
             citySlug: true,
