@@ -666,6 +666,7 @@ export async function GET(
         postRunFoodKind: run.postRunFoodKind ?? null,
         postRunBrandShortDescription: run.postRunBrandShortDescription ?? null,
         stravaMapUrl: run.stravaMapUrl,
+        routeId: run.route?.id ?? null,
         route: run.route
           ? {
               id: run.route.id,

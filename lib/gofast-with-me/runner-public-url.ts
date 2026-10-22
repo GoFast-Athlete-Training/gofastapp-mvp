@@ -26,3 +26,15 @@ export function runnerPublicSegmentUrl(
   if (!seg) return landing;
   return `${landing}/${encodeURIComponent(seg)}`;
 }
+
+/** Runner host route slice: `{handle}/routes/{routeId}`. */
+export function runnerPublicRouteSliceUrl(
+  handle: string,
+  routeId: string,
+  baseUrl?: string,
+): string {
+  const slug = handle.trim();
+  const id = routeId.trim();
+  const landing = runnerPublicLandingUrl(slug, baseUrl).replace(/\/$/, '');
+  return `${landing}/routes/${encodeURIComponent(id)}`;
+}

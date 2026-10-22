@@ -16,7 +16,6 @@ import {
   type CityRunRsvp,
 } from '@/components/runs/city-run-types';
 import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
-import { cityRunDoorUrl } from '@/lib/city-run/run-nav-paths';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
 import { resolveViewerRsvpRole } from '@/lib/city-run/viewer-run-role';
 import CityRunHostActions from '@/components/runs/CityRunHostActions';
@@ -70,7 +69,6 @@ export default function CityRunTogetherMemberHub({
   const isHost = isHostRsvpRole(viewerRsvpRole);
   const isIndividual = run.cityRunType === 'INDIVIDUAL';
   const socialRun = hasSocialRunLifecycle(run);
-  const publicDoorHref = cityRunDoorUrl(run.slug?.trim() || run.id);
   const showPastCheckinPanel = runIsPast && !isHost && socialRun;
 
   const handleCheckin = async () => {
@@ -98,7 +96,7 @@ export default function CityRunTogetherMemberHub({
       <h1 className="text-xl font-bold text-gray-900">{run.title}</h1>
       <CityRunTogetherMeetupStrip run={run} />
       <CityRunHostedByStrip run={run} />
-      <CityRunRouteSlice run={run} publicDoorHref={publicDoorHref} />
+      <CityRunRouteSlice run={run} />
       {showPastCheckinPanel ? (
         <button
           type="button"

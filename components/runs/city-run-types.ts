@@ -130,6 +130,7 @@ export interface CityRunDetails {
   runType?: string | null;
   workoutDescription?: string | null;
   directionsText?: string | null;
+  routeId?: string | null;
   route?: {
     id: string;
     name: string;

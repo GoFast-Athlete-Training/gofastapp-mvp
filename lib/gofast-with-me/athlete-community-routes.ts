@@ -102,6 +102,19 @@ export function athleteCommunityPath(
   return section ? `${base}#${section}` : base;
 }
 
+/** In-app public route slice — athlete who built the route + routes.id (no route slug yet). */
+export function athletePublicRouteSliceAppPath(
+  handle: string,
+  routeId: string,
+  opts?: { from?: string },
+): string {
+  const slug = normalizeGoFastWithMeSlug(handle);
+  const base = `/u/${encodeURIComponent(slug)}/routes/${encodeURIComponent(routeId.trim())}`;
+  const from = opts?.from?.trim();
+  if (!from || !from.startsWith('/') || from.startsWith('//')) return base;
+  return `${base}?from=${encodeURIComponent(from)}`;
+}
+
 /** Public training week view at `/u/{handle}/myplan`. */
 export function athleteMyPlanPath(
   handle: string,
