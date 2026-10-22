@@ -3,7 +3,7 @@ import { formatCompanyUser, type FormattedCompanyUser } from '@/lib/format-compa
 export type CompanyProfileCard = {
   identity: {
     athleteId: string;
-    firebaseId: string;
+    firebaseId: string | null;
     name: string;
     handle: string | null;
     photoURL: string | null;
