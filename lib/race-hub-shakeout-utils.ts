@@ -34,8 +34,11 @@ type ShakeoutRsvpRow = {
   } | null;
 };
 
+type RunStoreSnap = { id: string; name: string; slug: string };
+
 type RunWithClub = city_runs & {
   runClub?: Pick<run_clubs, "id" | "name" | "slug"> | null;
+  runStore?: RunStoreSnap | null;
   city_run_rsvps?: ShakeoutRsvpRow[];
 };
 
@@ -104,6 +107,12 @@ export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string)
     organizerName: run.organizerName ?? null,
     organizerType: run.organizerType ?? null,
     staffNotes: run.staffNotes ?? null,
+    runBrandId: run.runBrandId ?? null,
+    runBrandName: run.runBrandName?.trim() || null,
+    runStoreId: run.runStoreId ?? null,
+    runStore: run.runStore
+      ? { id: run.runStore.id, name: run.runStore.name, slug: run.runStore.slug }
+      : null,
     gorunPath: `/gorun/${run.id}`,
     runClub: run.runClub ?? null,
     rsvpCount: rsvps.filter((rv) => rv.status === "going").length,

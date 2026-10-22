@@ -126,6 +126,7 @@ export async function loadRaceHubStaffPreviewBySlug(
           },
         },
         runClub: { select: { id: true, name: true, slug: true } },
+        runStore: { select: { id: true, name: true, slug: true } },
       },
     }),
     prisma.race_memberships.findMany({

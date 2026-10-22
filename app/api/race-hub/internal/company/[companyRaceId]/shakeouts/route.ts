@@ -52,6 +52,7 @@ export async function GET(
           },
         },
         runClub: { select: { id: true, name: true, slug: true } },
+        runStore: { select: { id: true, name: true, slug: true } },
       },
     });
 
@@ -308,6 +309,7 @@ export async function POST(
       include: {
         city_run_rsvps: true,
         runClub: { select: { id: true, name: true, slug: true } },
+        runStore: { select: { id: true, name: true, slug: true } },
       },
     });
 
