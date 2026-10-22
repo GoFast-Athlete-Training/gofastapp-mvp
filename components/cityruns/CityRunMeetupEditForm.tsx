@@ -15,6 +15,7 @@ import {
 } from "@/lib/parse-google-address";
 import type { HostedRunInviteRouteSnap } from "@/lib/city-run/list-athlete-hosted-invites";
 import CityRunProfileMetaFields from "@/components/cityruns/CityRunProfileMetaFields";
+import { OPEN_RUN_PAGE_LABEL } from "@/lib/city-run/host-run-card-actions";
 
 function ManageCard({
   title,
@@ -450,7 +451,7 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
           href={gorunPath}
           className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
         >
-          Open run page
+          {OPEN_RUN_PAGE_LABEL}
         </Link>
       </div>
     </div>

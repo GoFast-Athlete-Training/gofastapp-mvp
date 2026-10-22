@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Copy, ExternalLink } from "lucide-react";
 import api from "@/lib/api";
 import type { AthleteHostedRunInvite } from "@/lib/city-run/list-athlete-hosted-invites";
+import { OPEN_RUN_PAGE_LABEL } from "@/lib/city-run/host-run-card-actions";
 import { cityRunTogetherPath, runCompletePath } from "@/lib/city-run/run-nav-paths";
 import type { CityRunExecutionStatus } from "@prisma/client";
 
@@ -141,7 +142,7 @@ export default function HostRunDashboard({ cityRunId, onInviteLoaded }: Props) {
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800"
           >
             <ExternalLink className="h-4 w-4" />
-            Open run page
+            {OPEN_RUN_PAGE_LABEL}
           </Link>
           {invite.cityRunExecutionStatus === "RAN" ? (
             <Link

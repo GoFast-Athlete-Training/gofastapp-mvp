@@ -7,6 +7,7 @@ import {
 import { buildCityRunShareText } from "@/lib/city-run/build-run-share-text";
 import { getCityRunRsvpCounts, type CityRunRsvpCounts } from "@/lib/city-run/rsvp-counts";
 import type { CityRunExecutionStatus } from "@prisma/client";
+import { cityRunTogetherPath } from "@/lib/city-run/run-nav-paths";
 
 export type AthleteHostedRunInvite = {
   id: string;
@@ -43,7 +44,7 @@ function appBaseUrl(): string {
 }
 
 function gorunPathForRun(run: { id: string; slug: string | null }): string {
-  return `/gorun/${run.slug?.trim() || run.id}`;
+  return cityRunTogetherPath(run.slug?.trim() || run.id);
 }
 
 const inviteSelect = {

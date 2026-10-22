@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import RunnerAgendaCard from "@/components/runner/RunnerAgendaCard";
 import api from "@/lib/api";
-import { runRsvpPath } from "@/lib/city-run/run-nav-paths";
+import { cityRunTogetherPath } from "@/lib/city-run/run-nav-paths";
 import type { RunnerAgendaItem, RunnerAgendaPayload } from "@/lib/runner/runner-agenda";
 
 type Props = {
@@ -43,7 +43,7 @@ export default function GoRunUpcomingRunsPanel({ mode = "home" }: Props) {
     try {
       await api.post(`/runs/${runId}/checkin`, {});
       if (run?.slug || run?.id) {
-        router.push(runRsvpPath(run.slug?.trim() || run.id));
+        router.push(cityRunTogetherPath(run.slug?.trim() || run.id));
         return;
       }
       await load();
@@ -67,7 +67,7 @@ export default function GoRunUpcomingRunsPanel({ mode = "home" }: Props) {
           </h2>
           <p className="text-sm text-gray-600 mt-0.5">
             {mode === "home"
-              ? "Your soonest city run — copy the link or edit before you share."
+              ? "Your soonest city run — copy the link, view/edit details, or open your run page."
               : "City runs you created or joined — open the run group for details and chatter."}
           </p>
         </div>

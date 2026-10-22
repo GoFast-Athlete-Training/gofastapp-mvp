@@ -4,6 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Copy, ExternalLink, Pencil, Share2, Trash2 } from "lucide-react";
 import api from "@/lib/api";
+import {
+  hostRunEditHref,
+  hostRunPageHref,
+  hostRunPublicSegment,
+  OPEN_RUN_PAGE_LABEL,
+  VIEW_EDIT_LABEL,
+} from "@/lib/city-run/host-run-card-actions";
 
 const LAST_HOSTED_RUN_KEY = "gofast_last_hosted_run_id";
 
@@ -210,30 +217,30 @@ export default function HostedRunInvitesPanel({ collapsible = false }: Props) {
                   <button
                     type="button"
                     onClick={() => void copyLink(invite)}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
                   >
                     <Copy className="h-4 w-4" />
                     {copiedId === invite.id ? "Copied" : "Copy invite link"}
                   </button>
                   <Link
-                    href={`/host-a-run/${encodeURIComponent(invite.id)}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                    href={hostRunEditHref(invite.id)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                   >
                     <Pencil className="h-4 w-4" />
-                    Edit
+                    {VIEW_EDIT_LABEL}
                   </Link>
                   <Link
-                    href={invite.gorunPath}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                    href={hostRunPageHref(hostRunPublicSegment({ id: invite.id, slug: invite.slug }))}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                   >
                     <ExternalLink className="h-4 w-4" />
-                    Open run page
+                    {OPEN_RUN_PAGE_LABEL}
                   </Link>
                   <button
                     type="button"
                     disabled={deletingId === invite.id}
                     onClick={() => void deleteInvite(invite)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50"
                   >
                     <Trash2 className="h-4 w-4" />
                     {deletingId === invite.id ? "Deleting…" : "Delete"}

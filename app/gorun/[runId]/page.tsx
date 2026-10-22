@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { runRsvpPath } from '@/lib/city-run/run-nav-paths';
+import { cityRunTogetherPath } from '@/lib/city-run/run-nav-paths';
 
-/** Legacy slug under /gorun — always send to the public RSVP page. */
+/** Legacy slug under /gorun — send to the city run together surface. */
 export default function GoRunSlugRedirectPage() {
   const params = useParams();
   const router = useRouter();
@@ -12,7 +12,7 @@ export default function GoRunSlugRedirectPage() {
 
   useEffect(() => {
     if (!runId) return;
-    router.replace(runRsvpPath(runId));
+    router.replace(cityRunTogetherPath(runId));
   }, [runId, router]);
 
   return (

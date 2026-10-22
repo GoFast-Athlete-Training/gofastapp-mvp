@@ -8,7 +8,14 @@ import { formatRunTime } from '@/utils/formatTime';
 import type { RunnerAgendaItem } from '@/lib/runner/runner-agenda';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
 import { companyRunLinkSliceUrl } from '@/lib/city-run-public-card-url';
-import { runCompletePath, runRsvpPath } from '@/lib/city-run/run-nav-paths';
+import {
+  hostRunEditHref,
+  hostRunPageHref,
+  hostRunPublicSegment,
+  OPEN_RUN_PAGE_LABEL,
+  VIEW_EDIT_LABEL,
+} from '@/lib/city-run/host-run-card-actions';
+import { runCompletePath } from '@/lib/city-run/run-nav-paths';
 import api from '@/lib/api';
 
 type RunnerAgendaCardProps = {
@@ -46,8 +53,8 @@ export default function RunnerAgendaCard({
     startTimePeriod: run.startTimePeriod,
   });
 
-  const runSegment = run.slug?.trim() || run.id;
-  const runHref = runRsvpPath(runSegment);
+  const runSegment = hostRunPublicSegment(run);
+  const runPageHref = hostRunPageHref(runSegment);
   const recapHref = runCompletePath(runSegment);
   const showRecapCta = run.isPast || run.cityRunExecutionStatus === 'RAN';
 
@@ -134,7 +141,7 @@ export default function RunnerAgendaCard({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-2">
         {!isCreated && run.supportsCheckin && run.isLive && !run.hasCheckin ? (
           <button
             type="button"
@@ -145,38 +152,40 @@ export default function RunnerAgendaCard({
             {checkingInId === run.id ? 'Checking in…' : 'Check in'}
           </button>
         ) : null}
-        <button
-          type="button"
-          onClick={() => void copyInviteLink()}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-700"
-        >
-          <Copy className="h-4 w-4" />
-          {copied ? 'Copied' : 'Copy invite link'}
-        </button>
+        {isCreated ? (
+          <button
+            type="button"
+            onClick={() => void copyInviteLink()}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+          >
+            <Copy className="h-4 w-4" />
+            {copied ? 'Copied' : 'Copy invite link'}
+          </button>
+        ) : null}
         {isCreated ? (
           <Link
-            href={`/host-a-run/${encodeURIComponent(run.id)}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+            href={hostRunEditHref(run.id)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
           >
             <Pencil className="h-4 w-4" />
-            Edit
+            {VIEW_EDIT_LABEL}
           </Link>
         ) : null}
         {showRecapCta ? (
           <Link
             href={recapHref}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
           >
             <ExternalLink className="h-4 w-4" />
             See how the run went
           </Link>
         ) : (
           <Link
-            href={runHref}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+            href={runPageHref}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
           >
             <ExternalLink className="h-4 w-4" />
-            Open run page
+            {OPEN_RUN_PAGE_LABEL}
           </Link>
         )}
         {isCreated ? (
@@ -184,7 +193,7 @@ export default function RunnerAgendaCard({
             type="button"
             disabled={deleting}
             onClick={() => void deleteRun()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50"
           >
             <Trash2 className="h-4 w-4" />
             {deleting ? 'Deleting…' : 'Delete'}
