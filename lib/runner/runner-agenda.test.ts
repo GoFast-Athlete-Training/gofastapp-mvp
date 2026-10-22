@@ -45,6 +45,7 @@ function joined(overrides: Partial<RunnerJoinedRun> & Pick<RunnerJoinedRun, 'id'
     isLive: overrides.dateKey === TODAY,
     needsWereYouThere: false,
     supportsCheckin: true,
+    inviteShareUrl: 'https://dcruns.gofastcrushgoals.com/clubrun/test-run',
     ...overrides,
   };
 }

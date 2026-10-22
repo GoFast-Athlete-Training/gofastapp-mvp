@@ -58,6 +58,8 @@ export type RunnerJoinedRun = {
   needsWereYouThere: boolean;
   supportsCheckin: boolean;
   cityRunExecutionStatus: 'PLANNED' | 'RAN' | 'CANCELED';
+  /** Public read URL (dcruns / Pulse) — server-built for Copy invite on /gorun. */
+  inviteShareUrl: string;
 };
 
 export type RunnerAgendaItemKind = 'merged' | 'plan-only' | 'joined-run-only';

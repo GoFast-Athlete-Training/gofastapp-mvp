@@ -10,6 +10,7 @@ import { isHostRsvpRole, RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
 import { isAttendingCityRunRsvp } from '@/lib/city-run/rsvp-attendance';
 import { isCityRunUpcomingForLists } from '@/lib/city-run/execution-status';
 import type { CityRunExecutionStatus } from '@prisma/client';
+import { getPublicRunDetailPageUrl } from '@/lib/public-run-detail-url';
 import {
   buildRunnerAgenda,
   type RunnerAgendaItem,
@@ -154,6 +155,12 @@ function mapCityRunToJoinedRun(
     needsWereYouThere: false,
     supportsCheckin: hasSocialRunLifecycle(run),
     cityRunExecutionStatus: run.cityRunExecutionStatus,
+    inviteShareUrl: getPublicRunDetailPageUrl({
+      id: run.id,
+      slug: run.slug,
+      cityRunType: run.cityRunType,
+      runClub: run.runClub?.slug ? { slug: run.runClub.slug } : null,
+    }),
   };
 }
 

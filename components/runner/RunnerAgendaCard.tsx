@@ -63,12 +63,17 @@ export default function RunnerAgendaCard({
 
   const headerLabel = item.isToday ? "Today's run" : run.isPast ? 'Past run' : 'Upcoming';
 
-  async function copyInviteLink() {
-    const url = getPublicRunDetailPageUrl({
+  const inviteShareUrl =
+    run.inviteShareUrl?.trim() ||
+    getPublicRunDetailPageUrl({
       id: run.id,
       slug: run.slug,
       cityRunType: run.cityRunType,
+      runClub: run.runClub?.slug ? { slug: run.runClub.slug } : null,
     });
+
+  async function copyInviteLink() {
+    const url = inviteShareUrl;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -157,14 +162,19 @@ export default function RunnerAgendaCard({
           </button>
         ) : null}
         {isCreated ? (
-          <button
-            type="button"
-            onClick={() => void copyInviteLink()}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
-          >
-            <Copy className="h-4 w-4" />
-            {copied ? 'Copied' : 'Copy invite link'}
-          </button>
+          <div className="w-full min-w-[min(100%,20rem)] space-y-1.5 sm:w-auto">
+            <button
+              type="button"
+              onClick={() => void copyInviteLink()}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 sm:w-auto"
+            >
+              <Copy className="h-4 w-4" />
+              {copied ? 'Copied' : 'Copy invite link'}
+            </button>
+            <p className="text-[11px] text-gray-500 break-all" title={inviteShareUrl}>
+              {inviteShareUrl}
+            </p>
+          </div>
         ) : null}
         {isCreated ? (
           <Link
