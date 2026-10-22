@@ -102,7 +102,7 @@ export default function CityRunRsvpGroup({
     }
   };
 
-  const shellMax = isIndividual ? 'max-w-4xl' : 'max-w-6xl';
+  const shellMax = 'max-w-6xl';
 
   const rsvpPanel = (
     <CityRunRsvpPanel
@@ -154,22 +154,16 @@ export default function CityRunRsvpGroup({
           {isHost ? <CityRunHostActions cityRunId={run.id} /> : null}
           {isHost && isIndividual ? <HostRunExecutionPanel cityRunId={run.id} /> : null}
 
-          <div
-            className={
-              isIndividual
-                ? 'grid grid-cols-1 xl:grid-cols-[1fr_17rem] items-start gap-4'
-                : 'grid grid-cols-3 items-start gap-4'
-            }
-          >
-            <div className={isIndividual ? 'space-y-3 min-w-0' : 'col-span-2 space-y-3'}>
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] items-start">
+            <div className="space-y-3 min-w-0">
               <CityRunDetailsSection run={run} />
               {showJoinPanel || showPastCheckinPanel ? rsvpPanel : null}
             </div>
-            <div className="space-y-3">
-              <CityRunPeopleSection rsvps={rsvps} sticky />
+            <div className="space-y-4 xl:sticky xl:top-20 self-start min-w-0 w-full">
+              <CityRunPeopleSection rsvps={rsvps} />
               <CityRunChatSection
                 runId={run.id}
-                variant="sidebar-square"
+                variant="sidebar-panel"
                 chatLock={chatLock}
                 joinRunHref={joinRunHref}
                 onJoinRun={onJoinRun}

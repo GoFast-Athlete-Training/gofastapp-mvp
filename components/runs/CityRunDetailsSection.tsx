@@ -69,7 +69,13 @@ export default function CityRunDetailsSection({
     route: run.route,
   };
   const heroImage = resolveRunHeroImage(visualInput);
-  const routeSectionMapUrl = mapImageUrlForRouteSection(visualInput, heroImage);
+  const showHeaderHero =
+    Boolean(heroImage) &&
+    !(showRouteMedia && heroImage?.source === "routeMap");
+  const routeSectionMapUrl = mapImageUrlForRouteSection(
+    visualInput,
+    showHeaderHero ? heroImage : null,
+  );
 
   return (
     <div className="space-y-4">
@@ -167,6 +173,7 @@ export default function CityRunDetailsSection({
           title={displayTitle}
           metroBadge={metroBadge}
           compact={compact}
+          showHero={showHeaderHero}
           {...visualInput}
         />
 

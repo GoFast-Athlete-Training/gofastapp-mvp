@@ -11,6 +11,8 @@ type Props = RunProfileVisualInput & {
   metroBadge?: string | null;
   compact?: boolean;
   centered?: boolean;
+  /** When false, skip wide hero (e.g. route map lives in Route section below). */
+  showHero?: boolean;
 };
 
 export default function CityRunLinksHeader({
@@ -18,10 +20,11 @@ export default function CityRunLinksHeader({
   metroBadge,
   compact = false,
   centered = true,
+  showHero = true,
   ...visual
 }: Props) {
   const circle = resolveRunCircleMark(visual);
-  const hero = resolveRunHeroImage(visual);
+  const hero = showHero ? resolveRunHeroImage(visual) : null;
   const align = centered ? 'text-center' : 'text-left';
 
   return (

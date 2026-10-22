@@ -40,7 +40,7 @@ export type CityRunChatLock = 'sign-in' | 'rsvp' | null;
 
 type CityRunChatSectionProps = {
   runId: string;
-  variant?: 'default' | 'mobile-hub' | 'sidebar-square';
+  variant?: 'default' | 'mobile-hub' | 'sidebar-square' | 'sidebar-panel';
   showHeading?: boolean;
   chatLock?: CityRunChatLock;
   joinRunHref?: string;
@@ -65,6 +65,7 @@ export default function CityRunChatSection({
 
   const isMobileHub = variant === 'mobile-hub';
   const isSidebarSquare = variant === 'sidebar-square';
+  const isSidebarPanel = variant === 'sidebar-panel';
   const chatLive = chatLock == null;
 
   useEffect(() => {
@@ -113,15 +114,19 @@ export default function CityRunChatSection({
 
   const listClassName = isMobileHub
     ? 'min-h-[min(18rem,42dvh)] max-h-[min(32rem,calc(100dvh-18rem))]'
-    : isSidebarSquare
-      ? 'min-h-0 flex-1'
-      : 'min-h-[200px] max-h-[400px]';
+    : isSidebarPanel
+      ? 'min-h-[12rem] max-h-[min(28rem,calc(100dvh-14rem))] flex-1'
+      : isSidebarSquare
+        ? 'min-h-0 flex-1'
+        : 'min-h-[200px] max-h-[400px]';
 
   const shellClass = isMobileHub
     ? 'flex min-h-0 flex-1 flex-col min-w-0'
-    : isSidebarSquare
-      ? 'bg-white rounded-xl shadow-sm flex flex-col aspect-square w-full max-w-md'
-      : 'bg-white rounded-xl shadow-sm flex flex-col';
+    : isSidebarPanel
+      ? 'bg-white rounded-xl shadow-sm flex flex-col min-h-[20rem] w-full min-w-0'
+      : isSidebarSquare
+        ? 'bg-white rounded-xl shadow-sm flex flex-col aspect-square w-full max-w-md'
+        : 'bg-white rounded-xl shadow-sm flex flex-col';
 
   const lockMessage =
     chatLock === 'sign-in'
@@ -137,7 +142,7 @@ export default function CityRunChatSection({
           className={
             isMobileHub
               ? 'mb-3 px-0.5'
-              : isSidebarSquare
+              : isSidebarSquare || isSidebarPanel
                 ? 'px-4 py-3 border-b border-gray-100'
                 : 'px-6 py-4 border-b border-gray-100'
           }
@@ -151,10 +156,10 @@ export default function CityRunChatSection({
         className={`flex-1 overflow-y-auto space-y-3 ${listClassName} ${
           isMobileHub
             ? 'border border-gray-200 rounded-lg bg-gray-50 p-4'
-            : isSidebarSquare
+            : isSidebarSquare || isSidebarPanel
               ? 'px-3 py-3'
               : 'px-6 py-4'
-        } ${isMobileHub || isSidebarSquare ? 'min-h-0' : ''}`}
+        } ${isMobileHub || isSidebarSquare || isSidebarPanel ? 'min-h-0' : ''}`}
       >
         {chatLock ? (
           <div className="flex flex-col items-center justify-center py-8 px-4 text-center space-y-3">
@@ -215,7 +220,7 @@ export default function CityRunChatSection({
           className={`flex gap-2 shrink-0 ${
             isMobileHub
               ? 'sticky bottom-20 z-30 mt-3 border-t border-gray-200 bg-gray-50 pt-3'
-              : isSidebarSquare
+              : isSidebarSquare || isSidebarPanel
                 ? 'px-3 py-3 border-t border-gray-100'
                 : 'px-4 py-3 border-t border-gray-100'
           }`}
@@ -227,7 +232,7 @@ export default function CityRunChatSection({
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && void handleSendMessage()}
             placeholder="Write a message…"
             className={`flex-1 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 ${
-              isMobileHub || isSidebarSquare
+              isMobileHub || isSidebarSquare || isSidebarPanel
                 ? 'border border-gray-300 rounded-lg bg-white'
                 : 'bg-gray-100 rounded-full'
             }`}
@@ -237,12 +242,12 @@ export default function CityRunChatSection({
             onClick={() => void handleSendMessage()}
             disabled={!newMessage.trim() || sendingMessage}
             className={`bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40 transition shrink-0 ${
-              isMobileHub || isSidebarSquare
+              isMobileHub || isSidebarSquare || isSidebarPanel
                 ? 'px-3 py-2 rounded-lg text-sm font-semibold'
                 : 'p-2 rounded-full'
             }`}
           >
-            {isMobileHub || isSidebarSquare ? (
+            {isMobileHub || isSidebarSquare || isSidebarPanel ? (
               sendingMessage ? '…' : 'Send'
             ) : (
               <Send className="h-4 w-4" />

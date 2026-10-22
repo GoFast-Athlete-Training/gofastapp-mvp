@@ -88,9 +88,9 @@ const PRE_RSVP_TABS = [
 ] as const;
 
 const GOING_TABS = [
-  { id: 'chatter', label: 'Chatter', icon: <MessageCircle className="h-5 w-5" /> },
   { id: 'details', label: 'Details', icon: <Info className="h-5 w-5" /> },
   { id: 'people', label: 'People', icon: <Users className="h-5 w-5" /> },
+  { id: 'chatter', label: 'Chatter', icon: <MessageCircle className="h-5 w-5" /> },
 ] as const;
 
 const POST_RUN_TABS = [
@@ -101,7 +101,7 @@ const POST_RUN_TABS = [
 
 export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
   const defaultTab =
-    props.mode === 'going' ? 'chatter' : props.mode === 'post-run' ? 'shouts' : 'details';
+    props.mode === 'going' ? 'details' : props.mode === 'post-run' ? 'shouts' : 'details';
   const [activeTab, setActiveTab] = useState(defaultTab);
 
   if (props.mode === 'pre-rsvp') {
@@ -175,18 +175,11 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
     return (
       <MobileHubTabs tabs={[...GOING_TABS]} activeTab={activeTab} onTabChange={setActiveTab}>
         {activeTab === 'chatter' ? (
-          <div className="flex min-h-[calc(100dvh-11rem)] flex-col space-y-3">
-            {props.hasMembership !== false ? (
-              <CityRunGoingBanner rsvpRole={viewerRsvpRole} />
-            ) : null}
-            {isHost ? <CityRunHostActions cityRunId={props.run.id} /> : null}
-            {isHost && isIndividual ? (
-              <HostRunExecutionPanel cityRunId={props.run.id} />
-            ) : null}
+          <div className="flex min-h-[calc(100dvh-11rem)] flex-col">
             <CityRunChatSection
               runId={props.run.id}
               variant="mobile-hub"
-              showHeading={false}
+              showHeading
               chatLock={props.chatLock ?? null}
               joinRunHref={props.joinRunHref}
               onJoinRun={props.onJoinRun}
@@ -196,6 +189,9 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
         ) : null}
         {activeTab === 'details' ? (
           <div className="space-y-4">
+            {props.hasMembership !== false ? (
+              <CityRunGoingBanner rsvpRole={viewerRsvpRole} />
+            ) : null}
             {isHost ? <CityRunHostActions cityRunId={props.run.id} /> : null}
             {isHost && isIndividual ? (
               <HostRunExecutionPanel cityRunId={props.run.id} />
