@@ -493,6 +493,7 @@ export async function POST(request: NextRequest) {
           id: true,
           slug: true,
           runClubId: true,
+          cityRunType: true,
         },
       });
     } catch (error: unknown) {
@@ -510,6 +511,7 @@ export async function POST(request: NextRequest) {
           id: true,
           slug: true,
           runClubId: true,
+          cityRunType: true,
         },
       });
     }

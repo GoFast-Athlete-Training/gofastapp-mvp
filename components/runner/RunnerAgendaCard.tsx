@@ -83,6 +83,7 @@ export default function RunnerAgendaCard({
   }, [run, isCreated, loadShareUrl]);
 
   if (!run) return null;
+  const joinedRun = run;
 
   const dateKey = item.dateKey;
   const dateLabel = formatCalendarDate(`${dateKey}T12:00:00.000Z`, {
@@ -92,24 +93,24 @@ export default function RunnerAgendaCard({
   });
 
   const runTimeStr = formatRunTime({
-    startTimeHour: run.startTimeHour,
-    startTimeMinute: run.startTimeMinute,
-    startTimePeriod: run.startTimePeriod,
+    startTimeHour: joinedRun.startTimeHour,
+    startTimeMinute: joinedRun.startTimeMinute,
+    startTimePeriod: joinedRun.startTimePeriod,
   });
 
-  const runSegment = hostRunPublicSegment(run);
+  const runSegment = hostRunPublicSegment(joinedRun);
   const runPageHref = hostRunPageHref(runSegment);
   const recapHref = runCompletePath(runSegment);
-  const showRecapCta = run.isPast || run.cityRunExecutionStatus === 'RAN';
+  const showRecapCta = joinedRun.isPast || joinedRun.cityRunExecutionStatus === 'RAN';
 
   const membershipBadge = isCreated ? 'Created' : 'Joined';
 
-  const headerLabel = item.isToday ? "Today's run" : run.isPast ? 'Past run' : 'Upcoming';
+  const headerLabel = item.isToday ? "Today's run" : joinedRun.isPast ? 'Past run' : 'Upcoming';
 
   async function copyInviteLink() {
     const url =
       normalizeInviteShareUrl(shareUrlFromApi) ||
-      normalizeInviteShareUrl(run.inviteShareUrl) ||
+      normalizeInviteShareUrl(joinedRun.inviteShareUrl) ||
       (await loadShareUrl());
     try {
       await navigator.clipboard.writeText(url);
@@ -122,13 +123,13 @@ export default function RunnerAgendaCard({
 
   async function deleteRun() {
     if (
-      !window.confirm(`Delete "${run.title}"? This removes the invite and cannot be undone.`)
+      !window.confirm(`Delete "${joinedRun.title}"? This removes the invite and cannot be undone.`)
     ) {
       return;
     }
     setDeleting(true);
     try {
-      await api.delete(`/me/hosted-run-invites/${encodeURIComponent(run.id)}`);
+      await api.delete(`/me/hosted-run-invites/${encodeURIComponent(joinedRun.id)}`);
       onDeleted?.();
     } catch (err) {
       console.error('Delete run failed:', err);
