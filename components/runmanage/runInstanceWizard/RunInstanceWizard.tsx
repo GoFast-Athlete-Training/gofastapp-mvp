@@ -42,6 +42,7 @@ import {
 } from "@/lib/client/uploadImages";
 import RunInstanceSourcesPanel, { hasRunInstanceSources } from "./RunInstanceSourcesPanel";
 import TrackWorkoutBuilder from "./TrackWorkoutBuilder";
+import AthleteHostedDistancePaceStep from "./AthleteHostedDistancePaceStep";
 import RunClubPublicSourcesCard, {
   type RunClubPublicSources,
   type RunInstancePublicReadout,
@@ -52,6 +53,7 @@ import { wizardSidebarButtonClasses } from "@/components/club-manager/WizardStat
 import type { WizardStepVisualStatus } from "@/lib/runmanage/wizard-step-visual-status";
 import {
   WIZARD_STEPS,
+  ATHLETE_HOSTED_WIZARD_STEP_COPY,
   wizardStepOrderForVariant,
   buildInstanceContextFromValues,
   fieldChanged,
@@ -186,10 +188,11 @@ export default function RunInstanceWizard({
 
   const isEasySimpleWorkout =
     values.clubWorkoutType === "Easy" && !values.plannedWorkoutId.trim();
-  const workoutStepComplete =
-    Boolean(values.plannedWorkoutId.trim() && values.attachedWorkoutTitle.trim()) ||
-    !values.trackWorkoutDescription.trim() ||
-    (isEasySimpleWorkout && Boolean(values.trackWorkoutDescription.trim()));
+  const workoutStepComplete = isAthleteHosted
+    ? true
+    : Boolean(values.plannedWorkoutId.trim() && values.attachedWorkoutTitle.trim()) ||
+      !values.trackWorkoutDescription.trim() ||
+      (isEasySimpleWorkout && Boolean(values.trackWorkoutDescription.trim()));
 
   const descriptionStepComplete = Boolean(values.description.trim());
 
@@ -394,6 +397,10 @@ export default function RunInstanceWizard({
       return "idle";
     }
     if (step === "workout") {
+      if (isAthleteHosted) {
+        if (values.totalMiles.trim() || values.pace.trim()) return "complete";
+        return "idle";
+      }
       if (workoutStepComplete) return "complete";
       if (values.trackWorkoutDescription.trim()) return "partial";
       return "idle";
@@ -532,6 +539,10 @@ export default function RunInstanceWizard({
           </p>
           <nav className="space-y-2">
             {WIZARD_STEPS.filter((step) => visibleWizardSteps.includes(step.id)).map((step, index) => {
+              const athleteCopy =
+                isAthleteHosted ? ATHLETE_HOSTED_WIZARD_STEP_COPY[step.id] : undefined;
+              const stepTitle = athleteCopy?.title ?? step.title;
+              const stepDescription = athleteCopy?.description ?? step.description;
               const isActive = wizardStep === step.id;
               const visualStatus = wizardStepVisualStatus(step.id);
               return (
@@ -560,9 +571,9 @@ export default function RunInstanceWizard({
                         <span className={isActive ? "text-sky-600" : "text-gray-400"}>
                           {wizardStepIcon(step.id)}
                         </span>
-                        <p className="truncate text-sm font-medium">{step.title}</p>
+                        <p className="truncate text-sm font-medium">{stepTitle}</p>
                       </div>
-                      <p className="mt-0.5 text-xs opacity-80">{step.description}</p>
+                      <p className="mt-0.5 text-xs opacity-80">{stepDescription}</p>
                     </div>
                   </div>
                 </button>
@@ -876,28 +887,38 @@ export default function RunInstanceWizard({
           {wizardStep === "workout" && (
             <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Workout</h3>
+                <h3 className="text-sm font-semibold text-gray-900">
+                  {isAthleteHosted
+                    ? (ATHLETE_HOSTED_WIZARD_STEP_COPY.workout?.title ?? "Distance & pace")
+                    : "Workout"}
+                </h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  Optional structured session for this run — intervals, tempo, hills, or progression.
-                  Most social runs only need pace in Core details.
+                  {isAthleteHosted
+                    ? (ATHLETE_HOSTED_WIZARD_STEP_COPY.workout?.description ??
+                      "Optional — how far and how fast")
+                    : "Optional structured session for this run — intervals, tempo, hills, or progression."}
                 </p>
               </div>
-              <TrackWorkoutBuilder
-                clubId={context.clubId?.trim() || ""}
-                cityRunId={context.cityRunId}
-                runDate={values.date}
-                values={{
-                  trackWorkoutDescription: values.trackWorkoutDescription,
-                  plannedWorkoutId: values.plannedWorkoutId,
-                  attachedWorkoutTitle: values.attachedWorkoutTitle,
-                  clubWorkoutType: values.clubWorkoutType,
-                }}
-                initialSegments={context.plannedWorkoutSegments ?? null}
-                initialWorkoutTitle={context.plannedWorkoutTitle ?? null}
-                initialWorkoutType={context.plannedWorkoutType ?? null}
-                onChange={(partial) => patch(partial)}
-                onError={onErrorChange}
-              />
+              {isAthleteHosted ? (
+                <AthleteHostedDistancePaceStep values={values} onChange={patch} />
+              ) : (
+                <TrackWorkoutBuilder
+                  clubId={context.clubId?.trim() || ""}
+                  cityRunId={context.cityRunId}
+                  runDate={values.date}
+                  values={{
+                    trackWorkoutDescription: values.trackWorkoutDescription,
+                    plannedWorkoutId: values.plannedWorkoutId,
+                    attachedWorkoutTitle: values.attachedWorkoutTitle,
+                    clubWorkoutType: values.clubWorkoutType,
+                  }}
+                  initialSegments={context.plannedWorkoutSegments ?? null}
+                  initialWorkoutTitle={context.plannedWorkoutTitle ?? null}
+                  initialWorkoutType={context.plannedWorkoutType ?? null}
+                  onChange={(partial) => patch(partial)}
+                  onError={onErrorChange}
+                />
+              )}
             </div>
           )}
 

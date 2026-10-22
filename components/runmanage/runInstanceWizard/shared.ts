@@ -78,7 +78,7 @@ export const WIZARD_STEPS: { id: WizardStep; title: string; description: string 
     title: "Associate",
     description: "Optional club or brand — does not change run type",
   },
-  { id: "core", title: "Core details", description: "Confirm date, meet-up, miles, pace" },
+  { id: "core", title: "Core details", description: "Date, meet-up, and start time" },
   {
     id: "description",
     title: "Description",
@@ -91,6 +91,13 @@ export const WIZARD_STEPS: { id: WizardStep; title: string; description: string 
     description: "Optional structured session — intervals, tempo, hills",
   },
 ];
+
+export const ATHLETE_HOSTED_WIZARD_STEP_COPY: Partial<
+  Record<WizardStep, { title: string; description: string }>
+> = {
+  core: { title: "Core details", description: "Title, date, meet-up, and start time" },
+  workout: { title: "Distance & pace", description: "Optional — how far and how fast" },
+};
 
 export type RunInstanceWizardValues = {
   title: string;
