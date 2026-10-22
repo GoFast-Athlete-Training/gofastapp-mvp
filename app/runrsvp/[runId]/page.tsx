@@ -1,21 +1,14 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { cityRunTogetherPath } from '@/lib/city-run/run-nav-paths';
+import { Suspense } from 'react';
+import { useParams } from 'next/navigation';
+import { useCityRunEntryRedirect } from '@/components/runs/useCityRunEntryRedirect';
 
-/** Legacy / alias URL — canonical public hub is /cityruntogether/{slug}. */
+/** Legacy alias — door = public slice; hub = members only. */
 function RunRsvpRedirectContent() {
   const params = useParams();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const runId = params.runId as string;
-
-  useEffect(() => {
-    if (!runId) return;
-    const qs = searchParams.toString();
-    router.replace(`${cityRunTogetherPath(runId)}${qs ? `?${qs}` : ''}`);
-  }, [runId, searchParams, router]);
+  useCityRunEntryRedirect(runId);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">

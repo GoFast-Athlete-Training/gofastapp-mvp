@@ -10,6 +10,7 @@ import {
   isExternallyContactableEmail,
 } from '@/lib/athlete-contact-email';
 import { touchAthleteLastSeenIfStale } from '@/lib/touch-athlete-last-seen';
+import { normalizeAthleteEmail } from '@/lib/athlete-email-normalize';
 
 export async function POST(request: Request) {
   try {
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
     }
 
     const firebaseId = decodedToken.uid;
-    const email = decodedToken.email || undefined;
+    const email = normalizeAthleteEmail(decodedToken.email) ?? undefined;
     // Firebase Admin SDK uses 'name' field for displayName in decoded token
     // Check both 'name' and 'displayName' fields (though 'displayName' is less common)
     const displayName = decodedToken.name || decodedToken.displayName || undefined;
@@ -169,13 +170,37 @@ export async function POST(request: Request) {
     console.log('🔍 ATHLETE CREATE: Looking up athlete with firebaseId:', firebaseId);
 
     // Check if athlete already exists to preserve user-edited profile data
-    const existingAthlete = await prisma.athlete.findUnique({
+    const existingByFirebase = await prisma.athlete.findUnique({
       where: { firebaseId },
-      select: { id: true, firstName: true, lastName: true }
+      select: { id: true, firstName: true, lastName: true },
     });
 
+    let existingAthlete = existingByFirebase;
+
+    // Claim name-only public RSVP row before firebase upsert
+    if (email) {
+      const seeded = await prisma.athlete.findUnique({
+        where: { email },
+        select: { id: true, firebaseId: true, firstName: true, lastName: true },
+      });
+      if (seeded) {
+        if (seeded.firebaseId && seeded.firebaseId !== firebaseId) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Email already exists',
+              details: 'Sign in with the account that owns this email',
+            },
+            { status: 409 },
+          );
+        }
+        if (!seeded.firebaseId) {
+          existingAthlete = seeded;
+        }
+      }
+    }
+
     // Use upsert pattern to atomically handle create/update and prevent race conditions
-    // This ensures only one athlete record exists per firebaseId
     const updateData: any = {};
     const createData: any = {
       firebaseId,
@@ -208,7 +233,12 @@ export async function POST(request: Request) {
       if (hasBothNames) {
         // Athlete has complete name - NEVER overwrite (strongest protection)
         console.log('🔒 ATHLETE CREATE: Athlete has both firstName and lastName - PRESERVING (idempotent)');
-        console.log('🔒 ATHLETE CREATE: Existing - firstName:', existingAthlete.firstName, 'lastName:', existingAthlete.lastName);
+        console.log(
+          '🔒 ATHLETE CREATE: Existing - firstName:',
+          existingAthlete?.firstName,
+          'lastName:',
+          existingAthlete?.lastName,
+        );
         console.log('🔒 ATHLETE CREATE: Ignoring displayName to prevent overwrite:', displayName);
         // Don't set updateData.firstName or updateData.lastName at all
       } else if (!hasAnyName) {
@@ -248,11 +278,22 @@ export async function POST(request: Request) {
     updateData.lastSeenAt = new Date();
     createData.lastSeenAt = new Date();
 
-    let athlete = await prisma.athlete.upsert({
-      where: { firebaseId },
-      update: updateData,
-      create: createData,
-    });
+    let athlete;
+    if (existingAthlete && !existingByFirebase) {
+      athlete = await prisma.athlete.update({
+        where: { id: existingAthlete.id },
+        data: {
+          ...updateData,
+          firebaseId,
+        },
+      });
+    } else {
+      athlete = await prisma.athlete.upsert({
+        where: { firebaseId },
+        update: updateData,
+        create: createData,
+      });
+    }
 
     if (athlete.firebaseId === firebaseId && athlete.companyId === company.id) {
       console.log('✅ ATHLETE CREATE: Athlete record synced successfully:', athlete.id);

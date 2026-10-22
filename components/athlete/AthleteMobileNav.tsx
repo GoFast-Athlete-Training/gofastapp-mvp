@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, LayoutDashboard, MapPin, PenLine, Trophy, Users, X } from 'lucide-react';
+import { Activity, LayoutDashboard, Link2, MapPin, PenLine, Trophy, Users, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
   BUILD_CONTENT_LABEL,
   BUILD_CONTENT_PATH,
   COMMUNITY_HUB_PATH,
+  GOFAST_LINKS_LABEL,
+  GOFAST_LINKS_PATH,
   MANAGE_COMMUNITY_LABEL,
   isCommunityHubPath,
   isContentStudioPath,
+  isGoFastLinksPath,
 } from '@/lib/athlete/community-nav';
 
 type NavItem = {
@@ -77,6 +80,13 @@ const moreItems: NavItem[] = [
     href: BUILD_CONTENT_PATH,
     icon: PenLine,
     match: isContentStudioPath,
+  },
+  {
+    id: 'gofast-links',
+    label: GOFAST_LINKS_LABEL,
+    href: GOFAST_LINKS_PATH,
+    icon: Link2,
+    match: isGoFastLinksPath,
   },
   {
     id: 'community-hub',

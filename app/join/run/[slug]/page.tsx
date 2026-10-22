@@ -6,12 +6,16 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
-import { cityRunTogetherPath, runRsvpPath } from '@/lib/city-run/run-nav-paths';
+import {
+  cityRunJoinSignupPath,
+  cityRunTogetherPath,
+  markCityRunJoinedBanner,
+} from '@/lib/city-run/run-nav-paths';
 
 /**
  * /join/run/[slug] — legacy entry from old public links.
  * Signed-in: RSVP once → cityruntogether success screen.
- * Signed-out: runrsvp (sign up there).
+ * Signed-out: signup for this run.
  */
 export default function JoinRunPage() {
   const params = useParams();
@@ -75,7 +79,7 @@ export default function JoinRunPage() {
 
   useEffect(() => {
     if (!authResolved || isLoggedIn || !slug) return;
-    router.replace(runRsvpPath(slug));
+    router.replace(cityRunJoinSignupPath(slug, cityRunTogetherPath(slug)));
   }, [authResolved, isLoggedIn, slug, router]);
 
   const completeGoingRsvp = async () => {
@@ -84,7 +88,8 @@ export default function JoinRunPage() {
     try {
       await api.post(`/runs/${runId}/rsvp`, { status: 'going' });
       const key = runSlug ?? runId;
-      router.replace(`${cityRunTogetherPath(key)}?rsvp=success`);
+      markCityRunJoinedBanner(runId);
+      router.replace(cityRunTogetherPath(key));
     } catch (err: unknown) {
       console.error('RSVP error:', err);
       setRsvpError('Could not save your RSVP. Please try again.');

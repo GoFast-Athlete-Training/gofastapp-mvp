@@ -72,12 +72,14 @@ export async function GET(
       );
     }
 
-    const lastSignInAt = await fetchFirebaseLastSignIn(athlete.firebaseId);
+    const lastSignInAt = athlete.firebaseId
+      ? await fetchFirebaseLastSignIn(athlete.firebaseId)
+      : null;
 
     const profileCard = formatAthleteToProfileCard(
       {
         id: athlete.id,
-        firebaseId: athlete.firebaseId,
+        firebaseId: athlete.firebaseId ?? '',
         email: athlete.email,
         firstName: athlete.firstName,
         lastName: athlete.lastName,

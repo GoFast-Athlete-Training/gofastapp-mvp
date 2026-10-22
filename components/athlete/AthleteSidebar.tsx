@@ -4,16 +4,19 @@ import { Suspense } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, LayoutDashboard, MapPin, PenLine, Trophy, Users } from "lucide-react";
+import { Activity, LayoutDashboard, Link2, MapPin, PenLine, Trophy, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import AthleteMobileNav from "@/components/athlete/AthleteMobileNav";
 import {
   BUILD_CONTENT_LABEL,
   BUILD_CONTENT_PATH,
   COMMUNITY_HUB_PATH,
+  GOFAST_LINKS_LABEL,
+  GOFAST_LINKS_PATH,
   MANAGE_COMMUNITY_LABEL,
   isCommunityHubPath,
   isContentStudioPath,
+  isGoFastLinksPath,
 } from "@/lib/athlete/community-nav";
 
 type NavItem = {
@@ -94,6 +97,7 @@ function AthleteSidebarInner() {
   const router = useRouter();
   const pathname = usePathname();
   const contentStudioActive = isContentStudioPath(pathname);
+  const linksActive = isGoFastLinksPath(pathname);
   const hubActive = isCommunityHubPath(pathname);
 
   return (
@@ -155,6 +159,18 @@ function AthleteSidebarInner() {
             >
               <PenLine className="h-5 w-5 shrink-0" />
               <span className="text-left">{BUILD_CONTENT_LABEL}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(GOFAST_LINKS_PATH)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                linksActive
+                  ? "bg-orange-50 text-orange-700 border border-orange-200"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              <Link2 className="h-5 w-5 shrink-0" />
+              <span className="text-left">{GOFAST_LINKS_LABEL}</span>
             </button>
           </div>
 

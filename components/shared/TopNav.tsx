@@ -14,7 +14,7 @@ import {
   rememberAthleteChrome,
   resolveChromePhotoSrc,
 } from '@/lib/athlete-chrome-cache';
-import { Settings, Wallet, Footprints, Link2 } from 'lucide-react';
+import { Settings, Wallet, Footprints } from 'lucide-react';
 import { contentBuilderPayoutsPath } from '@/lib/athlete/community-nav';
 
 type TopNavAthleteChrome = {
@@ -137,8 +137,6 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
 
           {/* Right: quick links not duplicated in left rail, profile & actions */}
           <div className="flex items-center gap-1 sm:gap-3">
-            <TopNavLinksLink />
-
             <Suspense
               fallback={
                 <span className="p-2 text-gray-600 rounded-lg" aria-hidden>
@@ -200,26 +198,6 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
         </div>
       </div>
     </header>
-  );
-}
-
-function TopNavLinksLink() {
-  const pathname = usePathname();
-  const active = pathname === '/links' || !!pathname?.startsWith('/links/');
-
-  return (
-    <Link
-      href="/links"
-      className={`p-2 rounded-lg transition ${
-        active
-          ? 'bg-gray-100 text-gray-900'
-          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-      }`}
-      title="Links"
-      aria-current={active ? 'page' : undefined}
-    >
-      <Link2 className="h-5 w-5" />
-    </Link>
   );
 }
 

@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
         routePhotos: true,
         runPhotos: true,
         igPostGraphic: true,
+        profileEmoji: true,
       },
     });
     if (!run) {

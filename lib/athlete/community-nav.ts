@@ -18,7 +18,16 @@ export const CONTENT_BUILDER_LABEL = 'Content builder';
 /** @deprecated Use CONTENT_BUILDER_LABEL */
 export const BUILD_CONTENT_LABEL = CONTENT_BUILDER_LABEL;
 
+export const GOFAST_LINKS_PATH = '/links';
+
+export const GOFAST_LINKS_LABEL = 'Links';
+
 export const MANAGE_COMMUNITY_LABEL = 'Manage Community';
+
+export function isGoFastLinksPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === GOFAST_LINKS_PATH || pathname.startsWith(`${GOFAST_LINKS_PATH}/`);
+}
 
 /** @deprecated Use `/gofast-with-others` redirect only */
 export const LEGACY_GOFAST_WITH_OTHERS_PATH = '/gofast-with-others';

@@ -1,3 +1,5 @@
+import { normalizeProfileEmoji } from "@/lib/city-run/run-profile-visual";
+
 export type CityRunLinkVisual = {
   linkLogoUrl: string | null;
   emoji: string | null;
@@ -17,6 +19,7 @@ export function inferCityRunLinkVisual(run: {
   routePhotos?: unknown;
   runPhotos?: unknown;
   igPostGraphic?: string | null;
+  profileEmoji?: string | null;
 }): CityRunLinkVisual {
   const candidates = [
     run.mapImageUrl,
@@ -30,6 +33,11 @@ export function inferCityRunLinkVisual(run: {
     if (url) {
       return { linkLogoUrl: url, emoji: null };
     }
+  }
+
+  const profileEmoji = normalizeProfileEmoji(run.profileEmoji);
+  if (profileEmoji) {
+    return { linkLogoUrl: null, emoji: profileEmoji };
   }
 
   return { linkLogoUrl: null, emoji: "🏃" };

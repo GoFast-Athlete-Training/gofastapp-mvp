@@ -50,8 +50,8 @@ enum PlanCustomWorkoutVisibility {
 /// Role of a race inside a specific training plan timeline.
 model Athlete {
   id                      String                   @id @default(uuid())
-  firebaseId              String                   @unique
-  email                   String?
+  firebaseId              String?                  @unique
+  email                   String?                  @unique
   companyId               String
   firstName               String?
   lastName                String?

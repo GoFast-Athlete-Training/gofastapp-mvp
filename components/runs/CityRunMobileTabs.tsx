@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ImagePlus, Info, MessageCircle, Users } from 'lucide-react';
 import MobileHubTabs from '@/components/shared/MobileHubTabs';
 import CityRunChatSection, { type CityRunChatLock } from '@/components/runs/CityRunChatSection';
@@ -56,6 +56,9 @@ type GoingMobileProps = {
   showJoinPanel?: boolean;
   showPastCheckinPanel?: boolean;
   hasMembership?: boolean;
+  /** Member /cityruntogether — slim overview instead of full details slice */
+  surface?: 'default' | 'together';
+  togetherOverview?: ReactNode;
 };
 
 type PostRunMobileProps = {
@@ -93,6 +96,12 @@ const GOING_TABS = [
   { id: 'chatter', label: 'Chatter', icon: <MessageCircle className="h-5 w-5" /> },
 ] as const;
 
+const TOGETHER_TABS = [
+  { id: 'run', label: 'Run', icon: <Info className="h-5 w-5" /> },
+  { id: 'people', label: 'People', icon: <Users className="h-5 w-5" /> },
+  { id: 'chatter', label: 'Chatter', icon: <MessageCircle className="h-5 w-5" /> },
+] as const;
+
 const POST_RUN_TABS = [
   { id: 'shouts', label: 'Shouts', icon: <MessageCircle className="h-5 w-5" /> },
   { id: 'photos', label: 'Photos', icon: <ImagePlus className="h-5 w-5" /> },
@@ -101,7 +110,13 @@ const POST_RUN_TABS = [
 
 export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
   const defaultTab =
-    props.mode === 'going' ? 'details' : props.mode === 'post-run' ? 'shouts' : 'details';
+    props.mode === 'going'
+      ? props.surface === 'together'
+        ? 'run'
+        : 'details'
+      : props.mode === 'post-run'
+        ? 'shouts'
+        : 'details';
   const [activeTab, setActiveTab] = useState(defaultTab);
 
   if (props.mode === 'pre-rsvp') {
@@ -166,14 +181,19 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
   }
 
   if (props.mode === 'going') {
+    const isTogether = props.surface === 'together';
     const hasWorkout =
       !props.hideWorkoutPrescribe && runShouldShowWorkoutPrescribe(props.run);
     const viewerRsvpRole = props.viewerRsvpRole ?? props.run.currentRSVPRole;
     const isHost = isHostRsvpRole(viewerRsvpRole);
     const isIndividual = props.run.cityRunType === 'INDIVIDUAL';
+    const tabs = isTogether ? [...TOGETHER_TABS] : [...GOING_TABS];
 
     return (
-      <MobileHubTabs tabs={[...GOING_TABS]} activeTab={activeTab} onTabChange={setActiveTab}>
+      <MobileHubTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab}>
+        {isTogether && activeTab === 'run' ? (
+          <div className="space-y-4 lg:hidden">{props.togetherOverview}</div>
+        ) : null}
         {activeTab === 'chatter' ? (
           <div className="flex min-h-[calc(100dvh-11rem)] flex-col">
             <CityRunChatSection
@@ -187,7 +207,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
             />
           </div>
         ) : null}
-        {activeTab === 'details' ? (
+        {!isTogether && activeTab === 'details' ? (
           <div className="space-y-4">
             {props.hasMembership !== false ? (
               <CityRunGoingBanner rsvpRole={viewerRsvpRole} />

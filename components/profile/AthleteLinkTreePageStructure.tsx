@@ -7,9 +7,9 @@ import type { AthleteLinkTreeDetail, AthleteLinkTreeLink } from "@/lib/content/a
 import { buildLinkTreeEditorBlocks } from "@/lib/athlete-link-tree/link-tree-blocks";
 import { useDebouncedSave, type SaveStatus } from "@/lib/athlete-link-tree/use-debounced-save";
 import { AthleteLinkTreeLinkKind } from "@prisma/client";
+import { RUN_PROFILE_EMOJI_PRESETS } from "@/components/cityruns/CityRunProfileMetaFields";
 
 const EMOJI_PRESETS = ["🌐", "📱", "🏃", "👟", "🔗", "📍"] as const;
-const RUN_LINK_EMOJI_PRESETS = ["🏃", "📍", "🏛️", "🌉", "☕", "👟"] as const;
 
 type Props = {
   sortedLinks: AthleteLinkTreeLink[];
@@ -193,7 +193,7 @@ function CompactLinkRow({
               </div>
             </div>
             <div className="flex flex-wrap gap-0.5">
-              {RUN_LINK_EMOJI_PRESETS.map((e) => (
+              {RUN_PROFILE_EMOJI_PRESETS.map((e) => (
                 <button
                   key={e}
                   type="button"

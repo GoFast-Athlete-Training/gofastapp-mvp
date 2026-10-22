@@ -24,3 +24,18 @@ test("inferCityRunLinkVisual defaults to run emoji", () => {
   assert.equal(result.linkLogoUrl, null);
   assert.equal(result.emoji, "🏃");
 });
+
+test("inferCityRunLinkVisual uses profile emoji when no photo", () => {
+  const result = inferCityRunLinkVisual({ profileEmoji: "🎂" });
+  assert.equal(result.linkLogoUrl, null);
+  assert.equal(result.emoji, "🎂");
+});
+
+test("inferCityRunLinkVisual prefers map over profile emoji", () => {
+  const result = inferCityRunLinkVisual({
+    mapImageUrl: "https://cdn.example/map.png",
+    profileEmoji: "🎂",
+  });
+  assert.equal(result.linkLogoUrl, "https://cdn.example/map.png");
+  assert.equal(result.emoji, null);
+});

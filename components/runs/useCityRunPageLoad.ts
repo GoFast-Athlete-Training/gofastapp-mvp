@@ -10,8 +10,20 @@ import {
   mapPublicRunToCityRunDetails,
   type PublicCityRunPayload,
 } from '@/lib/city-run/map-public-run-to-details';
+import {
+  cityRunJoinSignupPath,
+  cityRunTogetherPath,
+} from '@/lib/city-run/run-nav-paths';
 
-export function useCityRunPageLoad(runId: string) {
+export type CityRunPageLoadOptions = {
+  /** /cityruntogether — never hydrate guest/public hub */
+  memberOnly?: boolean;
+};
+
+export function useCityRunPageLoad(
+  runId: string,
+  options?: CityRunPageLoadOptions,
+) {
   const router = useRouter();
   const [run, setRun] = useState<CityRunDetails | null>(null);
   const [checkins, setCheckins] = useState<CityRunCheckin[]>([]);
@@ -95,7 +107,14 @@ export function useCityRunPageLoad(runId: string) {
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       unsubscribe();
-      const guest = !user;
+      const memberOnly = options?.memberOnly === true;
+      if (memberOnly && !user) {
+        const returnTo = cityRunTogetherPath(runId);
+        router.replace(cityRunJoinSignupPath(runId, returnTo));
+        setLoading(false);
+        return;
+      }
+      const guest = !user && !memberOnly;
       setIsGuestSession(guest);
       if (user) {
         const athleteId = LocalStorageAPI.getAthleteId();
@@ -113,9 +132,9 @@ export function useCityRunPageLoad(runId: string) {
           }
         }
       }
-      void fetchAll(guest);
+      void fetchAll(memberOnly ? false : guest);
     });
-  }, [runId, fetchAll]);
+  }, [runId, fetchAll, options?.memberOnly, router]);
 
   const canonicalSlug = run?.slug?.trim() || run?.id;
 

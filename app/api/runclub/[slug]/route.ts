@@ -42,12 +42,12 @@ export async function GET(
     }
 
     // Athlete is optional — RSVP status is hydrated if present
-    let athlete: { id: string; firebaseId: string } | null = null;
+    let athlete: { id: string; firebaseId: string | null } | null = null;
     const sessionAthleteId = request.headers.get(ATHLETE_ID_HEADER)?.trim();
     if (sessionAthleteId) {
       const byId = await getAthleteById(sessionAthleteId);
-      if (byId && byId.firebaseId === decodedToken.uid) {
-        athlete = byId;
+      if (byId?.firebaseId && byId.firebaseId === decodedToken.uid) {
+        athlete = { id: byId.id, firebaseId: byId.firebaseId };
       }
     }
 

@@ -41,7 +41,7 @@ export async function resolveAthleteForVerifiedUid(
   if (!athlete) {
     return { error: "Athlete not found" as const, status: 404 as const };
   }
-  if (athlete.firebaseId !== uid) {
+  if (!athlete.firebaseId || athlete.firebaseId !== uid) {
     return {
       error: "Athlete session mismatch — sign out and back in" as const,
       status: 403 as const,

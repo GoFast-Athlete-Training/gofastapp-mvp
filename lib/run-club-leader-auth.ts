@@ -69,7 +69,11 @@ export async function requireRunClubLeader(
   }
 
   return {
-    athlete: { id: athlete.id, firebaseId: athlete.firebaseId, role: athlete.role },
+    athlete: {
+      id: athlete.id,
+      firebaseId: athlete.firebaseId ?? '',
+      role: athlete.role,
+    },
     club,
     membership,
   };

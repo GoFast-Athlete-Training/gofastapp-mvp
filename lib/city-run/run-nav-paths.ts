@@ -1,15 +1,52 @@
-/** Alias — redirects to cityRunTogetherPath. */
-export function runRsvpPath(slugOrId: string): string {
-  return cityRunTogetherPath(slugOrId);
+import { companyRunLinkSliceUrl } from '@/lib/city-run-public-card-url';
+
+/** Public gofastlinks run slice (details door). */
+export function cityRunDoorUrl(slugOrId: string): string {
+  return companyRunLinkSliceUrl(slugOrId);
 }
 
-/** Member run hub (details, people, chatter) after RSVP. */
+/** GoFast signup + RSVP lane for a city run. */
+export function cityRunJoinPath(slugOrId: string): string {
+  return `/join/run/${encodeURIComponent(slugOrId)}`;
+}
+
+export function cityRunJoinSignupPath(
+  slugOrId: string,
+  returnTo?: string,
+): string {
+  const base = `/join/run/${encodeURIComponent(slugOrId)}/signup`;
+  if (!returnTo?.trim()) return base;
+  return `${base}?returnTo=${encodeURIComponent(returnTo.trim())}`;
+}
+
+/** @deprecated Prefer cityRunJoinPath — legacy alias. */
+export function runRsvpPath(slugOrId: string): string {
+  return cityRunJoinPath(slugOrId);
+}
+
+/** Member run together surface (people, chatter) after GoFast join. */
 export function cityRunTogetherPath(slugOrId: string): string {
   return `/cityruntogether/${encodeURIComponent(slugOrId)}`;
 }
 
+export const CITY_RUN_JOINED_SESSION_KEY = 'gofast:city-run-joined';
+
+export function markCityRunJoinedBanner(runId: string): void {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(`${CITY_RUN_JOINED_SESSION_KEY}:${runId}`, '1');
+}
+
+export function consumeCityRunJoinedBanner(runId: string): boolean {
+  if (typeof sessionStorage === 'undefined') return false;
+  const key = `${CITY_RUN_JOINED_SESSION_KEY}:${runId}`;
+  if (sessionStorage.getItem(key) !== '1') return false;
+  sessionStorage.removeItem(key);
+  return true;
+}
+
+/** @deprecated Join lane lands on hub with session banner instead. */
 export function cityRunRsvpSuccessQuery(): string {
-  return "rsvp=success";
+  return 'rsvp=success';
 }
 
 /** Post-run recap — planned workout head + photos / shouts (not the run hub). */

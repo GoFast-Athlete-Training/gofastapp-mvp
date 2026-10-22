@@ -31,7 +31,7 @@ export async function getAthleteByFirebaseId(firebaseId: string) {
 }
 
 export async function createAthlete(data: {
-  firebaseId: string;
+  firebaseId?: string | null;
   email?: string;
   firstName?: string;
   lastName?: string;
@@ -386,6 +386,10 @@ export async function deleteAthleteAccount(athleteId: string): Promise<void> {
   await prisma.athlete.delete({
     where: { id: athleteId },
   });
+
+  if (!firebaseId) {
+    return;
+  }
 
   try {
     await adminAuth.deleteUser(firebaseId);

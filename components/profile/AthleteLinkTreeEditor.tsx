@@ -38,7 +38,7 @@ function SaveStatusLine({ headerStatus, rowStatus }: { headerStatus: SaveStatus;
 
 export function AthleteLinkTreeEditor() {
   const searchParams = useSearchParams();
-  const initialTab: EditorTab = searchParams.get("tab") === "links" ? "links" : "header";
+  const initialTab: EditorTab = searchParams.get("tab") === "header" ? "header" : "links";
 
   const [tab, setTab] = useState<EditorTab>(initialTab);
   const [tree, setTree] = useState<AthleteLinkTreeDetail | null>(null);
@@ -235,52 +235,41 @@ export function AthleteLinkTreeEditor() {
 
   return (
     <div className="space-y-4 pb-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">GoFast Links</h1>
-            {handleSlug ? (
-              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900">
-                /{handleSlug}
-              </span>
-            ) : null}
-          </div>
-          {shareUrl ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-              <a
-                href={shareUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline break-all"
-              >
-                {shareUrl}
-                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-              </a>
-              <button
-                type="button"
-                onClick={() => void copyShare()}
-                className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs font-medium text-gray-800 hover:bg-gray-50"
-              >
-                {shareCopied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-                {shareCopied ? "Copied" : "Copy"}
-              </button>
-            </div>
+      <div className="min-w-0 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">GoFast Links</h1>
+          {handleSlug ? (
+            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900">
+              /{handleSlug}
+            </span>
           ) : null}
         </div>
-
+        {shareUrl ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <a
+              href={shareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline break-all"
+            >
+              {shareUrl}
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            </a>
+            <button
+              type="button"
+              onClick={() => void copyShare()}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs font-medium text-gray-800 hover:bg-gray-50"
+            >
+              {shareCopied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+              {shareCopied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        ) : null}
         <div
           className="inline-flex rounded-lg border border-gray-200 bg-gray-100 p-0.5 text-sm"
           role="tablist"
+          aria-label="GoFast Links sections"
         >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "header"}
-            onClick={() => setTab("header")}
-            className={`rounded-md px-3 py-1.5 font-medium ${tab === "header" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"}`}
-          >
-            Header
-          </button>
           <button
             type="button"
             role="tab"
@@ -289,6 +278,15 @@ export function AthleteLinkTreeEditor() {
             className={`rounded-md px-3 py-1.5 font-medium ${tab === "links" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"}`}
           >
             Links
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "header"}
+            onClick={() => setTab("header")}
+            className={`rounded-md px-3 py-1.5 font-medium ${tab === "header" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"}`}
+          >
+            Header
           </button>
         </div>
       </div>
