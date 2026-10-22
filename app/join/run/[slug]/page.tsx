@@ -6,16 +6,16 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import TopNav from '@/components/shared/TopNav';
+import JoinRunGuestExplainer from '@/components/runs/JoinRunGuestExplainer';
 import {
-  cityRunJoinSignupPath,
   cityRunTogetherPath,
   markCityRunJoinedBanner,
 } from '@/lib/city-run/run-nav-paths';
 
 /**
- * /join/run/[slug] — legacy entry from old public links.
- * Signed-in: RSVP once → cityruntogether success screen.
- * Signed-out: signup for this run.
+ * /join/run/[slug] — session gate from public "I'm in".
+ * Signed-in: auto RSVP → cityruntogether.
+ * Signed-out: two-option explainer (signup vs name on list).
  */
 export default function JoinRunPage() {
   const params = useParams();
@@ -24,6 +24,7 @@ export default function JoinRunPage() {
 
   const [runId, setRunId] = useState<string | null>(null);
   const [runSlug, setRunSlug] = useState<string | null>(null);
+  const [runTitle, setRunTitle] = useState<string>('this run');
   const [runLoading, setRunLoading] = useState(true);
   const [runError, setRunError] = useState<string | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
@@ -39,6 +40,7 @@ export default function JoinRunPage() {
         if (data.success && data.run) {
           setRunId(data.run.id);
           setRunSlug(data.run.slug?.trim() || slug);
+          if (data.run.title?.trim()) setRunTitle(data.run.title.trim());
         } else {
           setRunError('Run not found');
         }
@@ -76,11 +78,6 @@ export default function JoinRunPage() {
       unsubscribe();
     };
   }, []);
-
-  useEffect(() => {
-    if (!authResolved || isLoggedIn || !slug) return;
-    router.replace(cityRunJoinSignupPath(slug, cityRunTogetherPath(slug)));
-  }, [authResolved, isLoggedIn, slug, router]);
 
   const completeGoingRsvp = async () => {
     if (!runId) return;
@@ -125,9 +122,12 @@ export default function JoinRunPage() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
-      </div>
+      <JoinRunGuestExplainer
+        run={{
+          title: runTitle,
+          slug: runSlug ?? slug,
+        }}
+      />
     );
   }
 
