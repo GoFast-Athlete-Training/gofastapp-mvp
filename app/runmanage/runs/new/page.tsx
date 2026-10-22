@@ -52,6 +52,8 @@ export default function RunManageCreateRunPage() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
 
+  const returnTo = searchParams.get("returnTo")?.trim() || RUN_MANAGE_DASHBOARD_PATH;
+
   const initialMode: CreateRunMode =
     searchParams.get("mode") === "series" || searchParams.get("seriesId")?.trim()
       ? "series"
@@ -298,7 +300,11 @@ export default function RunManageCreateRunPage() {
       if (!runId) {
         throw new Error(res.data?.error || "Run created but no id returned.");
       }
-      router.push(runInstanceEditPath(String(runId)));
+      const editUrl =
+        returnTo !== RUN_MANAGE_DASHBOARD_PATH
+          ? `${runInstanceEditPath(String(runId))}&returnTo=${encodeURIComponent(returnTo)}`
+          : runInstanceEditPath(String(runId));
+      router.push(editUrl);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || err.message || "Failed to create run.");
@@ -365,11 +371,11 @@ export default function RunManageCreateRunPage() {
   return (
     <div className="py-2">
       <Link
-        href={RUN_MANAGE_DASHBOARD_PATH}
+        href={returnTo}
         className="mb-4 inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to dashboard
+        {returnTo !== RUN_MANAGE_DASHBOARD_PATH ? "Back" : "Back to dashboard"}
       </Link>
       <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Run builder</p>
       <label className="mt-2 block">

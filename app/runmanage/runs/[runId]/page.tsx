@@ -30,6 +30,7 @@ function RunManageRunDetailContent() {
   const modeParam = searchParams?.get("mode");
   const clubId = searchParams?.get("clubId");
   const initialWizardStep = parseWizardStep(searchParams?.get("step") ?? null);
+  const returnTo = searchParams?.get("returnTo")?.trim() || "/runmanage/runs";
   const initialMode: RunInstanceManageMode =
     modeParam === "edit" || modeParam === "rsvps" || modeParam === "view"
       ? modeParam
@@ -45,7 +46,7 @@ function RunManageRunDetailContent() {
       clubId={clubId}
       initialMode={initialMode}
       initialWizardStep={initialWizardStep ?? (initialMode === "edit" ? "core" : undefined)}
-      backTo="/runmanage/runs"
+      backTo={returnTo}
       showBackButton
     />
   );
