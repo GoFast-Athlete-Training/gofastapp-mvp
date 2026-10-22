@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { buildJoinRunSignupUrl } from "@/lib/host-run-rsvp";
+import { getGoFastAppPublicUrl } from "@/lib/gofast-app-public-url";
 import {
   cityRunPublicCardUrl,
   companyRunLinkSliceUrl,
@@ -36,11 +37,7 @@ export type AthleteHostedRunInvite = {
 };
 
 function appBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXT_PUBLIC_CONTENT_PUBLIC_BASE_DOMAIN ||
-    "https://gofastapp.com"
-  ).replace(/\/$/, "");
+  return getGoFastAppPublicUrl().replace(/\/$/, "");
 }
 
 function gorunPathForRun(run: { id: string; slug: string | null }): string {

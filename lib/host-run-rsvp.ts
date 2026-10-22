@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { RSVP_ROLE_HOST } from '@/lib/city-run/rsvp-role';
 import { upsertIndividualCityRunStampForAthlete } from '@/lib/city-run/individual-city-run-stamp';
+import { getGoFastAppPublicUrl } from '@/lib/gofast-app-public-url';
 
 function generateRsvpId(): string {
   const timestamp = Date.now().toString(36);
@@ -38,11 +39,7 @@ export const autoRsvpHostGoing = autoRsvpHostRole;
 
 export function buildJoinRunSignupUrl(slug: string | null | undefined, baseUrl?: string): string | null {
   if (!slug?.trim()) return null;
-  const base =
-    baseUrl ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXT_PUBLIC_CONTENT_PUBLIC_BASE_DOMAIN ||
-    'https://gofastapp.com';
+  const base = baseUrl || getGoFastAppPublicUrl();
   return `${base.replace(/\/$/, '')}/join/run/${encodeURIComponent(slug.trim())}/signup`;
 }
 
