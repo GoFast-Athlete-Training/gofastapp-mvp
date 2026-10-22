@@ -29,6 +29,7 @@ export type AthleteHostedInviteDetail = {
   pace: string | null;
   plannedWorkoutId: string | null;
   workoutId: string | null;
+  plannedWorkoutType?: string | null;
   route: { id: string; name: string | null } | null;
 };
 
@@ -88,7 +89,9 @@ export function wizardValuesFromHostedInvite(
     routeNeighborhood: inv.routeNeighborhood?.trim() || "",
     routeDescription: inv.workoutDescription?.trim() || "",
     trackWorkoutDescription: inv.meetUpNote?.trim() || "",
-    clubWorkoutType: inv.plannedWorkoutId?.trim() ? "Intervals" : "Easy",
+    clubWorkoutType:
+      inv.plannedWorkoutType?.trim() ||
+      (inv.plannedWorkoutId?.trim() ? "Intervals" : "Easy"),
     plannedWorkoutId: inv.plannedWorkoutId?.trim() || "",
     workoutId: inv.workoutId?.trim() || "",
     profileEmoji: inv.profileEmoji?.trim() || "",

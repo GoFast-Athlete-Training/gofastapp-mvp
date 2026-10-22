@@ -1,6 +1,5 @@
 import prisma from "@/lib/prisma";
 import { buildJoinRunSignupUrl } from "@/lib/host-run-rsvp";
-import { isCreatedInviteCityRun } from "@/lib/city-run/is-created-invite-city-run";
 import {
   cityRunPublicCardUrl,
   companyRunLinkSliceUrl,
@@ -144,7 +143,6 @@ export async function listAthleteHostedRunInvites(
 
   const out: AthleteHostedRunInvite[] = [];
   for (const run of rows) {
-    if (!isCreatedInviteCityRun(run)) continue;
     const rsvpCounts = await getCityRunRsvpCounts(run.id);
     out.push(await mapInviteRow(run, startOfToday, rsvpCounts));
     if (out.length >= limit) break;
@@ -183,6 +181,7 @@ export async function getAthleteHostedRunInviteForHost(
   coverPhotoUrl: string | null;
   workoutDescription: string | null;
   route: HostedRunInviteRouteSnap | null;
+  plannedWorkoutType: string | null;
 }) | null> {
   const run = await prisma.city_runs.findFirst({
     where: {
@@ -219,7 +218,7 @@ export async function getAthleteHostedRunInviteForHost(
       },
     },
   });
-  if (!run || !isCreatedInviteCityRun(run)) return null;
+  if (!run) return null;
   const startOfToday = new Date();
   startOfToday.setUTCHours(0, 0, 0, 0);
   const rsvpCounts = await getCityRunRsvpCounts(run.id);
@@ -243,5 +242,6 @@ export async function getAthleteHostedRunInviteForHost(
     coverPhotoUrl: run.coverPhotoUrl,
     workoutDescription: run.workoutDescription,
     route: run.route,
+    plannedWorkoutType: run.plannedWorkout?.workoutType ?? null,
   };
 }

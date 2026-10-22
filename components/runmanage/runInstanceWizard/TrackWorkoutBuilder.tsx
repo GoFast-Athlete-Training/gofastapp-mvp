@@ -159,7 +159,22 @@ export default function TrackWorkoutBuilder({
     }
   }
 
-  function detachWorkout() {
+  async function detachWorkout() {
+    const runId = cityRunId?.trim();
+    const hasPersistedTemplate =
+      runId && plannedWorkoutId.trim() && plannedWorkoutId !== "pending";
+
+    if (hasPersistedTemplate) {
+      onError?.(null);
+      try {
+        await api.delete(`/api/runs/${encodeURIComponent(runId)}/planned-workout`);
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { error?: string } }; message?: string };
+        onError?.(err.response?.data?.error || err.message || "Could not detach workout.");
+        return;
+      }
+    }
+
     onChange({
       plannedWorkoutId: "",
       attachedWorkoutTitle: "",
@@ -309,7 +324,7 @@ export default function TrackWorkoutBuilder({
               </button>
               <button
                 type="button"
-                onClick={detachWorkout}
+                onClick={() => void detachWorkout()}
                 className="text-xs font-medium text-red-700 hover:text-red-900"
               >
                 Detach
