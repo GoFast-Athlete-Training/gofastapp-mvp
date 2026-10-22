@@ -77,6 +77,7 @@ type AthleteRunRouteRow = {
     mapImageUrl: string | null;
     distanceMiles: number | null;
     routeNeighborhood: string | null;
+    routeDescription: string | null;
     runType: string | null;
     routePhotos: unknown;
     citySlug: string | null;
