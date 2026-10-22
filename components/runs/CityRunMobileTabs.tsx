@@ -25,6 +25,7 @@ import type {
 import { runShouldShowWorkoutPrescribe } from '@/components/runs/city-run-types';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
 import CityRunHostActions from '@/components/runs/CityRunHostActions';
+import HostRunExecutionPanel from '@/components/runs/HostRunExecutionPanel';
 type PreRsvpMobileProps = {
   mode: 'pre-rsvp';
   run: CityRunDetails;
@@ -164,6 +165,7 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
       !props.hideWorkoutPrescribe && runShouldShowWorkoutPrescribe(props.run);
     const viewerRsvpRole = props.viewerRsvpRole ?? props.run.currentRSVPRole;
     const isHost = isHostRsvpRole(viewerRsvpRole);
+    const isIndividual = props.run.cityRunType === 'INDIVIDUAL';
 
     return (
       <MobileHubTabs tabs={[...GOING_TABS]} activeTab={activeTab} onTabChange={setActiveTab}>
@@ -171,12 +173,18 @@ export default function CityRunMobileTabs(props: CityRunMobileTabsProps) {
           <div className="flex min-h-[calc(100dvh-11rem)] flex-col space-y-3">
             <CityRunGoingBanner rsvpRole={viewerRsvpRole} />
             {isHost ? <CityRunHostActions cityRunId={props.run.id} /> : null}
+            {isHost && isIndividual ? (
+              <HostRunExecutionPanel cityRunId={props.run.id} />
+            ) : null}
             <CityRunChatSection runId={props.run.id} variant="mobile-hub" showHeading={false} />
           </div>
         ) : null}
         {activeTab === 'details' ? (
           <div className="space-y-4">
             {isHost ? <CityRunHostActions cityRunId={props.run.id} /> : null}
+            {isHost && isIndividual ? (
+              <HostRunExecutionPanel cityRunId={props.run.id} />
+            ) : null}
             {hasWorkout ? (
               <CityRunWorkoutCard
                 workoutId={props.run.workoutId}

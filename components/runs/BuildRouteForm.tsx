@@ -12,22 +12,16 @@ type Props = {
   className?: string;
   /** When set, hide post-save navigation (parent handles attach). */
   embedded?: boolean;
-  /** Prefill from city run create (step 2). */
-  defaultRouteNeighborhood?: string | null;
 };
 
 export default function BuildRouteForm({
   onSaved,
   className = '',
   embedded = false,
-  defaultRouteNeighborhood = null,
 }: Props) {
   const [name, setName] = useState('');
   const [stravaUrl, setStravaUrl] = useState('');
   const [distanceMiles, setDistanceMiles] = useState('');
-  const [routeNeighborhood, setRouteNeighborhood] = useState(
-    () => defaultRouteNeighborhood?.trim() || ''
-  );
   const [routeDescription, setRouteDescription] = useState('');
   const [mapImageUrl, setMapImageUrl] = useState('');
   const [routePhotos, setRoutePhotos] = useState<string[]>([]);
@@ -46,7 +40,6 @@ export default function BuildRouteForm({
         name: name.trim(),
         stravaUrl: stravaUrl.trim(),
         distanceMiles: Number.isFinite(miles) && miles > 0 ? miles : undefined,
-        routeNeighborhood: routeNeighborhood.trim() || undefined,
         routeDescription: routeDescription.trim() || undefined,
         mapImageUrl: mapImageUrl.trim() || undefined,
         routePhotos: routePhotos.length > 0 ? routePhotos : undefined,
@@ -116,7 +109,6 @@ export default function BuildRouteForm({
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Teddy Friday loop"
           className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           required
         />
@@ -134,29 +126,17 @@ export default function BuildRouteForm({
         />
       </label>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-xs font-semibold text-gray-700">Miles (optional)</span>
-          <input
-            type="number"
-            step={0.1}
-            min={0}
-            value={distanceMiles}
-            onChange={(e) => setDistanceMiles(e.target.value)}
-            className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold text-gray-700">Route neighborhood</span>
-          <input
-            value={routeNeighborhood}
-            onChange={(e) => setRouteNeighborhood(e.target.value)}
-            placeholder="e.g. Fletcher's Cove, Carderock"
-            className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          <span className="mt-1 block text-xs text-gray-500">Optional — matches the run invite when attached.</span>
-        </label>
-      </div>
+      <label className="block">
+        <span className="text-xs font-semibold text-gray-700">Miles (optional)</span>
+        <input
+          type="number"
+          step={0.1}
+          min={0}
+          value={distanceMiles}
+          onChange={(e) => setDistanceMiles(e.target.value)}
+          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        />
+      </label>
 
       <label className="block">
         <span className="text-xs font-semibold text-gray-700">Route description</span>
@@ -164,11 +144,10 @@ export default function BuildRouteForm({
           value={routeDescription}
           onChange={(e) => setRouteDescription(e.target.value)}
           rows={4}
-          placeholder="Turn-by-turn notes or what runners should expect on this path…"
           className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
         />
         <span className="mt-1 block text-xs text-gray-500">
-          Optional — same field staff use as route description; shows on the invite when attached.
+          Optional — what runners see about the path when this route is attached.
         </span>
       </label>
 

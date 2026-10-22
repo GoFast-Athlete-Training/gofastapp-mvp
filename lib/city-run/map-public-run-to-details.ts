@@ -26,6 +26,9 @@ export type PublicCityRunPayload = {
   stravaMapUrl?: string | null;
   routePhotos?: string[] | null;
   mapImageUrl?: string | null;
+  profileEmoji?: string | null;
+  coverPhotoUrl?: string | null;
+  hostPhotoUrl?: string | null;
   routeNeighborhood?: string | null;
   runType?: string | null;
   instanceType?: string;
@@ -98,6 +101,9 @@ export function mapPublicRunToCityRunDetails(
     stravaMapUrl: publicRun.stravaMapUrl ?? null,
     routePhotos: publicRun.routePhotos ?? null,
     mapImageUrl: publicRun.mapImageUrl ?? null,
+    profileEmoji: publicRun.profileEmoji ?? null,
+    coverPhotoUrl: publicRun.coverPhotoUrl ?? null,
+    hostPhotoUrl: publicRun.hostPhotoUrl ?? null,
     routeNeighborhood: publicRun.routeNeighborhood ?? null,
     runType: publicRun.runType ?? null,
     workoutDescription: publicRun.routeDescription ?? null,

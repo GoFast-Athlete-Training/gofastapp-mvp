@@ -20,6 +20,7 @@ import {
   resolveSavedRouteForAthlete,
 } from '@/lib/city-run/saved-route-for-athlete';
 import { mergeCityRunRouteMedia, mergeTotalMiles } from '@/lib/city-run/merge-route-media';
+import { normalizeProfileEmoji } from '@/lib/city-run/run-profile-visual';
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +130,8 @@ type FromWorkoutBody = {
   mapImageUrl?: string | null;
   routePhotos?: string[] | null;
   runPhotos?: string[] | null;
+  /** Path prose for the route block (shows on invite when no saved route description). */
+  workoutDescription?: string | null;
   /** Social meetup title — required; never defaults to plan workout title. */
   title?: string;
   /** Optional pace band label for city run listing (e.g. 7:00-7:30). */
@@ -139,6 +142,8 @@ type FromWorkoutBody = {
   totalMiles?: number | null;
   /** Saved route from My Routes — copies map media onto the city run. */
   routeId?: string | null;
+  profileEmoji?: string | null;
+  coverPhotoUrl?: string | null;
 };
 
 /**
@@ -182,8 +187,11 @@ export async function POST(request: NextRequest) {
       title: socialTitleBody,
       pace: paceBody,
       description: descriptionBody,
+      workoutDescription: workoutDescriptionBody,
       totalMiles: totalMilesBody,
       routeId: routeIdBody,
+      profileEmoji: profileEmojiBody,
+      coverPhotoUrl: coverPhotoUrlBody,
     } = body;
 
     const workoutIdTrimmed = workoutId?.trim() || null;
@@ -364,6 +372,10 @@ export async function POST(request: NextRequest) {
     );
 
     const paceLabel = typeof paceBody === 'string' && paceBody.trim() ? paceBody.trim() : null;
+    const workoutDescriptionLabel =
+      typeof workoutDescriptionBody === 'string' && workoutDescriptionBody.trim()
+        ? workoutDescriptionBody.trim()
+        : null;
     const descriptionLabel =
       typeof descriptionBody === 'string' && descriptionBody.trim()
         ? descriptionBody.trim()
@@ -437,7 +449,8 @@ export async function POST(request: NextRequest) {
       meetUpNote: meetUpNote?.trim() || null,
       routeNeighborhood: mergedRoute.routeNeighborhood,
       runType: mergedRoute.runType,
-      workoutDescription: savedRouteRow?.routeDescription?.trim() || null,
+      workoutDescription:
+        savedRouteRow?.routeDescription?.trim() || workoutDescriptionLabel || null,
       meetUpPlaceId: meetUpPlaceId?.trim() || null,
       meetUpLat: meetUpLatFinal,
       meetUpLng: meetUpLngFinal,
@@ -453,6 +466,8 @@ export async function POST(request: NextRequest) {
       routePhotos: mergedRoute.routePhotos,
       runPhotos: runPhotoUrls.length > 0 ? runPhotoUrls : Prisma.JsonNull,
       mapImageUrl: mergedRoute.mapImageUrl,
+      profileEmoji: normalizeProfileEmoji(profileEmojiBody ?? null),
+      coverPhotoUrl: coverPhotoUrlBody?.trim() || null,
       staffNotes: null,
       stravaEventUrl: null,
       stravaText: null,

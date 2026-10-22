@@ -1809,6 +1809,10 @@ model city_runs {
   routePhotos         Json?                // Array of photo URLs: ["url1", "url2", ...]
   runPhotos           Json?                // Athlete photos of the run (group vibe, last time out)
   mapImageUrl         String?              // Single map image URL (snip from Strava or uploaded)
+  /// Optional emoji for Links-style run header (e.g. birthday cake); falls back to club logo or host photo.
+  profileEmoji        String?
+  /// Optional cover photo for run header — not tied to route; route map fills hero when absent.
+  coverPhotoUrl       String?
   staffNotes          String?              // Data entry note for approver (e.g. "Couldn't get Strava URL")
   // Source inputs - capture ALL available sources for AI processing and traceability
   stravaEventUrl      String?              // Optional Strava event URL for description context

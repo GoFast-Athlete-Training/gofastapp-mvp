@@ -109,14 +109,14 @@ export default function CreateRunInviteForm({
   const [selectedRoutePhotos, setSelectedRoutePhotos] = useState<string[]>([]);
   const [mapImageUrl, setMapImageUrl] = useState('');
   const [stravaMapUrl, setStravaMapUrl] = useState('');
-  const [routeNeighborhood, setRouteNeighborhood] = useState('');
+  const [routeDescription, setRouteDescription] = useState('');
 
   const handlePickSavedRoute = (snap: SavedRouteSnapshot) => {
     setSelectedRouteId(snap.routeId);
     setSelectedRoutePhotos(snap.routePhotos);
     applySavedRouteToFormFields(snap, {
       setStravaMapUrl,
-      setRouteNeighborhood,
+      setRouteDescription,
       setMapImageUrl,
       setTotalMiles,
     });
@@ -127,7 +127,7 @@ export default function CreateRunInviteForm({
     setSelectedRoutePhotos([]);
     clearSavedRouteFormFields({
       setStravaMapUrl,
-      setRouteNeighborhood,
+      setRouteDescription,
       setMapImageUrl,
     });
   };
@@ -138,7 +138,7 @@ export default function CreateRunInviteForm({
     onRoutePhotos: setSelectedRoutePhotos,
     fieldSetters: {
       setStravaMapUrl,
-      setRouteNeighborhood,
+      setRouteDescription,
       setMapImageUrl,
       setTotalMiles,
     },
@@ -262,7 +262,7 @@ export default function CreateRunInviteForm({
         meetUpLng: meetUpLng ?? undefined,
         ...(selectedRouteId ? { routeId: selectedRouteId } : {}),
         stravaMapUrl: stravaMapUrl.trim() || undefined,
-        routeNeighborhood: routeNeighborhood.trim() || undefined,
+        workoutDescription: routeDescription.trim() || undefined,
         mapImageUrl: mapImageUrl.trim() || undefined,
         routePhotos: selectedRoutePhotos.length > 0 ? selectedRoutePhotos : undefined,
         startTimeHour: hourNum,
@@ -532,10 +532,10 @@ export default function CreateRunInviteForm({
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
             Route description <span className="font-normal text-gray-400">(optional)</span>
           </label>
-          <input
-            type="text"
-            value={routeNeighborhood}
-            onChange={(e) => setRouteNeighborhood(e.target.value)}
+          <textarea
+            value={routeDescription}
+            onChange={(e) => setRouteDescription(e.target.value)}
+            rows={2}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>

@@ -12,6 +12,13 @@ import {
 import { buildClubPastCheckinCopy, resolveRunRsvpCopy, resolveRunPastCheckinCopy } from '@/lib/city-run-copy';
 import { resolveSeriesOccurrenceFields } from '@/lib/city-run/resolve-series-occurrence-fields';
 import { formatCityRunMetroBadge } from '@/lib/city-run/city-run-metro-badge';
+import CityRunLinksHeader from '@/components/runs/CityRunLinksHeader';
+import {
+  mapImageUrlForRouteSection,
+  resolveHostPhotoUrlFromRsvps,
+  resolveRunHeroImage,
+} from '@/lib/city-run/run-profile-visual';
+import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
 
 type CityRunDetailsSectionProps = {
   run: CityRunDetails;
@@ -42,6 +49,27 @@ export default function CityRunDetailsSection({
       meetUpCity: run.meetUpCity,
       meetUpState: run.meetUpState,
     });
+
+  const displayTitle =
+    run.cityRunType === 'INDIVIDUAL'
+      ? run.title
+      : run.workout?.title?.trim() || run.title;
+
+  const hostPhotoUrl =
+    run.hostPhotoUrl ??
+    resolveHostPhotoUrlFromRsvps(run.rsvps, isHostRsvpRole);
+
+  const visualInput = {
+    profileEmoji: run.profileEmoji,
+    coverPhotoUrl: run.coverPhotoUrl,
+    mapImageUrl: run.mapImageUrl,
+    runType: run.runType,
+    runClub: run.runClub,
+    hostPhotoUrl,
+    route: run.route,
+  };
+  const heroImage = resolveRunHeroImage(visualInput);
+  const routeSectionMapUrl = mapImageUrlForRouteSection(visualInput, heroImage);
 
   return (
     <div className="space-y-4">
@@ -129,38 +157,20 @@ export default function CityRunDetailsSection({
       ) : null}
 
       <div className={`bg-white rounded-xl shadow-sm ${compact ? 'p-4' : 'p-6'}`}>
-        {run.runClub && !showHostCard ? (
-          <div className="flex items-center gap-3 mb-4">
-            {run.runClub.logoUrl ? (
-              <img
-                src={run.runClub.logoUrl}
-                alt={run.runClub.name}
-                className="w-10 h-10 rounded-full object-cover"
-              />
-            ) : null}
-            <span className="text-sm font-medium text-gray-600">{run.runClub.name}</span>
-          </div>
-        ) : null}
         {run.cityRunType === 'INDIVIDUAL' && run.clubAssociation && !run.runClub ? (
-          <p className="mb-3 text-xs text-gray-500">
+          <p className="mb-3 text-xs text-gray-500 text-center">
             Associated with {run.clubAssociation.nameSnapshot}
           </p>
         ) : null}
 
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <h1 className={`font-bold text-gray-900 min-w-0 ${compact ? 'text-xl' : 'text-2xl'}`}>
-            {run.cityRunType === 'INDIVIDUAL'
-              ? run.title
-              : run.workout?.title?.trim() || run.title}
-          </h1>
-          {metroBadge ? (
-            <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-sky-900 ring-1 ring-sky-200/80">
-              {metroBadge}
-            </span>
-          ) : null}
-        </div>
+        <CityRunLinksHeader
+          title={displayTitle}
+          metroBadge={metroBadge}
+          compact={compact}
+          {...visualInput}
+        />
 
-        <div className="space-y-2 sm:space-y-3 text-gray-700">
+        <div className="space-y-2 sm:space-y-3 text-gray-700 mt-4 sm:mt-5">
           <div className="flex items-center gap-2 sm:gap-3">
             <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
             <span>
@@ -229,7 +239,7 @@ export default function CityRunDetailsSection({
         <CityRunRouteMedia
           routePhotos={run.routePhotos}
           runPhotos={run.runPhotos}
-          mapImageUrl={run.mapImageUrl}
+          mapImageUrl={routeSectionMapUrl}
           stravaMapUrl={run.stravaMapUrl}
           workoutDescription={run.workoutDescription}
           directionsText={run.directionsText}

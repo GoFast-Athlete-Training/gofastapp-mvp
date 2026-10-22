@@ -2,18 +2,12 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Users } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
-import CreateCityRunForm, {
-  type CreateCityRunFormWorkout,
-} from "@/components/cityruns/CreateCityRunForm";
-import CityRunMeetupOnlyForm, {
-  type CityRunMeetupTemplate,
-} from "@/components/cityruns/CityRunMeetupOnlyForm";
-import HostRunCreateFork from "@/components/runs/HostRunCreateFork";
-import HostedRunInvitesPanel from "@/components/runs/HostedRunInvitesPanel";
+import AthleteHostedRunWizard from "@/components/runs/AthleteHostedRunWizard";
+import type { CreateCityRunFormWorkout } from "@/components/cityruns/CreateCityRunForm";
+import type { MeetupTemplateSeed } from "@/lib/city-run/athlete-hosted-wizard-map";
 import api from "@/lib/api";
 import { ensureAthleteIdInStorage } from "@/lib/ensure-athlete-session";
 
@@ -29,8 +23,6 @@ function mapTrainingWorkoutToHostForm(w: {
   description?: string | null;
   date?: string | null;
   estimatedDistanceInMeters?: number | null;
-  segments?: CreateCityRunFormWorkout["segments"];
-  city_runs?: CreateCityRunFormWorkout["city_runs"];
 }): CreateCityRunFormWorkout {
   return {
     id: w.id,
@@ -39,28 +31,23 @@ function mapTrainingWorkoutToHostForm(w: {
     description: w.description ?? null,
     date: w.date ?? todayYmd(),
     estimatedDistanceInMeters: w.estimatedDistanceInMeters ?? 5000,
-    segments: Array.isArray(w.segments) ? w.segments : [],
-    city_runs: w.city_runs,
+    segments: [],
+    city_runs: undefined,
   };
 }
 
 function HostARunPageInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const workoutIdParam = searchParams.get("workoutId")?.trim() || null;
   const routeIdParam = searchParams.get("routeId")?.trim() || null;
   const fromRunIdParam = searchParams.get("fromRunId")?.trim() || null;
 
-  const [createStarted, setCreateStarted] = useState(Boolean(fromRunIdParam || workoutIdParam));
   const [workout, setWorkout] = useState<CreateCityRunFormWorkout | null>(null);
-  const [template, setTemplate] = useState<CityRunMeetupTemplate | null>(null);
+  const [template, setTemplate] = useState<MeetupTemplateSeed | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(workoutIdParam || fromRunIdParam));
-  const [inviteReady, setInviteReady] = useState(false);
 
-  const showCreateLanding = !createStarted && !workoutIdParam && !inviteReady;
-
-  const ensureHostWorkout = useCallback(async () => {
+  const loadSeed = useCallback(async () => {
     if (fromRunIdParam) {
       setLoading(true);
       setLoadError(null);
@@ -85,15 +72,14 @@ function HostARunPageInner() {
           meetUpPlaceId: (inv.meetUpPlaceId as string | null) ?? null,
           meetUpLat: (inv.meetUpLat as number | null) ?? null,
           meetUpLng: (inv.meetUpLng as number | null) ?? null,
-          meetUpNote: (inv.meetUpNote as string | null) ?? null,
-          routeNeighborhood: (inv.routeNeighborhood as string | null) ?? null,
           totalMiles: (inv.totalMiles as number | null) ?? null,
           pace: (inv.pace as string | null) ?? null,
           startTimeHour: (inv.startTimeHour as number | null) ?? null,
           startTimeMinute: (inv.startTimeMinute as number | null) ?? null,
           startTimePeriod: (inv.startTimePeriod as string | null) ?? null,
+          profileEmoji: (inv.profileEmoji as string | null) ?? null,
+          coverPhotoUrl: (inv.coverPhotoUrl as string | null) ?? null,
         });
-        setCreateStarted(true);
       } catch {
         setLoadError("Could not load that prior run.");
       } finally {
@@ -122,7 +108,6 @@ function HostARunPageInner() {
         return;
       }
       setWorkout(mapTrainingWorkoutToHostForm(w));
-      setCreateStarted(true);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };
       setLoadError(err.response?.data?.error || "Could not prepare your run");
@@ -137,8 +122,10 @@ function HostARunPageInner() {
   }, []);
 
   useEffect(() => {
-    void ensureHostWorkout();
-  }, [ensureHostWorkout]);
+    void loadSeed();
+  }, [loadSeed]);
+
+  const wizardKey = [fromRunIdParam, workoutIdParam, routeIdParam].filter(Boolean).join("-") || "new";
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -147,65 +134,30 @@ function HostARunPageInner() {
         <AthleteSidebar />
         <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-            <div className="flex items-start gap-3 mb-6">
-              <div className="rounded-xl bg-orange-100 p-3">
-                <Users className="w-6 h-6 text-orange-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {inviteReady ? "Invite ready" : "Create a run"}
-                </h1>
-                <p className="mt-1 text-gray-600 max-w-xl">
-                  {inviteReady
-                    ? "Share the link, attach a route if you want, then manage the run from your dashboard."
-                    : "Run home — build the meetup, share the invite, and manage execution after run day."}
-                </p>
-                <p className="mt-2 text-sm text-gray-600">
-                  <Link href="/gorun" className="font-semibold text-orange-700 hover:underline">
-                    My upcoming runs
-                  </Link>
-                </p>
-              </div>
-            </div>
-
-            {showCreateLanding ? (
-              <>
-                <HostRunCreateFork
-                  onChooseNew={() => {
-                    setInviteReady(false);
-                    setCreateStarted(true);
-                  }}
-                  onChooseFromPrevious={(runId) => {
-                    setInviteReady(false);
-                    router.replace(`/host-a-run?fromRunId=${encodeURIComponent(runId)}`);
-                  }}
-                />
-                <HostedRunInvitesPanel collapsible />
-              </>
-            ) : null}
-
             {loading ? (
               <div className="py-16 text-center">
                 <div className="animate-spin rounded-full h-10 w-10 border-2 border-orange-500 border-t-transparent mx-auto" />
               </div>
-            ) : workoutIdParam && (loadError || !workout) ? (
+            ) : loadError ? (
               <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
-                <p>{loadError || "Something went wrong"}</p>
+                <p>{loadError}</p>
+                <Link href="/gorun" className="mt-3 inline-block text-sm font-semibold underline">
+                  Back to Run
+                </Link>
               </div>
-            ) : workout ? (
-              <CreateCityRunForm
-                workout={workout}
+            ) : (
+              <AthleteHostedRunWizard
+                key={wizardKey}
+                mode="create"
+                pageTitle="Create a run"
+                backHref="/gorun"
+                backLabel="Back to Run"
                 initialRouteId={routeIdParam}
-                onInviteCreated={() => setInviteReady(true)}
+                templateSeed={template}
+                showCopyFromPrior={!fromRunIdParam}
+                trainingWorkout={workout}
               />
-            ) : createStarted ? (
-              <CityRunMeetupOnlyForm
-                initialRouteId={routeIdParam}
-                initialTemplate={template}
-                key={fromRunIdParam ?? "new"}
-                onInviteCreated={() => setInviteReady(true)}
-              />
-            ) : null}
+            )}
           </div>
         </main>
       </div>

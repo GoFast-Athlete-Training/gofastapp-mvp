@@ -123,6 +123,9 @@ export interface CityRunDetails {
   routePhotos?: string[] | null;
   runPhotos?: string[] | null;
   mapImageUrl?: string | null;
+  profileEmoji?: string | null;
+  coverPhotoUrl?: string | null;
+  hostPhotoUrl?: string | null;
   routeNeighborhood?: string | null;
   runType?: string | null;
   workoutDescription?: string | null;

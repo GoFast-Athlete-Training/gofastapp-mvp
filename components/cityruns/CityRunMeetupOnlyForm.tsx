@@ -17,6 +17,7 @@ import { markLastHostedRunForBuildPage } from "@/components/runs/HostedRunInvite
 import type { CityRunFromWorkoutSuccess } from "@/components/cityruns/CreateCityRunForm";
 import HostRunWorkoutAttachStep from "@/components/runs/HostRunWorkoutAttachStep";
 import { cityRunTogetherPath } from "@/lib/city-run/run-nav-paths";
+import CityRunProfileMetaFields from "@/components/cityruns/CityRunProfileMetaFields";
 
 export type CityRunMeetupTemplate = {
   title?: string;
@@ -107,9 +108,8 @@ export default function CityRunMeetupOnlyForm({
   const [pace, setPace] = useState(initialTemplate?.pace?.trim() || "");
   const [meetUpNote, setMeetUpNote] = useState(initialTemplate?.meetUpNote ?? "");
   const [aboutThisRun, setAboutThisRun] = useState(initialTemplate?.description ?? "");
-  const [routeNeighborhood, setRouteNeighborhood] = useState(
-    initialTemplate?.routeNeighborhood ?? "",
-  );
+  const [profileEmoji, setProfileEmoji] = useState("");
+  const [coverPhotoUrl, setCoverPhotoUrl] = useState("");
   const [plannedWorkoutId, setPlannedWorkoutId] = useState<string | null>(null);
   const [workoutId, setWorkoutId] = useState<string | null>(null);
 
@@ -193,7 +193,6 @@ export default function CityRunMeetupOnlyForm({
         meetUpLng: meetUpLng ?? undefined,
         meetUpNote: meetUpNote.trim() || undefined,
         description: aboutThisRun.trim() || undefined,
-        routeNeighborhood: routeNeighborhood.trim() || undefined,
         pace: pace.trim() ? pace.trim() : undefined,
         totalMiles:
           Number.isFinite(milesNum) && milesNum > 0 ? milesNum : undefined,
@@ -203,6 +202,8 @@ export default function CityRunMeetupOnlyForm({
         plannedWorkoutId: plannedWorkoutId ?? undefined,
         workoutId: workoutId ?? undefined,
         routeId: initialRouteId ?? undefined,
+        profileEmoji: profileEmoji.trim() || undefined,
+        coverPhotoUrl: coverPhotoUrl.trim() || undefined,
       });
       if (data?.cityRunId && data?.path) {
         setSuccess(data);
@@ -262,7 +263,6 @@ export default function CityRunMeetupOnlyForm({
         {!routeStepDismissed ? (
           <CityRunPostInviteRouteStep
             cityRunId={success.cityRunId}
-            cityRunRouteNeighborhood={routeNeighborhood.trim() || null}
             suggestedRouteId={initialRouteId}
             onSkip={() => {
               markLastHostedRunForBuildPage(success.cityRunId);
@@ -299,6 +299,14 @@ export default function CityRunMeetupOnlyForm({
               placeholder="Saturday morning group run"
             />
           </div>
+
+          <CityRunProfileMetaFields
+            profileEmoji={profileEmoji}
+            onProfileEmojiChange={setProfileEmoji}
+            coverPhotoUrl={coverPhotoUrl}
+            onCoverPhotoUrlChange={setCoverPhotoUrl}
+            onUploadError={setError}
+          />
 
           <div className="space-y-2">
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
@@ -394,22 +402,6 @@ export default function CityRunMeetupOnlyForm({
             miles={totalMiles}
             onMilesChange={setTotalMiles}
           />
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              Route neighborhood <span className="font-normal text-gray-400">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={routeNeighborhood}
-              onChange={(e) => setRouteNeighborhood(e.target.value)}
-              placeholder="e.g. Fletcher's Cove, Carderock"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Where the route runs — saved on your invite; attach a route in step 2 to add the map.
-            </p>
-          </div>
 
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">

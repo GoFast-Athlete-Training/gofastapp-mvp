@@ -13,6 +13,7 @@ import {
 } from "@/lib/runTypes";
 import { EntitySearch } from "@/components/runmanage/RunManageRunAffiliations";
 import { coffeeFoodKindLabel } from "@/lib/brands/coffee-food-kind";
+import CityRunProfileMetaFields from "@/components/cityruns/CityRunProfileMetaFields";
 import type { RunInstanceWizardContext, RunInstanceWizardValues } from "./shared";
 
 type Props = {
@@ -32,6 +33,7 @@ export default function RunManageOpenCorePanel({
   weekdayMismatch,
   onErrorChange,
 }: Props) {
+  const isAthleteHosted = context.variant === "athlete-hosted";
   const isSeries = context.isSeriesInstance ?? context.variant === "create-series";
   const dayLabel = context.dayOfWeek ? formatDayLabel(context.dayOfWeek) : "Run";
   const isTrack = isTrackRun(values.runType);
@@ -65,7 +67,31 @@ export default function RunManageOpenCorePanel({
         </p>
       </div>
       <div className="space-y-4 px-4 py-4">
-        {!isSeries ? (
+        {isAthleteHosted ? (
+          <>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-900">Title *</label>
+              <input
+                type="text"
+                value={values.title}
+                onChange={(e) => patch({ title: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="Friday morning shakeout"
+              />
+            </div>
+            {context.onProfileEmojiChange && context.onCoverPhotoUrlChange ? (
+              <CityRunProfileMetaFields
+                profileEmoji={context.profileEmoji ?? ""}
+                onProfileEmojiChange={context.onProfileEmojiChange}
+                coverPhotoUrl={context.coverPhotoUrl ?? ""}
+                onCoverPhotoUrlChange={context.onCoverPhotoUrlChange}
+                onUploadError={onErrorChange}
+              />
+            ) : null}
+          </>
+        ) : null}
+
+        {!isSeries && !isAthleteHosted ? (
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-900">Day of week</label>
             <select
@@ -188,35 +214,37 @@ export default function RunManageOpenCorePanel({
           </div>
         </div>
 
-        <div>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={values.endPointSameAsStart}
-              onChange={(e) => patch({ endPointSameAsStart: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300 text-sky-600"
-            />
-            <span className="text-sm text-gray-900">Finish same as start</span>
-          </label>
-          {!values.endPointSameAsStart ? (
-            <GooglePlacesAutocomplete
-              value={values.endPoint}
-              onChange={(e) => patch({ endPoint: e.target.value })}
-              onPlaceSelected={(placeData) => {
-                const parsed = parseGoogleAddress(placeData.address);
-                onChange({
-                  ...values,
-                  endPoint: placeData.name || placeData.address,
-                  endStreetAddress: parsed.streetAddress || "",
-                  endCity: parsed.city || "",
-                  endState: parsed.state || "",
-                });
-              }}
-              placeholder="Where runners finish"
-              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          ) : null}
-        </div>
+        {!isAthleteHosted ? (
+          <div>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={values.endPointSameAsStart}
+                onChange={(e) => patch({ endPointSameAsStart: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300 text-sky-600"
+              />
+              <span className="text-sm text-gray-900">Finish same as start</span>
+            </label>
+            {!values.endPointSameAsStart ? (
+              <GooglePlacesAutocomplete
+                value={values.endPoint}
+                onChange={(e) => patch({ endPoint: e.target.value })}
+                onPlaceSelected={(placeData) => {
+                  const parsed = parseGoogleAddress(placeData.address);
+                  onChange({
+                    ...values,
+                    endPoint: placeData.name || placeData.address,
+                    endStreetAddress: parsed.streetAddress || "",
+                    endCity: parsed.city || "",
+                    endState: parsed.state || "",
+                  });
+                }}
+                placeholder="Where runners finish"
+                className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            ) : null}
+          </div>
+        ) : null}
 
         {!isTrack ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -252,6 +280,7 @@ export default function RunManageOpenCorePanel({
           </div>
         ) : null}
 
+        {!isAthleteHosted ? (
         <div>
           <EntitySearch
             label="Post-run stop"
@@ -290,7 +319,9 @@ export default function RunManageOpenCorePanel({
             </p>
           ) : null}
         </div>
+        ) : null}
 
+        {!isAthleteHosted ? (
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900">Run type *</label>
           <select
@@ -306,7 +337,9 @@ export default function RunManageOpenCorePanel({
             ))}
           </select>
         </div>
+        ) : null}
 
+        {!isAthleteHosted ? (
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-900">Public description (optional)</label>
           <textarea
@@ -317,6 +350,7 @@ export default function RunManageOpenCorePanel({
             placeholder="Short blurb for this run…"
           />
         </div>
+        ) : null}
       </div>
     </div>
   );

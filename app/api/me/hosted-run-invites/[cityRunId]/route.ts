@@ -14,6 +14,7 @@ import {
   executionStatusPatchData,
   parseCityRunExecutionStatus,
 } from "@/lib/city-run/execution-status";
+import { normalizeProfileEmoji } from "@/lib/city-run/run-profile-visual";
 
 type PatchBody = {
   title?: string;
@@ -37,6 +38,12 @@ type PatchBody = {
   cityRunExecutionStatus?: string;
   postRunNote?: string | null;
   postRunPhotoUrl?: string | null;
+  profileEmoji?: string | null;
+  coverPhotoUrl?: string | null;
+  workoutDescription?: string | null;
+  directionsText?: string | null;
+  stravaMapUrl?: string | null;
+  mapImageUrl?: string | null;
 };
 
 export async function GET(
@@ -162,6 +169,24 @@ export async function PATCH(
         : {}),
       ...(body.postRunPhotoUrl !== undefined
         ? { postRunPhotoUrl: body.postRunPhotoUrl?.trim() || null }
+        : {}),
+      ...(body.profileEmoji !== undefined
+        ? { profileEmoji: normalizeProfileEmoji(body.profileEmoji ?? null) }
+        : {}),
+      ...(body.coverPhotoUrl !== undefined
+        ? { coverPhotoUrl: body.coverPhotoUrl?.trim() || null }
+        : {}),
+      ...(body.workoutDescription !== undefined
+        ? { workoutDescription: body.workoutDescription?.trim() || null }
+        : {}),
+      ...(body.directionsText !== undefined
+        ? { directionsText: body.directionsText?.trim() || null }
+        : {}),
+      ...(body.stravaMapUrl !== undefined
+        ? { stravaMapUrl: body.stravaMapUrl?.trim() || null }
+        : {}),
+      ...(body.mapImageUrl !== undefined
+        ? { mapImageUrl: body.mapImageUrl?.trim() || null }
         : {}),
       updatedAt: new Date(),
     },

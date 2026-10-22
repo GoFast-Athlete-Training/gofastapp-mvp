@@ -42,9 +42,18 @@ export const CREATE_SCRATCH_WIZARD_STEP_ORDER: WizardStep[] = [
   "workout",
 ];
 
+/** Athlete-hosted individual runs — create and edit share this chrome. */
+export const ATHLETE_HOSTED_WIZARD_STEP_ORDER: WizardStep[] = [
+  "core",
+  "description",
+  "route",
+  "workout",
+];
+
 export function wizardStepOrderForVariant(
   variant: RunInstanceWizardContext["variant"]
 ): WizardStep[] {
+  if (variant === "athlete-hosted") return ATHLETE_HOSTED_WIZARD_STEP_ORDER;
   return variant === "create-scratch" ? CREATE_SCRATCH_WIZARD_STEP_ORDER : WIZARD_STEP_ORDER;
 }
 
@@ -152,8 +161,13 @@ export type SeriesBaseline = {
 };
 
 export type RunInstanceWizardContext = {
-  variant: "edit" | "create-scratch" | "create-series";
+  variant: "edit" | "create-scratch" | "create-series" | "athlete-hosted";
   cityRunType?: string | null;
+  /** Athlete-hosted core step — cover + emoji. */
+  profileEmoji?: string;
+  coverPhotoUrl?: string;
+  onProfileEmojiChange?: (value: string) => void;
+  onCoverPhotoUrlChange?: (value: string) => void;
   /** Product city_runs.id — required to attach planned workout on edit. */
   cityRunId?: string | null;
   isSeriesInstance?: boolean;

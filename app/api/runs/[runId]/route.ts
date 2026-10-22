@@ -41,6 +41,7 @@ import {
   postRunBrandStampFromProdBrand,
 } from '@/lib/runmanage/post-run-brand-stamp';
 import { maybeStampCityRunStartsAtOnUpdate } from '@/lib/city-run/stamp-city-run-write';
+import { resolveHostPhotoUrlFromRsvps } from '@/lib/city-run/run-profile-visual';
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
   process.env.RENDER_GIT_COMMIT ||
@@ -204,6 +205,8 @@ export async function GET(
           stravaMapUrl: true,
           routePhotos: true,
           mapImageUrl: true,
+          profileEmoji: true,
+          coverPhotoUrl: true,
           staffNotes: true,
           stravaEventUrl: true,
           stravaText: true,
@@ -574,6 +577,11 @@ export async function GET(
       currentRSVPRole = RSVP_ROLE_HOST;
     }
 
+    const hostPhotoUrl = resolveHostPhotoUrlFromRsvps(
+      run.city_run_rsvps,
+      isHostRsvpRole,
+    );
+
     // Format response (exclude sensitive fields)
     return NextResponse.json({
       success: true,
@@ -670,6 +678,9 @@ export async function GET(
           : null,
         routePhotos: normalizeRoutePhotosForResponse(run.routePhotos),
         mapImageUrl: run.mapImageUrl ?? null,
+        profileEmoji: run.profileEmoji ?? null,
+        coverPhotoUrl: run.coverPhotoUrl ?? null,
+        hostPhotoUrl,
         staffNotes: run.staffNotes ?? null,
         stravaEventUrl: run.stravaEventUrl ?? null,
         stravaText: run.stravaText ?? null,

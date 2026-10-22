@@ -18,6 +18,7 @@ import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
 import { resolveViewerRsvpRole } from '@/lib/city-run/viewer-run-role';
 import CityRunHostActions from '@/components/runs/CityRunHostActions';
+import HostRunExecutionPanel from '@/components/runs/HostRunExecutionPanel';
 
 interface Props {
   run: CityRunDetails;
@@ -55,7 +56,7 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
   );
   const isHost = isHostRsvpRole(viewerRsvpRole);
   const isIndividual = run.cityRunType === 'INDIVIDUAL';
-  const backHref = isHost ? '/host-a-run' : '/myruns';
+  const backHref = isHost ? '/gorun' : '/myruns';
   const backLabel = isHost ? 'Run' : 'My Runs';
   const socialRun = hasSocialRunLifecycle(run);
 
@@ -100,6 +101,7 @@ export default function CityRunRsvpGroup({ run, onLeave }: Props) {
         <div className="hidden lg:block space-y-3">
           <CityRunGoingBanner rsvpRole={viewerRsvpRole} />
           {isHost ? <CityRunHostActions cityRunId={run.id} /> : null}
+          {isHost && isIndividual ? <HostRunExecutionPanel cityRunId={run.id} /> : null}
 
           <div
             className={

@@ -178,6 +178,8 @@ export async function getAthleteHostedRunInviteForHost(
   routeId: string | null;
   stravaMapUrl: string | null;
   mapImageUrl: string | null;
+  profileEmoji: string | null;
+  coverPhotoUrl: string | null;
   workoutDescription: string | null;
   route: HostedRunInviteRouteSnap | null;
 }) | null> {
@@ -202,6 +204,8 @@ export async function getAthleteHostedRunInviteForHost(
       routeId: true,
       stravaMapUrl: true,
       mapImageUrl: true,
+      profileEmoji: true,
+      coverPhotoUrl: true,
       workoutDescription: true,
       route: {
         select: {
@@ -234,6 +238,8 @@ export async function getAthleteHostedRunInviteForHost(
     routeId: run.routeId,
     stravaMapUrl: run.stravaMapUrl,
     mapImageUrl: run.mapImageUrl,
+    profileEmoji: run.profileEmoji,
+    coverPhotoUrl: run.coverPhotoUrl,
     workoutDescription: run.workoutDescription,
     route: run.route,
   };

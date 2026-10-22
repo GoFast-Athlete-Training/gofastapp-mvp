@@ -10,8 +10,6 @@ import type { SavedRouteSnapshot } from "@/lib/city-run/saved-route-snapshot";
 
 type Props = {
   cityRunId: string;
-  /** From meetup create — authoritative for this invite unless attach picks route. */
-  cityRunRouteNeighborhood?: string | null;
   suggestedRouteId?: string | null;
   onSkip: () => void;
   /** Edit run invite — no skip, different heading. */
@@ -21,15 +19,8 @@ type Props = {
 
 type StepMode = "choose" | "attach" | "create";
 
-type NeighborhoodConflict = {
-  routeId: string;
-  cityRunNeighborhood: string;
-  routeNeighborhood: string;
-};
-
 export default function CityRunPostInviteRouteStep({
   cityRunId,
-  cityRunRouteNeighborhood = null,
   suggestedRouteId = null,
   onSkip,
   variant = "postCreate",
@@ -40,13 +31,9 @@ export default function CityRunPostInviteRouteStep({
   const [error, setError] = useState<string | null>(null);
   const [attachedName, setAttachedName] = useState<string | null>(null);
   const [pickerRouteId, setPickerRouteId] = useState<string | null>(suggestedRouteId);
-  const [conflict, setConflict] = useState<NeighborhoodConflict | null>(null);
 
   const attachRoute = useCallback(
-    async (
-      routeId: string,
-      neighborhoodAuthority: "auto" | "cityRun" | "route" = "auto"
-    ) => {
+    async (routeId: string) => {
       setBusy(true);
       setError(null);
       try {
@@ -54,26 +41,13 @@ export default function CityRunPostInviteRouteStep({
           success?: boolean;
           routeName?: string;
           error?: string;
-          conflict?: boolean;
-          cityRunNeighborhood?: string;
-          routeNeighborhood?: string;
         }>(`/cityrun/${encodeURIComponent(cityRunId)}/attach-route`, {
           routeId,
-          neighborhoodAuthority,
+          neighborhoodAuthority: "route",
         });
-        if (res.status === 409 || res.data?.conflict) {
-          setConflict({
-            routeId,
-            cityRunNeighborhood:
-              res.data?.cityRunNeighborhood || cityRunRouteNeighborhood?.trim() || "—",
-            routeNeighborhood: res.data?.routeNeighborhood || "—",
-          });
-          return;
-        }
         if (!res.data?.success) {
           throw new Error(res.data?.error || "Could not attach route");
         }
-        setConflict(null);
         const name = res.data.routeName || "Route";
         if (variant === "edit") {
           setAttachedName(null);
@@ -86,39 +60,20 @@ export default function CityRunPostInviteRouteStep({
         }
       } catch (e: unknown) {
         const err = e as {
-          response?: {
-            status?: number;
-            data?: {
-              error?: string;
-              conflict?: boolean;
-              cityRunNeighborhood?: string;
-              routeNeighborhood?: string;
-            };
-          };
+          response?: { data?: { error?: string } };
           message?: string;
         };
-        if (err.response?.status === 409 || err.response?.data?.conflict) {
-          setConflict({
-            routeId,
-            cityRunNeighborhood:
-              err.response.data?.cityRunNeighborhood ||
-              cityRunRouteNeighborhood?.trim() ||
-              "—",
-            routeNeighborhood: err.response.data?.routeNeighborhood || "—",
-          });
-          return;
-        }
         setError(err.response?.data?.error || err.message || "Could not attach route.");
       } finally {
         setBusy(false);
       }
     },
-    [cityRunId, cityRunRouteNeighborhood, onAttached, variant]
+    [cityRunId, onAttached, variant]
   );
 
   const handleSelectSaved = (snap: SavedRouteSnapshot) => {
     setPickerRouteId(snap.routeId);
-    void attachRoute(snap.routeId, "auto");
+    void attachRoute(snap.routeId);
   };
 
   if (attachedName) {
@@ -142,59 +97,9 @@ export default function CityRunPostInviteRouteStep({
             ? "Attach a saved route so runners see the map and path on your invite."
             : "Your invite is saved. A route is a named saved path — attach one you already built or create one now."}
         </p>
-        {cityRunRouteNeighborhood?.trim() ? (
-          <p className="text-xs text-gray-600 mt-2">
-            Route neighborhood on this invite:{" "}
-            <span className="font-medium text-gray-900">{cityRunRouteNeighborhood.trim()}</span>
-          </p>
-        ) : null}
       </div>
 
-      {conflict ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
-          <p className="text-sm font-semibold text-amber-950">Neighborhood mismatch</p>
-          <p className="text-sm text-amber-900">
-            This run and the saved route name different areas. Which one should we keep?
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2 text-sm">
-            <div className="rounded-md bg-white/80 border border-amber-100 px-3 py-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase">This run</p>
-              <p className="font-medium text-gray-900">{conflict.cityRunNeighborhood}</p>
-            </div>
-            <div className="rounded-md bg-white/80 border border-amber-100 px-3 py-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase">Saved route</p>
-              <p className="font-medium text-gray-900">{conflict.routeNeighborhood}</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void attachRoute(conflict.routeId, "cityRun")}
-              className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-            >
-              Use this run
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void attachRoute(conflict.routeId, "route")}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-            >
-              Use saved route
-            </button>
-            <button
-              type="button"
-              onClick={() => setConflict(null)}
-              className="text-sm font-medium text-gray-600 hover:text-gray-900"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {mode === "choose" && !conflict ? (
+      {mode === "choose" ? (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -222,7 +127,7 @@ export default function CityRunPostInviteRouteStep({
         </div>
       ) : null}
 
-      {mode === "attach" && !conflict ? (
+      {mode === "attach" ? (
         <div className="space-y-3">
           <button
             type="button"
@@ -241,7 +146,7 @@ export default function CityRunPostInviteRouteStep({
             <button
               type="button"
               disabled={busy}
-              onClick={() => void attachRoute(suggestedRouteId, "auto")}
+              onClick={() => void attachRoute(suggestedRouteId)}
               className="text-sm font-semibold text-orange-700 hover:underline disabled:opacity-50"
             >
               Attach the route you picked earlier
@@ -250,7 +155,7 @@ export default function CityRunPostInviteRouteStep({
         </div>
       ) : null}
 
-      {mode === "create" && !conflict ? (
+      {mode === "create" ? (
         <div className="space-y-3">
           <button
             type="button"
@@ -261,9 +166,8 @@ export default function CityRunPostInviteRouteStep({
           </button>
           <BuildRouteForm
             embedded
-            defaultRouteNeighborhood={cityRunRouteNeighborhood}
             className="border-0 shadow-none p-0"
-            onSaved={(routeId) => void attachRoute(routeId, "auto")}
+            onSaved={(routeId) => void attachRoute(routeId)}
           />
           <p className="text-xs text-gray-500">
             Saving the route attaches it to this invite automatically.

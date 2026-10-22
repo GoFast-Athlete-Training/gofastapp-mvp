@@ -10,6 +10,7 @@ export type AthleteRunRouteCatalogPayload = {
   mapImageUrl: string | null;
   distanceMiles: number | null;
   routeNeighborhood: string | null;
+  routeDescription: string | null;
   runType: string | null;
   routePhotos: string[] | null;
   citySlug: string | null;
@@ -43,6 +44,7 @@ const routeInclude = {
       mapImageUrl: true,
       distanceMiles: true,
       routeNeighborhood: true,
+      routeDescription: true,
       runType: true,
       routePhotos: true,
       citySlug: true,
@@ -113,6 +115,7 @@ export function mapAthleteRunRoute(row: AthleteRunRouteRow): AthleteRunRoutePayl
       mapImageUrl: row.route.mapImageUrl?.trim() || null,
       distanceMiles: row.route.distanceMiles,
       routeNeighborhood: row.route.routeNeighborhood?.trim() || null,
+      routeDescription: row.route.routeDescription?.trim() || null,
       runType: row.route.runType?.trim() || null,
       routePhotos: normalizeRoutePhotosJson(row.route.routePhotos),
       citySlug: row.route.citySlug?.trim() || null,

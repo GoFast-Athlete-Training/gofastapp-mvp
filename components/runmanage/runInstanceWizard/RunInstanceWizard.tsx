@@ -130,9 +130,11 @@ export default function RunInstanceWizard({
   associateError,
   associateMessage,
 }: RunInstanceWizardProps) {
+  const isAthleteHosted = context.variant === "athlete-hosted";
   const isCreateScratch = context.variant === "create-scratch";
   const resolvedInitialStep: WizardStep =
-    initialWizardStep ?? (isCreateScratch ? "intake" : "core");
+    initialWizardStep ??
+    (isAthleteHosted ? "core" : isCreateScratch ? "intake" : "core");
   const [wizardStep, setWizardStep] = useState<WizardStep>(resolvedInitialStep);
   const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
   const [intakeApplied, setIntakeApplied] = useState(false);
@@ -196,12 +198,13 @@ export default function RunInstanceWizard({
   const showAssociateStep = Boolean(associateDraft && onAssociateChange);
 
   const visibleWizardSteps = useMemo(() => {
+    if (isAthleteHosted) return stepOrder;
     let steps = isCreateScratch ? stepOrder : isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
     if (!showAssociateStep) {
       steps = steps.filter((s) => s !== "associate");
     }
     return steps;
-  }, [isCreateScratch, isTrack, stepOrder, showAssociateStep]);
+  }, [isAthleteHosted, isCreateScratch, isTrack, stepOrder, showAssociateStep]);
 
   const lastWizardStep = visibleWizardSteps[visibleWizardSteps.length - 1] ?? "workout";
 
@@ -685,17 +688,19 @@ export default function RunInstanceWizard({
                     </p>
                   </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-900">Route neighborhood</label>
-                    <input
-                      type="text"
-                      value={values.routeNeighborhood}
-                      onChange={(e) => patch({ routeNeighborhood: e.target.value })}
-                      placeholder="e.g. Fletcher's Cove, Carderock"
-                      disabled={linkedSavedRoute}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
-                    />
-                  </div>
+                  {!isAthleteHosted ? (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-900">Route neighborhood</label>
+                      <input
+                        type="text"
+                        value={values.routeNeighborhood}
+                        onChange={(e) => patch({ routeNeighborhood: e.target.value })}
+                        placeholder="e.g. Fletcher's Cove, Carderock"
+                        disabled={linkedSavedRoute}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-600"
+                      />
+                    </div>
+                  ) : null}
 
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-900">Route map</label>
@@ -892,7 +897,25 @@ export default function RunInstanceWizard({
             </div>
           )}
 
-          {wizardStep === "description" && (
+          {wizardStep === "description" && isAthleteHosted ? (
+            <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Description</h3>
+                <p className="mt-1 text-xs text-gray-600">
+                  Public blurb for your invite — what runners should know before they RSVP.
+                </p>
+              </div>
+              <textarea
+                value={values.description}
+                onChange={(e) => patch({ description: e.target.value })}
+                rows={5}
+                placeholder="What kind of run is this? All paces welcome, bag drop, etc."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+          ) : null}
+
+          {wizardStep === "description" && !isAthleteHosted ? (
             <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Staff notes</h3>
@@ -909,7 +932,7 @@ export default function RunInstanceWizard({
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               />
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 

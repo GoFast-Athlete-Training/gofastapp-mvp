@@ -16,6 +16,8 @@ type RunnerAgendaCardProps = {
   checkingInId: string | null;
   onCheckin: (runId: string) => void;
   onDeleted?: () => void;
+  /** Hide Created / Joined on /gorun home — RSVP role, not run meta. */
+  hideMembershipBadge?: boolean;
 };
 
 export default function RunnerAgendaCard({
@@ -23,6 +25,7 @@ export default function RunnerAgendaCard({
   checkingInId,
   onCheckin,
   onDeleted,
+  hideMembershipBadge = false,
 }: RunnerAgendaCardProps) {
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -101,15 +104,17 @@ export default function RunnerAgendaCard({
       </div>
 
       <div className="rounded-xl border border-sky-200 bg-sky-50/40 px-4 py-3 space-y-2">
-        <span
-          className={
-            isCreated
-              ? 'inline-flex rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-orange-800'
-              : 'inline-flex rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-sky-900'
-          }
-        >
-          {membershipBadge}
-        </span>
+        {!hideMembershipBadge ? (
+          <span
+            className={
+              isCreated
+                ? 'inline-flex rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-orange-800'
+                : 'inline-flex rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-sky-900'
+            }
+          >
+            {membershipBadge}
+          </span>
+        ) : null}
         <p className="font-semibold text-gray-900">{run.title}</p>
         <p className="text-sm text-gray-600 flex items-start gap-1.5">
           <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5 text-gray-400" aria-hidden />

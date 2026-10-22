@@ -8,6 +8,7 @@ export type RouteCatalogRow = {
   mapImageUrl?: string | null;
   routePhotos?: unknown;
   routeNeighborhood?: string | null;
+  routeDescription?: string | null;
   distanceMiles?: number | null;
   runType?: string | null;
 };
@@ -26,6 +27,7 @@ export function snapshotFromRouteCatalogRow(row: RouteCatalogRow): SavedRouteSna
     mapImageUrl: row.mapImageUrl?.trim() || null,
     routePhotos: photos,
     routeNeighborhood: row.routeNeighborhood?.trim() || null,
+    routeDescription: row.routeDescription?.trim() || null,
     distanceMiles: row.distanceMiles ?? null,
     runType: row.runType?.trim() || null,
   };
@@ -39,6 +41,7 @@ export type SavedRouteSnapshot = {
   mapImageUrl: string | null;
   routePhotos: string[];
   routeNeighborhood: string | null;
+  routeDescription: string | null;
   distanceMiles: number | null;
   runType: string | null;
 };
@@ -58,6 +61,7 @@ export function snapshotFromAthleteRunRoute(row: AthleteRunRoutePayload): SavedR
     mapImageUrl: route.mapImageUrl?.trim() || null,
     routePhotos: photos,
     routeNeighborhood: route.routeNeighborhood?.trim() || null,
+    routeDescription: route.routeDescription?.trim() || null,
     distanceMiles: route.distanceMiles,
     runType: route.runType?.trim() || null,
   };
@@ -71,7 +75,8 @@ export function formatMilesForInput(miles: number | null | undefined): string {
 
 export type CityRunRouteFieldSetters = {
   setStravaMapUrl: (v: string) => void;
-  setRouteNeighborhood: (v: string) => void;
+  setRouteNeighborhood?: (v: string) => void;
+  setRouteDescription?: (v: string) => void;
   setMapImageUrl?: (v: string) => void;
   setTotalMiles?: (v: string) => void;
   setRoutePhotos?: (v: string[]) => void;
@@ -80,6 +85,7 @@ export type CityRunRouteFieldSetters = {
 export type CityRunRouteFieldCurrent = {
   stravaMapUrl?: string;
   routeNeighborhood?: string;
+  routeDescription?: string;
   mapImageUrl?: string;
   totalMiles?: string;
   routePhotos?: string[];
@@ -93,6 +99,7 @@ export function applySavedRouteToFormFields(
   const onlyEmpty = Boolean(current);
   const stravaEmpty = !current?.stravaMapUrl?.trim();
   const neighborhoodEmpty = !current?.routeNeighborhood?.trim();
+  const descriptionEmpty = !current?.routeDescription?.trim();
   const mapEmpty = !current?.mapImageUrl?.trim();
   const milesEmpty = !current?.totalMiles?.trim();
   const photosEmpty = !current?.routePhotos?.length;
@@ -100,7 +107,9 @@ export function applySavedRouteToFormFields(
   if (!onlyEmpty || stravaEmpty) {
     setters.setStravaMapUrl(snap.stravaMapUrl ?? '');
   }
-  if (!onlyEmpty || neighborhoodEmpty) {
+  if (setters.setRouteDescription && (!onlyEmpty || descriptionEmpty)) {
+    setters.setRouteDescription(snap.routeDescription ?? '');
+  } else if (setters.setRouteNeighborhood && (!onlyEmpty || neighborhoodEmpty)) {
     setters.setRouteNeighborhood(snap.routeNeighborhood ?? '');
   }
   if (setters.setMapImageUrl && (!onlyEmpty || mapEmpty)) {
@@ -117,6 +126,7 @@ export function applySavedRouteToFormFields(
 
 export function clearSavedRouteFormFields(setters: CityRunRouteFieldSetters): void {
   setters.setStravaMapUrl('');
-  setters.setRouteNeighborhood('');
+  setters.setRouteDescription?.('');
+  setters.setRouteNeighborhood?.('');
   setters.setMapImageUrl?.('');
 }

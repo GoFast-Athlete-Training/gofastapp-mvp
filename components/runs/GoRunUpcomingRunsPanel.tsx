@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import RunnerAgendaCard from "@/components/runner/RunnerAgendaCard";
-import GoRunPastSections from "@/components/runs/GoRunPastSections";
-import { pastGroupRunItems } from "@/lib/runner/past-run-sections";
 import api from "@/lib/api";
 import type { RunnerAgendaItem, RunnerAgendaPayload } from "@/lib/runner/runner-agenda";
 
-export default function GoRunUpcomingRunsPanel() {
+type Props = {
+  /** Home shows the next run only; full lists every upcoming item. */
+  mode?: "home" | "full";
+};
+
+export default function GoRunUpcomingRunsPanel({ mode = "home" }: Props) {
   const router = useRouter();
   const [agenda, setAgenda] = useState<RunnerAgendaPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,17 +55,32 @@ export default function GoRunUpcomingRunsPanel() {
   };
 
   const items: RunnerAgendaItem[] = agenda?.items ?? [];
-  const pastItems: RunnerAgendaItem[] = agenda?.pastItems ?? [];
-  const pastGroupCount = pastGroupRunItems(pastItems).length;
-  const empty = !loading && items.length === 0 && pastGroupCount === 0;
+  const displayItems = mode === "home" ? items.slice(0, 1) : items;
+  const empty = !loading && items.length === 0;
 
   return (
     <section className="space-y-4 border-t border-gray-200 pt-8" aria-label="My upcoming runs">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">My upcoming runs</h2>
-        <p className="text-sm text-gray-600 mt-0.5">
-          City runs you created or joined — open the run group for details and chatter.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">
+            {mode === "home" ? "Next run" : "My upcoming runs"}
+          </h2>
+          <p className="text-sm text-gray-600 mt-0.5">
+            {mode === "home"
+              ? "Your soonest city run — copy the link or edit before you share."
+              : "City runs you created or joined — open the run group for details and chatter."}
+          </p>
+        </div>
+        {mode === "home" ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold">
+            <Link href="/gorun/upcoming" className="text-orange-700 hover:underline">
+              Upcoming Runs
+            </Link>
+            <Link href="/gorun/past-group-runs" className="text-gray-700 hover:underline">
+              Past Runs
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       {loading ? (
@@ -92,21 +110,20 @@ export default function GoRunUpcomingRunsPanel() {
         </div>
       ) : null}
 
-      {!loading && items.length > 0 ? (
+      {!loading && displayItems.length > 0 ? (
         <div className="space-y-4">
-          {items.map((item) => (
+          {displayItems.map((item) => (
             <RunnerAgendaCard
               key={item.id}
               item={item}
               checkingInId={checkingInId}
               onCheckin={(runId) => void handleCheckin(runId)}
               onDeleted={() => void load()}
+              hideMembershipBadge={mode === "home"}
             />
           ))}
         </div>
       ) : null}
-
-      {!loading ? <GoRunPastSections /> : null}
     </section>
   );
 }

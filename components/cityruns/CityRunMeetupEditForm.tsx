@@ -15,6 +15,7 @@ import {
   parseGoogleAddressFromComponents,
 } from "@/lib/parse-google-address";
 import type { HostedRunInviteRouteSnap } from "@/lib/city-run/list-athlete-hosted-invites";
+import CityRunProfileMetaFields from "@/components/cityruns/CityRunProfileMetaFields";
 
 function ManageCard({
   title,
@@ -65,6 +66,8 @@ type InviteDetail = {
   routeId: string | null;
   stravaMapUrl: string | null;
   mapImageUrl: string | null;
+  profileEmoji: string | null;
+  coverPhotoUrl: string | null;
   workoutDescription: string | null;
   route: HostedRunInviteRouteSnap | null;
   startTimeHour: number | null;
@@ -102,12 +105,13 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
   const [meetUpPlaceSet, setMeetUpPlaceSet] = useState(false);
   const [meetUpNote, setMeetUpNote] = useState("");
   const [aboutThisRun, setAboutThisRun] = useState("");
-  const [routeNeighborhood, setRouteNeighborhood] = useState("");
   const [gorunPath, setGorunPath] = useState("/host-a-run");
   const [routeSnap, setRouteSnap] = useState<HostedRunInviteRouteSnap | null>(null);
   const [runMapImageUrl, setRunMapImageUrl] = useState<string | null>(null);
   const [runStravaMapUrl, setRunStravaMapUrl] = useState<string | null>(null);
   const [workoutDescription, setWorkoutDescription] = useState<string | null>(null);
+  const [profileEmoji, setProfileEmoji] = useState("");
+  const [coverPhotoUrl, setCoverPhotoUrl] = useState("");
   const [routeAttachKey, setRouteAttachKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,12 +144,13 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
     setMeetUpPlaceSet(Boolean(inv.meetUpPoint.trim()));
     setMeetUpNote(inv.meetUpNote ?? "");
     setAboutThisRun(inv.description ?? "");
-    setRouteNeighborhood(inv.routeNeighborhood ?? "");
     setGorunPath(inv.gorunPath);
     setRouteSnap(inv.route);
     setRunMapImageUrl(inv.mapImageUrl ?? inv.route?.mapImageUrl ?? null);
     setRunStravaMapUrl(inv.stravaMapUrl ?? inv.route?.stravaMapUrl ?? null);
     setWorkoutDescription(inv.workoutDescription);
+    setProfileEmoji(inv.profileEmoji ?? "");
+    setCoverPhotoUrl(inv.coverPhotoUrl ?? "");
     setRouteAttachKey((k) => k + 1);
   }, []);
 
@@ -238,10 +243,11 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
         meetUpLng: meetUpLng ?? undefined,
         meetUpNote: meetUpNote.trim() || null,
         description: aboutThisRun.trim() || null,
-        routeNeighborhood: routeNeighborhood.trim() || null,
         startTimeHour: hourNum,
         startTimeMinute: minuteNum,
         startTimePeriod: startPeriod,
+        profileEmoji: profileEmoji.trim() || null,
+        coverPhotoUrl: coverPhotoUrl.trim() || null,
       });
       setSaveSuccess(true);
       const path = gorunPath;
@@ -321,6 +327,13 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
             placeholder="Short blurb for the invite."
           />
         </label>
+        <CityRunProfileMetaFields
+          profileEmoji={profileEmoji}
+          onProfileEmojiChange={setProfileEmoji}
+          coverPhotoUrl={coverPhotoUrl}
+          onCoverPhotoUrlChange={setCoverPhotoUrl}
+          onUploadError={setError}
+        />
       </ManageCard>
 
       <ManageCard title="Meetup">
@@ -428,19 +441,9 @@ export default function CityRunMeetupEditForm({ cityRunId }: Props) {
         ) : (
           <p className="text-sm text-gray-600">No route attached yet.</p>
         )}
-        <label className="block">
-          <span className="text-sm font-medium text-gray-800">Route neighborhood</span>
-          <input
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-            value={routeNeighborhood}
-            onChange={(e) => setRouteNeighborhood(e.target.value)}
-            placeholder="e.g. Fletcher's Cove"
-          />
-        </label>
         <CityRunPostInviteRouteStep
           key={routeAttachKey}
           cityRunId={cityRunId}
-          cityRunRouteNeighborhood={routeNeighborhood.trim() || null}
           variant="edit"
           onSkip={() => undefined}
           onAttached={() => void hydrate({ silent: true })}

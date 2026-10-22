@@ -133,7 +133,7 @@ export default function RoutesDiscoverPicker({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search your routes (e.g. Teddy Friday)…"
+              placeholder="Search your routes…"
               className="w-full border border-gray-300 rounded-lg py-2 pl-9 pr-3 text-sm"
             />
           </div>

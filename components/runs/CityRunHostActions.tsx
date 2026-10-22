@@ -26,7 +26,7 @@ export default function CityRunHostActions({ cityRunId, className = '' }: Props)
     setDeleteError(null);
     try {
       await api.delete(`/me/hosted-run-invites/${encodeURIComponent(cityRunId)}`);
-      router.push('/build-a-run');
+      router.push('/gorun');
     } catch (e) {
       console.error(e);
       setDeleteError('Could not delete this run.');

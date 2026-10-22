@@ -28,6 +28,7 @@ export async function GET(
         mapImageUrl: true,
         routePhotos: true,
         routeNeighborhood: true,
+        routeDescription: true,
         runType: true,
         citySlug: true,
       },

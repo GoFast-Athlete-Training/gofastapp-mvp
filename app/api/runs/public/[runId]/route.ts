@@ -79,6 +79,15 @@ export async function GET(
     if (!run) run = await prisma.city_runs.findUnique({ where: { slug: segment }, include });
     if (!run) return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
 
+    let hostPhotoUrl: string | null = null;
+    if (run.athleteGeneratedId) {
+      const hostAthlete = await prisma.athlete.findUnique({
+        where: { id: run.athleteGeneratedId },
+        select: { photoURL: true },
+      });
+      hostPhotoUrl = hostAthlete?.photoURL?.trim() || null;
+    }
+
     const runDescription = run.description ?? run.runSeries?.description ?? null;
     const routeDirections = run.directionsText ?? run.runSeries?.seriesRunRawText ?? null;
     const routeDescription =
@@ -120,6 +129,9 @@ export async function GET(
         routePhotos: run.routePhotos as string[] | null ?? null,
         runPhotos: run.runPhotos as string[] | null ?? null,
         mapImageUrl: run.mapImageUrl ?? null,
+        profileEmoji: run.profileEmoji ?? null,
+        coverPhotoUrl: run.coverPhotoUrl ?? null,
+        hostPhotoUrl,
         routeNeighborhood: run.routeNeighborhood ?? null,
         runType: run.runType ?? null,
         routeId: run.routeId ?? null,
