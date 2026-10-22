@@ -60,6 +60,10 @@ export type TrackWorkoutBuilderProps = {
   initialSegments?: GroupWorkoutSegment[] | null;
   initialWorkoutTitle?: string | null;
   initialWorkoutType?: string | null;
+  /** Parent already picked Tempo/Intervals/etc. — hide Easy UI and type dropdown. */
+  athleteStructured?: boolean;
+  /** Athlete wizard IntakeModePicker drives AI vs manual — hide duplicate toggle. */
+  controlledBuildMode?: WorkoutBuildMode;
 };
 
 function segmentsToPreview(segments: GroupWorkoutSegment[]): WorkoutPreviewSegment[] {
@@ -89,16 +93,20 @@ export default function TrackWorkoutBuilder({
   initialSegments,
   initialWorkoutTitle,
   initialWorkoutType,
+  athleteStructured = false,
+  controlledBuildMode,
 }: TrackWorkoutBuilderProps) {
   const workoutType = resolveClubWorkoutType(
     values.clubWorkoutType || initialWorkoutType,
-    "Easy",
+    athleteStructured ? "Intervals" : "Easy",
   );
-  const isEasy = workoutType === "Easy";
-  const [buildMode, setBuildMode] = useState<WorkoutBuildMode>(() =>
+  const isEasy = !athleteStructured && workoutType === "Easy";
+  const [buildModeState, setBuildModeState] = useState<WorkoutBuildMode>(() =>
     isEasy ? "manual" : "ai",
   );
-  const [showStructuredForEasy, setShowStructuredForEasy] = useState(false);
+  const buildMode: WorkoutBuildMode = controlledBuildMode ?? buildModeState;
+  const setBuildMode = controlledBuildMode ? () => {} : setBuildModeState;
+  const [showStructuredForEasy, setShowStructuredForEasy] = useState(athleteStructured);
 
   const [editableSegments, setEditableSegments] = useState<EditableWorkoutSegment[]>([]);
   const [structuredWorkoutTitle, setStructuredWorkoutTitle] = useState("");
@@ -108,7 +116,8 @@ export default function TrackWorkoutBuilder({
 
   const { trackWorkoutDescription, plannedWorkoutId, attachedWorkoutTitle } = values;
 
-  const structuredMode = !isEasy || showStructuredForEasy || editableSegments.length > 0;
+  const structuredMode =
+    athleteStructured || !isEasy || showStructuredForEasy || editableSegments.length > 0;
 
   const previewSegments = useMemo(() => {
     if (editableSegments.length > 0) {
@@ -342,21 +351,23 @@ export default function TrackWorkoutBuilder({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">Workout type</label>
-          <select
-            value={workoutType}
-            onChange={(e) => setWorkoutType(e.target.value as ClubWorkoutType)}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-          >
-            {CLUB_WORKOUT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </div>
-        {structuredMode ? (
+        {!athleteStructured ? (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Workout type</label>
+            <select
+              value={workoutType}
+              onChange={(e) => setWorkoutType(e.target.value as ClubWorkoutType)}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              {CLUB_WORKOUT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+        {structuredMode && controlledBuildMode == null ? (
           <div className="flex rounded-lg border border-gray-200 p-0.5">
             <button
               type="button"
@@ -382,20 +393,15 @@ export default function TrackWorkoutBuilder({
         ) : null}
       </div>
 
-      {isEasy && !structuredMode ? (
+      {isEasy && !structuredMode && !athleteStructured ? (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900">Easy run note</label>
-          <p className="mb-2 text-xs text-gray-600">
-            Optional — pace window, effort, or leave blank. Most birthday and social runs only need
-            pace on Core details.
-          </p>
+          <label className="mb-1 block text-sm font-medium text-gray-900">Note</label>
           <textarea
             value={trackWorkoutDescription}
             onChange={(e) => {
               onChange({ trackWorkoutDescription: e.target.value });
             }}
             rows={2}
-            placeholder="e.g. 8:45–9:15 easy pace"
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
           />
           <button

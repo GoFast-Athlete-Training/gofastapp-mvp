@@ -42,7 +42,7 @@ import {
 } from "@/lib/client/uploadImages";
 import RunInstanceSourcesPanel, { hasRunInstanceSources } from "./RunInstanceSourcesPanel";
 import TrackWorkoutBuilder from "./TrackWorkoutBuilder";
-import AthleteHostedDistancePaceStep from "./AthleteHostedDistancePaceStep";
+import AthleteHostedWorkoutStep from "./AthleteHostedWorkoutStep";
 import RunClubPublicSourcesCard, {
   type RunClubPublicSources,
   type RunInstancePublicReadout,
@@ -204,7 +204,9 @@ export default function RunInstanceWizard({
   const showAssociateStep = Boolean(associateDraft && onAssociateChange);
 
   const visibleWizardSteps = useMemo(() => {
-    if (isAthleteHosted) return stepOrder;
+    if (isAthleteHosted) {
+      return isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
+    }
     let steps = isCreateScratch ? stepOrder : isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
     if (!showAssociateStep) {
       steps = steps.filter((s) => s !== "associate");
@@ -892,15 +894,26 @@ export default function RunInstanceWizard({
                     ? (ATHLETE_HOSTED_WIZARD_STEP_COPY.workout?.title ?? "Distance & pace")
                     : "Workout"}
                 </h3>
-                <p className="mt-1 text-xs text-gray-600">
-                  {isAthleteHosted
-                    ? (ATHLETE_HOSTED_WIZARD_STEP_COPY.workout?.description ??
-                      "Optional — how far and how fast")
-                    : "Optional structured session for this run — intervals, tempo, hills, or progression."}
-                </p>
+                {isAthleteHosted ? (
+                  ATHLETE_HOSTED_WIZARD_STEP_COPY.workout?.description ? (
+                    <p className="mt-1 text-xs text-gray-600">
+                      {ATHLETE_HOSTED_WIZARD_STEP_COPY.workout.description}
+                    </p>
+                  ) : null
+                ) : (
+                  <p className="mt-1 text-xs text-gray-600">
+                    Optional structured session for this run — intervals, tempo, hills, or progression.
+                  </p>
+                )}
               </div>
               {isAthleteHosted ? (
-                <AthleteHostedDistancePaceStep values={values} onChange={patch} />
+                <AthleteHostedWorkoutStep
+                  values={values}
+                  onChange={patch}
+                  onReplace={onChange}
+                  context={context}
+                  onError={onErrorChange}
+                />
               ) : (
                 <TrackWorkoutBuilder
                   clubId={context.clubId?.trim() || ""}

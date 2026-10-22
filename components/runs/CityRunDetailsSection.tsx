@@ -445,7 +445,7 @@ export function CityRunGoingBanner({ rsvpRole }: { rsvpRole?: string | null }) {
             : 'text-green-800 font-semibold text-sm'
         }
       >
-        {hosting ? "You're hosting" : "You're going"}
+        {hosting ? "You're hosting" : "You're in"}
       </span>
     </div>
   );

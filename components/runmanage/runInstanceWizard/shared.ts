@@ -96,7 +96,7 @@ export const ATHLETE_HOSTED_WIZARD_STEP_COPY: Partial<
   Record<WizardStep, { title: string; description: string }>
 > = {
   core: { title: "Core details", description: "Title, date, meet-up, and start time" },
-  workout: { title: "Distance & pace", description: "Optional — how far and how fast" },
+  workout: { title: "Distance & workout", description: "" },
 };
 
 export type RunInstanceWizardValues = {

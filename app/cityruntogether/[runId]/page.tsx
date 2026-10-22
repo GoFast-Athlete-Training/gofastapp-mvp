@@ -1,32 +1,40 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import TopNav from '@/components/shared/TopNav';
 import CityRunRsvpGroup from '@/components/runs/CityRunRsvpGroup';
+import CityRunRsvpSuccessScreen from '@/components/runs/CityRunRsvpSuccessScreen';
 import { useCityRunPageLoad } from '@/components/runs/useCityRunPageLoad';
 import { athleteHasCityRunMembership } from '@/lib/city-run/rsvp-attendance';
-import { runRsvpPath } from '@/lib/city-run/run-nav-paths';
+import { cityRunTogetherPath, runRsvpPath } from '@/lib/city-run/run-nav-paths';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import { auth } from '@/lib/firebase';
 
-export default function CityRunTogetherPage() {
+function CityRunTogetherPageContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const runId = params.runId as string;
+  const showSuccess = searchParams.get('rsvp') === 'success';
   const { run, loading, error, isGuestSession, fetchAll } = useCityRunPageLoad(runId);
 
   useEffect(() => {
     if (loading || !run) return;
-    if (isGuestSession || !auth.currentUser) {
-      router.replace(runRsvpPath(run.slug?.trim() || run.id));
-      return;
-    }
     const athleteId = LocalStorageAPI.getAthleteId();
-    if (!athleteHasCityRunMembership(run, athleteId)) {
-      router.replace(runRsvpPath(run.slug?.trim() || run.id));
+    const hasMembership = athleteHasCityRunMembership(run, athleteId);
+    const guest = isGuestSession || !auth.currentUser;
+
+    if (guest || !hasMembership) {
+      const qs = showSuccess ? '?rsvp=success' : '';
+      router.replace(`${runRsvpPath(run.slug?.trim() || run.id)}${qs}`);
     }
-  }, [loading, run, isGuestSession, router]);
+  }, [loading, run, isGuestSession, router, showSuccess]);
+
+  const dismissSuccess = () => {
+    if (!run) return;
+    router.replace(cityRunTogetherPath(run.slug?.trim() || run.id));
+  };
 
   if (loading) {
     return (
@@ -55,7 +63,9 @@ export default function CityRunTogetherPage() {
   }
 
   const athleteId = LocalStorageAPI.getAthleteId();
-  if (isGuestSession || !athleteHasCityRunMembership(run, athleteId)) {
+  const hasMembership = athleteHasCityRunMembership(run, athleteId);
+
+  if (isGuestSession || !hasMembership) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
@@ -63,10 +73,33 @@ export default function CityRunTogetherPage() {
     );
   }
 
+  if (showSuccess) {
+    return (
+      <>
+        <TopNav />
+        <CityRunRsvpSuccessScreen run={run} onContinue={dismissSuccess} />
+      </>
+    );
+  }
+
   return (
     <>
       <TopNav />
-      <CityRunRsvpGroup run={run} onLeave={() => void fetchAll(false)} />
+      <CityRunRsvpGroup run={run} onLeave={() => void fetchAll(false)} backHref="/gorun" backLabel="Run" />
     </>
+  );
+}
+
+export default function CityRunTogetherPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+        </div>
+      }
+    >
+      <CityRunTogetherPageContent />
+    </Suspense>
   );
 }

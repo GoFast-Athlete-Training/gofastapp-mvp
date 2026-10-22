@@ -12,7 +12,7 @@ import {
 import { auth } from '@/lib/firebase';
 import { signInWithGoogle } from '@/lib/auth';
 import api from '@/lib/api';
-import { runRsvpPath } from '@/lib/city-run/run-nav-paths';
+import { cityRunTogetherPath } from '@/lib/city-run/run-nav-paths';
 import { Calendar, Clock, MapPin } from 'lucide-react';
 
 /**
@@ -87,7 +87,7 @@ function JoinRunSignupContent() {
         // RSVP failed — still navigate, they can RSVP from the run page
         console.warn('RSVP failed after signup, continuing:', err?.response?.status);
       }
-      router.replace(runRsvpPath(r.slug?.trim() || r.id));
+      router.replace(`${cityRunTogetherPath(r.slug?.trim() || r.id)}?rsvp=success`);
     } else {
       router.replace(`/gorun`);
     }
