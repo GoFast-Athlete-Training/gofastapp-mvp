@@ -1,10 +1,7 @@
 import prisma from "@/lib/prisma";
 import { buildJoinRunSignupUrl } from "@/lib/host-run-rsvp";
 import { getGoFastAppPublicUrl } from "@/lib/gofast-app-public-url";
-import {
-  cityRunPublicCardUrl,
-  companyRunLinkSliceUrl,
-} from "@/lib/city-run-public-card-url";
+import { getPublicRunDetailPageUrl } from "@/lib/public-run-detail-url";
 import { buildCityRunShareText } from "@/lib/city-run/build-run-share-text";
 import { getCityRunRsvpCounts, type CityRunRsvpCounts } from "@/lib/city-run/rsvp-counts";
 import type { CityRunExecutionStatus } from "@prisma/client";
@@ -67,7 +64,7 @@ const inviteSelect = {
   plannedWorkout: { select: { planId: true, title: true, workoutType: true } },
   planned_workouts: { select: { planId: true } },
   route: { select: { routeDescription: true } },
-  runClub: { select: { name: true } },
+  runClub: { select: { name: true, slug: true } },
 } as const;
 
 type InviteRow = Awaited<
@@ -105,9 +102,19 @@ async function mapInviteRow(
     totalMiles: run.totalMiles,
     pace: run.pace,
     gorunPath,
-    shareUrl: companyRunLinkSliceUrl(publicKey),
+    shareUrl: getPublicRunDetailPageUrl({
+      id: run.id,
+      slug: run.slug,
+      cityRunType: run.cityRunType,
+      runClub: run.runClub?.slug ? { slug: run.runClub.slug } : null,
+    }),
     joinSignupUrl: buildJoinRunSignupUrl(run.slug, base),
-    publicCardUrl: cityRunPublicCardUrl(publicKey, run.citySlug, run.id),
+    publicCardUrl: getPublicRunDetailPageUrl({
+      id: run.id,
+      slug: run.slug,
+      cityRunType: run.cityRunType,
+      runClub: run.runClub?.slug ? { slug: run.runClub.slug } : null,
+    }),
     isUpcoming: run.date >= startOfToday && run.cityRunExecutionStatus === "PLANNED",
     cityRunExecutionStatus: run.cityRunExecutionStatus,
     executedAt: run.executedAt?.toISOString() ?? null,

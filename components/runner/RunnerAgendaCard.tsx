@@ -7,7 +7,7 @@ import { formatCalendarDate } from '@/lib/calendar-date';
 import { formatRunTime } from '@/utils/formatTime';
 import type { RunnerAgendaItem } from '@/lib/runner/runner-agenda';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
-import { companyRunLinkSliceUrl } from '@/lib/city-run-public-card-url';
+import { getPublicRunDetailPageUrl } from '@/lib/public-run-detail-url';
 import {
   hostRunEditHref,
   hostRunPageHref,
@@ -64,7 +64,11 @@ export default function RunnerAgendaCard({
   const headerLabel = item.isToday ? "Today's run" : run.isPast ? 'Past run' : 'Upcoming';
 
   async function copyInviteLink() {
-    const url = companyRunLinkSliceUrl(runSegment);
+    const url = getPublicRunDetailPageUrl({
+      id: run.id,
+      slug: run.slug,
+      cityRunType: run.cityRunType,
+    });
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);

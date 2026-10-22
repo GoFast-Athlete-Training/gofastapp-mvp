@@ -5,8 +5,8 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import {
   generateUniqueCityRunSlug,
   generateCityRunUrlPath,
-  generateCityRunUrl,
 } from "@/lib/slug-utils";
+import { getPublicRunDetailPageUrl } from "@/lib/public-run-detail-url";
 import { assignUniqueWorkoutShareSlug } from "@/lib/workout-public-slug";
 import { parseCalendarDateForWrite } from "@/lib/calendar-date";
 import { WORKOUT_BACKED_CITY_RUN_VISIBILITY } from '@/lib/cityrun/workout-backed-run-visibility';
@@ -533,18 +533,13 @@ export async function POST(request: NextRequest) {
         : `/gorun/${run.id}`;
     const shareUrl =
       run.slug != null && run.slug !== ""
-        ? generateCityRunUrl({
+        ? getPublicRunDetailPageUrl({
             id: run.id,
             slug: run.slug,
+            cityRunType: run.cityRunType,
             runClub: runClubSlug ? { slug: runClubSlug } : null,
           })
-        : (() => {
-            const base =
-              process.env.NEXT_PUBLIC_APP_URL ||
-              process.env.NEXT_PUBLIC_CONTENT_PUBLIC_BASE_DOMAIN ||
-              "https://gofastapp.com";
-            return `${base.replace(/\/$/, "")}/gorun/${run.id}`;
-          })();
+        : getPublicRunDetailPageUrl({ id: run.id, slug: null, cityRunType: run.cityRunType });
 
     const baseApp =
       process.env.NEXT_PUBLIC_APP_URL ||

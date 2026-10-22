@@ -18,7 +18,7 @@ export async function OPTIONS() {
 
 /**
  * POST /api/runs/public/[runId]/rsvp
- * Public name + email RSVP (no Firebase). Used by gofastlinks run slice.
+ * Public name + email RSVP (no Firebase). Used by join explainer + public run flows.
  */
 export async function POST(
   request: Request,

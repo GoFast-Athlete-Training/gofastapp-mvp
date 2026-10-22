@@ -1,5 +1,8 @@
+import { getPublicRunDetailPageUrl } from "@/lib/public-run-detail-url";
+
 /**
- * Company run link slice on gofastlinks — narrow card for link trees (all CityRunType values).
+ * gofastlinks /run/{slug} — narrow card kept for legacy bookmarks only.
+ * Do not use for new share links; use getPublicRunDetailPageUrl instead.
  * @see gofast-contentpublic app/run/[slug]
  */
 export function companyRunLinkSliceUrl(runSlugOrId: string): string {
@@ -12,11 +15,19 @@ export function companyRunLinkSliceUrl(runSlugOrId: string): string {
   return `${base}/run/${encodeURIComponent(key)}`;
 }
 
-/** @deprecated Use companyRunLinkSliceUrl — legacy dcruns /runs/{slug}/card path retired. */
+/** Share + link-tree CITY_RUN read URL (dcruns / Pulse typed detail). */
 export function cityRunPublicCardUrl(
   runSlugOrId: string,
   _citySlug?: string | null,
-  _runId?: string,
+  runId?: string,
+  cityRunType?: string | null,
+  runClubSlug?: string | null,
 ): string {
-  return companyRunLinkSliceUrl(runSlugOrId);
+  const slug = runSlugOrId.trim();
+  return getPublicRunDetailPageUrl({
+    id: runId?.trim() || slug,
+    slug,
+    cityRunType,
+    runClub: runClubSlug?.trim() ? { slug: runClubSlug.trim() } : null,
+  });
 }

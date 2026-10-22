@@ -135,11 +135,13 @@ export async function POST(request: NextRequest) {
         title: true,
         slug: true,
         citySlug: true,
+        cityRunType: true,
         mapImageUrl: true,
         routePhotos: true,
         runPhotos: true,
         igPostGraphic: true,
         profileEmoji: true,
+        runClub: { select: { slug: true } },
       },
     });
     if (!run) {
@@ -155,7 +157,13 @@ export async function POST(request: NextRequest) {
     cityRunId = run.id;
     name = run.title;
     const publicKey = run.slug?.trim() || run.id;
-    url = cityRunPublicCardUrl(publicKey, run.citySlug, run.id);
+    url = cityRunPublicCardUrl(
+      publicKey,
+      run.citySlug,
+      run.id,
+      run.cityRunType,
+      run.runClub?.slug ?? null,
+    );
     cityRunVisual = inferCityRunLinkVisual(run);
   } else if (!isSection) {
     const dest = normalizeLinkDestination({ url: body.url, kind: parsedKind });

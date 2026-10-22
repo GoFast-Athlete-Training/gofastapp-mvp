@@ -1,10 +1,14 @@
-import { companyRunLinkSliceUrl } from '@/lib/city-run-public-card-url';
+import { getPublicRunDetailPageUrl } from '@/lib/public-run-detail-url';
 import { athletePublicRouteSliceAppPath } from '@/lib/gofast-with-me/athlete-community-routes';
 import { runnerPublicRouteSliceUrl } from '@/lib/gofast-with-me/runner-public-url';
 
-/** Public gofastlinks run slice (details door). */
-export function cityRunDoorUrl(slugOrId: string): string {
-  return companyRunLinkSliceUrl(slugOrId);
+/** Public run read URL (content directory / Pulse — not gofastlinks). */
+export function cityRunDoorUrl(
+  slugOrId: string,
+  cityRunType?: string | null,
+): string {
+  const key = slugOrId.trim();
+  return getPublicRunDetailPageUrl({ id: key, slug: key, cityRunType: cityRunType ?? 'INDIVIDUAL' });
 }
 
 /** GoFast signup + RSVP lane for a city run. */
