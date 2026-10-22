@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, CheckCircle2, Copy, ExternalLink, MapPin, Pencil, Trash2 } from 'lucide-react';
 import { formatCalendarDate } from '@/lib/calendar-date';
 import { formatRunTime } from '@/utils/formatTime';
 import type { RunnerAgendaItem } from '@/lib/runner/runner-agenda';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
-import { getPublicRunDetailPageUrl } from '@/lib/public-run-detail-url';
+import {
+  getPublicRunDetailPageUrl,
+  normalizeInviteShareUrl,
+} from '@/lib/public-run-detail-url';
 import {
   hostRunEditHref,
   hostRunPageHref,
@@ -34,11 +37,52 @@ export default function RunnerAgendaCard({
   onDeleted,
   hideMembershipBadge = false,
 }: RunnerAgendaCardProps) {
+  const run = item.joinedRun;
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [shareUrlFromApi, setShareUrlFromApi] = useState<string | null>(null);
 
-  if (!item.joinedRun) return null;
-  const run = item.joinedRun;
+  const isCreated = run ? isHostRsvpRole(run.rsvpRole) : false;
+
+  const fallbackShareUrl = useMemo(() => {
+    if (!run) return '';
+    return getPublicRunDetailPageUrl({
+      id: run.id,
+      slug: run.slug,
+      cityRunType: run.cityRunType,
+      runClub: run.runClub?.slug ? { slug: run.runClub.slug } : null,
+    });
+  }, [run]);
+
+  const inviteShareUrl =
+    normalizeInviteShareUrl(shareUrlFromApi) ||
+    normalizeInviteShareUrl(run?.inviteShareUrl) ||
+    fallbackShareUrl;
+
+  const loadShareUrl = useCallback(async (): Promise<string> => {
+    if (!run) return fallbackShareUrl;
+    try {
+      const { data } = await api.get<{ success?: boolean; invite?: { shareUrl?: string } }>(
+        `/me/hosted-run-invites/${encodeURIComponent(run.id)}`,
+      );
+      const fromApi = normalizeInviteShareUrl(data?.invite?.shareUrl);
+      if (fromApi) {
+        setShareUrlFromApi(fromApi);
+        return fromApi;
+      }
+    } catch (err) {
+      console.error('Load invite share URL failed:', err);
+    }
+    return fallbackShareUrl;
+  }, [run, fallbackShareUrl]);
+
+  useEffect(() => {
+    if (!run || !isCreated) return;
+    if (normalizeInviteShareUrl(run.inviteShareUrl)) return;
+    void loadShareUrl();
+  }, [run, isCreated, loadShareUrl]);
+
+  if (!run) return null;
 
   const dateKey = item.dateKey;
   const dateLabel = formatCalendarDate(`${dateKey}T12:00:00.000Z`, {
@@ -58,22 +102,15 @@ export default function RunnerAgendaCard({
   const recapHref = runCompletePath(runSegment);
   const showRecapCta = run.isPast || run.cityRunExecutionStatus === 'RAN';
 
-  const isCreated = isHostRsvpRole(run.rsvpRole);
   const membershipBadge = isCreated ? 'Created' : 'Joined';
 
   const headerLabel = item.isToday ? "Today's run" : run.isPast ? 'Past run' : 'Upcoming';
 
-  const inviteShareUrl =
-    run.inviteShareUrl?.trim() ||
-    getPublicRunDetailPageUrl({
-      id: run.id,
-      slug: run.slug,
-      cityRunType: run.cityRunType,
-      runClub: run.runClub?.slug ? { slug: run.runClub.slug } : null,
-    });
-
   async function copyInviteLink() {
-    const url = inviteShareUrl;
+    const url =
+      normalizeInviteShareUrl(shareUrlFromApi) ||
+      normalizeInviteShareUrl(run.inviteShareUrl) ||
+      (await loadShareUrl());
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);

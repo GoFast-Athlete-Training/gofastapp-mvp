@@ -43,13 +43,40 @@ export function publicRunDetailPath(
   return `/${segment}/${encodeURIComponent(key)}`;
 }
 
+const DEFAULT_PUBLIC_RUN_SITE = "https://dcruns.gofastcrushgoals.com";
+
+/** Bio / link-tree hosts — never use for public run detail share URLs. */
+function isLinkTreeOnlyHost(baseUrl: string): boolean {
+  const host = baseUrl.replace(/^https?:\/\//i, "").split("/")[0]?.toLowerCase() ?? "";
+  return host.includes("gofastlinks") || host.includes("athletelinks");
+}
+
+function pickPublicRunSiteBase(): string {
+  const candidates = [
+    process.env.NEXT_PUBLIC_PUBLIC_RUN_SITE_URL,
+    process.env.NEXT_PUBLIC_DC_RUNS_URL,
+    process.env.PUBLIC_RUN_SITE_URL,
+  ];
+  for (const raw of candidates) {
+    const base = raw?.trim().replace(/\/$/, "");
+    if (base && !isLinkTreeOnlyHost(base)) return base;
+  }
+  return DEFAULT_PUBLIC_RUN_SITE;
+}
+
 /** Directory / Pulse host where typed run detail pages live. */
 export function getPublicRunSiteBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_PUBLIC_RUN_SITE_URL?.replace(/\/$/, "") ||
-    process.env.NEXT_PUBLIC_DC_RUNS_URL?.replace(/\/$/, "") ||
-    "https://dcruns.gofastcrushgoals.com"
-  );
+  return pickPublicRunSiteBase();
+}
+
+/** Reject legacy gofastlinks /run/{slug} slices masquerading as share URLs. */
+export function normalizeInviteShareUrl(url: string | null | undefined): string | null {
+  const trimmed = url?.trim();
+  if (!trimmed) return null;
+  if (/\/run\/[^/?#]+/i.test(trimmed) && isLinkTreeOnlyHost(trimmed)) {
+    return null;
+  }
+  return trimmed;
 }
 
 export function getPublicRunDetailPageUrl(
