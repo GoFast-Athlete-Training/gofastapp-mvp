@@ -2,6 +2,7 @@ import {
   computeCityRunStartsAt,
   type CityRunStartsAtInput,
 } from '@/lib/city-run/city-run-starts-at-setter';
+import { cityRunStorageDateFromCalendarKey } from '@/lib/city-run/city-run-zoned-format';
 
 type ExistingCityRunClock = {
   date: Date;
@@ -13,6 +14,7 @@ type ExistingCityRunClock = {
 };
 
 const CLOCK_PATCH_KEYS = [
+  'calendarDateKey',
   'date',
   'startTimeHour',
   'startTimeMinute',
@@ -25,6 +27,7 @@ function mergedClockInput(
   existing: ExistingCityRunClock
 ): CityRunStartsAtInput {
   return {
+    calendarDateKey: updateData.calendarDateKey as string | null | undefined,
     date: (updateData.date as Date | undefined) ?? existing.date,
     startTimeHour:
       updateData.startTimeHour !== undefined
@@ -49,7 +52,8 @@ function mergedClockInput(
 /** Always stamp on create — caller passes full clock fields on the write payload. */
 export function stampCityRunStartsAtOnCreateData(data: Record<string, unknown>): void {
   const stamped = computeCityRunStartsAt({
-    date: data.date as Date,
+    calendarDateKey: data.calendarDateKey as string | null | undefined,
+    date: data.date as Date | undefined,
     startTimeHour: data.startTimeHour as number | null | undefined,
     startTimeMinute: data.startTimeMinute as number | null | undefined,
     startTimePeriod: data.startTimePeriod as string | null | undefined,
@@ -58,6 +62,10 @@ export function stampCityRunStartsAtOnCreateData(data: Record<string, unknown>):
   });
   data.timezone = stamped.timezone;
   data.startsAt = stamped.startsAt;
+  data.date = cityRunStorageDateFromCalendarKey(
+    stamped.calendarDateKey,
+    stamped.timezone
+  );
 }
 
 /** Recompute when any clock field changes on PATCH. */
@@ -71,4 +79,8 @@ export function maybeStampCityRunStartsAtOnUpdate(
   const stamped = computeCityRunStartsAt(mergedClockInput(updateData, existing));
   updateData.timezone = stamped.timezone;
   updateData.startsAt = stamped.startsAt;
+  updateData.date = cityRunStorageDateFromCalendarKey(
+    stamped.calendarDateKey,
+    stamped.timezone
+  );
 }

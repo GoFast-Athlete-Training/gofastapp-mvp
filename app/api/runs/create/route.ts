@@ -8,7 +8,10 @@ import { findExistingRun } from "@/lib/run-duplicate-check";
 import { parseRunTotalMiles } from "@/lib/parse-run-total-miles";
 import { toCanonicalDayOfWeek } from "@/lib/utils/dayOfWeekConverter";
 import { resolveCityRunType } from "@/lib/city-run-type";
-import { parseCalendarDateForWrite } from "@/lib/calendar-date";
+import {
+  calendarDateKeyFromDateInput,
+  cityRunStorageDateFromCalendarKey,
+} from "@/lib/city-run/city-run-zoned-format";
 import { autoRsvpHostRole } from "@/lib/host-run-rsvp";
 import { stampPlannedWorkoutCityRun } from "@/lib/city-run/stamp-planned-city-run";
 import { resolveWorkoutTargetForAthlete } from "@/lib/training/workout-or-planned-resolve";
@@ -487,16 +490,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Parse date (date-only inputs anchor at UTC noon)
-    let runDateObj: Date;
-    try {
-      runDateObj = parseCalendarDateForWrite(String(date));
-    } catch {
+    const calendarDateKey = calendarDateKeyFromDateInput(String(date));
+    if (!calendarDateKey) {
       return NextResponse.json(
         { success: false, error: "Invalid date" },
         { status: 400, headers: corsHeaders }
       );
     }
+    const statedTimezone =
+      typeof timezone === "string" && timezone.trim() ? timezone.trim() : null;
+    const runDateObj = cityRunStorageDateFromCalendarKey(
+      calendarDateKey,
+      statedTimezone ?? "America/New_York"
+    );
 
     // If runClub object is provided, ensure RunClub exists in DB (dual save)
     // GoFastCompany sends full RunClub object when admin selects from dropdown
@@ -623,7 +629,7 @@ export async function POST(request: NextRequest) {
     let runSlug: string | null = null;
     try {
       runSlug = await generateUniqueCityRunSlug(title, {
-        date: runDateObj,
+        date: calendarDateKey,
         clubSlug: resolvedClubSlug,
       });
     } catch (error) {
@@ -655,6 +661,7 @@ export async function POST(request: NextRequest) {
       workflowStatus: isAthleteJoinMyWorkoutShare ? 'APPROVED' : 'DEVELOP',
       published,
       dayOfWeek: toCanonicalDayOfWeek(dayOfWeek) ?? (dayOfWeek?.trim() || null) as string | null,
+      calendarDateKey,
       date: runDateObj,
       startTimeHour: startTimeHour ? parseInt(startTimeHour) : null,
       startTimeMinute: startTimeMinute ? parseInt(startTimeMinute) : null,
@@ -754,6 +761,7 @@ export async function POST(request: NextRequest) {
     }
 
     stampCityRunStartsAtOnCreateData(createData);
+    delete createData.calendarDateKey;
 
     // Create the run
     let run;

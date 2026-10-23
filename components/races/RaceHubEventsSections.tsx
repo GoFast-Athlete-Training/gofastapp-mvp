@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Calendar, MapPin } from "lucide-react";
 import type { RaceEventRow, ShakeoutRunRow } from "@/components/races/race-hub-types";
+import { formatCityRunDateInZone } from "@/lib/city-run/city-run-zoned-format";
+import { formatCalendarDate } from "@/lib/calendar-date";
 
 type RaceHubShakeoutsSectionProps = {
   shakeouts: ShakeoutRunRow[];
@@ -41,7 +43,7 @@ export function RaceHubShakeoutsSection({
               return `${sh.startTimeHour}:${min} ${sh.startTimePeriod ?? ""}`.trim();
             })();
 
-            const dateLabel = new Date(sh.date).toLocaleDateString("en-US", {
+            const dateLabel = formatCityRunDateInZone(sh.date, sh.timezone, {
               weekday: "long",
               month: "long",
               day: "numeric",
@@ -191,7 +193,7 @@ export function RaceHubEventsSection({
               <li key={ev.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                 <p className="font-semibold text-gray-900">{ev.title}</p>
                 <p className="text-sm text-gray-600 mt-1">
-                  {new Date(ev.date).toLocaleDateString()} · {ev.time} · {ev.venue}
+                  {formatCalendarDate(ev.date)} · {ev.time} · {ev.venue}
                 </p>
                 {ev.description ? (
                   <p className="text-sm text-gray-700 mt-2 whitespace-pre-line">{ev.description}</p>

@@ -9,6 +9,7 @@ import {
   cockpitBucketForRun,
   type CockpitBucket,
 } from "@/lib/runmanage/run-cockpit-buckets";
+import { formatCityRunDateInZone } from "@/lib/city-run/city-run-zoned-format";
 
 interface RunClub {
   id: string;
@@ -24,6 +25,7 @@ interface RunRow {
   startTimeHour: number | null;
   startTimeMinute: number | null;
   startTimePeriod: string | null;
+  timezone?: string | null;
   workflowStatus?: string;
   runClub: RunClub | null;
   runClubId?: string | null;
@@ -34,9 +36,9 @@ interface RunRow {
   rsvpCount?: number;
 }
 
-function formatRunDate(iso: string) {
+function formatRunDate(iso: string, timezone?: string | null) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return formatCityRunDateInZone(iso, timezone, {
       weekday: "short",
       month: "short",
       day: "numeric",
@@ -237,7 +239,7 @@ export function RunManageInstanceList({ bucket, backHref, backLabel }: RunManage
                     <td className="px-4 py-3 whitespace-nowrap text-gray-800">
                       <span className="inline-flex items-center gap-1">
                         <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                        {formatRunDate(run.date)}
+                        {formatRunDate(run.date, run.timezone)}
                       </span>
                       <div className="text-xs text-gray-500">
                         {formatTime(run.startTimeHour, run.startTimeMinute, run.startTimePeriod)}

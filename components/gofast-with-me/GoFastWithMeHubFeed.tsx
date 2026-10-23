@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
+import { formatCityRunDateInZone } from '@/lib/city-run/city-run-zoned-format';
 import {
   CONTAINER_TOPICS,
   type ContainerTopic,
@@ -367,7 +368,7 @@ export default function GoFastWithMeHubFeed({
                   <option value="">No run attached</option>
                   {upcomingRuns.map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.title} — {new Date(r.date).toLocaleDateString()}
+                      {r.title} — {formatCityRunDateInZone(r.date, r.timezone)}
                     </option>
                   ))}
                 </select>

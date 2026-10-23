@@ -2,6 +2,7 @@
 
 import { Plus } from "lucide-react";
 import AnnouncementCard from "@/components/RunCrew/AnnouncementCard";
+import RaceHubLatestAnnouncementBanner from "@/components/races/RaceHubLatestAnnouncementBanner";
 import type { AnnouncementRow } from "@/components/races/race-hub-types";
 
 type RaceHubAnnouncementsSectionProps = {
@@ -18,6 +19,8 @@ type RaceHubAnnouncementsSectionProps = {
   postingAnnounce: boolean;
   /** Compact mode hides the section heading (used inside Info tab on mobile). */
   compact?: boolean;
+  /** Mobile hub column: latest banner + admin post only (no full list). */
+  stripOnly?: boolean;
 };
 
 export default function RaceHubAnnouncementsSection({
@@ -33,9 +36,71 @@ export default function RaceHubAnnouncementsSection({
   onPostAnnouncement,
   postingAnnounce,
   compact = false,
+  stripOnly = false,
 }: RaceHubAnnouncementsSectionProps) {
   if (announcements.length === 0 && !isAdmin) {
     return null;
+  }
+
+  const latestAnnouncement = announcements[0] ?? null;
+
+  if (stripOnly) {
+    return (
+      <section className="space-y-2">
+        {isAdmin ? (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onToggleAnnounceForm}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700"
+            >
+              <Plus className="w-4 h-4" />
+              {showAnnounceForm ? "Cancel" : "New announcement"}
+            </button>
+          </div>
+        ) : null}
+        {isAdmin && showAnnounceForm ? (
+          <form
+            onSubmit={(e) => void onPostAnnouncement(e)}
+            className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3"
+          >
+            <input
+              type="text"
+              value={announceTitle}
+              onChange={(e) => onAnnounceTitleChange(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="Title"
+            />
+            <textarea
+              value={announceBody}
+              onChange={(e) => onAnnounceBodyChange(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              rows={3}
+              placeholder="Details for the group…"
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={postingAnnounce || !announceTitle.trim() || !announceBody.trim()}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
+              >
+                {postingAnnounce ? "Posting…" : "Publish"}
+              </button>
+              <button
+                type="button"
+                onClick={onCancelAnnounceForm}
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : null}
+        {latestAnnouncement ? (
+          <RaceHubLatestAnnouncementBanner announcement={latestAnnouncement} />
+        ) : null}
+      </section>
+    );
   }
 
   return (

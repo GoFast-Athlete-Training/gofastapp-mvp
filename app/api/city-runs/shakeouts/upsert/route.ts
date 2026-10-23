@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {
+  calendarDateKeyFromDateInput,
+  cityRunStorageDateFromCalendarKey,
+} from "@/lib/city-run/city-run-zoned-format";
 import { inferRegionSlugFromCitySlug } from "@/lib/region-slug";
 
 export const dynamic = "force-dynamic";
@@ -115,8 +119,16 @@ export async function POST(request: NextRequest) {
           typeof raw.runAtIso === "string" && raw.runAtIso.trim()
             ? raw.runAtIso.trim()
             : "";
-        const runAt = runAtIso ? new Date(runAtIso) : null;
-        if (!runAt || Number.isNaN(runAt.getTime())) continue;
+        const runAtInstant = runAtIso ? new Date(runAtIso) : null;
+        if (!runAtInstant || Number.isNaN(runAtInstant.getTime())) continue;
+
+        const calendarDateKey = calendarDateKeyFromDateInput(runAtIso);
+        if (!calendarDateKey) continue;
+        const legacyTimezone = "America/New_York";
+        const runCalendarDate = cityRunStorageDateFromCalendarKey(
+          calendarDateKey,
+          legacyTimezone
+        );
 
         const title =
           typeof raw.title === "string" && raw.title.trim()
@@ -127,20 +139,20 @@ export async function POST(request: NextRequest) {
             ? raw.meetUpPoint.trim().slice(0, 500)
             : "Shakeout meetup";
 
-        const { hour, minute, period } = utcTo12h(runAt);
+        const { hour, minute, period } = utcTo12h(runAtInstant);
 
         const existing = await prisma.city_runs.findFirst({
           where: {
             raceRegistryId: reg.id,
             cityRunType: "RACE_SHAKEOUT",
-            date: runAt,
+            date: runCalendarDate,
             title,
           },
         });
 
         const common = {
           title,
-          date: runAt,
+          date: runCalendarDate,
           meetUpPoint,
           meetUpPlaceId:
             raw.meetUpPlaceId != null && String(raw.meetUpPlaceId).trim()
@@ -170,6 +182,7 @@ export async function POST(request: NextRequest) {
           startTimeHour: hour,
           startTimeMinute: minute,
           startTimePeriod: period,
+          timezone: legacyTimezone,
           citySlug,
           regionSlug: inferRegionSlugFromCitySlug(citySlug),
           raceRegistryId: reg.id,

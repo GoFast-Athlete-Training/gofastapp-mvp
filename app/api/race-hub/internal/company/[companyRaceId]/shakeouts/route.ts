@@ -8,6 +8,11 @@ import {
   assertStaffBearerAuth,
   getForwardedStaffId,
 } from "@/lib/training/training-engine-auth";
+import {
+  applyCityRunCalendarAnchorOnly,
+  calendarDateKeyFromDateInput,
+  isValidIanaTimezone,
+} from "@/lib/city-run/city-run-zoned-format";
 import { stampCityRunStartsAtOnCreateData } from "@/lib/city-run/stamp-city-run-write";
 import { normalizeRunType } from "@/lib/runTypes";
 import {
@@ -118,13 +123,23 @@ export async function POST(
       typeof body.meetUpPoint === "string" && body.meetUpPoint.trim()
         ? body.meetUpPoint.trim().slice(0, 500)
         : "";
-    const dateRaw = body.date;
-    let runAt =
-      typeof dateRaw === "string" || dateRaw instanceof Date ? new Date(dateRaw) : null;
+    const calendarDateKeyRaw =
+      typeof body.calendarDateKey === "string" && body.calendarDateKey.trim()
+        ? body.calendarDateKey.trim()
+        : typeof body.date === "string" && body.date.trim()
+          ? calendarDateKeyFromDateInput(body.date)
+          : body.date instanceof Date
+            ? calendarDateKeyFromDateInput(body.date.toISOString())
+            : null;
 
-    if (!title || !meetUpPoint || !runAt || Number.isNaN(runAt.getTime())) {
+    const timezoneRaw =
+      typeof body.timezone === "string" && body.timezone.trim()
+        ? body.timezone.trim()
+        : null;
+
+    if (!title || !meetUpPoint || !calendarDateKeyRaw) {
       return NextResponse.json(
-        { error: "title, meetUpPoint, and valid date required" },
+        { error: "title, meetUpPoint, and valid date (YYYY-MM-DD) required" },
         { status: 400 }
       );
     }
@@ -153,6 +168,19 @@ export async function POST(
     const minute = hasStartClock ? (bodyMinute ?? 0) : null;
     const period = hasStartClock ? (bodyPeriod ?? "AM") : null;
 
+    if (hasStartClock && (!timezoneRaw || !isValidIanaTimezone(timezoneRaw))) {
+      return NextResponse.json(
+        { error: "Valid IANA timezone (e.g. America/New_York) is required when start time is set" },
+        { status: 400 }
+      );
+    }
+    if (timezoneRaw && !isValidIanaTimezone(timezoneRaw)) {
+      return NextResponse.json(
+        { error: "Invalid IANA timezone" },
+        { status: 400 }
+      );
+    }
+
     const runTypeRaw =
       body.runType != null && String(body.runType).trim() ? String(body.runType).trim() : "";
     let runType: string | null = null;
@@ -175,7 +203,8 @@ export async function POST(
     const createData: Record<string, unknown> = {
         id,
         title,
-        date: runAt,
+        calendarDateKey: calendarDateKeyRaw,
+        timezone: timezoneRaw,
         meetUpPoint,
         meetUpStreetAddress:
           body.meetUpStreetAddress != null && String(body.meetUpStreetAddress).trim()
@@ -302,7 +331,15 @@ export async function POST(
 
     if (hasStartClock) {
       stampCityRunStartsAtOnCreateData(createData);
+    } else if (timezoneRaw) {
+      applyCityRunCalendarAnchorOnly(createData);
+    } else {
+      applyCityRunCalendarAnchorOnly({
+        ...createData,
+        timezone: "America/New_York",
+      });
     }
+    delete createData.calendarDateKey;
 
     const run = await prisma.city_runs.create({
       data: createData as Parameters<typeof prisma.city_runs.create>[0]["data"],

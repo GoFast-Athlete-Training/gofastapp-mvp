@@ -90,6 +90,8 @@ export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string)
     id: run.id,
     title: run.title,
     date: run.date.toISOString(),
+    timezone: run.timezone ?? null,
+    startsAt: run.startsAt ? run.startsAt.toISOString() : null,
     meetUpPoint: run.meetUpPoint,
     meetUpLat: run.meetUpLat,
     meetUpLng: run.meetUpLng,

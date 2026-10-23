@@ -1,11 +1,16 @@
-import { dateKeyFromDate } from '@/lib/calendar-date';
+import {
+  parseCalendarDateKeyParts,
+  resolveCalendarDateKeyForWrite,
+} from '@/lib/city-run/city-run-zoned-format';
 import { zonedLocalWallClockToUtcMs } from '@/lib/run-discover-freshness';
 
 /** Product default when the user did not state a zone (DC metro). */
 export const DEFAULT_CITY_RUN_TIMEZONE = 'America/New_York';
 
 export type CityRunStartsAtInput = {
-  date: Date;
+  /** Civil day YYYY-MM-DD in the event zone (preferred over inferring from `date`). */
+  calendarDateKey?: string | null;
+  date?: Date;
   startTimeHour?: number | null;
   startTimeMinute?: number | null;
   startTimePeriod?: string | null;
@@ -38,14 +43,8 @@ export function computeCityRunStartsAt(input: CityRunStartsAtInput): {
   startsAt: Date;
 } {
   const timezone = resolveCityRunTimezone(input);
-  const dateKey = dateKeyFromDate(input.date);
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
-  if (!m) {
-    throw new Error(`Invalid run calendar date: ${input.date.toISOString()}`);
-  }
-  const year = Number(m[1]);
-  const month = Number(m[2]);
-  const day = Number(m[3]);
+  const dateKey = resolveCalendarDateKeyForWrite(input);
+  const { year, month, day } = parseCalendarDateKeyParts(dateKey);
 
   let hour: number;
   let minute: number;
@@ -61,7 +60,7 @@ export function computeCityRunStartsAt(input: CityRunStartsAtInput): {
   const ms = zonedLocalWallClockToUtcMs(year, month, day, hour, minute, timezone);
   const startsAt = new Date(ms);
 
-  return { timezone, startsAt };
+  return { timezone, startsAt, calendarDateKey: dateKey };
 }
 
 /** Stamp `timezone` + `startsAt` on create/update payloads from clock fields. */

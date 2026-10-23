@@ -55,6 +55,8 @@ export type ShakeoutRunRow = {
   id: string;
   title: string;
   date: string;
+  timezone?: string | null;
+  startsAt?: string | null;
   meetUpPoint: string;
   meetUpLat: number | null;
   meetUpLng: number | null;

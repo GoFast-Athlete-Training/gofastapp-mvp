@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatCityRunDateInZone } from '@/lib/city-run/city-run-zoned-format';
 import type { ContainerHubPayload } from '@/lib/gofast-with-me/container-hub-service';
 
 type Props = {
@@ -31,7 +32,7 @@ export default function GoFastWithMeMyRunsV2Section({ runs, isHost }: Props) {
                   href={r.gorunPath.startsWith('/') ? r.gorunPath : `/${r.gorunPath}`}
                   className="block text-sm text-orange-700 hover:underline"
                 >
-                  {r.title} — {new Date(r.date).toLocaleDateString()}
+                  {r.title} — {formatCityRunDateInZone(r.date, r.timezone)}
                 </Link>
               </li>
             ))}

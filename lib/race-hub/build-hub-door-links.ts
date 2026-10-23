@@ -5,12 +5,13 @@ import {
 } from "@/lib/public-race-url";
 import { raceHubRunsPath } from "@/lib/race-hub-urls";
 import type { ShakeoutRunRow } from "@/components/races/race-hub-types";
+import { formatCityRunDateInZone } from "@/lib/city-run/city-run-zoned-format";
 
 function formatShakeoutSummary(shakeouts: ShakeoutRunRow[]): string | null {
   if (shakeouts.length === 0) return "No runs yet";
   const next = shakeouts[0];
   const when = next.date
-    ? new Date(next.date).toLocaleDateString(undefined, {
+    ? formatCityRunDateInZone(next.date, next.timezone, {
         weekday: "short",
         month: "short",
         day: "numeric",
