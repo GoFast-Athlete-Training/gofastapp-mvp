@@ -193,7 +193,18 @@ export async function POST(
         );
       }
       runType = normalized;
+    } else {
+      runType = normalizeRunType("urban");
     }
+
+    const shakeoutClubName =
+      body.shakeoutClubName != null && String(body.shakeoutClubName).trim()
+        ? String(body.shakeoutClubName).trim()
+        : null;
+    const shakeoutSponsorName =
+      body.shakeoutSponsorName != null && String(body.shakeoutSponsorName).trim()
+        ? String(body.shakeoutSponsorName).trim()
+        : null;
 
     const id = generateCityRunId();
 
@@ -298,14 +309,8 @@ export async function POST(
           body.instagramPostUrl != null && String(body.instagramPostUrl).trim()
             ? String(body.instagramPostUrl).trim()
             : null,
-        organizerName:
-          body.organizerName != null && String(body.organizerName).trim()
-            ? String(body.organizerName).trim()
-            : null,
-        organizerType:
-          body.organizerType != null && String(body.organizerType).trim()
-            ? String(body.organizerType).trim().toLowerCase()
-            : null,
+        shakeoutClubName,
+        shakeoutSponsorName,
         routeNeighborhood:
           body.routeNeighborhood != null && String(body.routeNeighborhood).trim()
             ? String(body.routeNeighborhood).trim()

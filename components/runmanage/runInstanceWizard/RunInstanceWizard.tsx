@@ -203,16 +203,21 @@ export default function RunInstanceWizard({
 
   const showAssociateStep = Boolean(associateDraft && onAssociateChange);
 
+  const isRaceShakeout = context.cityRunType === "RACE_SHAKEOUT";
+
   const visibleWizardSteps = useMemo(() => {
     if (isAthleteHosted) {
       return isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
     }
     let steps = isCreateScratch ? stepOrder : isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
+    if (isRaceShakeout) {
+      steps = steps.filter((s) => s !== "workout");
+    }
     if (!showAssociateStep) {
       steps = steps.filter((s) => s !== "associate");
     }
     return steps;
-  }, [isAthleteHosted, isCreateScratch, isTrack, stepOrder, showAssociateStep]);
+  }, [isAthleteHosted, isCreateScratch, isTrack, isRaceShakeout, stepOrder, showAssociateStep]);
 
   const lastWizardStep = visibleWizardSteps[visibleWizardSteps.length - 1] ?? "workout";
 
@@ -956,17 +961,16 @@ export default function RunInstanceWizard({
           {wizardStep === "description" && !isAthleteHosted ? (
             <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Staff notes</h3>
+                <h3 className="text-sm font-semibold text-gray-900">Description</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  Internal only — not shown on the public run page. Public description is edited
-                  above the core fields.
+                  Public blurb on the run page — what runners should know before they RSVP.
                 </p>
               </div>
               <textarea
-                value={values.staffNotes}
-                onChange={(e) => patch({ staffNotes: e.target.value })}
-                rows={4}
-                placeholder="Internal notes…"
+                value={values.description}
+                onChange={(e) => patch({ description: e.target.value })}
+                rows={5}
+                placeholder="What kind of run is this? All paces welcome, bag drop, etc."
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               />
             </div>

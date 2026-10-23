@@ -1822,8 +1822,12 @@ model city_runs {
   igPostText          String?              // Instagram post text (copy/paste)
   igPostGraphic       String?              // Instagram post image URL (uploaded blob)
   instagramPostUrl    String?              // Instagram post URL (staff source link)
-  organizerName       String?              // Shakeout organizer label (string; card is club/brand/store id)
-  organizerType       String?              // club | brand | store — which Associate ingest to show
+  organizerName       String?              // Legacy shakeout label (prefer shakeoutClubName / shakeoutSponsorName)
+  organizerType       String?              // Legacy club | brand | store hint
+  /// CSV import stub until runClubId is linked (Club Manage).
+  shakeoutClubName    String?
+  /// CSV import stub until runBrandId is linked (Sponsor Manage).
+  shakeoutSponsorName String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime
   startTimeHour       Int?

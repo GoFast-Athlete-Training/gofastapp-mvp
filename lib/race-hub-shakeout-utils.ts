@@ -114,6 +114,8 @@ export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string)
     cityRunType: run.cityRunType,
     organizerName: run.organizerName ?? null,
     organizerType: run.organizerType ?? null,
+    shakeoutClubName: run.shakeoutClubName?.trim() || null,
+    shakeoutSponsorName: run.shakeoutSponsorName?.trim() || null,
     staffNotes: run.staffNotes ?? null,
     runBrandId: run.runBrandId ?? null,
     runBrandName: run.runBrandName?.trim() || null,

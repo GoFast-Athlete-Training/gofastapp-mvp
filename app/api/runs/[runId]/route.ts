@@ -859,6 +859,18 @@ export async function PUT(
           ? null
           : String(body.organizerType).trim().toLowerCase();
     }
+    if (body.shakeoutClubName !== undefined) {
+      updateData.shakeoutClubName =
+        body.shakeoutClubName === null || body.shakeoutClubName === ''
+          ? null
+          : String(body.shakeoutClubName).trim();
+    }
+    if (body.shakeoutSponsorName !== undefined) {
+      updateData.shakeoutSponsorName =
+        body.shakeoutSponsorName === null || body.shakeoutSponsorName === ''
+          ? null
+          : String(body.shakeoutSponsorName).trim();
+    }
     if (body.clubReviewStatus !== undefined && body.clubReviewStatus !== null) {
       const nextReview = String(body.clubReviewStatus);
       if (!isClubReviewStatus(nextReview)) {
