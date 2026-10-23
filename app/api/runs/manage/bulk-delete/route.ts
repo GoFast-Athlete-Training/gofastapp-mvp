@@ -8,7 +8,9 @@ import { assertRunManageAuth } from '@/lib/runmanage/require-run-manage-auth';
  * POST /api/runs/manage/bulk-delete
  *
  * Delete multiple runs by ID. Cascade removes RSVPs.
- * Body: { runIds: string[] }
+ * Body: { runIds: string[], raceRegistryId?: string, scope?: "race_shakeout" }
+ *
+ * When scope is race_shakeout, raceRegistryId is required and only matching hub shakeouts are deleted.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +19,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const runIds = body.runIds;
+    const raceRegistryId =
+      typeof body.raceRegistryId === 'string' ? body.raceRegistryId.trim() : '';
+    const scope = body.scope === 'race_shakeout' ? 'race_shakeout' : null;
 
     if (!Array.isArray(runIds) || runIds.length === 0) {
       return NextResponse.json(
@@ -25,8 +30,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (scope === 'race_shakeout' && !raceRegistryId) {
+      return NextResponse.json(
+        { success: false, error: 'raceRegistryId required for race_shakeout bulk delete' },
+        { status: 400 }
+      );
+    }
+
+    const where =
+      scope === 'race_shakeout'
+        ? {
+            id: { in: runIds as string[] },
+            raceRegistryId,
+            cityRunType: 'RACE_SHAKEOUT' as const,
+          }
+        : { id: { in: runIds as string[] } };
+
     const result = await prisma.city_runs.deleteMany({
-      where: { id: { in: runIds } },
+      where,
     });
 
     return NextResponse.json({
