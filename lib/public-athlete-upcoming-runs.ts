@@ -7,6 +7,7 @@ export type PublicUpcomingRunCard = {
   slug: string | null;
   title: string;
   date: string;
+  timezone: string | null;
   citySlug: string | null;
   /** Alias for contentpublic landing (`gofastCity`). */
   gofastCity: string;
@@ -129,6 +130,7 @@ export async function listPublicUpcomingRunsForAthlete(
       slug: run.slug,
       title: run.title,
       date: run.date.toISOString(),
+      timezone: run.timezone,
       citySlug: run.citySlug,
       gofastCity: run.citySlug ?? '',
       meetUpPoint: run.meetUpPoint,

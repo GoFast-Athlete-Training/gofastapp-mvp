@@ -41,6 +41,7 @@ export function resolveCityRunTimezone(input: {
 export function computeCityRunStartsAt(input: CityRunStartsAtInput): {
   timezone: string;
   startsAt: Date;
+  calendarDateKey: string;
 } {
   const timezone = resolveCityRunTimezone(input);
   const dateKey = resolveCalendarDateKeyForWrite(input);
