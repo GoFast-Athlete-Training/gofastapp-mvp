@@ -99,19 +99,24 @@ export function applyCityRunCalendarAnchorOnly(data: Record<string, unknown>): v
     citySlug: (data.citySlug as string | null | undefined) ?? null,
   });
   const key = resolveCalendarDateKeyForWrite({
+    runDay: data.runDay as string | null | undefined,
     calendarDateKey: data.calendarDateKey as string | null | undefined,
     date: data.date as Date | undefined,
     timezone: tz,
   });
+  data.runDay = key;
   data.timezone = tz;
   data.date = cityRunStorageDateFromCalendarKey(key, tz);
 }
 
 export function resolveCalendarDateKeyForWrite(input: {
+  runDay?: string | null;
   calendarDateKey?: string | null;
   date?: Date;
   timezone?: string | null;
 }): string {
+  const runDay = input.runDay?.trim();
+  if (runDay && isCalendarDateKey(runDay)) return runDay;
   const stated = input.calendarDateKey?.trim();
   if (stated && isCalendarDateKey(stated)) return stated;
   if (input.date && !Number.isNaN(input.date.getTime())) {

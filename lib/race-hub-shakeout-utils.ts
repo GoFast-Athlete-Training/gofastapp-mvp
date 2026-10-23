@@ -92,6 +92,7 @@ export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string)
   return {
     id: run.id,
     title: run.title,
+    runDay: run.runDay?.trim() || null,
     date: run.date.toISOString(),
     timezone: run.timezone ?? null,
     startsAt: run.startsAt ? run.startsAt.toISOString() : null,
@@ -116,6 +117,9 @@ export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string)
     organizerType: run.organizerType ?? null,
     shakeoutClubName: run.shakeoutClubName?.trim() || null,
     shakeoutSponsorName: run.shakeoutSponsorName?.trim() || null,
+    webUrl: run.webUrl?.trim() || null,
+    stravaEventUrl: run.stravaEventUrl?.trim() || null,
+    instagramPostUrl: run.instagramPostUrl?.trim() || null,
     staffNotes: run.staffNotes ?? null,
     runBrandId: run.runBrandId ?? null,
     runBrandName: run.runBrandName?.trim() || null,

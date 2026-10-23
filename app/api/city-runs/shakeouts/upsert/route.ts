@@ -152,6 +152,7 @@ export async function POST(request: NextRequest) {
 
         const common = {
           title,
+          runDay: calendarDateKey,
           date: runCalendarDate,
           meetUpPoint,
           meetUpPlaceId:

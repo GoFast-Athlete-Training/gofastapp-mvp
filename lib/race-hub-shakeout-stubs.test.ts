@@ -14,6 +14,7 @@ test("serializeHubShakeout includes import stub fields", () => {
     id: "c1",
     title: "Shakeout",
     date: new Date("2026-10-24T12:00:00.000Z"),
+    runDay: "2026-10-24",
     meetUpPoint: "Start",
     timezone: "America/New_York",
     startsAt: null,
@@ -37,6 +38,9 @@ test("serializeHubShakeout includes import stub fields", () => {
     organizerType: null,
     shakeoutClubName: "Northeast Track Club",
     shakeoutSponsorName: "lululemon",
+    webUrl: "https://www.eventbrite.com/e/example",
+    stravaEventUrl: null,
+    instagramPostUrl: null,
     staffNotes: null,
     runBrandId: null,
     runBrandName: null,
@@ -47,4 +51,6 @@ test("serializeHubShakeout includes import stub fields", () => {
   const hub = serializeHubShakeout(run);
   assert.equal(hub.shakeoutClubName, "Northeast Track Club");
   assert.equal(hub.shakeoutSponsorName, "lululemon");
+  assert.equal(hub.webUrl, "https://www.eventbrite.com/e/example");
+  assert.equal(hub.runDay, "2026-10-24");
 });

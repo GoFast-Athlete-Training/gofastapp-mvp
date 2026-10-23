@@ -23,8 +23,9 @@ function routeMapFields(run: CityRunData) {
 }
 
 export function cityRunToWizardValues(run: CityRunData): RunInstanceWizardValues {
-  const dateStr = run.date;
-  const dateForInput = dateStr ? new Date(dateStr).toISOString().split("T")[0] : "";
+  const dateForInput =
+    run.runDay?.trim() ||
+    (run.date ? new Date(run.date).toISOString().split("T")[0] : "");
   const isTrack = isTrackRun(run.runType);
   const routeFields = routeMapFields(run);
 
@@ -105,14 +106,15 @@ export function wizardValuesToSavePayload(
     runClubStravaUrl?: string;
   }
 ) {
-  const dateObj = values.date ? new Date(values.date) : new Date();
+  const runDay = values.date?.trim() || null;
   const trackRouteNulls = nullRouteFieldsForTrackRun(values.runType);
   const isTrack = isTrackRun(values.runType);
 
   return {
     title: values.title.trim(),
     dayOfWeek: values.dayOfWeek?.trim() || null,
-    date: dateObj.toISOString(),
+    runDay,
+    calendarDateKey: runDay,
     startTimeHour: values.startTimeHour.trim() ? parseInt(values.startTimeHour, 10) : null,
     startTimeMinute: values.startTimeMinute.trim() ? parseInt(values.startTimeMinute, 10) : null,
     startTimePeriod: values.startTimePeriod || null,

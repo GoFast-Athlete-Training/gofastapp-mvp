@@ -90,6 +90,7 @@ export interface CityRunData {
   meetUpLat?: number | null;
   meetUpLng?: number | null;
   date: string;
+  runDay?: string | null;
   startTimeHour: number | null;
   startTimeMinute: number | null;
   startTimePeriod: string | null;

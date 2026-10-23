@@ -211,6 +211,7 @@ export async function POST(
     const createData: Record<string, unknown> = {
         id,
         title,
+        runDay: calendarDateKeyRaw,
         calendarDateKey: calendarDateKeyRaw,
         timezone: timezoneResolved,
         meetUpPoint,

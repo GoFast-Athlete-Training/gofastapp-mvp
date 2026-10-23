@@ -41,6 +41,10 @@ import {
   postRunBrandStampFromProdBrand,
 } from '@/lib/runmanage/post-run-brand-stamp';
 import { maybeStampCityRunStartsAtOnUpdate } from '@/lib/city-run/stamp-city-run-write';
+import {
+  calendarDateKeyFromDateInput,
+  isCalendarDateKey,
+} from '@/lib/city-run/city-run-zoned-format';
 import { normalizeProfileEmoji, resolveHostPhotoUrlFromRsvps } from '@/lib/city-run/run-profile-visual';
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -1012,11 +1016,16 @@ export async function PUT(
           ? null
           : String(body.checkInTimePeriod);
     }
-    if (body.date !== undefined && body.date) {
-      const d = new Date(body.date);
-      if (!isNaN(d.getTime())) {
-        updateData.date = d;
-      }
+    const runDayFromBody =
+      typeof body.runDay === 'string' && body.runDay.trim()
+        ? body.runDay.trim()
+        : typeof body.calendarDateKey === 'string' && body.calendarDateKey.trim()
+          ? body.calendarDateKey.trim()
+          : body.date != null && body.date !== ''
+            ? calendarDateKeyFromDateInput(String(body.date))
+            : null;
+    if (runDayFromBody && isCalendarDateKey(runDayFromBody)) {
+      updateData.runDay = runDayFromBody;
     }
 
     // Relationship FKs that determine cityRunType
@@ -1120,6 +1129,7 @@ export async function PUT(
 
     maybeStampCityRunStartsAtOnUpdate(updateData, {
       date: run.date,
+      runDay: run.runDay ?? null,
       startTimeHour: run.startTimeHour,
       startTimeMinute: run.startTimeMinute,
       startTimePeriod: run.startTimePeriod,

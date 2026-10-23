@@ -9,7 +9,9 @@ import { zonedLocalWallClockToUtcMs } from '@/lib/run-discover-freshness';
 export const DEFAULT_CITY_RUN_TIMEZONE = 'America/New_York';
 
 export type CityRunStartsAtInput = {
-  /** Civil day YYYY-MM-DD in the event zone (preferred over inferring from `date`). */
+  /** Civil day YYYY-MM-DD — ingest SOT (preferred). */
+  runDay?: string | null;
+  /** @deprecated alias for runDay on API payloads */
   calendarDateKey?: string | null;
   date?: Date;
   startTimeHour?: number | null;

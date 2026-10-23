@@ -6,6 +6,7 @@ import { cityRunStorageDateFromCalendarKey } from '@/lib/city-run/city-run-zoned
 
 type ExistingCityRunClock = {
   date: Date;
+  runDay: string | null;
   startTimeHour: number | null;
   startTimeMinute: number | null;
   startTimePeriod: string | null;
@@ -14,6 +15,7 @@ type ExistingCityRunClock = {
 };
 
 const CLOCK_PATCH_KEYS = [
+  'runDay',
   'calendarDateKey',
   'date',
   'startTimeHour',
@@ -27,6 +29,10 @@ function mergedClockInput(
   existing: ExistingCityRunClock
 ): CityRunStartsAtInput {
   return {
+    runDay:
+      (updateData.runDay as string | null | undefined) ??
+      (updateData.calendarDateKey as string | null | undefined) ??
+      existing.runDay,
     calendarDateKey: updateData.calendarDateKey as string | null | undefined,
     date: (updateData.date as Date | undefined) ?? existing.date,
     startTimeHour:
@@ -52,6 +58,9 @@ function mergedClockInput(
 /** Always stamp on create — caller passes full clock fields on the write payload. */
 export function stampCityRunStartsAtOnCreateData(data: Record<string, unknown>): void {
   const stamped = computeCityRunStartsAt({
+    runDay:
+      (data.runDay as string | null | undefined) ??
+      (data.calendarDateKey as string | null | undefined),
     calendarDateKey: data.calendarDateKey as string | null | undefined,
     date: data.date as Date | undefined,
     startTimeHour: data.startTimeHour as number | null | undefined,
@@ -60,6 +69,7 @@ export function stampCityRunStartsAtOnCreateData(data: Record<string, unknown>):
     timezone: data.timezone as string | null | undefined,
     citySlug: (data.citySlug as string | null | undefined) ?? null,
   });
+  data.runDay = stamped.calendarDateKey;
   data.timezone = stamped.timezone;
   data.startsAt = stamped.startsAt;
   data.date = cityRunStorageDateFromCalendarKey(
@@ -77,6 +87,7 @@ export function maybeStampCityRunStartsAtOnUpdate(
   if (!touched) return;
 
   const stamped = computeCityRunStartsAt(mergedClockInput(updateData, existing));
+  updateData.runDay = stamped.calendarDateKey;
   updateData.timezone = stamped.timezone;
   updateData.startsAt = stamped.startsAt;
   updateData.date = cityRunStorageDateFromCalendarKey(
