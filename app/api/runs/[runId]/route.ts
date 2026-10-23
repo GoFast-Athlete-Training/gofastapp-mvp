@@ -645,6 +645,9 @@ export async function GET(
         startTimeHour: run.startTimeHour,
         startTimeMinute: run.startTimeMinute,
         startTimePeriod: run.startTimePeriod,
+        checkInTimeHour: run.checkInTimeHour,
+        checkInTimeMinute: run.checkInTimeMinute,
+        checkInTimePeriod: run.checkInTimePeriod,
         timezone: run.timezone,
         totalMiles: run.totalMiles,
         pace: run.pace,
@@ -978,6 +981,24 @@ export async function PUT(
     }
     if (body.startTimePeriod !== undefined) {
       updateData.startTimePeriod = body.startTimePeriod === null || body.startTimePeriod === '' ? null : String(body.startTimePeriod);
+    }
+    if (body.checkInTimeHour !== undefined) {
+      updateData.checkInTimeHour =
+        body.checkInTimeHour === null || body.checkInTimeHour === ''
+          ? null
+          : parseInt(body.checkInTimeHour, 10);
+    }
+    if (body.checkInTimeMinute !== undefined) {
+      updateData.checkInTimeMinute =
+        body.checkInTimeMinute === null || body.checkInTimeMinute === ''
+          ? null
+          : parseInt(body.checkInTimeMinute, 10);
+    }
+    if (body.checkInTimePeriod !== undefined) {
+      updateData.checkInTimePeriod =
+        body.checkInTimePeriod === null || body.checkInTimePeriod === ''
+          ? null
+          : String(body.checkInTimePeriod);
     }
     if (body.date !== undefined && body.date) {
       const d = new Date(body.date);

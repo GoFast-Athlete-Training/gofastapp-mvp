@@ -16,6 +16,7 @@ import {
 } from "@/lib/city-run/city-run-zoned-format";
 import { stampCityRunStartsAtOnCreateData } from "@/lib/city-run/stamp-city-run-write";
 import { normalizeRunType } from "@/lib/runTypes";
+import { parseWallClockFromBody } from "@/lib/city-run/parse-wall-clock-body";
 import {
   citySlugFromRegistry,
   generateCityRunId,
@@ -154,23 +155,12 @@ export async function POST(
         : citySlugFromRegistry(race.city, race.slug);
     const citySlug = citySlugRaw.slice(0, 64);
 
-    const bodyHour =
-      body.startTimeHour != null && Number.isFinite(Number(body.startTimeHour))
-        ? Number(body.startTimeHour)
-        : null;
-    const bodyMinute =
-      body.startTimeMinute != null && Number.isFinite(Number(body.startTimeMinute))
-        ? Number(body.startTimeMinute)
-        : null;
-    const bodyPeriod =
-      typeof body.startTimePeriod === "string" && body.startTimePeriod.trim()
-        ? body.startTimePeriod.trim()
-        : null;
-    const hasStartClock =
-      bodyHour != null && bodyHour >= 1 && bodyHour <= 12;
-    const hour = hasStartClock ? bodyHour : null;
-    const minute = hasStartClock ? (bodyMinute ?? 0) : null;
-    const period = hasStartClock ? (bodyPeriod ?? "AM") : null;
+    const startClock = parseWallClockFromBody(body as Record<string, unknown>, "startTime");
+    const checkInClock = parseWallClockFromBody(body as Record<string, unknown>, "checkInTime");
+    const hasStartClock = startClock.hasClock;
+    const hour = startClock.hour;
+    const minute = startClock.minute;
+    const period = startClock.period;
 
     if (hasStartClock && (!timezoneResolved || !isValidIanaTimezone(timezoneResolved))) {
       return NextResponse.json(
@@ -323,6 +313,9 @@ export async function POST(
         startTimeHour: hour,
         startTimeMinute: minute,
         startTimePeriod: period,
+        checkInTimeHour: checkInClock.hasClock ? checkInClock.hour : null,
+        checkInTimeMinute: checkInClock.hasClock ? checkInClock.minute : null,
+        checkInTimePeriod: checkInClock.hasClock ? checkInClock.period : null,
         citySlug,
         regionSlug: inferRegionSlugFromCitySlug(citySlug),
         raceRegistryId: race.id,

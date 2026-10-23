@@ -1829,6 +1829,10 @@ model city_runs {
   startTimeHour       Int?
   startTimeMinute     Int?
   startTimePeriod     String?
+  /// Optional shakeout check-in wall clock (same civil day as run in `timezone`); does not drive `startsAt`.
+  checkInTimeHour     Int?
+  checkInTimeMinute   Int?
+  checkInTimePeriod   String?
   runClubId           String?
   athleteGeneratedId  String?
   staffGeneratedId    String?
