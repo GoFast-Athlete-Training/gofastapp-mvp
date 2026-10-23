@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { dateKeyFromDate, dateKeyFromIsoOrDateKey } from "@/lib/calendar-date";
 import { productTodayKey, resolveRaceDayKey } from "@/lib/plan-calendar-day";
 import { hasGoalOnRace } from "@/lib/goal-race-display";
 
@@ -168,11 +169,12 @@ export function filterAthleteRacesInPlanWindow(
   planStart: Date,
   planRaceDate: Date
 ): HydratedRaceCalendarAthleteRace[] {
-  const startMs = utcDateOnly(planStart).getTime();
-  const endMs = utcDateOnly(planRaceDate).getTime();
+  const startKey = dateKeyFromDate(planStart);
+  const endKey = dateKeyFromDate(planRaceDate);
   return athleteRaces.filter((s) => {
-    const d = utcDateOnly(new Date(s.race.raceDate)).getTime();
-    return d >= startMs && d <= endMs;
+    const dKey =
+      dateKeyFromIsoOrDateKey(s.race.raceDate) ?? s.race.raceDate.trim().slice(0, 10);
+    return dKey >= startKey && dKey <= endKey;
   });
 }
 
