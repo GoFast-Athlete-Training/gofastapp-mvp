@@ -172,7 +172,6 @@ export async function GET(
               postRunActivity: run.runSeries.postRunActivity ?? null,
             }
           : null,
-        cityRunType: run.cityRunType,
         instanceType: run.runSeriesId ? 'SERIES' : 'STANDALONE',
         cityRunSetup: run.runSeries
           ? {
