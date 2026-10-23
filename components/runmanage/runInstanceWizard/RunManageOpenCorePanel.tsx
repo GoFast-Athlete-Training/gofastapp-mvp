@@ -14,6 +14,8 @@ import {
 import { EntitySearch } from "@/components/runmanage/RunManageRunAffiliations";
 import { coffeeFoodKindLabel } from "@/lib/brands/coffee-food-kind";
 import CityRunProfileMetaFields from "@/components/cityruns/CityRunProfileMetaFields";
+import { resolvePartnerCircleMark } from "@/lib/city-run/run-profile-visual";
+import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
 import type { RunInstanceWizardContext, RunInstanceWizardValues } from "./shared";
 
 type Props = {
@@ -23,6 +25,7 @@ type Props = {
   context: RunInstanceWizardContext;
   weekdayMismatch: boolean;
   onErrorChange?: (msg: string | null) => void;
+  associateDraft?: RunAffiliationDraft | null;
 };
 
 export default function RunManageOpenCorePanel({
@@ -32,7 +35,13 @@ export default function RunManageOpenCorePanel({
   context,
   weekdayMismatch,
   onErrorChange,
+  associateDraft = null,
 }: Props) {
+  const partnerMark = resolvePartnerCircleMark({
+    runBrandPick: associateDraft?.runBrandPick,
+    runClubPick: associateDraft?.runClubPick,
+    ...context.affiliateLogoFallback,
+  });
   const isAthleteHosted = context.variant === "athlete-hosted";
   const isSeries = context.isSeriesInstance ?? context.variant === "create-series";
   const dayLabel = context.dayOfWeek ? formatDayLabel(context.dayOfWeek) : "Run";
@@ -88,6 +97,7 @@ export default function RunManageOpenCorePanel({
           coverPhotoUrl={values.coverPhotoUrl}
           onCoverPhotoUrlChange={(v) => patch({ coverPhotoUrl: v })}
           onUploadError={onErrorChange}
+          partnerMark={partnerMark}
         />
 
         {!isSeries && !isAthleteHosted ? (
@@ -355,18 +365,6 @@ export default function RunManageOpenCorePanel({
         </div>
         ) : null}
 
-        {!isAthleteHosted ? (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-900">Public description (optional)</label>
-          <textarea
-            value={values.description}
-            onChange={(e) => patch({ description: e.target.value })}
-            rows={3}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Short blurb for this run…"
-          />
-        </div>
-        ) : null}
       </div>
     </div>
   );

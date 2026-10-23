@@ -16,7 +16,8 @@ export default function RunInstanceSourcesPanel({ values, onChange }: Props) {
         </p>
         <p className="mt-1 text-xs text-sky-950/80">
           True source material for this dated run — staff-only, not shown on the public page. Paste
-          the Strava event, web listing, or IG post for this week before drafting description copy.
+          Eventbrite About text, Strava event copy, or IG caption — stored as listing paste (`webText`).
+          Use this before generating public description (especially shakeouts that are not mileage runs).
         </p>
       </div>
       <div>
@@ -59,12 +60,14 @@ export default function RunInstanceSourcesPanel({ values, onChange }: Props) {
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-900">Pasted web copy</label>
+        <label className="mb-1 block text-sm font-medium text-gray-900">
+          Event listing paste (Eventbrite About, etc.)
+        </label>
         <textarea
           value={values.webText}
           onChange={(e) => onChange({ webText: e.target.value })}
-          rows={3}
-          placeholder="Paste relevant text from the run listing or announcement page."
+          rows={4}
+          placeholder="Paste the listing About section — sound bath, demo, shakeout run, etc."
           className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
         />
       </div>

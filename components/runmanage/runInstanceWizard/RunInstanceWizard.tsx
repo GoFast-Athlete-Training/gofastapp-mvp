@@ -66,6 +66,7 @@ import {
 import type { IntakeMode } from "@/components/runmanage/intake/IntakeModePicker";
 import RunManageScratchIntakeStep from "./RunManageScratchIntakeStep";
 import RunManageOpenCorePanel from "./RunManageOpenCorePanel";
+import RunPublicDescriptionField from "@/components/runmanage/RunPublicDescriptionField";
 
 export type RunInstanceWizardProps = {
   values: RunInstanceWizardValues;
@@ -107,6 +108,11 @@ export type RunInstanceWizardProps = {
   associateSaving?: boolean;
   associateError?: string | null;
   associateMessage?: string | null;
+  /** When set, description step uses AI generate + staff copy field (not a floating header). */
+  publicDescriptionContext?: {
+    cityRunType?: string | null;
+    clubName?: string | null;
+  };
 };
 
 export default function RunInstanceWizard({
@@ -131,12 +137,13 @@ export default function RunInstanceWizard({
   associateSaving = false,
   associateError,
   associateMessage,
+  publicDescriptionContext,
 }: RunInstanceWizardProps) {
   const isAthleteHosted = context.variant === "athlete-hosted";
   const isCreateScratch = context.variant === "create-scratch";
   const resolvedInitialStep: WizardStep =
     initialWizardStep ??
-    (isAthleteHosted ? "core" : isCreateScratch ? "intake" : "core");
+    (isAthleteHosted ? "core" : isCreateScratch ? "intake" : "sources");
   const [wizardStep, setWizardStep] = useState<WizardStep>(resolvedInitialStep);
   const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
   const [intakeApplied, setIntakeApplied] = useState(false);
@@ -535,9 +542,6 @@ export default function RunInstanceWizard({
   return (
     <div className="space-y-4">
       {headerSlot}
-      {publicSources || instancePublicReadout ? (
-        <RunClubPublicSourcesCard runClub={publicSources} instance={instancePublicReadout} />
-      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
         <aside className="lg:sticky lg:top-4 lg:self-start">
@@ -627,15 +631,19 @@ export default function RunInstanceWizard({
           ) : null}
 
           {wizardStep === "sources" && (
-            <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">Source info</h3>
-                <p className="mt-1 text-xs text-gray-600">
-                  Paste this week&apos;s run-specific sources first. General club links stay in the
-                  reference card above when you need them.
-                </p>
+            <div className="space-y-4">
+              {publicSources ? (
+                <RunClubPublicSourcesCard runClub={publicSources} showInstanceSection={false} />
+              ) : null}
+              <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Source info</h3>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Paste this week&apos;s Strava event, web listing, or IG post for this instance.
+                  </p>
+                </div>
+                <RunInstanceSourcesPanel values={values} onChange={patch} />
               </div>
-              <RunInstanceSourcesPanel values={values} onChange={patch} />
             </div>
           )}
 
@@ -659,6 +667,7 @@ export default function RunInstanceWizard({
               context={context}
               weekdayMismatch={weekdayMismatch}
               onErrorChange={onErrorChange}
+              associateDraft={associateDraft}
             />
           ) : null}
 
@@ -959,20 +968,39 @@ export default function RunInstanceWizard({
           ) : null}
 
           {wizardStep === "description" && !isAthleteHosted ? (
-            <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">Description</h3>
-                <p className="mt-1 text-xs text-gray-600">
-                  Public blurb on the run page — what runners should know before they RSVP.
-                </p>
+            <div className="space-y-4">
+              {instancePublicReadout ? (
+                <RunClubPublicSourcesCard
+                  runClub={publicSources}
+                  instance={instancePublicReadout}
+                  showClubSection={false}
+                />
+              ) : null}
+              <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Description</h3>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Public blurb on the run page — finish core details, then generate or edit here.
+                  </p>
+                </div>
+                {publicDescriptionContext ? (
+                  <RunPublicDescriptionField
+                    values={values}
+                    onDescriptionChange={(description) => patch({ description })}
+                    cityRunType={publicDescriptionContext.cityRunType}
+                    clubName={publicDescriptionContext.clubName}
+                    onError={onErrorChange}
+                  />
+                ) : (
+                  <textarea
+                    value={values.description}
+                    onChange={(e) => patch({ description: e.target.value })}
+                    rows={5}
+                    placeholder="What kind of run is this? All paces welcome, bag drop, etc."
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                )}
               </div>
-              <textarea
-                value={values.description}
-                onChange={(e) => patch({ description: e.target.value })}
-                rows={5}
-                placeholder="What kind of run is this? All paces welcome, bag drop, etc."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
             </div>
           ) : null}
         </div>

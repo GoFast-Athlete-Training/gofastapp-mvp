@@ -59,12 +59,17 @@ export default function CityRunDetailsSection({
     run.hostPhotoUrl ??
     resolveHostPhotoUrlFromRsvps(run.rsvps, isHostRsvpRole);
 
+  const brandLogo =
+    run.runBrandLogoUrl?.trim() || run.runBrand?.logoUrl?.trim() || null;
+  const brandName = run.runBrandName?.trim() || run.runBrand?.name?.trim() || null;
+
   const visualInput = {
     profileEmoji: run.profileEmoji,
     coverPhotoUrl: run.coverPhotoUrl,
     mapImageUrl: run.mapImageUrl,
     runType: run.runType,
     runClub: run.runClub,
+    runBrand: brandLogo ? { logoUrl: brandLogo, name: brandName } : null,
     hostPhotoUrl,
     route: run.route,
   };

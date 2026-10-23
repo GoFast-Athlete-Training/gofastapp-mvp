@@ -41,6 +41,14 @@ export async function POST(request: NextRequest) {
     workoutDescription: workoutFromBody,
     workoutTitle: typeof body.workoutTitle === "string" ? body.workoutTitle : null,
     routeDescription: routeFromBody,
+    webText: typeof body.webText === "string" ? body.webText : null,
+    stravaText: typeof body.stravaText === "string" ? body.stravaText : null,
+    igPostText: typeof body.igPostText === "string" ? body.igPostText : null,
+    webUrl: typeof body.webUrl === "string" ? body.webUrl : null,
+    shakeoutClubName:
+      typeof body.shakeoutClubName === "string" ? body.shakeoutClubName : null,
+    shakeoutSponsorName:
+      typeof body.shakeoutSponsorName === "string" ? body.shakeoutSponsorName : null,
   });
 
   if (!result.success) {

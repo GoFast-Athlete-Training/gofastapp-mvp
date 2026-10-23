@@ -4,6 +4,7 @@ import {
   buildPublicDescriptionContextLines,
   buildPublicDescriptionSystemPrompt,
   buildPublicDescriptionUserMessage,
+  hasShakeoutListingSource,
   TRACK_PUBLIC_DESCRIPTION_STRICT_RETRY,
   trackDescriptionNeedsRetry,
   type PublicDescriptionGenerateInput,
@@ -34,13 +35,23 @@ export async function generatePublicRunDescription(
   const isShakeout = input.cityRunType === "RACE_SHAKEOUT";
   const existing = input.existingDescription?.trim() ?? "";
   const track = isTrackRun(input.runType);
+  const listingSource = hasShakeoutListingSource(input);
 
   if (input.mode === "smooth" && !existing) {
     return { success: false, error: "Type or paste a rough description first." };
   }
 
-  if (input.mode === "from_core" && !input.meetUpPoint?.trim()) {
-    return { success: false, error: "Add meet-up and core details first." };
+  if (
+    input.mode === "from_core" &&
+    !input.meetUpPoint?.trim() &&
+    !(isShakeout && (listingSource || input.title?.trim()))
+  ) {
+    return {
+      success: false,
+      error: isShakeout
+        ? "Add meet-up or paste the Eventbrite / listing text in Source info first."
+        : "Add meet-up and core details first.",
+    };
   }
 
   const contextLines = buildPublicDescriptionContextLines(input, {
@@ -50,8 +61,8 @@ export async function generatePublicRunDescription(
   });
 
   const system = buildPublicDescriptionSystemPrompt({ isShakeout, track });
-  const user = buildPublicDescriptionUserMessage(input.mode, existing, contextLines, track);
-  const temperature = track ? 0.2 : 0.6;
+  const user = buildPublicDescriptionUserMessage(input.mode, existing, contextLines, track, isShakeout);
+  const temperature = track ? 0.2 : isShakeout ? 0.45 : 0.6;
 
   try {
     let text = await callDescriptionModel(system, user, temperature);

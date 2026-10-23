@@ -286,7 +286,6 @@ export default function RunManageCreateRunPage() {
         routePhotos: trackRouteNulls ? [] : wizardValues.routePhotos.filter((u) => u.trim()),
         description: wizardValues.description.trim() || null,
         postRunActivity: wizardValues.postRunActivity.trim() || null,
-        staffNotes: wizardValues.staffNotes.trim() || null,
         stravaEventUrl: wizardValues.stravaEventUrl.trim() || null,
         stravaText: wizardValues.stravaText.trim() || null,
         webUrl: wizardValues.webUrl.trim() || null,

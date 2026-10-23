@@ -194,6 +194,13 @@ export type RunInstanceWizardContext = {
   plannedWorkoutSegments?: GroupWorkoutSegment[] | null;
   plannedWorkoutTitle?: string | null;
   plannedWorkoutType?: string | null;
+  /** Saved stamps when Associate draft has not been opened yet. */
+  affiliateLogoFallback?: {
+    runBrandLogoUrl?: string | null;
+    runBrandName?: string | null;
+    runClubLogoUrl?: string | null;
+    runClubName?: string | null;
+  };
 };
 
 export function formatInstanceDateLabel(ymd: string): string {

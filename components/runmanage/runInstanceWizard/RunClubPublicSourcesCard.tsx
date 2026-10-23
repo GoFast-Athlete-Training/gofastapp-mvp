@@ -127,9 +127,13 @@ export function acqRunClubToPublicSources(
 export default function RunClubPublicSourcesCard({
   runClub,
   instance,
+  showClubSection = true,
+  showInstanceSection = true,
 }: {
   runClub: RunClubPublicSources | null | undefined;
   instance?: RunInstancePublicReadout | null;
+  showClubSection?: boolean;
+  showInstanceSection?: boolean;
 }) {
   const stravaClubUrl = stravaPublicUrl(runClub?.stravaUrl);
   const runsPageUrl = externalHttpUrl(runClub?.runUrl);
@@ -167,11 +171,13 @@ export default function RunClubPublicSourcesCard({
 
   const hasInstance = Boolean(publicRunUrl || descriptionSnippet || highlightPhotoUrl);
 
-  if (!hasClubLinks && !hasClubContext && !hasInstance) return null;
+  const showClub = showClubSection && (hasClubLinks || hasClubContext);
+  const showInstance = showInstanceSection && hasInstance;
+  if (!showClub && !showInstance) return null;
 
   return (
     <div className="space-y-3">
-      {(hasClubLinks || hasClubContext) && (
+      {showClub ? (
         <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-4 py-3 shadow-sm">
           {runAccessBlocked ? (
             <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
@@ -211,9 +217,9 @@ export default function RunClubPublicSourcesCard({
             <p className="mt-2 text-xs leading-relaxed text-gray-600">{truncateSnippet(overview)}</p>
           ) : null}
         </div>
-      )}
+      ) : null}
 
-      {hasInstance ? (
+      {showInstance ? (
         <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-4 py-3 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">
             This instance (GoFast public)

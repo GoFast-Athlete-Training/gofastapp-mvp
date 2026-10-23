@@ -18,7 +18,6 @@ import runmanageApi from "@/lib/runmanage/api-client";
 import RunContentPreviewFrame from "@/components/runmanage/RunContentPreviewFrame";
 import RunInstanceRsvpPanel from "@/components/runmanage/RunInstanceRsvpPanel";
 import RunInstanceWizard from "@/components/runmanage/runInstanceWizard/RunInstanceWizard";
-import RunPublicDescriptionField from "@/components/runmanage/RunPublicDescriptionField";
 import type { AutoSaveStatus } from "@/components/runclub/edit/SaveStatusPill";
 import type { RunInstanceWizardValues } from "@/components/runmanage/runInstanceWizard/shared";
 import { normalizeGroupWorkoutSegment } from "@/lib/group-workout-segment-editor";
@@ -45,7 +44,6 @@ import {
   instanceStaffStateBadgeClasses,
   instanceStaffStateLabel,
 } from "@/lib/runmanage/instance-staff-state";
-import { RunManageRunAffiliationsEditor } from "@/components/runmanage/RunManageRunAffiliationsEditor";
 import {
   associateStampsToPayload,
   draftFromRun,
@@ -305,6 +303,8 @@ export default function RunManageStaffEditor({
   const autoSavingRef = useRef(false);
   const [isFounder, setIsFounder] = useState(false);
   const [submittingForReview, setSubmittingForReview] = useState(false);
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+  const [submissionNote, setSubmissionNote] = useState("");
   const [associateDraft, setAssociateDraft] = useState<RunAffiliationDraft | null>(null);
   const [associateSaving, setAssociateSaving] = useState(false);
   const [associateError, setAssociateError] = useState<string | null>(null);
@@ -567,16 +567,25 @@ export default function RunManageStaffEditor({
     }
   };
 
+  const openSubmitForReview = () => {
+    if (!run) return;
+    setSubmissionNote(run.staffNotes?.trim() || "");
+    setSubmitDialogOpen(true);
+  };
+
   const handleSubmitForReview = async () => {
     if (!run) return;
     setSubmittingForReview(true);
     try {
-      const res = await runmanageApi.patch(`/api/runs/${run.id}/workflow-status`, {
+      const note = submissionNote.trim();
+      const res = await runmanageApi.patch(`/api/runs/manage/${run.id}`, {
         workflowStatus: "SUBMITTED",
+        staffNotes: note || null,
       });
       if (!res.data?.success) {
         throw new Error(res.data?.error || "Submit failed");
       }
+      setSubmitDialogOpen(false);
       await fetchRun({ silent: true });
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } }; message?: string };
@@ -779,42 +788,44 @@ export default function RunManageStaffEditor({
             />
           </div>
 
-          <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-sky-900">Public run URL</p>
-                <a
-                  href={runUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="break-all text-sm text-sky-600 underline hover:text-sky-800"
-                >
-                  {runUrl}
-                </a>
-              </div>
-              <div className="flex items-center gap-1">
-                <a
-                  href={runUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 rounded border border-gray-300 px-3 py-2 text-xs text-gray-600 hover:bg-white"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Open
-                </a>
-                <button
-                  type="button"
-                  onClick={() => void handleCopyUrl()}
-                  className="flex items-center gap-1 rounded border border-gray-300 px-3 py-2 text-xs text-gray-600 hover:bg-white"
-                >
-                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                  {copied ? "Copied" : "Copy"}
-                </button>
+          {staffMode !== "edit" ? (
+            <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-sky-900">Public run URL</p>
+                  <a
+                    href={runUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="break-all text-sm text-sky-600 underline hover:text-sky-800"
+                  >
+                    {runUrl}
+                  </a>
+                </div>
+                <div className="flex items-center gap-1">
+                  <a
+                    href={runUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 rounded border border-gray-300 px-3 py-2 text-xs text-gray-600 hover:bg-white"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Open
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyUrl()}
+                    className="flex items-center gap-1 rounded border border-gray-300 px-3 py-2 text-xs text-gray-600 hover:bg-white"
+                  >
+                    {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
 
-          {run.runClub && (
+          {run.runClub && staffMode !== "edit" && (
             <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-700">
@@ -895,12 +906,6 @@ export default function RunManageStaffEditor({
             </div>
           )}
 
-          {run && staffMode === "edit" && !useAssociateTab ? (
-            <RunManageRunAffiliationsEditor
-              run={run}
-              onSaved={() => fetchRun({ silent: true })}
-            />
-          ) : null}
         </div>
 
         {isSeriesInstance && run.runSeriesId && run.runClub?.id && staffMode === "edit" && (
@@ -943,28 +948,24 @@ export default function RunManageStaffEditor({
                 run.plannedWorkout?.segments?.map(normalizeGroupWorkoutSegment) ?? null,
               plannedWorkoutTitle: run.plannedWorkout?.title ?? null,
               plannedWorkoutType: run.plannedWorkout?.workoutType ?? null,
+              affiliateLogoFallback: {
+                runBrandLogoUrl: run.runBrandLogoUrl ?? run.runBrand?.logoUrl ?? null,
+                runBrandName: run.runBrandName ?? run.runBrand?.name ?? null,
+                runClubLogoUrl: run.runClub?.logoUrl ?? null,
+                runClubName: run.runClub?.name ?? null,
+              },
             }}
             onSave={() => void handleSaveAndPreview()}
             saving={saving}
             error={wizardError}
             onErrorChange={setWizardError}
             saveLabel="Save & Preview"
-            initialWizardStep={initialWizardStep ?? "core"}
-            headerSlot={
-              <div className="mb-4 space-y-3 border-b border-gray-100 pb-4">
-                <RunPublicDescriptionField
-                  values={wizardValues}
-                  onDescriptionChange={(description) =>
-                    setWizardValues((v) => (v ? { ...v, description } : v))
-                  }
-                  cityRunType={run.cityRunType}
-                  clubName={run.runClub?.name}
-                  onError={setWizardError}
-                  compact
-                />
-              </div>
-            }
+            initialWizardStep={initialWizardStep ?? "sources"}
             publicSources={publicSources}
+            publicDescriptionContext={{
+              cityRunType: run.cityRunType,
+              clubName: run.runClub?.name,
+            }}
             instancePublicReadout={{
               cityRunId: run.id,
               slug: run.slug,
@@ -983,7 +984,7 @@ export default function RunManageStaffEditor({
               published: Boolean(run.published),
               workflowStatus: run.workflowStatus ?? "DEVELOP",
               isFounder,
-              onSubmitForReview: () => void handleSubmitForReview(),
+              onSubmitForReview: () => openSubmitForReview(),
               submitting: submittingForReview,
               onTogglePublished: isFounder ? () => void handleTogglePublished() : undefined,
               togglingPublished,
@@ -1021,6 +1022,54 @@ export default function RunManageStaffEditor({
           <RunInstanceRsvpPanel rsvps={run.rsvps} runTitle={run.title} />
         )}
       </div>
+
+      {submitDialogOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="submit-for-review-title"
+        >
+          <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-lg">
+            <h2 id="submit-for-review-title" className="text-base font-semibold text-gray-900">
+              Submit for review
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Public description stays on the Description step. Use this note only for the founder
+              (missing route, verify listing, etc.).
+            </p>
+            <label htmlFor="submission-note" className="mt-4 block text-sm font-medium text-gray-700">
+              Submission note (optional)
+            </label>
+            <textarea
+              id="submission-note"
+              value={submissionNote}
+              onChange={(e) => setSubmissionNote(e.target.value)}
+              rows={4}
+              placeholder="What should the reviewer know?"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                disabled={submittingForReview}
+                onClick={() => setSubmitDialogOpen(false)}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={submittingForReview}
+                onClick={() => void handleSubmitForReview()}
+                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+              >
+                {submittingForReview ? "Submitting…" : "Submit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

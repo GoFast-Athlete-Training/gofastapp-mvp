@@ -46,6 +46,10 @@ export default function RunPublicDescriptionField({
         workoutDescription: isTrack ? values.trackWorkoutDescription.trim() || undefined : undefined,
         workoutTitle: isTrack ? values.attachedWorkoutTitle.trim() || undefined : undefined,
         routeDescription: !isTrack ? values.routeDescription.trim() || undefined : undefined,
+        webText: values.webText.trim() || undefined,
+        stravaText: values.stravaText.trim() || undefined,
+        igPostText: values.igPostText.trim() || undefined,
+        webUrl: values.webUrl.trim() || undefined,
       });
       if (res.data?.success && res.data.description) {
         onDescriptionChange(String(res.data.description).trim());

@@ -63,10 +63,15 @@ export function cityRunToWizardValues(run: CityRunData): RunInstanceWizardValues
     stravaMapUrl: routeFields.stravaMapUrl,
     mapImageUrl: routeFields.mapImageUrl,
     routePhotos: routeFields.routePhotos,
-    description: run.description || "",
+    description: (() => {
+      const d = run.description?.trim() || "";
+      const n = run.staffNotes?.trim() || "";
+      if (n && d === n) return "";
+      return run.description || "";
+    })(),
     postRunActivity: run.postRunActivity || "",
     postRunBrandPick: postRunBrandPickFromRunStamp(run) as AffiliationPick | null,
-    staffNotes: run.staffNotes || "",
+    staffNotes: "",
     stravaEventUrl: run.stravaEventUrl || "",
     stravaText: run.stravaText || "",
     webUrl: run.webUrl || "",
@@ -143,7 +148,6 @@ export function wizardValuesToSavePayload(
       : values.postRunActivity.trim() || null,
     postRunBrandId: values.postRunBrandPick?.id ?? null,
     postRunBrandPick: values.postRunBrandPick,
-    staffNotes: values.staffNotes.trim() || null,
     stravaEventUrl: values.stravaEventUrl.trim() || null,
     stravaText: values.stravaText.trim() || null,
     webUrl: values.webUrl.trim() || null,

@@ -15,12 +15,20 @@ export const RUN_PROFILE_EMOJI_PRESETS = [
   '🎉',
 ] as const;
 
+type PartnerMark = {
+  logoUrl: string;
+  name: string;
+  kind: "brand" | "club";
+};
+
 type Props = {
   profileEmoji: string;
   onProfileEmojiChange: (value: string) => void;
   coverPhotoUrl: string;
   onCoverPhotoUrlChange: (value: string) => void;
   onUploadError?: (message: string | null) => void;
+  /** When set and emoji is blank, the public run circle uses this logo (Associate step). */
+  partnerMark?: PartnerMark | null;
 };
 
 export default function CityRunProfileMetaFields({
@@ -29,9 +37,13 @@ export default function CityRunProfileMetaFields({
   coverPhotoUrl,
   onCoverPhotoUrlChange,
   onUploadError,
+  partnerMark = null,
 }: Props) {
   const selected = profileEmoji.trim();
   const [gridOpen, setGridOpen] = useState(false);
+  const [emojiOverrideOpen, setEmojiOverrideOpen] = useState(false);
+  const usePartnerLogo = Boolean(partnerMark?.logoUrl) && !selected;
+  const showEmojiPicker = !partnerMark?.logoUrl || emojiOverrideOpen || Boolean(selected);
 
   return (
     <div className="space-y-4 rounded-lg border border-sky-100 bg-gradient-to-b from-sky-50/80 to-white p-4">
@@ -39,10 +51,34 @@ export default function CityRunProfileMetaFields({
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
           Run look <span className="font-normal text-gray-400">(optional)</span>
         </p>
-        <p className="text-xs text-gray-600 mb-3">
-          Like GoFast Links — pick an emoji for the circle, or leave blank to use your photo or club
-          logo on the run page.
-        </p>
+        {partnerMark?.logoUrl ? (
+          <div className="mb-3 flex items-start gap-3 rounded-lg border border-sky-200 bg-white px-3 py-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={partnerMark.logoUrl}
+              alt=""
+              className="h-14 w-14 shrink-0 rounded-full border border-gray-200 object-contain bg-white p-1"
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-900">
+                {partnerMark.kind === "brand" ? "Brand logo" : "Club logo"}
+              </p>
+              <p className="text-sm text-gray-800">{partnerMark.name}</p>
+              <p className="mt-1 text-xs text-gray-600">
+                {usePartnerLogo
+                  ? "This logo is the public circle mark (Links-style header) when no emoji override is set."
+                  : "Emoji override is active — public page uses the emoji instead of this logo."}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-600 mb-3">
+            Pick a cover photo below. For the small circle on the run page, link a club or brand on
+            the Associate step — or choose an emoji override.
+          </p>
+        )}
+        {showEmojiPicker ? (
+        <>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -53,7 +89,7 @@ export default function CityRunProfileMetaFields({
                 : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
             }`}
           >
-            Auto
+            {partnerMark?.logoUrl ? "Partner logo" : "Default"}
           </button>
           {RUN_PROFILE_EMOJI_PRESETS.map((emoji) => (
             <button
@@ -107,6 +143,16 @@ export default function CityRunProfileMetaFields({
             className="mt-1 w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </label>
+        </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEmojiOverrideOpen(true)}
+            className="text-xs font-medium text-sky-800 underline hover:text-sky-950"
+          >
+            Override with emoji instead
+          </button>
+        )}
       </div>
 
       <CityRunCoverPhotoUploadField
