@@ -1,10 +1,16 @@
 /**
- * UTC calendar dates tied to athlete plan weeks (Monday-based training weeks).
+ * Calendar dates tied to athlete plan weeks (Monday-based training weeks).
  */
 
+import { dateKeyToUtcNoonDate } from "@/lib/calendar-date";
+import {
+  dateKeyForDayInWeek as dateKeyForDayInWeekFromStart,
+  resolveStartDayKey,
+} from "@/lib/plan-calendar-day";
 import {
   addDaysUtc,
   mondayUtcOfWeekContaining,
+  planStartDayKeyFromRow,
   utcDateOnly,
 } from "@/lib/training/plan-utils";
 
@@ -31,12 +37,31 @@ export function dateOnOurDowFromWeekMonday(
 /**
  * Week N = Nth Mon–Sun block starting at the Monday of the week that contains plan start.
  */
+export function dateKeyForDayInPlanWeek(
+  planStartDate: Date,
+  weekNumber: number,
+  ourDow: number
+): string {
+  const startDay = resolveStartDayKey({ startDate: planStartDate, startDay: null });
+  return dateKeyForDayInWeekFromStart(startDay, weekNumber, ourDow);
+}
+
 export function dateForDayInWeek(
   planStartDate: Date,
   weekNumber: number,
   ourDow: number
 ): Date {
-  const firstMonday = mondayUtcOfWeekContaining(planStartDate);
-  const weekMonday = addDaysUtc(firstMonday, (weekNumber - 1) * 7);
-  return dateOnOurDowFromWeekMonday(weekMonday, ourDow);
+  const key = dateKeyForDayInPlanWeek(planStartDate, weekNumber, ourDow);
+  return dateKeyToUtcNoonDate(key);
+}
+
+/** When `startDay` is stamped on the plan, prefer it over deriving from `startDate`. */
+export function dateForDayInWeekFromPlan(
+  plan: { startDate: Date; startDay?: string | null },
+  weekNumber: number,
+  ourDow: number
+): Date {
+  const startDay = planStartDayKeyFromRow(plan);
+  const key = dateKeyForDayInWeekFromStart(startDay, weekNumber, ourDow);
+  return dateKeyToUtcNoonDate(key);
 }

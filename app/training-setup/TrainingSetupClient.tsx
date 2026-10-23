@@ -8,8 +8,12 @@ import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
-import { raceCalendarBeforeTodayUtc, utcDateOnly } from "@/lib/training/plan-utils";
-import { weekNumberFromPlanDate } from "@/lib/training/plan-schedule";
+import { dateKeyToUtcNoonDate } from "@/lib/calendar-date";
+import {
+  calendarTrainingWeekCountFromKeys,
+  normalizeDateKeyInput,
+} from "@/lib/plan-calendar-day";
+import { raceCalendarBeforeTodayUtc, localTodayKey, trainingWeekNumberForDateKey } from "@/lib/training/plan-utils";
 import { isInRaceCloseOutWindow } from "@/lib/training/race-plan-closeout";
 import {
   presetMatchesRaceDistance,
@@ -26,7 +30,6 @@ import {
 } from "@/components/races/AthleteRaceDistanceField";
 import { fetchTrainingPlanDetail } from "@/lib/training/fetch-plan-week-client";
 import { WeekByWeekSetupPanel } from "@/components/training/WeekByWeekSetupPanel";
-import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import {
   planWeekPhaseForNumber,
   planWeekPhaseUxLabel,
@@ -126,14 +129,14 @@ function buildFiveKPaceFromParts(minStr: string, secStr: string): string | null 
 
 function formatRaceWhen(iso: string): string {
   try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
+    const key = iso.trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return iso;
+    const d = new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)), 12, 0, 0);
     return d.toLocaleDateString(undefined, {
       weekday: "short",
       year: "numeric",
       month: "short",
       day: "numeric",
-      timeZone: "UTC",
     });
   } catch {
     return iso;
@@ -907,7 +910,7 @@ export default function TrainingSetupClient() {
           athleteRaceId: wizardGoal.athleteRaceId ?? wizardGoal.id,
           raceRegistryId: wizardGoal.athlete_race.raceRegistryId,
           name: trimmedPlanName,
-          startDate: new Date(startDate).toISOString(),
+          startDate,
           fiveKPace: fiveKPaceOut,
           currentWeeklyMileage:
             baselineWeeklyMileage.trim() === ""
@@ -951,8 +954,19 @@ export default function TrainingSetupClient() {
       if (data.plan?.id) {
         setReplaceGoalAcknowledged(false);
         if (weekByWeekLoad) {
-          const start = utcDateOnly(new Date(startDate));
-          const weekNum = weekNumberFromPlanDate(start, utcDateOnly(new Date()));
+          const raceDayKey =
+            normalizeDateKeyInput(wizardGoal.athlete_race?.raceDate ?? "") ??
+            wizardGoal.athlete_race?.raceDate?.slice(0, 10) ??
+            "";
+          const tw = raceDayKey
+            ? calendarTrainingWeekCountFromKeys(startDate, raceDayKey)
+            : 1;
+          const planStartAnchor = dateKeyToUtcNoonDate(startDate);
+          const weekNum = trainingWeekNumberForDateKey(
+            planStartAnchor,
+            tw,
+            localTodayKey()
+          );
           if (opts?.weekByWeekRedirect === "plan") {
             router.push(`/training/plan/${data.plan.id}/adjust?lane=csv`);
           } else {
@@ -1133,23 +1147,20 @@ export default function TrainingSetupClient() {
             : null,
         };
       }
-      const start = utcDateOnly(new Date(startDate));
-      const race = utcDateOnly(new Date(rr.raceDate));
-      const totalWeeks = calendarTrainingWeekCount(start, race);
-      const weekNum = Math.max(
-        1,
-        weekNumberFromPlanDate(start, utcDateOnly(new Date()))
+      const raceDay =
+        normalizeDateKeyInput(rr.raceDate) ?? rr.raceDate.trim().slice(0, 10);
+      const totalWeeks = calendarTrainingWeekCountFromKeys(startDate, raceDay);
+      const weekNum = trainingWeekNumberForDateKey(
+        dateKeyToUtcNoonDate(startDate),
+        totalWeeks,
+        localTodayKey()
       );
       const phase = planWeekPhaseForNumber(totalWeeks, weekNum);
       return {
         weekNum,
         phaseLabel: planWeekPhaseUxLabel(phase),
         totalWeeks,
-        raceDateLabel: race.toLocaleDateString(undefined, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
+        raceDateLabel: formatRaceWhen(raceDay),
       };
     })();
 
@@ -1372,7 +1383,7 @@ export default function TrainingSetupClient() {
                     raceDistanceLabel={rr.distanceLabel ?? goalDistanceLine}
                     raceName={rr.name}
                     raceDate={rr.raceDate}
-                    planStartDate={startDate || new Date().toISOString()}
+                    planStartDate={startDate || localTodayKey()}
                     goalTime={wizardGoal.goalTime}
                     onGoalTimeSaved={handleInitiateGoalSaved}
                     onComplete={(ap) => {

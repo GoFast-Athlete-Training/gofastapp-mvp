@@ -5,17 +5,21 @@
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { rematerializeFuturePlannedWorkoutsForPlan } from "@/lib/training/rematerialize-future-planned-workouts";
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import { resolveRaceDayKey } from "@/lib/plan-calendar-day";
+import { raceCalendarBeforeTodayUtc } from "@/lib/training/plan-utils";
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
 import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
 import { shouldAutoArchivePlanForRaceDate } from "@/lib/training/race-plan-closeout";
 
-/** Race calendar day strictly before today (UTC) — aligns with training hub "past race" treatment. */
-export function isRaceCalendarBeforeTodayUtc(raceDate: Date | null | undefined): boolean {
-  if (!raceDate) return false;
-  const raceDay = utcDateOnly(raceDate);
-  const today = utcDateOnly(new Date());
-  return raceDay.getTime() < today.getTime();
+/** Race calendar day strictly before product today — aligns with training hub "past race" treatment. */
+export function isRaceCalendarBeforeTodayUtc(
+  raceDate: Date | string | null | undefined
+): boolean {
+  if (raceDate == null) return false;
+  if (typeof raceDate === "string") {
+    return raceCalendarBeforeTodayUtc(raceDate);
+  }
+  return raceCalendarBeforeTodayUtc(resolveRaceDayKey({ raceDate, raceDay: null }));
 }
 
 /**

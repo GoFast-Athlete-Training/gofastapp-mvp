@@ -20,6 +20,7 @@ import {
   parseAthleteRaceMainSnap,
   planRaceSnapshotsToPrismaJson,
 } from "@/lib/training/plan-race-snapshots";
+import { productTodayKey, resolveRaceDayKey } from "@/lib/plan-calendar-day";
 import { utcDateOnly, ymdFromDate, currentTrainingWeekNumber } from "@/lib/training/plan-utils";
 import { applyRaceDayRolesOnSchedule } from "@/lib/training/race-day-service";
 
@@ -477,14 +478,14 @@ export async function listSecondaryCandidatesForPlan(params: {
     where: { athleteId: params.athleteId },
     orderBy: { raceDate: "asc" },
   });
-  const startMs = utcDateOnly(params.planStart).getTime();
-  const endMs = utcDateOnly(params.terminalRaceDate).getTime();
-  const todayMs = utcDateOnly(new Date()).getTime();
+  const startKey = ymdFromDate(params.planStart);
+  const endKey = ymdFromDate(params.terminalRaceDate);
+  const todayKey = productTodayKey();
 
   return races.filter((r) => {
     if (params.athleteRaceId && r.id === params.athleteRaceId) return false;
-    const dMs = utcDateOnly(r.raceDate).getTime();
-    return dMs >= startMs && dMs <= endMs && dMs >= todayMs;
+    const dKey = resolveRaceDayKey(r);
+    return dKey >= startKey && dKey <= endKey && dKey >= todayKey;
   });
 }
 

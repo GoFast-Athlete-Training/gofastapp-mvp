@@ -11,6 +11,10 @@ import {
 } from "@/lib/races/registry-mirror-select";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
+import {
+  calendarDayWritePair,
+  normalizeDateKeyInput,
+} from "@/lib/plan-calendar-day";
 
 export type IncomingRace = Record<string, unknown>;
 
@@ -154,10 +158,11 @@ export async function upsertRaceRegistryFromPayload(
       };
     }
 
-    const raceDate = new Date(String(raceDateRaw));
-    if (Number.isNaN(raceDate.getTime())) {
+    const raceDay = normalizeDateKeyInput(String(raceDateRaw));
+    if (!raceDay) {
       return { ok: false, status: 400, error: "Invalid raceDate" };
     }
+    const raceDate = calendarDayWritePair(raceDay).anchor;
 
     const nameVal =
       racePayload.name != null ? String(racePayload.name).trim() : "Unnamed race";
@@ -307,6 +312,7 @@ export async function upsertRaceRegistryFromPayload(
       name: nameVal,
       slug: slugVal,
       raceDate,
+      raceDay,
       isVirtual,
       isActive: true,
       city: locationCity,
@@ -489,6 +495,7 @@ export async function upsertRaceRegistryFromPayload(
       data: {
         name: nameVal,
         raceDate,
+        raceDay,
         ...(distanceMeters !== undefined ? { distanceMeters } : {}),
         ...(distanceLabel !== undefined ? { distanceLabel } : {}),
         city: locationCity,

@@ -10,6 +10,7 @@ import {
   type PrescribeSegmentInput,
 } from "@/lib/training/workout-or-planned-resolve";
 import type { WorkoutStep } from "@/lib/training/prescription";
+import { dateKeyFromDate } from "@/lib/calendar-date";
 
 function stepsToPrescribeInput(steps: WorkoutStep[]): PrescribeSegmentInput[] {
   return steps.map((s, i) => ({
@@ -38,6 +39,8 @@ export async function upsertPlannedWorkoutFromIngestDay(params: {
     );
   }
 
+  const planDay = dateKeyFromDate(params.day.date);
+
   const existing = await prisma.planned_workouts.findFirst({
     where: {
       planId: params.planId,
@@ -60,6 +63,7 @@ export async function upsertPlannedWorkoutFromIngestDay(params: {
         dayAssigned: params.day.dayAssigned,
         nOffset: params.day.nOffset,
         planCycleIndex: params.day.planCycleIndex,
+        planDay,
         updatedAt: new Date(),
       },
     });
@@ -72,6 +76,7 @@ export async function upsertPlannedWorkoutFromIngestDay(params: {
         athleteId: params.athleteId,
         planId: params.planId,
         date: params.day.date,
+        planDay,
         estimatedDistanceInMeters: params.day.estimatedDistanceInMeters,
         catalogueWorkoutId: null,
         weekNumber: params.day.weekNumber,

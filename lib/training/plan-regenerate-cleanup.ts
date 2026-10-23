@@ -4,7 +4,8 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import { dateKeyToUtcNoonDate } from "@/lib/calendar-date";
+import { productTodayKey } from "@/lib/plan-calendar-day";
 
 export type RegenerateWorkoutCleanupResult = {
   clearedFutureWorkouts: number;
@@ -24,7 +25,7 @@ export async function cleanupFuturePlanWorkoutsAfterRegenerate(params: {
   planId: string;
   athleteId: string;
 }): Promise<RegenerateWorkoutCleanupResult> {
-  const todayUtc = utcDateOnly(new Date());
+  const todayUtc = dateKeyToUtcNoonDate(productTodayKey());
 
   const [workouts, plannedWorkouts] = await Promise.all([
     prisma.workouts.findMany({

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import { dateKeyToUtcNoonDate } from "@/lib/calendar-date";
+import { productTodayKey } from "@/lib/plan-calendar-day";
 
 /**
  * Hard-delete a plan's future uncompleted workouts (and segments). Completed workouts
@@ -9,7 +10,7 @@ export async function cleanupPlanWorkoutsBeforeDelete(params: {
   planId: string;
   athleteId: string;
 }): Promise<{ deletedFutureWorkouts: number; detachedCompletedWorkouts: number }> {
-  const todayUtc = utcDateOnly(new Date());
+  const todayUtc = dateKeyToUtcNoonDate(productTodayKey());
   const workouts = await prisma.workouts.findMany({
     where: { planId: params.planId, athleteId: params.athleteId },
     select: { id: true, garminDetailActivityId: true, date: true },

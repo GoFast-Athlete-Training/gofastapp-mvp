@@ -27,6 +27,7 @@ export async function GET(request: Request) {
         id: true,
         name: true,
         startDate: true,
+        startDay: true,
         totalWeeks: true,
         weeklyMileageTarget: true,
         goalRaceTime: true,
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
             id: true,
             name: true,
             raceDate: true,
+            raceDay: true,
             distanceLabel: true,
           },
         },
@@ -71,7 +73,7 @@ export async function GET(request: Request) {
       return {
         id: p.id,
         name: p.name,
-        startDate: ymdFromDate(p.startDate),
+        startDate: p.startDay?.trim() || ymdFromDate(p.startDate),
         totalWeeks: p.totalWeeks,
         weeklyMileageTarget: p.weeklyMileageTarget,
         goalRaceTime: p.goalRaceTime,
@@ -79,7 +81,9 @@ export async function GET(request: Request) {
           ? {
               id: p.race_registry.id,
               name: p.race_registry.name,
-              raceDate: ymdFromDate(p.race_registry.raceDate),
+              raceDate:
+                p.race_registry.raceDay?.trim() ||
+                ymdFromDate(p.race_registry.raceDate),
               distanceLabel: p.race_registry.distanceLabel,
             }
           : null,

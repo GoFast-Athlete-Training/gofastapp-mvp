@@ -2,6 +2,10 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
+import {
+  calendarDayWritePair,
+  normalizeDateKeyInput,
+} from "@/lib/plan-calendar-day";
 import { adoptPublishedPlanBySlug } from "@/lib/training/public-plan-service";
 
 type Ctx = { params: Promise<{ slug: string }> };
@@ -39,10 +43,11 @@ export async function POST(request: NextRequest, context: Ctx) {
       return NextResponse.json({ error: "goalTime is required" }, { status: 400 });
     }
 
-    const startDate = new Date(startRaw);
-    if (Number.isNaN(startDate.getTime())) {
+    const startDay = normalizeDateKeyInput(startRaw);
+    if (!startDay) {
       return NextResponse.json({ error: "Invalid startDate" }, { status: 400 });
     }
+    const startDate = calendarDayWritePair(startDay).anchor;
 
     const result = await adoptPublishedPlanBySlug({
       slug,

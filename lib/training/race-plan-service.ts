@@ -5,7 +5,11 @@ import {
   validateRacePlanDocument,
 } from "@/lib/races/race-plan-builder";
 import { EMPTY_RACE_PLAN, type RacePlanDocument } from "@/lib/races/race-plan-types";
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import {
+  calendarDayWritePair,
+  normalizeDateKeyInput,
+  resolveRaceDayKey,
+} from "@/lib/plan-calendar-day";
 
 export class RacePlanError extends Error {
   constructor(message: string) {
@@ -14,13 +18,14 @@ export class RacePlanError extends Error {
   }
 }
 
-function parseRaceDate(raw: Date | string): Date {
-  if (raw instanceof Date) return utcDateOnly(raw);
-  const s = String(raw).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-    return new Date(`${s.slice(0, 10)}T12:00:00.000Z`);
-  }
-  return utcDateOnly(new Date(s));
+function parseRaceDayAndAnchor(raw: Date | string, fallback?: { raceDate: Date; raceDay?: string | null }) {
+  const key =
+    raw instanceof Date
+      ? resolveRaceDayKey({ raceDate: raw, raceDay: null })
+      : normalizeDateKeyInput(String(raw)) ??
+        (fallback ? resolveRaceDayKey(fallback) : null);
+  if (!key) throw new RacePlanError("Invalid race date");
+  return { raceDay: key, raceDate: calendarDayWritePair(key).anchor };
 }
 
 export async function getRacePlanForAthleteRace(params: {
@@ -54,14 +59,17 @@ export async function upsertRacePlan(params: {
 
   const athleteRace = await prisma.athlete_races.findFirst({
     where: { id: params.athleteRaceId, athleteId: params.athleteId },
-    select: { id: true, raceDate: true },
+    select: { id: true, raceDate: true, raceDay: true },
   });
   if (!athleteRace) throw new RacePlanError("Race signup not found");
 
   const doc = normalizeRacePlanDocument(params.planJson);
   validateRacePlanDocument(doc);
 
-  const raceDate = parseRaceDate(params.raceDate ?? athleteRace.raceDate);
+  const { raceDate, raceDay } = parseRaceDayAndAnchor(
+    params.raceDate ?? athleteRace.raceDate,
+    athleteRace
+  );
   const planId = params.planId?.trim() || null;
 
   const existing = await prisma.race_plans.findUnique({
@@ -78,6 +86,7 @@ export async function upsertRacePlan(params: {
         title,
         planId,
         raceDate,
+        raceDay,
         planJson,
         updatedAt: new Date(),
       },
@@ -91,6 +100,7 @@ export async function upsertRacePlan(params: {
       athleteRaceId: params.athleteRaceId,
       planId,
       raceDate,
+      raceDay,
       title,
       planJson,
       updatedAt: new Date(),

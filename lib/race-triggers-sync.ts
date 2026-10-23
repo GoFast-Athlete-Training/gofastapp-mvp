@@ -3,26 +3,37 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { addDaysUtc, utcDateOnly } from "@/lib/training/plan-utils";
+import {
+  calendarDayWritePair,
+  resolveRaceDayKey,
+  triggerDayKeysFromRaceDay,
+} from "@/lib/plan-calendar-day";
 
-function anchorFromRaceDate(raceDate: Date) {
-  const raceDay = utcDateOnly(raceDate);
+function anchorFromRaceDayKey(raceDay: string) {
+  const { raceDay: rd, weekOutDay, reminderDay } = triggerDayKeysFromRaceDay(raceDay);
+  const raceAnchor = calendarDayWritePair(rd).anchor;
+  const weekOutAnchor = calendarDayWritePair(weekOutDay).anchor;
+  const reminderAnchor = calendarDayWritePair(reminderDay).anchor;
   return {
-    raceDate: raceDay,
-    weekOutDate: addDaysUtc(raceDay, -7),
-    reminderDate: addDaysUtc(raceDay, -1),
+    raceDay: rd,
+    weekOutDay,
+    reminderDay,
+    raceDate: raceAnchor,
+    weekOutDate: weekOutAnchor,
+    reminderDate: reminderAnchor,
   };
 }
 
-/** Upsert trigger row dates from catalog race day (UTC calendar). */
+/** Upsert trigger row dates from catalog race day. */
 export async function syncRaceTriggerForRegistry(raceRegistryId: string) {
   const registry = await prisma.race_registry.findUnique({
     where: { id: raceRegistryId },
-    select: { raceDate: true },
+    select: { raceDate: true, raceDay: true },
   });
   if (!registry) return null;
 
-  const dates = anchorFromRaceDate(registry.raceDate);
+  const raceDay = resolveRaceDayKey(registry);
+  const dates = anchorFromRaceDayKey(raceDay);
   const now = new Date();
 
   const trigger = await prisma.race_triggers.upsert({

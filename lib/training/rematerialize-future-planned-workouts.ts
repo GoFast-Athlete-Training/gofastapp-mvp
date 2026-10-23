@@ -4,7 +4,9 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { utcDateOnly, ymdFromDate } from "./plan-utils";
+import { addCalendarDays } from "@/lib/calendar-date";
+import { productTodayKey } from "@/lib/plan-calendar-day";
+import { ymdFromDate } from "./plan-utils";
 import { materializeWorkoutForPlanDay } from "./workout-materializer";
 
 export async function rematerializeFuturePlannedWorkoutsForPlan(params: {
@@ -15,13 +17,7 @@ export async function rematerializeFuturePlannedWorkoutsForPlan(params: {
 }): Promise<{ rematerialized: number; skipped: number; errors: string[] }> {
   const fromKey =
     params.fromDateKey?.trim() ||
-    ymdFromDate(
-      (() => {
-        const t = utcDateOnly(new Date());
-        t.setUTCDate(t.getUTCDate() + 1);
-        return t;
-      })()
-    );
+    addCalendarDays(productTodayKey(), 1);
 
   const fromDate = new Date(`${fromKey}T12:00:00.000Z`);
 

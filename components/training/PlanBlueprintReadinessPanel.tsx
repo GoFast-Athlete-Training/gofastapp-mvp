@@ -103,7 +103,7 @@ export function PlanBlueprintReadinessPanel({
           ...athleteBearerFetchHeaders(token),
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ startDate: new Date(startDateLocal).toISOString() }),
+        body: JSON.stringify({ startDate: startDateLocal.slice(0, 10) }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {

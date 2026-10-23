@@ -1,10 +1,19 @@
 /**
- * Plan length and calendar-week helpers (Mon–Sun, UTC date-only).
+ * Plan length and calendar-week helpers (Mon–Sun).
+ * Prefer civil day keys via `@/lib/plan-calendar-day` for new reads/writes.
  */
 import {
   dateKeyFromDate,
+  dateKeyFromIsoOrDateKey,
   formatCalendarDate,
 } from "@/lib/calendar-date";
+import {
+  calendarTrainingWeekCountFromKeys,
+  normalizeDateKeyInput,
+  productTodayKey,
+  resolveRaceDayKey,
+  resolveStartDayKey,
+} from "@/lib/plan-calendar-day";
 
 export function utcDateOnly(d: Date): Date {
   const x = new Date(d);
@@ -12,35 +21,48 @@ export function utcDateOnly(d: Date): Date {
   return x;
 }
 
-/** Parse race_registry.raceDate (ISO or calendar string) to UTC date-only anchor. */
-function parseRaceRegistryDayUtc(iso: string): Date | null {
-  const t = Date.parse(iso.includes("T") ? iso : `${iso}T12:00:00Z`);
-  if (!Number.isFinite(t)) return null;
-  return utcDateOnly(new Date(t));
+function parseRaceDayKey(isoOrKey: string): string | null {
+  const direct = normalizeDateKeyInput(isoOrKey);
+  if (direct) return direct;
+  const key = dateKeyFromIsoOrDateKey(isoOrKey);
+  return key ?? null;
 }
 
-/** Strictly before today’s UTC calendar day (race day fully in the past). */
+/** Strictly before product calendar today (race day fully in the past). */
 export function raceCalendarBeforeTodayUtc(iso: string): boolean {
-  const raceDay = parseRaceRegistryDayUtc(iso);
+  const raceDay = parseRaceDayKey(iso);
   if (!raceDay) return false;
-  const today = utcDateOnly(new Date());
-  return raceDay.getTime() < today.getTime();
+  return raceDay < productTodayKey();
 }
 
-/** Today or earlier in UTC — post-race result logging UX is appropriate. */
+/** Today or earlier — post-race result logging UX is appropriate. */
 export function raceCalendarOnOrBeforeTodayUtc(iso: string): boolean {
-  const raceDay = parseRaceRegistryDayUtc(iso);
+  const raceDay = parseRaceDayKey(iso);
   if (!raceDay) return false;
-  const today = utcDateOnly(new Date());
-  return raceDay.getTime() <= today.getTime();
+  return raceDay <= productTodayKey();
 }
 
-/** Strictly after today’s UTC calendar day — pre-race hub UX. */
+/** Strictly after product calendar today — pre-race hub UX. */
 export function raceCalendarAfterTodayUtc(iso: string): boolean {
-  const raceDay = parseRaceRegistryDayUtc(iso);
+  const raceDay = parseRaceDayKey(iso);
   if (!raceDay) return false;
-  const today = utcDateOnly(new Date());
-  return raceDay.getTime() > today.getTime();
+  return raceDay > productTodayKey();
+}
+
+/** Resolve civil race day from registry or athlete_race row. */
+export function raceDayKeyFromRow(row: {
+  raceDay?: string | null;
+  raceDate: Date;
+}): string {
+  return resolveRaceDayKey(row);
+}
+
+/** Resolve civil plan start from training_plans row. */
+export function planStartDayKeyFromRow(row: {
+  startDay?: string | null;
+  startDate: Date;
+}): string {
+  return resolveStartDayKey(row);
 }
 
 export function addDaysUtc(d: Date, days: number): Date {
@@ -82,19 +104,9 @@ export function mondayRaceFoldsIntoPriorPlanWeek(
  * If the race is a Monday (not in plan-start week), that day is folded into the prior week — not counted as its own week.
  */
 export function calendarTrainingWeekCount(planStart: Date, raceDate: Date): number {
-  const firstMon = mondayUtcOfWeekContaining(planStart);
-  const lastMon = mondayUtcOfWeekContaining(raceDate);
-  if (lastMon.getTime() < firstMon.getTime()) {
-    return 1;
-  }
-  const diffDays = Math.round(
-    (lastMon.getTime() - firstMon.getTime()) / 86400000
-  );
-  let count = Math.max(1, diffDays / 7 + 1);
-  if (mondayRaceFoldsIntoPriorPlanWeek(planStart, raceDate)) {
-    count = Math.max(1, count - 1);
-  }
-  return count;
+  const planStartDay = dateKeyFromDate(utcDateOnly(planStart));
+  const raceDay = dateKeyFromDate(utcDateOnly(raceDate));
+  return calendarTrainingWeekCountFromKeys(planStartDay, raceDay);
 }
 
 /**

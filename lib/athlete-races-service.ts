@@ -9,11 +9,16 @@ import {
   metersForCanonicalDistanceLabel,
 } from "@/lib/training/race-distance-infer";
 import { snapDistanceLabelFromMeters } from "@/lib/training/preset-distance-match";
+import {
+  calendarDayWritePair,
+  resolveRaceDayKey,
+} from "@/lib/plan-calendar-day";
 
 const registrySelectForClaim = {
   id: true,
   name: true,
   raceDate: true,
+  raceDay: true,
   distanceMeters: true,
   distanceLabel: true,
   city: true,
@@ -70,6 +75,7 @@ export function isUpcomingAthleteRace(raceDate: Date, now: Date = new Date()): b
 export function snapshotDataFromRegistry(race: {
   name: string;
   raceDate: Date;
+  raceDay?: string | null;
   distanceMeters: number | null;
   distanceLabel: string | null;
   city: string | null;
@@ -77,9 +83,12 @@ export function snapshotDataFromRegistry(race: {
   slug: string | null;
   logoUrl: string | null;
 }) {
+  const raceDay = resolveRaceDayKey(race);
+  const { anchor: raceDateAnchor } = calendarDayWritePair(raceDay);
   return {
     name: race.name,
-    raceDate: race.raceDate,
+    raceDate: raceDateAnchor,
+    raceDay,
     distanceMeters: race.distanceMeters,
     distanceLabel: race.distanceLabel,
     city: race.city,

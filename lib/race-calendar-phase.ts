@@ -1,4 +1,9 @@
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import {
+  normalizeDateKeyInput,
+  productTodayKey,
+  PRODUCT_CALENDAR_TIMEZONE,
+} from "@/lib/plan-calendar-day";
+import { dateKeyToUtcNoonDate } from "@/lib/calendar-date";
 
 export type RacePhase = "pre" | "day_before" | "race_day" | "post_early" | "post_cooled";
 
@@ -8,9 +13,8 @@ function localDateOnly(d: Date): Date {
   return x;
 }
 
-function parseRaceDayUtc(iso: string): Date {
-  const s = iso.trim();
-  return utcDateOnly(new Date(s.includes("T") ? s : `${s}T12:00:00Z`));
+function parseRaceDayKey(iso: string): string | null {
+  return normalizeDateKeyInput(iso);
 }
 
 /** Calendar race day in the athlete's local timezone (home banners, on-open prep). */
@@ -25,15 +29,17 @@ function parseRaceDayLocal(iso: string): Date {
   return localDateOnly(new Date(s.includes("T") ? s : `${s}T12:00:00`));
 }
 
-/** Signed calendar days from today's UTC date to race day: positive = race in future, negative = race in past. */
+/** Signed calendar days from product today to race day: positive = race in future, negative = race in past. */
 export function raceCalendarDaysFromTodayUtc(
   raceDateIso: string | null | undefined
 ): number | null {
   if (!raceDateIso || typeof raceDateIso !== "string") return null;
-  const today = utcDateOnly(new Date());
-  const raceDay = parseRaceDayUtc(raceDateIso);
-  if (Number.isNaN(raceDay.getTime())) return null;
-  return Math.round((raceDay.getTime() - today.getTime()) / 86_400_000);
+  const raceDay = parseRaceDayKey(raceDateIso);
+  if (!raceDay) return null;
+  const today = productTodayKey();
+  const todayMs = dateKeyToUtcNoonDate(today).getTime();
+  const raceMs = dateKeyToUtcNoonDate(raceDay).getTime();
+  return Math.round((raceMs - todayMs) / 86_400_000);
 }
 
 export function getRacePhase(raceDateIso: string | null | undefined): RacePhase {
@@ -71,7 +77,7 @@ export function getRacePhaseLocal(raceDateIso: string | null | undefined): RaceP
 }
 
 /** Product default for server cron — calendar YMD in a US timezone (not UTC midnight flip). */
-export const RACE_CALENDAR_TIMEZONE = "America/Denver";
+export const RACE_CALENDAR_TIMEZONE = PRODUCT_CALENDAR_TIMEZONE;
 
 export function calendarDayKeyInTimezone(
   value: Date | string,

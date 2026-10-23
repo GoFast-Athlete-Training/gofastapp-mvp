@@ -3,7 +3,13 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { totalWeeksFromDates, ymdFromDate } from "@/lib/training/plan-utils";
+import {
+  calendarDayWritePair,
+  normalizeDateKeyInput,
+  resolveRaceDayKey,
+  totalWeeksFromDayKeys,
+} from "@/lib/plan-calendar-day";
+import { planStartDayKeyFromRow, totalWeeksFromDates, ymdFromDate } from "@/lib/training/plan-utils";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { archiveOtherActivePlans, cascadeLinkedGoalAfterPlanArchived } from "@/lib/training/plan-lifecycle";
 import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
@@ -143,7 +149,7 @@ export async function GET(request: NextRequest, context: Ctx) {
     const serialized = {
       ...plan,
       training_plan_preset: catalogPreset,
-      startDate: ymdFromDate(plan.startDate),
+      startDate: plan.startDay?.trim() || planStartDayKeyFromRow(plan),
       race_registry: terminalRace
         ? {
             id: terminalRace.raceRegistryId,
@@ -339,14 +345,16 @@ export async function PATCH(request: NextRequest, context: Ctx) {
 
         if (!scheduleLocked) {
         if (body.startDate != null) {
-          const d = new Date(body.startDate);
-          if (Number.isNaN(d.getTime())) {
+          const startDay = normalizeDateKeyInput(body.startDate);
+          if (!startDay) {
             return NextResponse.json({ error: "Invalid startDate" }, { status: 400 });
           }
-          data.startDate = d;
-          const terminalDate = existing.athlete_race?.raceDate;
-          if (terminalDate) {
-            data.totalWeeks = totalWeeksFromDates(d, terminalDate);
+          data.startDay = startDay;
+          data.startDate = calendarDayWritePair(startDay).anchor;
+          const ar = existing.athlete_race;
+          if (ar?.raceDate) {
+            const raceDay = resolveRaceDayKey(ar);
+            data.totalWeeks = totalWeeksFromDayKeys(startDay, raceDay);
           }
         }
         if (body.currentWeeklyMileage != null) {
@@ -563,7 +571,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
 
     const serialized = {
       ...planRow,
-      startDate: ymdFromDate(planRow.startDate),
+      startDate: planRow.startDay?.trim() || planStartDayKeyFromRow(planRow),
       race_registry: (() => {
         const terminal = resolvePlanTerminalRaceDisplay(planRow);
         return terminal

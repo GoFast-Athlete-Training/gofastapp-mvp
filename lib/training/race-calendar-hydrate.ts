@@ -4,7 +4,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import { productTodayKey, resolveRaceDayKey } from "@/lib/plan-calendar-day";
 import { hasGoalOnRace } from "@/lib/goal-race-display";
 
 export type HydratedRaceCalendarAthleteRace = {
@@ -52,14 +52,12 @@ export type HydratedRaceCalendar = {
 };
 
 function positionRelativeToPlanRace(
-  raceDate: Date,
-  planRaceDate: Date | null
+  raceDay: string,
+  planRaceDay: string | null
 ): HydratedRaceCalendarAthleteRace["positionRelativeToPlanRace"] {
-  if (!planRaceDate) return "UNKNOWN";
-  const a = utcDateOnly(raceDate).getTime();
-  const b = utcDateOnly(planRaceDate).getTime();
-  if (a < b) return "BEFORE";
-  if (a > b) return "AFTER";
+  if (!planRaceDay) return "UNKNOWN";
+  if (raceDay < planRaceDay) return "BEFORE";
+  if (raceDay > planRaceDay) return "AFTER";
   return "ON";
 }
 
@@ -69,6 +67,7 @@ export function mapAthleteRaceToCalendarRow(
     raceRegistryId: string;
     name: string;
     raceDate: Date;
+    raceDay?: string | null;
     distanceLabel: string | null;
     distanceMeters: number | null;
     city: string | null;
@@ -83,6 +82,8 @@ export function mapAthleteRaceToCalendarRow(
   planAthleteRaceId: string | null
 ): HydratedRaceCalendarAthleteRace {
   const hasGoal = hasGoalOnRace(ar);
+  const raceDay = resolveRaceDayKey(ar);
+  const planRaceDay = planRaceDate ? resolveRaceDayKey({ raceDate: planRaceDate, raceDay: null }) : null;
   return {
     athleteRaceId: ar.id,
     raceRegistryId: ar.raceRegistryId,
@@ -90,7 +91,7 @@ export function mapAthleteRaceToCalendarRow(
     goalName: ar.goalName,
     hasGoal,
     isPrimaryRace: ar.isPrimaryRace ?? false,
-    positionRelativeToPlanRace: positionRelativeToPlanRace(ar.raceDate, planRaceDate),
+    positionRelativeToPlanRace: positionRelativeToPlanRace(raceDay, planRaceDay),
     isPlanTarget: planAthleteRaceId != null && ar.id === planAthleteRaceId,
     race: {
       id: ar.raceRegistryId,
@@ -98,7 +99,7 @@ export function mapAthleteRaceToCalendarRow(
       name: ar.name,
       distanceLabel: ar.distanceLabel,
       distanceMeters: ar.distanceMeters,
-      raceDate: ar.raceDate.toISOString(),
+      raceDate: raceDay,
       city: ar.city,
       state: ar.state,
       logoUrl: ar.logoUrl,
@@ -141,11 +142,10 @@ export async function loadHydratedRaceCalendar(
     mapAthleteRaceToCalendarRow(ar, planRaceDate, planAthleteRaceId)
   );
 
-  const todayMs = utcDateOnly(new Date()).getTime();
+  const todayKey = productTodayKey();
   const secondaryCandidates = athleteRaceRows.filter(
     (h) =>
-      h.positionRelativeToPlanRace === "BEFORE" &&
-      utcDateOnly(new Date(h.race.raceDate)).getTime() >= todayMs
+      h.positionRelativeToPlanRace === "BEFORE" && h.race.raceDate >= todayKey
   );
 
   const planHasGoal = planRaceRow != null && hasGoalOnRace(planRaceRow);

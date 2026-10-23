@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import { dateKeyToUtcNoonDate } from "@/lib/calendar-date";
+import { productTodayKey } from "@/lib/plan-calendar-day";
 
 export type PlanGarminCleanupResult = {
   clearedPushStamps: number;
@@ -16,7 +17,7 @@ export async function cleanupFutureGarminSchedulesForPlan(params: {
   planId: string;
   athleteId: string;
 }): Promise<PlanGarminCleanupResult> {
-  const todayUtc = utcDateOnly(new Date());
+  const todayUtc = dateKeyToUtcNoonDate(productTodayKey());
 
   const result = await prisma.planned_workouts.updateMany({
     where: {

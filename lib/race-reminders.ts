@@ -4,6 +4,7 @@ import type { NotificationTemplateKey } from "@/lib/app-notifications/types";
 import { publishProductEvent } from "@/lib/publish-product-event";
 import { myRacePlannerHref } from "@/lib/races/athlete-race-signup-display";
 import { calendarDayKeyInTimezone } from "@/lib/race-calendar-phase";
+import { productTodayKey } from "@/lib/plan-calendar-day";
 import { addDaysUtc, utcDateOnly } from "@/lib/training/plan-utils";
 
 export type RaceReminderKind = "week_out" | "day_before" | "race_day";
@@ -71,7 +72,7 @@ function pushCopy(kind: RaceReminderKind, raceName: string) {
 
 export async function processRaceReminders(now = new Date()) {
   const today = utcDateOnly(now);
-  const todayKey = calendarDayKeyInTimezone(now);
+  const todayKey = productTodayKey(now);
   const windowStart = addDaysUtc(today, -1);
   const windowEnd = addDaysUtc(today, 1);
 
@@ -118,9 +119,17 @@ export async function processRaceReminders(now = new Date()) {
   for (const trigger of triggers) {
     const raceName = trigger.race_registry.name;
     let kind: RaceReminderKind | null = null;
-    if (calendarDayKeyInTimezone(trigger.weekOutDate) === todayKey) kind = "week_out";
-    else if (calendarDayKeyInTimezone(trigger.reminderDate) === todayKey) kind = "day_before";
-    else if (calendarDayKeyInTimezone(trigger.raceDate) === todayKey) kind = "race_day";
+    const weekOutKey =
+      trigger.weekOutDay?.trim() ||
+      calendarDayKeyInTimezone(trigger.weekOutDate);
+    const reminderKey =
+      trigger.reminderDay?.trim() ||
+      calendarDayKeyInTimezone(trigger.reminderDate);
+    const raceKey =
+      trigger.raceDay?.trim() || calendarDayKeyInTimezone(trigger.raceDate);
+    if (weekOutKey === todayKey) kind = "week_out";
+    else if (reminderKey === todayKey) kind = "day_before";
+    else if (raceKey === todayKey) kind = "race_day";
     if (!kind) continue;
 
     const field = notifiedField(kind);

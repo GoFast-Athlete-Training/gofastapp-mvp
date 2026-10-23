@@ -8,7 +8,8 @@ import { prisma } from "@/lib/prisma";
 import { listAthleteRaceGoals } from "@/lib/athlete-race-goal";
 import { loadTrainingHydrateSnapshot } from "@/lib/training/training-hydrate-service";
 import { findActiveTrainingPlanForAthlete } from "@/lib/athlete-primary-race";
-import { utcDateOnly } from "@/lib/training/plan-utils";
+import { dateKeyToUtcNoonDate } from "@/lib/calendar-date";
+import { productTodayKey } from "@/lib/plan-calendar-day";
 
 export type AthleteTrainingStateDiagnosis = {
   athleteId: string;
@@ -72,7 +73,7 @@ function planScheduleWeekCount(planSchedule: unknown): number {
 export async function diagnoseAthleteTrainingState(
   athleteId: string
 ): Promise<AthleteTrainingStateDiagnosis> {
-  const todayUtc = utcDateOnly(new Date());
+  const todayUtc = dateKeyToUtcNoonDate(productTodayKey());
 
   const [athlete, allPlans, athleteRaces, goals, hydrate, activePlanRef, plannedRows, workoutRows] =
     await Promise.all([

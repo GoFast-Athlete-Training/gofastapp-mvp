@@ -10,7 +10,8 @@ import {
   workoutToScheduleRunRow,
 } from "@/lib/training/schedule-run-workout";
 import { buildStartTimeLabel } from "@/lib/training/schedule-run-estimated-finish";
-import { ymdFromDate, utcDateOnly } from "@/lib/training/plan-utils";
+import { addCalendarDays, dateKeyToUtcStartOfDay } from "@/lib/calendar-date";
+import { productTodayKey } from "@/lib/plan-calendar-day";
 
 function parseDateInput(raw: string | undefined): Date | null {
   if (!raw?.trim()) return null;
@@ -83,10 +84,9 @@ export async function GET(request: NextRequest) {
 
     const daysRaw = request.nextUrl.searchParams.get("days");
     const days = Math.min(Math.max(parseInt(daysRaw ?? "7", 10) || 7, 1), 30);
-    const todayKey = ymdFromDate(utcDateOnly(new Date()));
-    const start = new Date(`${todayKey}T00:00:00.000Z`);
-    const end = new Date(start);
-    end.setUTCDate(end.getUTCDate() + days);
+    const todayKey = productTodayKey();
+    const start = dateKeyToUtcStartOfDay(todayKey);
+    const end = dateKeyToUtcStartOfDay(addCalendarDays(todayKey, days));
 
     const rows = await prisma.workouts.findMany({
       where: scheduleRunWorkoutWhere(athlete.id, start, end),

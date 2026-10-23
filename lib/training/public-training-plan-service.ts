@@ -11,11 +11,16 @@ import {
   TrainingPlanLifecycle,
   WorkoutType,
 } from "@prisma/client";
+import { dateKeyFromDate } from "@/lib/calendar-date";
 import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
 import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
-import { totalWeeksFromDates } from "@/lib/training/plan-utils";
+import {
+  calendarDayWritePair,
+  resolveRaceDayKey,
+  totalWeeksFromDayKeys,
+} from "@/lib/plan-calendar-day";
 import { upsertRaceMembershipFromSignup } from "@/lib/race-container-membership";
 import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
 import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
@@ -449,11 +454,13 @@ export async function adoptPublicTrainingPlan(
   const gt = athleteRace.goalTime?.trim();
   if (!gt) throw new Error("Race must have a goal time");
 
-  const startDate = input.startDate;
-  if (Number.isNaN(startDate.getTime())) throw new Error("Invalid start date");
-  if (startDate >= race.raceDate) {
+  const startDay = dateKeyFromDate(input.startDate);
+  if (!startDay) throw new Error("Invalid start date");
+  const raceDay = resolveRaceDayKey(race);
+  if (startDay >= raceDay) {
     throw new Error("Plan start date must be before race date");
   }
+  const startDate = calendarDayWritePair(startDay).anchor;
 
   const athlete = await prisma.athlete.findUnique({ where: { id: input.athleteId } });
   if (!athlete) throw new Error("Athlete not found");
@@ -472,7 +479,7 @@ export async function adoptPublicTrainingPlan(
   const fiveKPace = input.fiveKPace?.trim() || athlete.fiveKPace || null;
   const weeklyResolved =
     input.weeklyMileage ?? athlete.weeklyMileage ?? null;
-  const totalWeeks = totalWeeksFromDates(startDate, race.raceDate);
+  const totalWeeks = totalWeeksFromDayKeys(startDay, raceDay);
 
   const raceDistanceMiles =
     race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
@@ -505,6 +512,7 @@ export async function adoptPublicTrainingPlan(
         raceRegistryId: race.id,
         name: race.name,
         raceDate: race.raceDate,
+        raceDay: resolveRaceDayKey(race),
         distanceMeters: race.distanceMeters,
         distanceLabel: race.distanceLabel,
         city: race.city,
@@ -556,6 +564,7 @@ export async function adoptPublicTrainingPlan(
         athleteRaceId: athleteRaceRow.id,
         name: planName,
         startDate,
+        startDay,
         totalWeeks,
         currentWeeklyMileage: weeklyResolved,
         weeklyMileageTarget: prefs?.weeklyMileageTarget ?? null,

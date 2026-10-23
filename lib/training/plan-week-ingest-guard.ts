@@ -7,8 +7,12 @@ import type { AthletePlanContext } from "@/lib/training/plan-ingest-plan-context
 import type { PlanDaySchedule, PlanWeekSchedule } from "@/lib/training/plan-schedule-schema";
 import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
 import { weekBoundsFromPlan } from "@/lib/training/plan-schedule";
-import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
+import {
+  dateKeyForDayInPlanWeek,
+  dateForDayInWeek,
+} from "@/lib/training/plan-schedule-dates";
 import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
+import { dateKeyForDayInWeek } from "@/lib/plan-calendar-day";
 import { WorkoutType as WT } from "@prisma/client";
 
 export function ensureStructuredPlanSchedule(planSchedule: unknown): PlanWeekSchedule[] {
@@ -23,9 +27,13 @@ export function ensureStructuredPlanSchedule(planSchedule: unknown): PlanWeekSch
 export function dateKeyForWeekDay(
   planStartDate: Date,
   weekNumber: number,
-  dow: number
+  dow: number,
+  startDay?: string | null
 ): string {
-  return ymdFromDate(dateForDayInWeek(planStartDate, weekNumber, dow));
+  if (startDay?.trim()) {
+    return dateKeyForDayInWeek(startDay.trim(), weekNumber, dow);
+  }
+  return dateKeyForDayInPlanWeek(planStartDate, weekNumber, dow);
 }
 
 export function dateKeyInWeekBounds(
@@ -67,11 +75,15 @@ export async function loadProtectedDateKeysForWeek(params: {
       date: { gte: bounds.weekStart, lte: bounds.weekEnd },
       OR: [{ workoutCompleted: true }, { workoutId: { not: null } }],
     },
-    select: { date: true },
+    select: { date: true, planDay: true },
   });
 
   for (const row of planned) {
-    protectedKeys.add(ymdFromDate(utcDateOnly(row.date)));
+    protectedKeys.add(
+      row.planDay?.trim() && /^\d{4}-\d{2}-\d{2}$/.test(row.planDay.trim())
+        ? row.planDay.trim()
+        : ymdFromDate(utcDateOnly(row.date))
+    );
   }
 
   return protectedKeys;

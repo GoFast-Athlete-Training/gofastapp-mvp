@@ -11,7 +11,11 @@ import {
   foundationPeakPoolComparisonRows,
 } from "@/lib/training/long-run-pool-fields";
 import { deriveLongRunPoolTripletFromPeak } from "@/lib/training/long-run-cup-setter";
-import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
+import { dateKeyToUtcNoonDate } from "@/lib/calendar-date";
+import {
+  calendarTrainingWeekCountFromKeys,
+  normalizeDateKeyInput,
+} from "@/lib/plan-calendar-day";
 import { computeLongRunTrajectoryPreview } from "@/lib/training/long-run-trajectory-preview";
 import { LongRunTrajectoryCard } from "@/components/training/LongRunTrajectoryCard";
 import {
@@ -847,7 +851,11 @@ export function AthletePresetBuilder({
   const foundationTotalWeeks = useMemo(() => {
     if (corePreview?.calendar.totalWeeks) return corePreview.calendar.totalWeeks;
     try {
-      return calendarTrainingWeekCount(new Date(planStartDate), new Date(raceDate));
+      const startDay =
+        normalizeDateKeyInput(planStartDate) ?? planStartDate.trim().slice(0, 10);
+      const raceDay =
+        normalizeDateKeyInput(raceDate) ?? raceDate.trim().slice(0, 10);
+      return calendarTrainingWeekCountFromKeys(startDay, raceDay);
     } catch {
       return 16;
     }
@@ -856,11 +864,13 @@ export function AthletePresetBuilder({
   const foundationTrajectory = useMemo(() => {
     const peak = Number(peakLongRunPoolMiles);
     if (!Number.isFinite(peak) || peak <= 0) return null;
+    const startDay =
+      normalizeDateKeyInput(planStartDate) ?? planStartDate.trim().slice(0, 10);
     return computeLongRunTrajectoryPreview({
       totalWeeks: foundationTotalWeeks,
       peakLongRunPoolMiles: peak,
       fitnessPhase,
-      planStartDate: new Date(planStartDate),
+      planStartDate: dateKeyToUtcNoonDate(startDay),
     });
   }, [fitnessPhase, foundationTotalWeeks, peakLongRunPoolMiles, planStartDate]);
 

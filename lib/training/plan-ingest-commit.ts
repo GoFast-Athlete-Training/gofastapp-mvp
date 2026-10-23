@@ -25,6 +25,8 @@ import {
   type PrescribeSegmentInput,
 } from "@/lib/training/workout-or-planned-resolve";
 import { cleanupFuturePlanWorkoutsAfterRegenerate } from "@/lib/training/plan-regenerate-cleanup";
+import { productTodayKey } from "@/lib/plan-calendar-day";
+import { dateKeyToUtcNoonDate } from "@/lib/calendar-date";
 import { utcDateOnly, ymdFromDate } from "@/lib/training/plan-utils";
 import type { WorkoutStep } from "@/lib/training/prescription";
 import { buildScheduleNativeWorkoutSteps } from "@/lib/training/schedule-native-workout-steps";
@@ -169,7 +171,7 @@ async function rematerializeFutureDaysInWeek(params: {
   daySegmentsByDateKey?: Record<string, WorkoutStep[]>;
   dayTitlesByDateKey?: Record<string, string>;
 }): Promise<{ materialized: number; errors: string[] }> {
-  const todayUtc = utcDateOnly(new Date());
+  const todayUtc = dateKeyToUtcNoonDate(productTodayKey());
   const bounds = weekBoundsFromPlan(params.plan.startDate, params.weekNumber, {
     raceDate: params.plan.raceCtx.raceDate,
     totalWeeks: params.plan.totalWeeks,
@@ -416,7 +418,7 @@ async function commitWeekIngest(params: {
   await persistPlanSchedule(params.plan.id, nextSchedule);
   params.plan.planSchedule = nextSchedule;
 
-  const todayUtc = utcDateOnly(new Date());
+  const todayUtc = dateKeyToUtcNoonDate(productTodayKey());
   const bounds = weekBoundsFromPlan(params.plan.startDate, weekNumber, {
     raceDate: params.plan.raceCtx.raceDate,
     totalWeeks: params.plan.totalWeeks,
@@ -449,7 +451,7 @@ async function commitPlanIngestScope(params: {
   plan: AthletePlanContext;
   preview: Extract<PlanIngestPreviewResult, { scope: "plan" }>;
 }): Promise<{ replacedWeeks: number; cleanup: Awaited<ReturnType<typeof cleanupFuturePlanWorkoutsAfterRegenerate>> }> {
-  const todayKey = utcDateOnly(new Date()).toISOString().slice(0, 10);
+  const todayKey = productTodayKey();
   const currentWeek = weekNumberFromPlanDate(
     params.plan.startDate,
     utcDateOnly(new Date(`${todayKey}T12:00:00.000Z`))

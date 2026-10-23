@@ -930,6 +930,8 @@ model race_registry {
   isVirtual               Boolean                   @default(false)
   officialWebsiteUrl      String?
   raceDate                DateTime
+  /// Civil race day YYYY-MM-DD — calendar SOT for plans and triggers. `raceDate` is sort anchor only.
+  raceDay                 String?
   registrationCloseDate   DateTime?
   /// Capacity closed before deadline (e.g. sold out); hides external registration CTA.
   registrationSoldOut     Boolean                   @default(false)
@@ -982,6 +984,7 @@ model race_registry {
   @@index([city, state])
   @@index([isActive])
   @@index([raceDate])
+  @@index([raceDay])
   @@index([slug])
   @@index([tags])
   @@index([companyRaceId])
@@ -1021,6 +1024,8 @@ model athlete_races {
   /// Snapshot at claim — not live registry reads for training rules.
   name             String
   raceDate         DateTime
+  /// Snapshot civil race day YYYY-MM-DD at claim — training reads this, not live registry clock.
+  raceDay          String?
   distanceMeters   Int?
   distanceLabel    String?
   city             String?
@@ -1065,6 +1070,7 @@ model athlete_races {
   @@index([athleteId])
   @@index([raceRegistryId])
   @@index([raceDate])
+  @@index([raceDay])
   @@index([athleteId, isPrimaryRace])
   @@map("athlete_races")
 }
@@ -1076,6 +1082,8 @@ model race_plans {
   athleteRaceId   String         @unique
   planId          String?
   raceDate        DateTime
+  /// Civil race day YYYY-MM-DD for race-day builder calendar.
+  raceDay         String?
   title           String
   planJson        Json
   garminWorkoutId Int?
@@ -1098,6 +1106,10 @@ model race_triggers {
   raceDate                 DateTime
   weekOutDate              DateTime
   reminderDate             DateTime
+  /// Civil day keys for cron matching (America/New_York product default).
+  raceDay                  String?
+  weekOutDay               String?
+  reminderDay              String?
   weekOutProductEventSlug  String   @default("race.week_out")
   reminderProductEventSlug String   @default("race.day_before")
   raceDayProductEventSlug  String   @default("race.race_day")
@@ -1110,6 +1122,9 @@ model race_triggers {
   @@index([weekOutDate])
   @@index([reminderDate])
   @@index([raceDate])
+  @@index([raceDay])
+  @@index([weekOutDay])
+  @@index([reminderDay])
   @@map("race_triggers")
 }
 
@@ -2807,6 +2822,8 @@ model training_plans {
   /// Company user id who published this plan to the training group
   publishedBy          String?
   startDate            DateTime
+  /// Civil plan start day YYYY-MM-DD — athlete date input; `startDate` is sort anchor only.
+  startDay             String?
   totalWeeks           Int
   /// Phase ranges snapshot: [{ name, startWeek, endWeek }]
   phases               Json?
@@ -2862,6 +2879,7 @@ model training_plans {
   @@index([presetId])
   @@index([athletePresetId])
   @@index([cohortId])
+  @@index([startDay])
   @@index([publicVisibility, publicPublishedAt])
 }
 
@@ -3009,6 +3027,8 @@ model planned_workouts {
   cityRunMatchLabel         String?
   catalogueWorkoutId        String?
   date                      DateTime
+  /// Civil scheduled day YYYY-MM-DD — agenda and week math read this.
+  planDay                   String?
   estimatedDistanceInMeters Float?
   nOffset                   Int?
   weekNumber                Int?
@@ -3043,6 +3063,7 @@ model planned_workouts {
   @@unique([athleteId, planId, date])
   @@unique([athleteId, cityRunId])
   @@index([planId, date])
+  @@index([planId, planDay])
   @@index([cityRunId])
   @@index([catalogueWorkoutId])
 }
@@ -3088,6 +3109,8 @@ model workouts {
   catalogueWorkoutId        String?
   /// Scheduled calendar date for plan workouts
   date                      DateTime?
+  /// Civil scheduled day YYYY-MM-DD when tied to a plan day.
+  planDay                   String?
   /// Garmin field: planned total distance in meters (source of truth before segment expansion)
   estimatedDistanceInMeters Float?
   /// Weeks before race: first week = -(totalWeeks-1), race week = 0; null for standalone

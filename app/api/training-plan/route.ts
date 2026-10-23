@@ -5,7 +5,12 @@ import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { totalWeeksFromDates } from "@/lib/training/plan-utils";
+import {
+  calendarDayWritePair,
+  normalizeDateKeyInput,
+  resolveRaceDayKey,
+  totalWeeksFromDayKeys,
+} from "@/lib/plan-calendar-day";
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import { metersToMiles } from "@/lib/pace-utils";
@@ -21,6 +26,7 @@ import {
   ensureRetiredActivePlansForPastRaces,
   isRaceCalendarBeforeTodayUtc,
 } from "@/lib/training/plan-lifecycle";
+import { planStartDayKeyFromRow } from "@/lib/training/plan-utils";
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
 import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
 import { isAthletePresetBlueprintComplete } from "@/lib/training/athlete-preset-blueprint";
@@ -119,7 +125,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Race not found" }, { status: 404 });
     }
 
-    if (isRaceCalendarBeforeTodayUtc(race.raceDate)) {
+    const raceDay = resolveRaceDayKey(race);
+    const athleteRaceDay = resolveRaceDayKey(terminalAthleteRace);
+
+    if (isRaceCalendarBeforeTodayUtc(raceDay)) {
       return NextResponse.json(
         { error: "That race has finished — pick an upcoming race to train for" },
         { status: 400 }
@@ -137,20 +146,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const startDate = new Date(startRaw);
-    if (Number.isNaN(startDate.getTime())) {
+    const startDay = normalizeDateKeyInput(startRaw);
+    if (!startDay) {
       return NextResponse.json({ error: "Invalid startDate" }, { status: 400 });
     }
 
-    const raceDate = new Date(race.raceDate);
-    if (startDate >= raceDate) {
+    if (startDay >= athleteRaceDay) {
       return NextResponse.json(
         { error: "Plan startDate must be before race date" },
         { status: 400 }
       );
     }
 
-    const totalWeeks = totalWeeksFromDates(startDate, raceDate);
+    const { anchor: startDate } = calendarDayWritePair(startDay);
+    const raceDate = calendarDayWritePair(athleteRaceDay).anchor;
+    const totalWeeks = totalWeeksFromDayKeys(startDay, athleteRaceDay);
 
     const raceDistanceMilesForPace = (() => {
       const athleteMeters =
@@ -340,6 +350,7 @@ export async function POST(request: NextRequest) {
           ...planRaceSnapshotsToPrismaJson(raceSnapshots),
           name: planName,
           startDate,
+          startDay,
           totalWeeks,
           currentWeeklyMileage: weeklyResolved,
           /// Set on the preferences screen after plan creation — not the wizard baseline.
@@ -458,6 +469,7 @@ export async function GET(request: NextRequest) {
         id: true,
         name: true,
         startDate: true,
+        startDay: true,
         totalWeeks: true,
         raceId: true,
         athleteRaceId: true,
@@ -468,13 +480,34 @@ export async function GET(request: NextRequest) {
         currentFiveKPace: true,
         createdAt: true,
         updatedAt: true,
-        race_registry: { select: { name: true, raceDate: true } },
-        athlete_race: { select: { raceDate: true } },
+        race_registry: { select: { name: true, raceDate: true, raceDay: true } },
+        athlete_race: { select: { raceDate: true, raceDay: true } },
         _count: { select: { planned_workouts: true } },
       },
     });
 
-    return NextResponse.json({ plans });
+    const serialized = plans.map((p) => ({
+      ...p,
+      startDate: p.startDay?.trim() || planStartDayKeyFromRow(p),
+      race_registry: p.race_registry
+        ? {
+            ...p.race_registry,
+            raceDate:
+              p.race_registry.raceDay?.trim() ||
+              resolveRaceDayKey(p.race_registry),
+          }
+        : null,
+      athlete_race: p.athlete_race
+        ? {
+            ...p.athlete_race,
+            raceDate:
+              p.athlete_race.raceDay?.trim() ||
+              resolveRaceDayKey(p.athlete_race),
+          }
+        : null,
+    }));
+
+    return NextResponse.json({ plans: serialized });
   } catch (e: unknown) {
     console.error("GET /api/training-plan", e);
     return NextResponse.json({ error: "Failed to list plans" }, { status: 500 });

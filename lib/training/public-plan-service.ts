@@ -11,7 +11,13 @@ import {
   WorkoutType,
 } from "@prisma/client";
 import { randomUUID } from "crypto";
+import { dateKeyFromDate } from "@/lib/calendar-date";
 import { prisma } from "@/lib/prisma";
+import {
+  calendarDayWritePair,
+  resolveRaceDayKey,
+  totalWeeksFromDayKeys,
+} from "@/lib/plan-calendar-day";
 import { metersToMiles } from "@/lib/pace-utils";
 import { loadCatalogueTitleByIdForWeekSchedule } from "@/lib/training/catalogue-title-map";
 import { planScheduleDaysForWeek } from "@/lib/training/plan-schedule";
@@ -525,11 +531,13 @@ export async function adoptPublishedPlanBySlug(
     throw new Error("You must add this race to My Races before adopting this plan");
   }
 
-  const startDate = input.startDate;
-  if (Number.isNaN(startDate.getTime())) throw new Error("Invalid start date");
-  if (startDate >= race.raceDate) {
+  if (Number.isNaN(input.startDate.getTime())) throw new Error("Invalid start date");
+  const startDay = dateKeyFromDate(input.startDate);
+  const raceDay = resolveRaceDayKey(race);
+  if (startDay >= raceDay) {
     throw new Error("Plan start date must be before race date");
   }
+  const startDate = calendarDayWritePair(startDay).anchor;
 
   const athlete = await prisma.athlete.findUnique({ where: { id: input.athleteId } });
   if (!athlete) throw new Error("Athlete not found");
@@ -547,7 +555,7 @@ export async function adoptPublishedPlanBySlug(
   const fiveKPace = input.fiveKPace?.trim() || athlete.fiveKPace || null;
   const weeklyResolved =
     input.weeklyMileage ?? athlete.weeklyMileage ?? null;
-  const totalWeeks = totalWeeksFromDates(startDate, race.raceDate);
+  const totalWeeks = totalWeeksFromDayKeys(startDay, raceDay);
 
   const raceDistanceMiles =
     race.distanceMeters != null && Number.isFinite(Number(race.distanceMeters))
@@ -617,6 +625,7 @@ export async function adoptPublishedPlanBySlug(
         athleteRaceId: athleteRaceRow.id,
         name: planName,
         startDate,
+        startDay,
         currentWeeklyMileage: weeklyResolved,
         weeklyMileageTarget: prefs?.weeklyMileageTarget ?? null,
         currentFiveKPace: fiveKPace,
