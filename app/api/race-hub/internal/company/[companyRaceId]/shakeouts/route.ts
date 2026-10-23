@@ -12,6 +12,7 @@ import {
   applyCityRunCalendarAnchorOnly,
   calendarDateKeyFromDateInput,
   isValidIanaTimezone,
+  resolveEventTimezoneForWrite,
 } from "@/lib/city-run/city-run-zoned-format";
 import { stampCityRunStartsAtOnCreateData } from "@/lib/city-run/stamp-city-run-write";
 import { normalizeRunType } from "@/lib/runTypes";
@@ -132,10 +133,13 @@ export async function POST(
             ? calendarDateKeyFromDateInput(body.date.toISOString())
             : null;
 
-    const timezoneRaw =
+    const timezoneInput =
       typeof body.timezone === "string" && body.timezone.trim()
         ? body.timezone.trim()
         : null;
+    const timezoneResolved = timezoneInput
+      ? resolveEventTimezoneForWrite(timezoneInput)
+      : null;
 
     if (!title || !meetUpPoint || !calendarDateKeyRaw) {
       return NextResponse.json(
@@ -168,15 +172,18 @@ export async function POST(
     const minute = hasStartClock ? (bodyMinute ?? 0) : null;
     const period = hasStartClock ? (bodyPeriod ?? "AM") : null;
 
-    if (hasStartClock && (!timezoneRaw || !isValidIanaTimezone(timezoneRaw))) {
+    if (hasStartClock && (!timezoneResolved || !isValidIanaTimezone(timezoneResolved))) {
       return NextResponse.json(
-        { error: "Valid IANA timezone (e.g. America/New_York) is required when start time is set" },
+        {
+          error:
+            "Timezone is required when start time is set (e.g. EST or Eastern)",
+        },
         { status: 400 }
       );
     }
-    if (timezoneRaw && !isValidIanaTimezone(timezoneRaw)) {
+    if (timezoneInput && (!timezoneResolved || !isValidIanaTimezone(timezoneResolved))) {
       return NextResponse.json(
-        { error: "Invalid IANA timezone" },
+        { error: "Timezone not recognized (try EST, Eastern, Central, or Pacific)" },
         { status: 400 }
       );
     }
@@ -204,7 +211,7 @@ export async function POST(
         id,
         title,
         calendarDateKey: calendarDateKeyRaw,
-        timezone: timezoneRaw,
+        timezone: timezoneResolved,
         meetUpPoint,
         meetUpStreetAddress:
           body.meetUpStreetAddress != null && String(body.meetUpStreetAddress).trim()
@@ -331,7 +338,7 @@ export async function POST(
 
     if (hasStartClock) {
       stampCityRunStartsAtOnCreateData(createData);
-    } else if (timezoneRaw) {
+    } else if (timezoneResolved) {
       applyCityRunCalendarAnchorOnly(createData);
     } else {
       applyCityRunCalendarAnchorOnly({

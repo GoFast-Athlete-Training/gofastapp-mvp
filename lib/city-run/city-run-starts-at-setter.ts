@@ -2,6 +2,7 @@ import {
   parseCalendarDateKeyParts,
   resolveCalendarDateKeyForWrite,
 } from '@/lib/city-run/city-run-zoned-format';
+import { normalizeEventTimezoneInput } from '@/lib/city-run/normalize-event-timezone';
 import { zonedLocalWallClockToUtcMs } from '@/lib/run-discover-freshness';
 
 /** Product default when the user did not state a zone (DC metro). */
@@ -31,7 +32,10 @@ export function resolveCityRunTimezone(input: {
   citySlug?: string | null;
 }): string {
   const stated = input.timezone?.trim();
-  if (stated) return stated;
+  if (stated) {
+    const normalized = normalizeEventTimezoneInput(stated);
+    if (normalized) return normalized;
+  }
   return DEFAULT_CITY_RUN_TIMEZONE;
 }
 

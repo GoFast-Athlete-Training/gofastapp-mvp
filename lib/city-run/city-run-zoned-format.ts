@@ -6,16 +6,11 @@ import { zonedLocalWallClockToUtcMs } from '@/lib/run-discover-freshness';
 
 const DATE_KEY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-export function isValidIanaTimezone(tz: string): boolean {
-  const trimmed = tz.trim();
-  if (!trimmed) return false;
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: trimmed });
-    return true;
-  } catch {
-    return false;
-  }
-}
+export {
+  isValidIanaTimezone,
+  normalizeEventTimezoneInput,
+  resolveEventTimezoneForWrite,
+} from '@/lib/city-run/normalize-event-timezone';
 
 export function isCalendarDateKey(value: string): boolean {
   return DATE_KEY_RE.test(value.trim());
