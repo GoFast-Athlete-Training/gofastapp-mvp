@@ -766,6 +766,7 @@ export async function PUT(
         clubReviewStatus: true,
         citySlug: true,
         date: true,
+        runDay: true,
         startTimeHour: true,
         startTimeMinute: true,
         startTimePeriod: true,
