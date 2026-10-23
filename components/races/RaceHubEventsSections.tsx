@@ -5,6 +5,7 @@ import { Calendar, MapPin } from "lucide-react";
 import type { RaceEventRow, ShakeoutRunRow } from "@/components/races/race-hub-types";
 import { formatCityRunDateInZone } from "@/lib/city-run/city-run-zoned-format";
 import { formatCalendarDate } from "@/lib/calendar-date";
+import ShakeoutRegistrationCallout from "@/components/races/ShakeoutRegistrationCallout";
 
 type RaceHubShakeoutsSectionProps = {
   shakeouts: ShakeoutRunRow[];
@@ -99,6 +100,12 @@ export function RaceHubShakeoutsSection({
                       </div>
                     ) : null}
                   </div>
+
+                  <ShakeoutRegistrationCallout
+                    registrationRequired={sh.registrationRequired}
+                    registrationUrl={sh.registrationUrl}
+                    className="mt-3"
+                  />
 
                   {sh.description ? (
                     <p className="mt-3 text-sm text-gray-700 leading-relaxed whitespace-pre-line">

@@ -83,6 +83,8 @@ export function serializePublicShakeout(
     checkInTimePeriod: hub.checkInTimePeriod,
     gorunPath: hub.gorunPath,
     runClub: hub.runClub,
+    registrationRequired: hub.registrationRequired,
+    registrationUrl: hub.registrationUrl,
   };
 }
 
@@ -118,6 +120,8 @@ export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string)
     shakeoutClubName: run.shakeoutClubName?.trim() || null,
     shakeoutSponsorName: run.shakeoutSponsorName?.trim() || null,
     webUrl: run.webUrl?.trim() || null,
+    registrationRequired: run.registrationRequired ?? null,
+    registrationUrl: run.registrationUrl?.trim() || null,
     stravaEventUrl: run.stravaEventUrl?.trim() || null,
     instagramPostUrl: run.instagramPostUrl?.trim() || null,
     staffNotes: run.staffNotes ?? null,

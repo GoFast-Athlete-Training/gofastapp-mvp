@@ -1845,6 +1845,10 @@ model city_runs {
   shakeoutClubName    String?
   /// CSV import stub until runBrandId is linked (Sponsor Manage).
   shakeoutSponsorName String?
+  /// Branded shakeout: registration required (null = unknown). Not inferred from listing URL.
+  registrationRequired Boolean?
+  /// Official organizer registration link — separate from webUrl listing.
+  registrationUrl      String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime
   startTimeHour       Int?

@@ -22,6 +22,10 @@ import {
   generateCityRunId,
   serializeHubShakeout,
 } from "@/lib/race-hub-shakeout-utils";
+import {
+  normalizeRegistrationUrl,
+  registrationRequiredFromBody,
+} from "@/lib/shakeout-registration";
 
 /** GET — paired city_runs for this registry (editorial + hand-written) */
 export async function GET(
@@ -296,6 +300,8 @@ export async function POST(
             : null,
         webUrl:
           body.webUrl != null && String(body.webUrl).trim() ? String(body.webUrl).trim() : null,
+        registrationRequired: registrationRequiredFromBody(body.registrationRequired) ?? null,
+        registrationUrl: normalizeRegistrationUrl(body.registrationUrl),
         webText:
           body.webText != null && String(body.webText).trim() ? String(body.webText).trim() : null,
         igPostText:

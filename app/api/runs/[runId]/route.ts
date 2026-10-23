@@ -45,6 +45,10 @@ import {
   calendarDateKeyFromDateInput,
   isCalendarDateKey,
 } from '@/lib/city-run/city-run-zoned-format';
+import {
+  normalizeRegistrationUrl,
+  registrationRequiredFromBody,
+} from '@/lib/shakeout-registration';
 import { normalizeProfileEmoji, resolveHostPhotoUrlFromRsvps } from '@/lib/city-run/run-profile-visual';
 const RUNTIME_COMMIT_SHA =
   process.env.VERCEL_GIT_COMMIT_SHA ||
@@ -851,6 +855,15 @@ export async function PUT(
         body.instagramPostUrl === null || body.instagramPostUrl === ''
           ? null
           : String(body.instagramPostUrl).trim();
+    }
+    if (body.registrationRequired !== undefined) {
+      updateData.registrationRequired = registrationRequiredFromBody(body.registrationRequired) ?? null;
+    }
+    if (body.registrationUrl !== undefined) {
+      updateData.registrationUrl =
+        body.registrationUrl === null || body.registrationUrl === ''
+          ? null
+          : normalizeRegistrationUrl(body.registrationUrl);
     }
     if (body.organizerName !== undefined) {
       updateData.organizerName =
