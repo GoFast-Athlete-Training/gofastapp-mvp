@@ -114,6 +114,8 @@ export interface CityRunData {
   runClub: RunClub | null;
   runClubId?: string | null;
   runBrandId?: string | null;
+  runBrandName?: string | null;
+  runBrandLogoUrl?: string | null;
   runStoreId?: string | null;
   cityRunType?: string | null;
   raceRegistryId?: string | null;
