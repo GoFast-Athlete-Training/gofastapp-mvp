@@ -447,6 +447,10 @@ export default function RunManageCreateRunPage() {
               onErrorChange={setError}
               saveLabel={isSeriesCreate ? "Build dated run" : "Create draft run"}
               publicSources={null}
+              publicDescriptionContext={{
+                cityRunType: affiliations.cityRunType,
+                clubName: affiliations.runClubLabel,
+              }}
               headerSlot={headerSlot}
               associateDraft={isSeriesCreate ? undefined : affiliations}
               onAssociateChange={isSeriesCreate ? undefined : setAffiliations}

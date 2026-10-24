@@ -8,6 +8,11 @@ import { parseRunTotalMiles } from "@/lib/parse-run-total-miles";
 import { postRunBrandPickFromRunStamp } from "@/lib/runmanage/post-run-brand-stamp";
 import { normalizeProfileEmoji } from "@/lib/city-run/run-profile-visual";
 import type { AffiliationPick } from "@/components/runmanage/RunManageRunAffiliations";
+import {
+  normalizeRegistrationUrl,
+  registrationRequiredFromUi,
+  registrationRequiredToUi,
+} from "@/lib/shakeout-registration";
 
 function routeMapFields(run: CityRunData) {
   const route = run.route;
@@ -76,6 +81,8 @@ export function cityRunToWizardValues(run: CityRunData): RunInstanceWizardValues
     stravaEventUrl: run.stravaEventUrl || "",
     stravaText: run.stravaText || "",
     webUrl: run.webUrl || "",
+    registrationRequiredUi: registrationRequiredToUi(run.registrationRequired),
+    registrationUrl: run.registrationUrl?.trim() || "",
     webText: run.webText || "",
     igPostText: run.igPostText || "",
     workoutId: "",
@@ -153,6 +160,8 @@ export function wizardValuesToSavePayload(
     stravaEventUrl: values.stravaEventUrl.trim() || null,
     stravaText: values.stravaText.trim() || null,
     webUrl: values.webUrl.trim() || null,
+    registrationRequired: registrationRequiredFromUi(values.registrationRequiredUi),
+    registrationUrl: normalizeRegistrationUrl(values.registrationUrl.trim()),
     webText: values.webText.trim() || null,
     igPostText: values.igPostText.trim() || null,
     workoutId: null,

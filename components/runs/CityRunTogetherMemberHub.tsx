@@ -19,6 +19,7 @@ import { hasSocialRunLifecycle } from '@/lib/city-run-copy';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
 import { resolveViewerRsvpRole } from '@/lib/city-run/viewer-run-role';
 import CityRunHostActions from '@/components/runs/CityRunHostActions';
+import ShakeoutRegistrationCallout from '@/components/races/ShakeoutRegistrationCallout';
 import HostRunExecutionPanel from '@/components/runs/HostRunExecutionPanel';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import api from '@/lib/api';
@@ -94,6 +95,10 @@ export default function CityRunTogetherMemberHub({
         <HostRunExecutionPanel cityRunId={run.id} />
       ) : null}
       <h1 className="text-xl font-bold text-gray-900">{run.title}</h1>
+      <ShakeoutRegistrationCallout
+        registrationRequired={run.registrationRequired}
+        registrationUrl={run.registrationUrl}
+      />
       <CityRunTogetherMeetupStrip run={run} />
       <CityRunHostedByStrip run={run} />
       <CityRunRouteSlice run={run} />

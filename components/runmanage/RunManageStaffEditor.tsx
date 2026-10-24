@@ -176,6 +176,8 @@ export interface CityRunData {
   stravaEventUrl?: string | null;
   stravaText?: string | null;
   webUrl?: string | null;
+  registrationRequired?: boolean | null;
+  registrationUrl?: string | null;
   webText?: string | null;
   igPostText?: string | null;
   workoutId?: string | null;

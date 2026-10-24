@@ -1,6 +1,7 @@
 import type { AffiliationPick } from "@/components/runmanage/RunManageRunAffiliations";
 import type { RunInstanceContext, RunSeriesContext } from "@/lib/runInstanceContent";
 import type { GroupWorkoutSegment } from "@/lib/group-workout-segment-editor";
+import type { RegistrationRequiredUi } from "@/lib/shakeout-registration";
 
 export type WizardStep =
   | "intake"
@@ -25,19 +26,17 @@ export type CoreEditKey =
 
 export const WIZARD_STEP_ORDER: WizardStep[] = [
   "sources",
-  "associate",
   "core",
-  "description",
+  "associate",
   "route",
   "workout",
 ];
 
-/** Create-from-scratch: scope on page → intake → open core → sources → description → route (always) → workout */
+/** Create-from-scratch: scope on page → intake → open core → sources → route (always) → workout */
 export const CREATE_SCRATCH_WIZARD_STEP_ORDER: WizardStep[] = [
   "intake",
   "core",
   "sources",
-  "description",
   "route",
   "workout",
 ];
@@ -45,7 +44,6 @@ export const CREATE_SCRATCH_WIZARD_STEP_ORDER: WizardStep[] = [
 /** Athlete-hosted individual runs — create and edit share this chrome. */
 export const ATHLETE_HOSTED_WIZARD_STEP_ORDER: WizardStep[] = [
   "core",
-  "description",
   "route",
   "workout",
 ];
@@ -78,13 +76,13 @@ export const WIZARD_STEPS: { id: WizardStep; title: string; description: string 
     title: "Associate",
     description: "Optional club or brand — does not change run type",
   },
-  { id: "core", title: "Core details", description: "Date, meet-up, and start time" },
+  { id: "core", title: "Core details", description: "Title, public description, date, meet-up" },
   {
     id: "description",
     title: "Description",
     description: "Draft public copy — regenerate after route is firm",
   },
-  { id: "route", title: "Route", description: "Map, directions, route description" },
+  { id: "route", title: "Route", description: "Optional map and directions" },
   {
     id: "workout",
     title: "Workout",
@@ -95,7 +93,7 @@ export const WIZARD_STEPS: { id: WizardStep; title: string; description: string 
 export const ATHLETE_HOSTED_WIZARD_STEP_COPY: Partial<
   Record<WizardStep, { title: string; description: string }>
 > = {
-  core: { title: "Core details", description: "Title, date, meet-up, and start time" },
+  core: { title: "Core details", description: "Title, public description, date, meet-up" },
   workout: { title: "Distance & workout", description: "" },
 };
 
@@ -142,6 +140,8 @@ export type RunInstanceWizardValues = {
   stravaText: string;
   /** Optional AI description sources — not shown on public page. */
   webUrl: string;
+  registrationRequiredUi: RegistrationRequiredUi;
+  registrationUrl: string;
   webText: string;
   igPostText: string;
   /** Track workout text (track runs only). */
@@ -287,6 +287,8 @@ export function emptyWizardValues(defaultDate?: string): RunInstanceWizardValues
     stravaEventUrl: "",
     stravaText: "",
     webUrl: "",
+    registrationRequiredUi: "unknown",
+    registrationUrl: "",
     webText: "",
     igPostText: "",
     trackWorkoutDescription: "",

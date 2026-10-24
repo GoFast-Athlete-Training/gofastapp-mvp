@@ -19,6 +19,7 @@ const WIZARD_STEP_IDS: WizardStep[] = [
 
 function parseWizardStep(raw: string | null): WizardStep | undefined {
   if (!raw?.trim()) return undefined;
+  if (raw.trim() === "description") return "core";
   const step = raw.trim() as WizardStep;
   return WIZARD_STEP_IDS.includes(step) ? step : undefined;
 }

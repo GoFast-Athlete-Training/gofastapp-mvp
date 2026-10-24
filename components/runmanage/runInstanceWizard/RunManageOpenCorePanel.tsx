@@ -17,6 +17,8 @@ import CityRunProfileMetaFields from "@/components/cityruns/CityRunProfileMetaFi
 import { resolvePartnerCircleMark } from "@/lib/city-run/run-profile-visual";
 import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
 import type { RunInstanceWizardContext, RunInstanceWizardValues } from "./shared";
+import RunPublicDescriptionField from "@/components/runmanage/RunPublicDescriptionField";
+import RunRegistrationFields from "./RunRegistrationFields";
 
 type Props = {
   values: RunInstanceWizardValues;
@@ -26,6 +28,11 @@ type Props = {
   weekdayMismatch: boolean;
   onErrorChange?: (msg: string | null) => void;
   associateDraft?: RunAffiliationDraft | null;
+  titleInPageHeading?: boolean;
+  publicDescriptionContext?: {
+    cityRunType?: string | null;
+    clubName?: string | null;
+  };
 };
 
 export default function RunManageOpenCorePanel({
@@ -36,6 +43,8 @@ export default function RunManageOpenCorePanel({
   weekdayMismatch,
   onErrorChange,
   associateDraft = null,
+  titleInPageHeading = false,
+  publicDescriptionContext,
 }: Props) {
   const partnerMark = resolvePartnerCircleMark({
     runBrandPick: associateDraft?.runBrandPick,
@@ -72,23 +81,69 @@ export default function RunManageOpenCorePanel({
       <div className="border-b border-gray-100 px-4 py-3">
         <h3 className="text-sm font-semibold text-gray-900">Core details</h3>
         <p className="mt-1 text-xs text-gray-600">
-          Date, meet-up, distance, pace, and run type for this run.
+          Title and the public description athletes see, plus date, meet-up, distance, and pace.
         </p>
       </div>
       <div className="space-y-4 px-4 py-4">
+        {!titleInPageHeading ? (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-900">Title *</label>
+            <input
+              type="text"
+              value={values.title}
+              onChange={(e) => {
+                patch({ title: e.target.value });
+                onErrorChange?.(null);
+              }}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="Friday morning shakeout"
+            />
+          </div>
+        ) : null}
+
         {isAthleteHosted ? (
-          <>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-900">Title *</label>
-              <input
-                type="text"
-                value={values.title}
-                onChange={(e) => patch({ title: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                placeholder="Friday morning shakeout"
-              />
-            </div>
-          </>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-900">
+              Public description
+            </label>
+            <p className="mb-1 text-xs text-gray-500">
+              This is the copy on the public run page — not staff notes.
+            </p>
+            <textarea
+              value={values.description}
+              onChange={(e) => patch({ description: e.target.value })}
+              rows={4}
+              placeholder="What kind of run is this? All paces welcome, bag drop, etc."
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+        ) : publicDescriptionContext ? (
+          <RunPublicDescriptionField
+            values={values}
+            onDescriptionChange={(description) => patch({ description })}
+            cityRunType={publicDescriptionContext.cityRunType}
+            clubName={publicDescriptionContext.clubName}
+            onError={onErrorChange}
+          />
+        ) : (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-900">
+              Public description
+            </label>
+            <p className="mb-1 text-xs text-gray-500">
+              This is the copy on the public run page — not staff notes or listing paste.
+            </p>
+            <textarea
+              value={values.description}
+              onChange={(e) => patch({ description: e.target.value })}
+              rows={4}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+        )}
+
+        {!isAthleteHosted ? (
+          <RunRegistrationFields values={values} onChange={patch} />
         ) : null}
 
         <CityRunProfileMetaFields

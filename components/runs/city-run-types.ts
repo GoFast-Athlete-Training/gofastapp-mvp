@@ -119,6 +119,8 @@ export interface CityRunDetails {
   totalMiles: number | null;
   pace: string | null;
   description: string | null;
+  registrationRequired?: boolean | null;
+  registrationUrl?: string | null;
   stravaMapUrl: string | null;
   routePhotos?: string[] | null;
   runPhotos?: string[] | null;

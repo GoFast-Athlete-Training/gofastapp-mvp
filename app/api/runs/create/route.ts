@@ -25,6 +25,10 @@ import {
   associatedRunClubIdFromBody,
   syncCityRunClubAssociation,
 } from "@/lib/city-run/club-association";
+import {
+  normalizeRegistrationUrl,
+  registrationRequiredFromBody,
+} from "@/lib/shakeout-registration";
 
 export const dynamic = "force-dynamic";
 
@@ -180,6 +184,8 @@ export async function POST(request: NextRequest) {
       stravaUrl: bodyStravaUrlLegacy,
       stravaText,
       webUrl,
+      registrationRequired: bodyRegistrationRequired,
+      registrationUrl: bodyRegistrationUrl,
       webText,
       igPostText,
       igPostGraphic,
@@ -694,6 +700,8 @@ export async function POST(request: NextRequest) {
       stravaEventUrl,
       stravaText: stravaText?.trim() || null,
       webUrl: webUrl?.trim() || null,
+      registrationRequired: registrationRequiredFromBody(bodyRegistrationRequired) ?? null,
+      registrationUrl: normalizeRegistrationUrl(bodyRegistrationUrl),
       webText: webText?.trim() || null,
       igPostText: igPostText?.trim() || null,
       igPostGraphic: igPostGraphic?.trim() || null,

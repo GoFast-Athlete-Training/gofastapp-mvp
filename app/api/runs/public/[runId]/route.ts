@@ -124,6 +124,8 @@ export async function GET(
         pace: run.pace,
         runDescription,
         description: runDescription,
+        registrationRequired: run.registrationRequired ?? null,
+        registrationUrl: run.registrationUrl?.trim() || null,
         routeDirections,
         routeDescription,
         seriesPhotoUrl: run.runSeries?.seriesPhotoUrl ?? null,

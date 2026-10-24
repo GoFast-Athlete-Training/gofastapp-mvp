@@ -67,7 +67,7 @@ export default function RunPublicDescriptionField({
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <label htmlFor="run-public-description" className="text-sm font-medium text-gray-700">
+        <label htmlFor="run-public-description" className="text-sm font-medium text-gray-900">
           Public description
         </label>
         <div className="flex flex-wrap gap-2">
@@ -94,6 +94,9 @@ export default function RunPublicDescriptionField({
           </button>
         </div>
       </div>
+      <p className="text-xs text-gray-500">
+        This is the copy athletes see on the public run page — not staff notes or listing paste.
+      </p>
       <textarea
         id="run-public-description"
         rows={compact ? 2 : 3}

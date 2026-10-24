@@ -19,6 +19,7 @@ import {
   resolveRunHeroImage,
 } from '@/lib/city-run/run-profile-visual';
 import { isHostRsvpRole } from '@/lib/city-run/rsvp-role';
+import ShakeoutRegistrationCallout from '@/components/races/ShakeoutRegistrationCallout';
 
 type CityRunDetailsSectionProps = {
   run: CityRunDetails;
@@ -180,6 +181,12 @@ export default function CityRunDetailsSection({
           compact={compact}
           showHero={showHeaderHero}
           {...visualInput}
+        />
+
+        <ShakeoutRegistrationCallout
+          registrationRequired={run.registrationRequired}
+          registrationUrl={run.registrationUrl}
+          className="mt-3"
         />
 
         <div className="space-y-2 sm:space-y-3 text-gray-700 mt-4 sm:mt-5">

@@ -32,3 +32,17 @@ export function normalizeRegistrationUrl(value: unknown): string | null {
 export function isValidRegistrationUrl(value: string | null | undefined): boolean {
   return normalizeRegistrationUrl(value ?? "") != null;
 }
+
+export type RegistrationRequiredUi = "unknown" | "required" | "optional";
+
+export function registrationRequiredToUi(value: boolean | null | undefined): RegistrationRequiredUi {
+  if (value === true) return "required";
+  if (value === false) return "optional";
+  return "unknown";
+}
+
+export function registrationRequiredFromUi(ui: RegistrationRequiredUi): boolean | null {
+  if (ui === "required") return true;
+  if (ui === "optional") return false;
+  return null;
+}

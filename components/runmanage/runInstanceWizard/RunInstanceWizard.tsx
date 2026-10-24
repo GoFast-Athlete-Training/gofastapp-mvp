@@ -66,7 +66,6 @@ import {
 import type { IntakeMode } from "@/components/runmanage/intake/IntakeModePicker";
 import RunManageScratchIntakeStep from "./RunManageScratchIntakeStep";
 import RunManageOpenCorePanel from "./RunManageOpenCorePanel";
-import RunPublicDescriptionField from "@/components/runmanage/RunPublicDescriptionField";
 
 export type RunInstanceWizardProps = {
   values: RunInstanceWizardValues;
@@ -127,7 +126,6 @@ export default function RunInstanceWizard({
   hideFooter = false,
   headerSlot,
   publicSources,
-  instancePublicReadout,
   instanceToolbar,
   initialWizardStep,
   titleInPageHeading = false,
@@ -141,9 +139,13 @@ export default function RunInstanceWizard({
 }: RunInstanceWizardProps) {
   const isAthleteHosted = context.variant === "athlete-hosted";
   const isCreateScratch = context.variant === "create-scratch";
-  const resolvedInitialStep: WizardStep =
-    initialWizardStep ??
-    (isAthleteHosted ? "core" : isCreateScratch ? "intake" : "sources");
+  const resolvedInitialStep: WizardStep = (() => {
+    const raw =
+      initialWizardStep ??
+      (isAthleteHosted ? "core" : isCreateScratch ? "intake" : "sources");
+    if (raw === "description") return "core";
+    return raw;
+  })();
   const [wizardStep, setWizardStep] = useState<WizardStep>(resolvedInitialStep);
   const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
   const [intakeApplied, setIntakeApplied] = useState(false);
@@ -214,9 +216,11 @@ export default function RunInstanceWizard({
 
   const visibleWizardSteps = useMemo(() => {
     if (isAthleteHosted) {
-      return isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
+      const hosted = isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
+      return hosted.filter((s) => s !== "description");
     }
     let steps = isCreateScratch ? stepOrder : isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
+    steps = steps.filter((s) => s !== "description");
     if (isRaceShakeout) {
       steps = steps.filter((s) => s !== "workout");
     }
@@ -668,6 +672,8 @@ export default function RunInstanceWizard({
               weekdayMismatch={weekdayMismatch}
               onErrorChange={onErrorChange}
               associateDraft={associateDraft}
+              titleInPageHeading={titleInPageHeading}
+              publicDescriptionContext={publicDescriptionContext}
             />
           ) : null}
 
@@ -677,7 +683,8 @@ export default function RunInstanceWizard({
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Route</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  Map, directions, and route description for this run.
+                  Optional. Add a map or directions when you have them — skip if this event has no
+                  course.
                 </p>
               </div>
 
@@ -949,60 +956,6 @@ export default function RunInstanceWizard({
             </div>
           )}
 
-          {wizardStep === "description" && isAthleteHosted ? (
-            <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">Description</h3>
-                <p className="mt-1 text-xs text-gray-600">
-                  Public blurb for your invite — what runners should know before they RSVP.
-                </p>
-              </div>
-              <textarea
-                value={values.description}
-                onChange={(e) => patch({ description: e.target.value })}
-                rows={5}
-                placeholder="What kind of run is this? All paces welcome, bag drop, etc."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
-            </div>
-          ) : null}
-
-          {wizardStep === "description" && !isAthleteHosted ? (
-            <div className="space-y-4">
-              {instancePublicReadout ? (
-                <RunClubPublicSourcesCard
-                  runClub={publicSources}
-                  instance={instancePublicReadout}
-                  showClubSection={false}
-                />
-              ) : null}
-              <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Description</h3>
-                  <p className="mt-1 text-xs text-gray-600">
-                    Public blurb on the run page — finish core details, then generate or edit here.
-                  </p>
-                </div>
-                {publicDescriptionContext ? (
-                  <RunPublicDescriptionField
-                    values={values}
-                    onDescriptionChange={(description) => patch({ description })}
-                    cityRunType={publicDescriptionContext.cityRunType}
-                    clubName={publicDescriptionContext.clubName}
-                    onError={onErrorChange}
-                  />
-                ) : (
-                  <textarea
-                    value={values.description}
-                    onChange={(e) => patch({ description: e.target.value })}
-                    rows={5}
-                    placeholder="What kind of run is this? All paces welcome, bag drop, etc."
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                )}
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
 
