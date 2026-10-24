@@ -53,7 +53,7 @@ export async function GET(
       where: { runId: resolvedId, ...(topic ? { topic } : {}) },
       include: {
         Athlete: {
-          select: { id: true, firstName: true, lastName: true, photoURL: true },
+          select: { id: true, firstName: true, lastName: true, photoURL: true, gofastHandle: true },
         },
       },
       orderBy: { createdAt: 'asc' },
@@ -124,7 +124,7 @@ export async function POST(
       },
       include: {
         Athlete: {
-          select: { id: true, firstName: true, lastName: true, photoURL: true },
+          select: { id: true, firstName: true, lastName: true, photoURL: true, gofastHandle: true },
         },
       },
     });

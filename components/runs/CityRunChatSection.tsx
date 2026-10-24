@@ -6,6 +6,7 @@ import { Send } from 'lucide-react';
 import api from '@/lib/api';
 import { LocalStorageAPI } from '@/lib/localstorage';
 import type { CityRunMessage } from '@/components/runs/city-run-types';
+import { athleteProfileHref } from '@/lib/gofast-with-me/athlete-community-routes';
 
 function Avatar({
   athlete,
@@ -188,14 +189,35 @@ export default function CityRunChatSection({
         ) : (
           messages.map((msg) => {
             const isMe = msg.athleteId === athleteId;
+            const authorHref = !isMe ? athleteProfileHref(msg.Athlete?.gofastHandle) : null;
+            const authorName = [msg.Athlete?.firstName, msg.Athlete?.lastName]
+              .filter(Boolean)
+              .join(' ')
+              .trim();
+            const avatar = <Avatar athlete={msg.Athlete} sizeClass="w-7 h-7" />;
             return (
               <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
-                <Avatar athlete={msg.Athlete} sizeClass="w-7 h-7" />
+                {authorHref ? (
+                  <a href={authorHref} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                    {avatar}
+                  </a>
+                ) : (
+                  avatar
+                )}
                 <div className={`max-w-[85%] ${isMe ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
                   {!isMe ? (
-                    <span className="text-[10px] text-gray-400">
-                      {msg.Athlete?.firstName} {msg.Athlete?.lastName}
-                    </span>
+                    authorHref ? (
+                      <a
+                        href={authorHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-gray-400 hover:text-orange-600 hover:underline"
+                      >
+                        {authorName}
+                      </a>
+                    ) : (
+                      <span className="text-[10px] text-gray-400">{authorName}</span>
+                    )
                   ) : null}
                   <div
                     className={`px-3 py-1.5 rounded-2xl text-xs ${

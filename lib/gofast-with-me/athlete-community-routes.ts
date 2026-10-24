@@ -89,6 +89,13 @@ export function athletePublicLandingUrl(handle: string): string {
   return runnerPublicLandingUrl(handle);
 }
 
+/** Public runner landing, or null when the athlete has no handle. */
+export function athleteProfileHref(handle?: string | null): string | null {
+  const trimmed = handle?.trim();
+  if (!trimmed) return null;
+  return athletePublicLandingUrl(trimmed);
+}
+
 /** @deprecated Use athletePublicLandingUrl for stranger-facing links. Kept for redirects. */
 export function athletePublicPagePath(handle: string): string {
   return `/u/${encodeURIComponent(normalizeGoFastWithMeSlug(handle))}`;

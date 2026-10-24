@@ -1,8 +1,39 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Users } from 'lucide-react';
 import type { CityRunRsvp } from '@/components/runs/city-run-types';
 import { splitCityRunRsvpsByRole } from '@/lib/city-run/rsvp-attendance';
+import { athleteProfileHref } from '@/lib/gofast-with-me/athlete-community-routes';
+
+function athleteName(athlete?: { firstName?: string; lastName?: string } | null): string {
+  return [athlete?.firstName, athlete?.lastName].filter(Boolean).join(' ').trim();
+}
+
+function PersonLink({
+  handle,
+  className,
+  children,
+}: {
+  handle?: string | null;
+  className: string;
+  children: ReactNode;
+}) {
+  const href = athleteProfileHref(handle);
+  if (!href) {
+    return <div className={className}>{children}</div>;
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`${className} hover:border-orange-200 hover:bg-orange-50/60`}
+    >
+      {children}
+    </a>
+  );
+}
 
 function Avatar({
   athlete,
@@ -32,12 +63,13 @@ function Avatar({
 
 function PersonRow({ rsvp }: { rsvp: CityRunRsvp }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2">
+    <PersonLink
+      handle={rsvp.Athlete?.gofastHandle}
+      className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2"
+    >
       <Avatar athlete={rsvp.Athlete} />
-      <span className="text-sm text-gray-700">
-        {rsvp.Athlete?.firstName} {rsvp.Athlete?.lastName}
-      </span>
-    </div>
+      <span className="text-sm text-gray-700">{athleteName(rsvp.Athlete)}</span>
+    </PersonLink>
   );
 }
 
@@ -90,12 +122,13 @@ export default function CityRunPeopleSection({
           {expanded ? (
             <PersonRow rsvp={host} />
           ) : (
-            <div className="flex items-center gap-2">
+            <PersonLink
+              handle={host.Athlete?.gofastHandle}
+              className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5"
+            >
               <Avatar athlete={host.Athlete} />
-              <span className="text-sm text-gray-700">
-                {host.Athlete?.firstName} {host.Athlete?.lastName}
-              </span>
-            </div>
+              <span className="text-sm text-gray-700">{athleteName(host.Athlete)}</span>
+            </PersonLink>
           )}
         </div>
       ) : null}
@@ -117,12 +150,14 @@ export default function CityRunPeopleSection({
         ) : (
           <div className="flex flex-wrap gap-3">
             {members.map((r) => (
-              <div key={r.id} className="flex items-center gap-2">
+              <PersonLink
+                key={r.id}
+                handle={r.Athlete?.gofastHandle}
+                className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5"
+              >
                 <Avatar athlete={r.Athlete} />
-                <span className="text-sm text-gray-700">
-                  {r.Athlete?.firstName} {r.Athlete?.lastName}
-                </span>
-              </div>
+                <span className="text-sm text-gray-700">{athleteName(r.Athlete)}</span>
+              </PersonLink>
             ))}
           </div>
         )}
@@ -147,10 +182,13 @@ function PublicPersonRow({ rsvp }: { rsvp: CityRunRsvp }) {
   const handle = rsvp.Athlete?.gofastHandle?.trim();
   const label = handle ? `@${handle.replace(/^@/, '')}` : 'Runner';
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2">
+    <PersonLink
+      handle={handle}
+      className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2"
+    >
       <Avatar athlete={rsvp.Athlete} />
       <span className="text-sm font-medium text-gray-800">{label}</span>
-    </div>
+    </PersonLink>
   );
 }
 

@@ -48,7 +48,7 @@ export async function PUT(
       data: { content: content.trim(), updatedAt: new Date() },
       include: {
         Athlete: {
-          select: { id: true, firstName: true, lastName: true, photoURL: true },
+          select: { id: true, firstName: true, lastName: true, photoURL: true, gofastHandle: true },
         },
       },
     });

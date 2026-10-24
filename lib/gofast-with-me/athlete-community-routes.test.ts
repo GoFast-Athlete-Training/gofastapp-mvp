@@ -5,6 +5,7 @@ import {
   athleteMyPlanPath,
   athleteCommunityPreviewPath,
   athleteCommunitySectionToHubTab,
+  athleteProfileHref,
   athletePublicLandingUrl,
   athletePublicPagePath,
   legacyContainerRedirectTarget,
@@ -15,6 +16,11 @@ import {
 test('builds canonical community URLs', () => {
   assert.equal(athletePublicPagePath('Adam'), '/u/adam');
   assert.equal(athletePublicLandingUrl('adam'), 'https://runner.gofastcrushgoals.com/adam');
+  assert.equal(athleteProfileHref('adam'), 'https://runner.gofastcrushgoals.com/adam');
+  assert.equal(athleteProfileHref('  adam  '), 'https://runner.gofastcrushgoals.com/adam');
+  assert.equal(athleteProfileHref(null), null);
+  assert.equal(athleteProfileHref(''), null);
+  assert.equal(athleteProfileHref('   '), null);
   assert.equal(athleteCommunityPath('adam'), '/u/adam/community');
   assert.equal(athleteCommunityPath('adam', 'plan'), '/u/adam/community#plan');
   assert.equal(athleteCommunityPreviewPath('adam'), '/u/adam/community?preview=follower');
