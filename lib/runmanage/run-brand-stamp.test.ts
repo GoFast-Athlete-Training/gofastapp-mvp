@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fillMissingRunBrandStampFromCatalog } from "./run-brand-stamp";
+import {
+  cityRunBrandStampOverwriteFromCatalog,
+  fillMissingRunBrandStampFromCatalog,
+} from "./run-brand-stamp";
 
 test("fills an empty logo from the prod brand snap", () => {
   const filled = fillMissingRunBrandStampFromCatalog(
@@ -22,4 +25,17 @@ test("does not overwrite a stamp that already has a logo", () => {
     { name: "lululemon", logoUrl: "https://cdn.example/lulu.png" },
   );
   assert.equal(filled.runBrandLogoUrl, "https://stamp.example/logo.png");
+});
+
+test("catalog overwrite replaces an existing city_run stamp logo", () => {
+  const stamp = cityRunBrandStampOverwriteFromCatalog({
+    name: "lululemon",
+    logoUrl: "https://cdn.example/lulu.png",
+    websiteUrl: "https://shop.lululemon.com",
+    instagramHandle: "@lululemon",
+  });
+  assert.equal(stamp.runBrandName, "lululemon");
+  assert.equal(stamp.runBrandLogoUrl, "https://cdn.example/lulu.png");
+  assert.equal(stamp.runBrandWebsiteUrl, "https://shop.lululemon.com");
+  assert.equal(stamp.runBrandInstagramHandle, "lululemon");
 });

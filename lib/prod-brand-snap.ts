@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { parseCoffeeFoodKind } from "@/lib/brands/coffee-food-kind";
+import { cityRunBrandStampOverwriteFromCatalog } from "@/lib/runmanage/run-brand-stamp";
 
 const BRAND_TYPES = [
   "SHOE",
@@ -133,6 +134,16 @@ export async function upsertProdBrandSnap(b: ProdBrandSnapInput) {
       updatedAt: now,
       ...(slugUpdate ? { slug: slugUpdate } : {}),
     },
+  });
+
+  await prisma.city_runs.updateMany({
+    where: { runBrandId: brandId },
+    data: cityRunBrandStampOverwriteFromCatalog({
+      name,
+      logoUrl,
+      websiteUrl,
+      instagramHandle,
+    }),
   });
 
   return { ok: true as const, brand };

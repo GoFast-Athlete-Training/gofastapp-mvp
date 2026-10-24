@@ -177,6 +177,21 @@ export function attachRunBrandSnap<
   return run;
 }
 
+/** SOT catalog overwrite for city_run stamps linked to this brand (not fill-if-empty). */
+export function cityRunBrandStampOverwriteFromCatalog(catalog: ProdBrandCatalogSnap): {
+  runBrandName: string;
+  runBrandLogoUrl: string | null;
+  runBrandWebsiteUrl: string | null;
+  runBrandInstagramHandle: string | null;
+} {
+  return {
+    runBrandName: catalog.name.trim(),
+    runBrandLogoUrl: catalog.logoUrl?.trim() || null,
+    runBrandWebsiteUrl: catalog.websiteUrl?.trim() || null,
+    runBrandInstagramHandle: catalog.instagramHandle?.trim().replace(/^@+/, "") || null,
+  };
+}
+
 export function cityRunBrandDisplay(run: {
   runBrandName?: string | null;
   runBrandLogoUrl?: string | null;
