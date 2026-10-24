@@ -826,6 +826,11 @@ export async function PUT(
         startTimeMinute: true,
         startTimePeriod: true,
         timezone: true,
+        runBrandId: true,
+        runBrandName: true,
+        runBrandLogoUrl: true,
+        runBrandWebsiteUrl: true,
+        runBrandInstagramHandle: true,
       },
     });
 
