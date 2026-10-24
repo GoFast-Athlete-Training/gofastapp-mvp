@@ -1080,7 +1080,15 @@ export async function PUT(
     // Relationship FKs that determine cityRunType
     const relationshipPatch = relationshipPatchFromBody(body as Record<string, unknown>);
     if (relationshipPatch.runClubId !== undefined) {
-      updateData.runClubId = relationshipPatch.runClubId;
+      let nextClubId = relationshipPatch.runClubId;
+      if (typeof nextClubId === "string" && nextClubId.trim()) {
+        const clubRow = await prisma.run_clubs.findUnique({
+          where: { id: nextClubId.trim() },
+          select: { id: true },
+        });
+        if (!clubRow) nextClubId = null;
+      }
+      updateData.runClubId = nextClubId;
     }
     if (relationshipPatch.runCrewId !== undefined) {
       updateData.runCrewId = relationshipPatch.runCrewId;
