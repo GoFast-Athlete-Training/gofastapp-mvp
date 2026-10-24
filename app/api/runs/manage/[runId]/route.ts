@@ -12,7 +12,8 @@ import {
   isClubReviewStatus,
 } from '@/lib/club-run-club-review';
 import type { ClubReviewStatus } from '@prisma/client';
-import { attachRunBrandSnap } from '@/lib/runmanage/run-brand-stamp';
+import { attachRunBrandSnap, overlayMissingBrandDisplay } from '@/lib/runmanage/run-brand-stamp';
+import { lookupProdBrandCatalog } from '@/lib/runmanage/prod-brand-catalog-lookup';
 import {
   cityRunClubAssociationSelect,
   mapClubAssociationRow,
@@ -256,16 +257,22 @@ export async function GET(
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
+    const catalog = await lookupProdBrandCatalog(run.runBrandId);
     return NextResponse.json({
       success: true,
-      run: attachRunBrandSnap({
-        ...run,
-        clubAssociation: run.club_association
-          ? mapClubAssociationRow(run.club_association)
-          : null,
-        routePhotos: Array.isArray(run.routePhotos) ? run.routePhotos : null,
-        rsvps: run.city_run_rsvps,
-      }),
+      run: attachRunBrandSnap(
+        overlayMissingBrandDisplay(
+          {
+            ...run,
+            clubAssociation: run.club_association
+              ? mapClubAssociationRow(run.club_association)
+              : null,
+            routePhotos: Array.isArray(run.routePhotos) ? run.routePhotos : null,
+            rsvps: run.city_run_rsvps,
+          },
+          catalog,
+        ),
+      ),
     });
   } catch (error: any) {
     if (isMissingCityRunsColumn(error)) {

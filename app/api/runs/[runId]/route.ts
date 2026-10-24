@@ -34,7 +34,13 @@ import {
   mapClubAssociationRow,
   syncCityRunClubAssociation,
 } from '@/lib/city-run/club-association';
-import { attachRunBrandSnap, runBrandStampFieldsFromBody } from '@/lib/runmanage/run-brand-stamp';
+import {
+  attachRunBrandSnap,
+  fillMissingRunBrandStampFromCatalog,
+  overlayMissingBrandDisplay,
+  runBrandStampFieldsFromBody,
+} from '@/lib/runmanage/run-brand-stamp';
+import { lookupProdBrandCatalog } from '@/lib/runmanage/prod-brand-catalog-lookup';
 import {
   postRunBrandProdSelect,
   postRunBrandStampFieldsFromBody,
@@ -611,6 +617,16 @@ export async function GET(
       isHostRsvpRole,
     );
 
+    const brandDisplay = overlayMissingBrandDisplay(
+      {
+        runBrandName: run.runBrandName ?? null,
+        runBrandLogoUrl: run.runBrandLogoUrl ?? null,
+        runBrandWebsiteUrl: run.runBrandWebsiteUrl ?? null,
+        runBrandInstagramHandle: run.runBrandInstagramHandle ?? null,
+      },
+      await lookupProdBrandCatalog(run.runBrandId),
+    );
+
     // Format response (exclude sensitive fields)
     return NextResponse.json({
       success: true,
@@ -730,10 +746,10 @@ export async function GET(
         shakeoutClubName: run.shakeoutClubName ?? null,
         shakeoutSponsorName: run.shakeoutSponsorName ?? null,
         runBrandId: run.runBrandId ?? null,
-        runBrandName: run.runBrandName ?? null,
-        runBrandLogoUrl: run.runBrandLogoUrl ?? null,
-        runBrandWebsiteUrl: run.runBrandWebsiteUrl ?? null,
-        runBrandInstagramHandle: run.runBrandInstagramHandle ?? null,
+        runBrandName: brandDisplay.runBrandName ?? null,
+        runBrandLogoUrl: brandDisplay.runBrandLogoUrl ?? null,
+        runBrandWebsiteUrl: brandDisplay.runBrandWebsiteUrl ?? null,
+        runBrandInstagramHandle: brandDisplay.runBrandInstagramHandle ?? null,
         runClub,
         runCrew,
         clubMembership,
@@ -1118,6 +1134,35 @@ export async function PUT(
           : String(body.meetUpStoreId).trim() || null;
     }
     Object.assign(updateData, runBrandStampFieldsFromBody(body as Record<string, unknown>));
+    const nextBrandId =
+      updateData.runBrandId !== undefined
+        ? (updateData.runBrandId as string | null)
+        : run.runBrandId;
+    const nextLogo =
+      updateData.runBrandLogoUrl !== undefined
+        ? (updateData.runBrandLogoUrl as string | null)
+        : run.runBrandLogoUrl;
+    if (typeof nextBrandId === "string" && nextBrandId.trim() && !String(nextLogo ?? "").trim()) {
+      const catalog = await lookupProdBrandCatalog(nextBrandId);
+      Object.assign(
+        updateData,
+        fillMissingRunBrandStampFromCatalog(
+          {
+            runBrandId: nextBrandId.trim(),
+            runBrandName:
+              (updateData.runBrandName as string | null | undefined) ?? run.runBrandName,
+            runBrandLogoUrl: nextLogo,
+            runBrandWebsiteUrl:
+              (updateData.runBrandWebsiteUrl as string | null | undefined) ??
+              run.runBrandWebsiteUrl,
+            runBrandInstagramHandle:
+              (updateData.runBrandInstagramHandle as string | null | undefined) ??
+              run.runBrandInstagramHandle,
+          },
+          catalog,
+        ),
+      );
+    }
 
     const postRunStampBody = postRunBrandStampFieldsFromBody(body as Record<string, unknown>);
     Object.assign(updateData, postRunStampBody);

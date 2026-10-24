@@ -6,6 +6,8 @@ import {
   cityRunClubAssociationSelect,
   mapClubAssociationRow,
 } from '@/lib/city-run/club-association';
+import { lookupProdBrandCatalog } from '@/lib/runmanage/prod-brand-catalog-lookup';
+import { overlayMissingBrandDisplay } from '@/lib/runmanage/run-brand-stamp';
 
 /**
  * GET /api/runs/public/[runId]
@@ -88,6 +90,16 @@ export async function GET(
       hostPhotoUrl = hostAthlete?.photoURL?.trim() || null;
     }
 
+    const brandDisplay = overlayMissingBrandDisplay(
+      {
+        runBrandName: run.runBrandName?.trim() || null,
+        runBrandLogoUrl: run.runBrandLogoUrl?.trim() || null,
+        runBrandWebsiteUrl: run.runBrandWebsiteUrl?.trim() || null,
+        runBrandInstagramHandle: run.runBrandInstagramHandle?.trim() || null,
+      },
+      await lookupProdBrandCatalog(run.runBrandId),
+    );
+
     const runDescription = run.description ?? run.runSeries?.description ?? null;
     const routeDirections = run.directionsText ?? run.runSeries?.seriesRunRawText ?? null;
     const routeDescription =
@@ -123,8 +135,8 @@ export async function GET(
         shakeoutClubName: run.shakeoutClubName?.trim() || null,
         shakeoutSponsorName: run.shakeoutSponsorName?.trim() || null,
         runBrandId: run.runBrandId ?? null,
-        runBrandName: run.runBrandName?.trim() || null,
-        runBrandLogoUrl: run.runBrandLogoUrl?.trim() || null,
+        runBrandName: brandDisplay.runBrandName?.trim() || null,
+        runBrandLogoUrl: brandDisplay.runBrandLogoUrl?.trim() || null,
         timezone: run.timezone,
         startsAt: run.startsAt?.toISOString() ?? null,
         totalMiles: run.totalMiles,

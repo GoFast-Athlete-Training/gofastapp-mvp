@@ -82,6 +82,61 @@ export function runBrandStampFieldsFromBody(body: Record<string, unknown>): RunB
   return out;
 }
 
+export type ProdBrandCatalogSnap = {
+  name: string;
+  logoUrl: string | null;
+  websiteUrl?: string | null;
+  instagramHandle?: string | null;
+};
+
+/** Fill empty city_run brand stamp fields from the prod `brands` snap (GSM ingest). */
+export function fillMissingRunBrandStampFromCatalog(
+  stamp: RunBrandStampFields,
+  catalog: ProdBrandCatalogSnap | null | undefined,
+): RunBrandStampFields {
+  if (!catalog) return stamp;
+  const catalogLogo = catalog.logoUrl?.trim() || null;
+  const catalogName = catalog.name?.trim() || null;
+  const catalogWebsite = catalog.websiteUrl?.trim() || null;
+  const catalogIg = catalog.instagramHandle?.trim().replace(/^@+/, "") || null;
+  return {
+    ...stamp,
+    runBrandName: stamp.runBrandName?.trim() || catalogName || stamp.runBrandName,
+    runBrandLogoUrl: stamp.runBrandLogoUrl?.trim() || catalogLogo || stamp.runBrandLogoUrl,
+    runBrandWebsiteUrl:
+      stamp.runBrandWebsiteUrl?.trim() || catalogWebsite || stamp.runBrandWebsiteUrl,
+    runBrandInstagramHandle:
+      stamp.runBrandInstagramHandle?.trim() || catalogIg || stamp.runBrandInstagramHandle,
+  };
+}
+
+export function overlayMissingBrandDisplay<
+  T extends {
+    runBrandName?: string | null;
+    runBrandLogoUrl?: string | null;
+    runBrandWebsiteUrl?: string | null;
+    runBrandInstagramHandle?: string | null;
+  },
+>(run: T, catalog: ProdBrandCatalogSnap | null | undefined): T {
+  if (!catalog) return run;
+  const filled = fillMissingRunBrandStampFromCatalog(
+    {
+      runBrandName: run.runBrandName,
+      runBrandLogoUrl: run.runBrandLogoUrl,
+      runBrandWebsiteUrl: run.runBrandWebsiteUrl,
+      runBrandInstagramHandle: run.runBrandInstagramHandle,
+    },
+    catalog,
+  );
+  return {
+    ...run,
+    runBrandName: filled.runBrandName ?? run.runBrandName,
+    runBrandLogoUrl: filled.runBrandLogoUrl ?? run.runBrandLogoUrl,
+    runBrandWebsiteUrl: filled.runBrandWebsiteUrl ?? run.runBrandWebsiteUrl,
+    runBrandInstagramHandle: filled.runBrandInstagramHandle ?? run.runBrandInstagramHandle,
+  };
+}
+
 export function attachRunBrandSnap<
   T extends {
     runBrandId?: string | null;
