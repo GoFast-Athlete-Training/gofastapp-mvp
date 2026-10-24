@@ -1377,24 +1377,37 @@ model special_events {
   @@map("special_events")
 }
 
-/// Physical run store — prodpush from Company acq_run_stores; id matches ACQ row id.
+/// Physical venue — run specialty retail, coffee, bagels, etc. (not a brand row).
 model run_stores {
   id               String      @id
   brandId          String?
   slug             String      @unique
   name             String
+  storeType        StoreType   @default(RUN_STORE)
+  whatItSells      String?
+  runningTieIn     String?
   websiteUrl       String?
+  instagramHandle  String?
   logoUrl          String?
+  contactEmail     String?
+  contactPhone     String?
+  streetAddress    String?
+  formattedAddress String?
+  placeId          String?
+  lat              Float?
+  lng              Float?
+  zipCode          String?
   city             String?
   state            String?
-  formattedAddress String?
   syncedAt         DateTime    @default(now())
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
   brand            brands?     @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  city_runs        city_runs[]
+  city_runs        city_runs[]  @relation("CityRunRunStoreHost")
+  meet_up_runs     city_runs[]  @relation("CityRunMeetUpStore")
 
   @@index([brandId])
+  @@index([storeType])
   @@map("run_stores")
 }
 
@@ -1894,6 +1907,8 @@ model city_runs {
   raceRegistryId      String?
   /// Optional store partner (e.g. local Fleet Feet) — hydrates website/logo on the run.
   runStoreId          String?
+  /// Shakeout meet-up venue (store catalog) — does not change cityRunType.
+  meetUpStoreId       String?
   /// Brand on this run (Sponsor Manage brand id — no prod brands FK).
   runBrandId          String?
   runBrandName        String?
@@ -1921,7 +1936,8 @@ model city_runs {
   runClub             run_clubs?           @relation(fields: [runClubId], references: [id], onDelete: SetNull)
   runSeries           run_series?          @relation(fields: [runSeriesId], references: [id], onDelete: SetNull)
   race_registry       race_registry?       @relation("CityRunRaceRegistry", fields: [raceRegistryId], references: [id], onDelete: SetNull)
-  runStore            run_stores?          @relation(fields: [runStoreId], references: [id], onDelete: SetNull)
+  runStore            run_stores?          @relation("CityRunRunStoreHost", fields: [runStoreId], references: [id], onDelete: SetNull)
+  meetUpStore         run_stores?          @relation("CityRunMeetUpStore", fields: [meetUpStoreId], references: [id], onDelete: SetNull)
   specialEvent        special_events?      @relation(fields: [specialEventId], references: [id], onDelete: SetNull)
   route               routes?              @relation(fields: [routeId], references: [id], onDelete: SetNull)
   workout             workouts?            @relation(fields: [workoutId], references: [id], onDelete: SetNull)
@@ -1944,6 +1960,7 @@ model city_runs {
   @@index([runSeriesId])
   @@index([raceRegistryId])
   @@index([runStoreId])
+  @@index([meetUpStoreId])
   @@index([runBrandId])
   @@index([postRunBrandId])
   @@index([specialEventId])
@@ -3617,6 +3634,13 @@ enum CoffeeFoodKind {
   COFFEE
   BAGELS
   OTHER
+}
+
+/// Physical venue kind on run_stores (meet-up / partnership catalog).
+enum StoreType {
+  RUN_STORE
+  FOOD_STORE
+  BIG_BRAND_STORE
 }
 
 enum RouteShape {

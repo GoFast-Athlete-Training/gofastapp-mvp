@@ -91,91 +91,52 @@ export default function CityRunPartnerPanel({
     setSearching(true);
     setError(null);
     try {
-      if (kind === "brand") {
-        const res = await runmanageApi.get(
-          `/api/runmanage/brands/search?${new URLSearchParams({ q }).toString()}`,
-        );
-        const brands = (res.data?.brands ?? []) as Array<{
-          id: string;
-          name: string;
-          slug?: string | null;
-          logoUrl?: string | null;
-          websiteUrl?: string | null;
-          instagramHandle?: string | null;
-        }>;
-        setHits(
-          brands.map((b) => ({
-            type: "BRAND",
-            id: b.id,
-            name: b.name,
-            secondary: b.slug ?? null,
-            logoUrl: b.logoUrl ?? null,
-            websiteUrl: b.websiteUrl ?? null,
-            instagramHandle: b.instagramHandle ?? null,
-          })),
-        );
-      } else {
-        const res = await runmanageApi.get(
-          `/api/runmanage/run-stores/search?${new URLSearchParams({ q }).toString()}`,
-        );
-        const stores = (res.data?.stores ?? []) as Array<{
-          id: string;
-          name: string;
-          slug?: string | null;
-          logoUrl?: string | null;
-          city?: string | null;
-        }>;
-        setHits(
-          stores.map((s) => ({
-            type: "RUN_STORE",
-            id: s.id,
-            name: s.name,
-            secondary: s.city ?? s.slug ?? null,
-            logoUrl: s.logoUrl ?? null,
-          })),
-        );
-      }
+      const res = await runmanageApi.get(
+        `/api/runmanage/brands/search?${new URLSearchParams({ q }).toString()}`,
+      );
+      const brands = (res.data?.brands ?? []) as Array<{
+        id: string;
+        name: string;
+        slug?: string | null;
+        logoUrl?: string | null;
+        websiteUrl?: string | null;
+        instagramHandle?: string | null;
+      }>;
+      setHits(
+        brands.map((b) => ({
+          type: "BRAND",
+          id: b.id,
+          name: b.name,
+          secondary: b.slug ?? null,
+          logoUrl: b.logoUrl ?? null,
+          websiteUrl: b.websiteUrl ?? null,
+          instagramHandle: b.instagramHandle ?? null,
+        })),
+      );
     } catch {
       setError("Search failed");
     } finally {
       setSearching(false);
     }
-  }, [query, kind]);
+  }, [query]);
 
   async function applyHit(hit: EntityHit) {
     setSaving(true);
     setError(null);
     try {
-      if (kind === "store" && hit.type !== "RUN_STORE") {
-        setError("Pick a run store");
-        return;
-      }
-      if (kind === "brand" && hit.type !== "BRAND") {
+      if (hit.type !== "BRAND") {
         setError("Pick a brand");
         return;
       }
 
-      if (kind === "store") {
-        const push = await runmanageApi.post(`/api/acq-run-stores/${encodeURIComponent(hit.id)}/companypush`);
-        if (!push.data?.success) {
-          setError(push.data?.error ?? "Store sync failed");
-          return;
-        }
-        const prodId = push.data.store?.id as string | undefined;
-        await runmanageApi.put(`/api/runs/${runId}`, {
-          runStoreId: prodId ?? hit.id,
-          runBrandId: null,
-        });
-      } else if (kind === "brand") {
-        await runmanageApi.put(`/api/runs/${runId}`, {
-          runBrandId: hit.id,
-          runBrandName: hit.name,
-          runBrandLogoUrl: hit.logoUrl ?? null,
-          runBrandWebsiteUrl: hit.websiteUrl ?? null,
-          runBrandInstagramHandle: hit.instagramHandle ?? null,
-          runStoreId: null,
-        });
-      }
+      await runmanageApi.put(`/api/runs/${runId}`, {
+        runBrandId: hit.id,
+        runBrandName: hit.name,
+        runBrandLogoUrl: hit.logoUrl ?? null,
+        runBrandWebsiteUrl: hit.websiteUrl ?? null,
+        runBrandInstagramHandle: hit.instagramHandle ?? null,
+        runStoreId: null,
+      });
       setHits([]);
       setQuery("");
       await onUpdated();
@@ -207,8 +168,8 @@ export default function CityRunPartnerPanel({
     <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-700">Run partner</p>
       <p className="mt-1 text-xs text-gray-500">
-        Optional store (e.g. Fleet Feet) or brand sponsor. Stores sync from ACQ; brands come from
-        Sponsor Manage (prod snap).
+        Optional brand sponsor from Sponsor Manage. Attach a local door on the Race Manage hub
+        (meet-up store).
       </p>
 
       {partner.kind !== "none" ? (
@@ -256,30 +217,27 @@ export default function CityRunPartnerPanel({
       ) : (
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap gap-2">
-            {(["store", "brand"] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => {
-                  setKind(k);
-                  setHits([]);
-                }}
-                className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
-                  kind === k
-                    ? "border-sky-600 bg-sky-100 text-sky-950"
-                    : "border-gray-200 bg-white text-gray-700"
-                }`}
-              >
-                {k === "store" ? "Run store" : "Brand"}
-              </button>
-            ))}
+            <button
+              type="button"
+              onClick={() => {
+                setKind("brand");
+                setHits([]);
+              }}
+              className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
+                kind === "brand"
+                  ? "border-sky-600 bg-sky-100 text-sky-950"
+                  : "border-gray-200 bg-white text-gray-700"
+              }`}
+            >
+              Brand
+            </button>
           </div>
-          {kind !== "none" ? (
+          {kind === "brand" ? (
             <>
               <div className="flex gap-2">
                 <input
                   className="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-                  placeholder="Search ACQ library…"
+                  placeholder="Search brands…"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => {

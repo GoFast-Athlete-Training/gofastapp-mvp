@@ -191,6 +191,7 @@ export async function GET(
           runClubId: true,
           runBrandId: true,
           runStoreId: true,
+          meetUpStoreId: true,
           raceRegistryId: true,
           partnerExtras: true,
           athleteGeneratedId: true,
@@ -324,7 +325,18 @@ export async function GET(
           select: cityRunClubAssociationSelect,
         },
         runStore: {
-          select: { id: true, name: true, websiteUrl: true, logoUrl: true },
+          select: { id: true, name: true, websiteUrl: true, logoUrl: true, storeType: true },
+        },
+        meetUpStore: {
+          select: {
+            id: true,
+            name: true,
+            websiteUrl: true,
+            logoUrl: true,
+            city: true,
+            state: true,
+            storeType: true,
+          },
         },
         runBrandName: true,
         runBrandLogoUrl: true,
@@ -376,6 +388,7 @@ export async function GET(
           runClubId: true,
           runBrandId: true,
           runStoreId: true,
+          meetUpStoreId: true,
           raceRegistryId: true,
           partnerExtras: true,
           athleteGeneratedId: true,
@@ -604,6 +617,8 @@ export async function GET(
         runSeries: run.runSeries ? { id: run.runSeries.id, dayOfWeek: run.runSeries.dayOfWeek, name: run.runSeries.name, meetUpPoint: run.runSeries.meetUpPoint, startTimeHour: run.runSeries.startTimeHour, startTimeMinute: run.runSeries.startTimeMinute, startTimePeriod: run.runSeries.startTimePeriod, description: run.runSeries.description } : null,
         date: run.date.toISOString(),
         runClubId: run.runClubId,
+        meetUpStoreId: run.meetUpStoreId ?? null,
+        meetUpStore: run.meetUpStore ?? null,
         cityRunType: run.cityRunType,
         athleteGeneratedId: run.athleteGeneratedId ?? null,
         clubAssociation: run.club_association
@@ -763,6 +778,7 @@ export async function PUT(
         runClubId: true,
         runCrewId: true,
         runStoreId: true,
+        meetUpStoreId: true,
         athleteGeneratedId: true,
         raceRegistryId: true,
         specialEventId: true,
@@ -1067,6 +1083,12 @@ export async function PUT(
         body.runStoreId === null || body.runStoreId === ''
           ? null
           : String(body.runStoreId).trim() || null;
+    }
+    if (body.meetUpStoreId !== undefined) {
+      updateData.meetUpStoreId =
+        body.meetUpStoreId === null || body.meetUpStoreId === ''
+          ? null
+          : String(body.meetUpStoreId).trim() || null;
     }
     Object.assign(updateData, runBrandStampFieldsFromBody(body as Record<string, unknown>));
 

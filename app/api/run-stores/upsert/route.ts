@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isStoreTypeValue, storeTypeFromMeetupPointType } from "@/lib/store-type";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,10 @@ export async function POST(request: NextRequest) {
         : null;
     const brandId =
       s.brandId != null && String(s.brandId).trim() ? String(s.brandId).trim() : null;
+    const storeTypeRaw = s.storeType != null ? String(s.storeType).trim().toUpperCase() : "";
+    const storeType =
+      storeTypeFromMeetupPointType(storeTypeRaw) ??
+      (isStoreTypeValue(storeTypeRaw) ? storeTypeRaw : undefined);
 
     const now = new Date();
     const store = await prisma.run_stores.upsert({
@@ -76,6 +81,7 @@ export async function POST(request: NextRequest) {
         brandId,
         slug,
         name,
+        ...(storeType ? { storeType } : {}),
         websiteUrl,
         logoUrl,
         city,
@@ -88,6 +94,7 @@ export async function POST(request: NextRequest) {
         brandId,
         slug,
         name,
+        ...(storeType ? { storeType } : {}),
         websiteUrl,
         logoUrl,
         city,
