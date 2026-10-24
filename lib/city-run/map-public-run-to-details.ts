@@ -32,12 +32,21 @@ export type PublicCityRunPayload = {
   routeNeighborhood?: string | null;
   runType?: string | null;
   instanceType?: string;
+  cityRunType?: string | null;
   runClub?: {
     slug: string;
     name: string;
     logoUrl: string | null;
     city: string | null;
   } | null;
+  runBrandName?: string | null;
+  runBrandLogoUrl?: string | null;
+  organizerType?: string | null;
+  organizerName?: string | null;
+  shakeoutClubName?: string | null;
+  shakeoutSponsorName?: string | null;
+  registrationRequired?: boolean | null;
+  registrationUrl?: string | null;
   runSeries?: {
     id: string;
     slug?: string | null;
@@ -83,7 +92,7 @@ export function mapPublicRunToCityRunDetails(
     dayOfWeek: publicRun.dayOfWeek ?? null,
     date: publicRun.date,
     runSeriesId,
-    cityRunType: null,
+    cityRunType: publicRun.cityRunType ?? null,
     runSeries: series,
     meetUpPoint: publicRun.meetUpPoint ?? '',
     meetUpStreetAddress: publicRun.meetUpStreetAddress ?? null,
@@ -116,6 +125,14 @@ export function mapPublicRunToCityRunDetails(
           city: publicRun.runClub.city,
         }
       : null,
+    runBrandName: publicRun.runBrandName ?? null,
+    runBrandLogoUrl: publicRun.runBrandLogoUrl ?? null,
+    organizerType: publicRun.organizerType ?? null,
+    organizerName: publicRun.organizerName ?? null,
+    shakeoutClubName: publicRun.shakeoutClubName ?? null,
+    shakeoutSponsorName: publicRun.shakeoutSponsorName ?? null,
+    registrationRequired: publicRun.registrationRequired ?? null,
+    registrationUrl: publicRun.registrationUrl ?? null,
     rsvps,
     currentRSVP: null,
     currentRSVPRole: null,

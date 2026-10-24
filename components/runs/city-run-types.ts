@@ -55,6 +55,7 @@ export interface CityRunMessage {
     firstName: string;
     lastName: string;
     photoURL: string | null;
+    gofastHandle?: string | null;
   };
 }
 
@@ -175,6 +176,10 @@ export interface CityRunDetails {
     instagramHandle?: string | null;
     logoUrl?: string | null;
   } | null;
+  organizerType?: string | null;
+  organizerName?: string | null;
+  shakeoutClubName?: string | null;
+  shakeoutSponsorName?: string | null;
   runCrew?: RunCrew | null;
   rsvps?: CityRunRsvp[];
   currentRSVP?: string | null;

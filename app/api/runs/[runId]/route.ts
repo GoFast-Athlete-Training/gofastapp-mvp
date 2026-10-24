@@ -306,6 +306,7 @@ export async function GET(
                 firstName: true,
                 lastName: true,
                 photoURL: true,
+                gofastHandle: true,
               },
             },
           },
@@ -344,6 +345,10 @@ export async function GET(
         runBrandLogoUrl: true,
         runBrandWebsiteUrl: true,
         runBrandInstagramHandle: true,
+        organizerType: true,
+        organizerName: true,
+        shakeoutClubName: true,
+        shakeoutSponsorName: true,
         runSeries: {
           select: {
             id: true,
@@ -427,6 +432,7 @@ export async function GET(
                   firstName: true,
                   lastName: true,
                   photoURL: true,
+                  gofastHandle: true,
                 },
               },
             },
@@ -608,7 +614,7 @@ export async function GET(
     // Format response (exclude sensitive fields)
     return NextResponse.json({
       success: true,
-      run: {
+      run: attachRunBrandSnap({
         id: run.id,
         slug: run.slug ?? null,
         title: run.title,
@@ -719,6 +725,15 @@ export async function GET(
         webText: run.webText ?? null,
         igPostText: run.igPostText ?? null,
         igPostGraphic: run.igPostGraphic ?? null,
+        organizerType: run.organizerType ?? null,
+        organizerName: run.organizerName ?? null,
+        shakeoutClubName: run.shakeoutClubName ?? null,
+        shakeoutSponsorName: run.shakeoutSponsorName ?? null,
+        runBrandId: run.runBrandId ?? null,
+        runBrandName: run.runBrandName ?? null,
+        runBrandLogoUrl: run.runBrandLogoUrl ?? null,
+        runBrandWebsiteUrl: run.runBrandWebsiteUrl ?? null,
+        runBrandInstagramHandle: run.runBrandInstagramHandle ?? null,
         runClub,
         runCrew,
         clubMembership,
@@ -731,7 +746,7 @@ export async function GET(
         })),
         currentRSVP: userRSVP?.status || null,
         currentRSVPRole,
-      },
+      }),
     });
   } catch (error: any) {
     if (isMissingCityRunsColumn(error)) {

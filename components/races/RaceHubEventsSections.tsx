@@ -6,6 +6,7 @@ import type { RaceEventRow, ShakeoutRunRow } from "@/components/races/race-hub-t
 import { formatCityRunDateInZone } from "@/lib/city-run/city-run-zoned-format";
 import { formatCalendarDate } from "@/lib/calendar-date";
 import ShakeoutRegistrationCallout from "@/components/races/ShakeoutRegistrationCallout";
+import { resolveShakeoutPublicHost } from "@/lib/city-run/shakeout-public-host";
 
 type RaceHubShakeoutsSectionProps = {
   shakeouts: ShakeoutRunRow[];
@@ -23,7 +24,7 @@ export function RaceHubShakeoutsSection({
       <div>
         <h2 className="text-lg font-bold text-gray-900">Official shakeouts</h2>
         <p className="text-sm text-gray-500 mt-1">
-          City runs synced from race HQ — same RSVPs and check-ins as club runs.
+          Group runs before race day.
         </p>
       </div>
       {shakeouts.length === 0 ? (
@@ -35,7 +36,17 @@ export function RaceHubShakeoutsSection({
           {shakeouts.map((sh) => {
             const my = sh.myRsvp?.status ?? null;
             const isGoing = my === "going";
-            const isCantGo = my === "not-going";
+            const host = resolveShakeoutPublicHost({
+              cityRunType: "RACE_SHAKEOUT",
+              organizerType: sh.organizerType,
+              organizerName: sh.organizerName,
+              runClub: sh.runClub,
+              shakeoutClubName: sh.shakeoutClubName,
+              runBrandName: sh.runBrandName,
+              runBrandLogoUrl: sh.runBrandLogoUrl,
+              shakeoutSponsorName: sh.shakeoutSponsorName,
+            });
+            const detailsHref = `/shakeout/${encodeURIComponent(sh.slug?.trim() || sh.id)}`;
 
             const timeLabel = (() => {
               if (sh.startTimeHour == null) return null;
@@ -60,9 +71,9 @@ export function RaceHubShakeoutsSection({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-bold text-gray-900 text-base leading-snug">{sh.title}</p>
-                      {sh.runClub ? (
+                      {host ? (
                         <p className="text-xs text-orange-600 font-medium mt-0.5">
-                          Hosted by {sh.runClub.name}
+                          Hosted by {host.name}
                         </p>
                       ) : null}
                     </div>
@@ -117,45 +128,34 @@ export function RaceHubShakeoutsSection({
                   ) : null}
 
                   {readOnly ? (
-                    sh.gorunPath ? (
-                      <div className="mt-4">
-                        <Link
-                          href={sh.gorunPath}
-                          className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
-                        >
-                          Run details
-                        </Link>
-                      </div>
-                    ) : null
+                    <div className="mt-4">
+                      <Link
+                        href={detailsHref}
+                        className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
+                      >
+                        Details
+                      </Link>
+                    </div>
                   ) : (
                     <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void onSetShakeoutRunRsvp(sh.id, "going")}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                          isGoing
-                            ? "bg-green-600 text-white"
-                            : "bg-orange-500 hover:bg-orange-600 text-white"
-                        }`}
-                      >
-                        {isGoing ? "✓ I'm in" : "I'm in"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void onSetShakeoutRunRsvp(sh.id, "not-going")}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                          isCantGo
-                            ? "bg-gray-600 text-white"
-                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                        }`}
-                      >
-                        Can&apos;t make it
-                      </button>
+                      {isGoing ? (
+                        <span className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white">
+                          ✓ I&apos;m in
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void onSetShakeoutRunRsvp(sh.id, "going")}
+                          className="px-4 py-2 rounded-lg text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white"
+                        >
+                          I&apos;m in
+                        </button>
+                      )}
                       <Link
-                        href={sh.gorunPath}
+                        href={detailsHref}
                         className="ml-auto text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
                       >
-                        Run details
+                        Details
                       </Link>
                     </div>
                   )}

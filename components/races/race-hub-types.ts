@@ -67,8 +67,15 @@ export type ShakeoutRunRow = {
   startTimeHour: number | null;
   startTimeMinute: number | null;
   startTimePeriod: string | null;
+  slug?: string | null;
   gorunPath: string;
   runClub: { id: string; name: string; slug: string } | null;
+  shakeoutClubName?: string | null;
+  shakeoutSponsorName?: string | null;
+  organizerType?: string | null;
+  organizerName?: string | null;
+  runBrandName?: string | null;
+  runBrandLogoUrl?: string | null;
   registrationRequired?: boolean | null;
   registrationUrl?: string | null;
   rsvpCount: number;

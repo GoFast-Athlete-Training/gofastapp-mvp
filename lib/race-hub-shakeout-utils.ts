@@ -127,10 +127,12 @@ export function serializeHubShakeout(run: RunWithClub, viewerAthleteId?: string)
     staffNotes: run.staffNotes ?? null,
     runBrandId: run.runBrandId ?? null,
     runBrandName: run.runBrandName?.trim() || null,
+    runBrandLogoUrl: run.runBrandLogoUrl?.trim() || null,
     runStoreId: run.runStoreId ?? null,
     runStore: run.runStore
       ? { id: run.runStore.id, name: run.runStore.name, slug: run.runStore.slug }
       : null,
+    slug: run.slug?.trim() || null,
     gorunPath: `/gorun/${run.id}`,
     runClub: run.runClub ?? null,
     rsvpCount: rsvps.filter((rv) => rv.status === "going").length,
