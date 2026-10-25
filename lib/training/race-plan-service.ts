@@ -31,16 +31,22 @@ function parseRaceDayAndAnchor(raw: Date | string, fallback?: { raceDate: Date; 
 export async function getRacePlanForAthleteRace(params: {
   athleteId: string;
   athleteRaceId: string;
-}): Promise<{ racePlanId: string | null; planJson: RacePlanDocument; pushedAt: Date | null }> {
+}): Promise<{
+  racePlanId: string | null;
+  title: string | null;
+  planJson: RacePlanDocument;
+  pushedAt: Date | null;
+}> {
   const row = await prisma.race_plans.findFirst({
     where: { athleteId: params.athleteId, athleteRaceId: params.athleteRaceId },
-    select: { id: true, planJson: true, pushedAt: true },
+    select: { id: true, title: true, planJson: true, pushedAt: true },
   });
   if (!row) {
-    return { racePlanId: null, planJson: { ...EMPTY_RACE_PLAN }, pushedAt: null };
+    return { racePlanId: null, title: null, planJson: { ...EMPTY_RACE_PLAN }, pushedAt: null };
   }
   return {
     racePlanId: row.id,
+    title: row.title?.trim() || null,
     planJson: normalizeRacePlanDocument(row.planJson),
     pushedAt: row.pushedAt,
   };

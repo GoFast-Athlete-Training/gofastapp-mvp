@@ -70,6 +70,36 @@ function blockPaceSplitState(block: RacePlanBlock) {
   return { lowMin, lowSec, highMin, highSec };
 }
 
+function defaultRacePlanTitle(context: RacePlanContext, raceTitle: string): string {
+  return context.title?.trim() || raceTitle.trim() || "Race plan";
+}
+
+function formatRaceDayLabel(raw: string): string {
+  const s = raw.trim();
+  if (!s) return "Race day";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(`${s}T12:00:00`);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  }
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  return s;
+}
+
 function applyPaceEdits(block: RacePlanBlock, lowMin: string, lowSec: string, highMin: string, highSec: string): RacePlanBlock {
   const ctx = block.cue.trim() || "Race block";
   let paceLow = block.paceLow;
@@ -102,6 +132,8 @@ function applyPaceEdits(block: RacePlanBlock, lowMin: string, lowSec: string, hi
 export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }: Props) {
   const [plan, setPlan] = useState<RacePlanDocument>({ ...EMPTY_RACE_PLAN });
   const [racePlanId, setRacePlanId] = useState<string | null>(null);
+  const [workoutTitle, setWorkoutTitle] = useState("");
+  const [garminPushedAt, setGarminPushedAt] = useState<string | null>(null);
   const [loadingState, setLoadingState] = useState(false);
 
   const [sourceText, setSourceText] = useState("");
@@ -125,16 +157,35 @@ export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }:
 
   const hasBlocks = plan.blocks.some((b) => b.mileEnd > b.mileStart);
 
+  const defaultPlanTitle = useMemo(
+    () => defaultRacePlanTitle(racePlanContext, raceTitle),
+    [racePlanContext, raceTitle]
+  );
+
+  const garminWorkoutTitle = useMemo(
+    () => workoutTitle.trim() || defaultPlanTitle,
+    [workoutTitle, defaultPlanTitle]
+  );
+
+  const garminCalendarDayLabel = useMemo(
+    () => formatRaceDayLabel(racePlanContext.raceDate),
+    [racePlanContext.raceDate]
+  );
+
   const loadRacePlan = useCallback(async () => {
     setLoadingState(true);
     try {
       const { data } = await api.get<{
         racePlanId?: string | null;
+        title?: string | null;
         planJson?: RacePlanDocument;
+        pushedAt?: string | null;
       }>(
         `/races/race-plan?athleteRaceId=${encodeURIComponent(racePlanContext.athleteRaceId)}`
       );
       setRacePlanId(data.racePlanId?.trim() || null);
+      setWorkoutTitle(data.title?.trim() || defaultRacePlanTitle(racePlanContext, raceTitle));
+      setGarminPushedAt(data.pushedAt?.trim() || null);
       if (data.planJson?.blocks?.length) {
         setPlan(data.planJson);
       }
@@ -143,7 +194,7 @@ export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }:
     } finally {
       setLoadingState(false);
     }
-  }, [racePlanContext.athleteRaceId]);
+  }, [racePlanContext, raceTitle]);
 
   useEffect(() => {
     void loadRacePlan();
@@ -214,12 +265,34 @@ export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }:
         sourceText: text,
       });
       setPlan(data.planJson);
+      setRacePlanId(null);
+      setWorkoutTitle(defaultPlanTitle);
+      setGarminPushedAt(null);
+      setSaveMessage(null);
+      setSaveError(null);
+      setGarminMessage(null);
+      setGarminError(null);
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
       setDeriveError(ax.response?.data?.error ?? "Could not parse race plan.");
     } finally {
       setDeriving(false);
     }
+  };
+
+  const persistRacePlan = async (): Promise<string | null> => {
+    const title = workoutTitle.trim() || defaultPlanTitle;
+    const { data } = await api.post<{ racePlanId?: string }>("races/race-plan", {
+      athleteRaceId: racePlanContext.athleteRaceId,
+      planId: racePlanContext.planId ?? null,
+      title,
+      raceDate: racePlanContext.raceDate,
+      planJson: plan,
+    });
+    const id = data.racePlanId?.trim() || null;
+    setRacePlanId(id);
+    setWorkoutTitle(title);
+    return id;
   };
 
   const handleSave = async () => {
@@ -230,17 +303,16 @@ export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }:
     setSaving(true);
     setSaveError(null);
     setSaveMessage(null);
+    setGarminMessage(null);
     try {
-      const { data } = await api.post<{ racePlanId?: string }>("races/race-plan", {
-        athleteRaceId: racePlanContext.athleteRaceId,
-        planId: racePlanContext.planId ?? null,
-        title: racePlanContext.title?.trim() || raceTitle,
-        raceDate: racePlanContext.raceDate,
-        planJson: plan,
-      });
-      const id = data.racePlanId?.trim() || null;
-      setRacePlanId(id);
-      setSaveMessage("Race plan saved.");
+      const id = await persistRacePlan();
+      if (!id) {
+        setSaveError("Could not save race plan.");
+        return;
+      }
+      setSaveMessage(
+        "Race plan saved to this race. You can send it to Garmin below whenever you're ready."
+      );
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
       setSaveError(ax.response?.data?.error ?? "Could not save.");
@@ -254,24 +326,23 @@ export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }:
     setGarminError(null);
     setGarminMessage(null);
     try {
-      let id = racePlanId;
+      const id = await persistRacePlan();
       if (!id) {
-        const { data } = await api.post<{ racePlanId?: string }>("races/race-plan", {
-          athleteRaceId: racePlanContext.athleteRaceId,
-          planId: racePlanContext.planId ?? null,
-          title: racePlanContext.title?.trim() || raceTitle,
-          raceDate: racePlanContext.raceDate,
-          planJson: plan,
-        });
-        id = data.racePlanId?.trim() || null;
-        setRacePlanId(id);
-      }
-      if (!id) {
-        setGarminError("Save your race plan first.");
+        setGarminError("Could not save your race plan before sending to Garmin.");
         return;
       }
-      await api.post(`races/race-plan/${encodeURIComponent(id)}/push-to-garmin`);
-      setGarminMessage("Sent to Garmin. Sync your watch.");
+      const { data: pushData } = await api.post<{ scheduledDate?: string }>(
+        `races/race-plan/${encodeURIComponent(id)}/push-to-garmin`
+      );
+      const scheduled =
+        pushData.scheduledDate?.trim() ?
+          formatRaceDayLabel(pushData.scheduledDate)
+        : garminCalendarDayLabel;
+      setGarminPushedAt(new Date().toISOString());
+      setGarminMessage(
+        `Sent to Garmin as “${garminWorkoutTitle}” on ${scheduled}. Sync your watch to load the workout.`
+      );
+      setSaveMessage("Race plan saved and sent to Garmin.");
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { error?: string } } };
       setGarminError(ax.response?.data?.error ?? "Could not send to Garmin.");
@@ -522,6 +593,9 @@ export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }:
             setPlan({ ...EMPTY_RACE_PLAN });
             setEditingIndex(null);
             setSourceText("");
+            setWorkoutTitle(defaultPlanTitle);
+            setRacePlanId(null);
+            setGarminPushedAt(null);
           }}
           className="text-sm text-gray-600 hover:text-gray-900 underline underline-offset-2"
         >
@@ -529,30 +603,93 @@ export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }:
         </button>
       ) : null}
 
-      <div className="flex flex-wrap gap-3 pt-2">
-        <button
-          type="button"
-          disabled={saving || loadingState || !hasBlocks}
-          onClick={() => void handleSave()}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save race plan"}
-        </button>
+      {hasBlocks ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-4 py-3 space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Save and send</p>
+            <p className="mt-1 text-xs text-gray-600">
+              <strong>Parse</strong> only loads a preview in this browser.{" "}
+              <strong>Save race plan</strong> stores it on your {raceTitle} signup so it reloads
+              next time. <strong>Send to Garmin</strong> saves the latest blocks and creates watch
+              workout steps (connect Garmin in Settings if the button is disabled).
+            </p>
+          </div>
+          <div>
+            <label htmlFor="race-plan-workout-title" className="block text-sm font-semibold text-gray-900">
+              Garmin workout name
+            </label>
+            <p className="mt-0.5 text-xs text-gray-600 mb-1.5">
+              Saved with your plan and used as the workout title in Garmin Connect (e.g.{" "}
+              {defaultPlanTitle} — 3:02).
+            </p>
+            <input
+              id="race-plan-workout-title"
+              type="text"
+              value={workoutTitle}
+              onChange={(e) => setWorkoutTitle(e.target.value)}
+              maxLength={120}
+              placeholder={defaultPlanTitle}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+          <div className="rounded-lg border border-orange-200 bg-orange-50/60 px-3 py-2.5 text-xs text-gray-800 space-y-1">
+            <p className="font-semibold text-orange-950">What Garmin will show</p>
+            <p>
+              <span className="text-gray-600">Workout name</span>{" "}
+              <span className="font-medium text-gray-900">{garminWorkoutTitle}</span>
+            </p>
+            <p>
+              <span className="text-gray-600">Calendar day</span>{" "}
+              <span className="font-medium text-gray-900">{garminCalendarDayLabel}</span>
+              <span className="text-gray-500"> — your race date on the plan</span>
+            </p>
+            <p className="text-gray-600">
+              Each mile block becomes one work step; the block title (cue/focus) is the step label on
+              your watch.
+              {plan.goal?.trim() ?
+                " Your pasted Goal becomes the workout description in Garmin."
+              : null}
+            </p>
+            {garminPushedAt ? (
+              <p className="text-gray-600 pt-0.5">
+                Last sent to Garmin:{" "}
+                {new Date(garminPushedAt).toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={saving || loadingState || !hasBlocks}
+              onClick={() => void handleSave()}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save race plan"}
+            </button>
 
-        {showGarminButton ? (
-          <button
-            type="button"
-            disabled={pushingGarmin || garminConnected === false}
-            onClick={() => void handlePushGarmin()}
-            className="rounded-lg border border-orange-300 bg-white px-4 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-50 disabled:opacity-50"
-          >
-            {pushingGarmin ? "Sending…" : "Send to Garmin"}
-          </button>
-        ) : null}
-      </div>
+            {showGarminButton ? (
+              <button
+                type="button"
+                disabled={pushingGarmin || saving || garminConnected === false}
+                onClick={() => void handlePushGarmin()}
+                className="rounded-lg border border-orange-300 bg-white px-4 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-50 disabled:opacity-50"
+              >
+                {pushingGarmin ? "Sending…" : "Send to Garmin"}
+              </button>
+            ) : null}
+          </div>
 
-      {saveMessage ? <p className="text-sm text-emerald-800">{saveMessage}</p> : null}
-      {saveError ? <p className="text-sm text-red-600">{saveError}</p> : null}
+          {saveMessage ? (
+            <p className="text-sm font-medium text-emerald-900 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+              {saveMessage}
+            </p>
+          ) : null}
+          {saveError ? <p className="text-sm text-red-600">{saveError}</p> : null}
+        </div>
+      ) : null}
       {garminMessage ? (
         <p className="text-sm font-medium text-emerald-900 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
           {garminMessage}

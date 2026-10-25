@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       racePlanId: state.racePlanId,
+      title: state.title,
       planJson: state.planJson,
       pushedAt: state.pushedAt?.toISOString() ?? null,
     });
