@@ -1,16 +1,16 @@
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import {
+  looksLikeRacePlanMileCsv,
+  parseRacePlanFromMileCsv,
+} from "@/lib/races/race-plan-csv";
+import {
   EMPTY_RACE_PLAN,
+  RacePlanParseError,
   type RacePlanBlock,
   type RacePlanDocument,
 } from "@/lib/races/race-plan-types";
 
-export class RacePlanParseError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RacePlanParseError";
-  }
-}
+export { RacePlanParseError };
 
 const BLOCK_HEADER =
   /^\s*BLOCK\s+\d+\s*[—–-]\s*Miles\s+([\d.]+)\s+to\s+([\d.]+)\s*$/im;
@@ -79,15 +79,19 @@ function parsePrimaryRule(text: string): string {
   return m?.[1]?.trim().replace(/\s+/g, " ") ?? "";
 }
 
-/** Parse a coach-style race plan document into planJson. */
+/** Parse a coach-style race plan document or mile CSV into planJson. */
 export function parseRacePlanDocument(sourceText: string): RacePlanDocument {
   const text = sourceText.trim();
   if (!text) throw new RacePlanParseError("Paste your race plan first.");
 
+  if (looksLikeRacePlanMileCsv(text)) {
+    return parseRacePlanFromMileCsv(text);
+  }
+
   const blocks = parseBlocksFromDocument(text);
   if (blocks.length === 0) {
     throw new RacePlanParseError(
-      "Could not find race blocks. Use BLOCK n — Miles a to b with Target Pace, Effort, Instruction, and Cue."
+      "Could not find race blocks. Use BLOCK n — Miles a to b with Target Pace, Effort, Instruction, and Cue — or paste mile CSV (mile_start, mile_end, pace_min, pace_max, focus)."
     );
   }
 

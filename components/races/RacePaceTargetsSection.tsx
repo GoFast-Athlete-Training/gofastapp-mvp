@@ -290,8 +290,8 @@ export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }:
             Create Race Pace Targets
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            Paste a full race plan with blocks (mile range, pace band, effort, instruction, cue).
-            Each block becomes a Garmin work step on race day.
+            Paste a coach BLOCK plan or mile CSV (mile_start, mile_end, pace_min, pace_max, focus).
+            Each row or block becomes a Garmin work step on race day.
           </p>
         </div>
       )}
@@ -299,12 +299,18 @@ export function RacePaceTargetsSection({ racePlanContext, raceTitle, embedded }:
       {!hasBlocks ? (
         <div className="rounded-lg border border-gray-200 bg-white/80 p-4">
           <h4 className="text-sm font-semibold text-gray-900 mb-2">Paste race plan</h4>
+          <p className="mb-2 text-xs text-gray-600">
+            CSV: mile_start,mile_end,target_pace,pace_min,pace_max,focus — or BLOCK headers with Target
+            Pace lines.
+          </p>
           <textarea
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}
             rows={8}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 font-mono"
-            placeholder={"Goal: …\n\nBLOCK 1 — Miles 0.0 to 3.0\nTarget Pace: 7:03-7:07/mi\n…"}
+            placeholder={
+              "mile_start,mile_end,pace_min,pace_max,focus\n0,1,6:53,7:03,\"Opening mile\"\n\n— or —\n\nBLOCK 1 — Miles 0.0 to 3.0\nTarget Pace: 7:03-7:07/mi"
+            }
           />
           {deriveError ? <p className="mt-1 text-sm text-red-600">{deriveError}</p> : null}
           <button

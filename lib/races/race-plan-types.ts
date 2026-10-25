@@ -1,3 +1,10 @@
+export class RacePlanParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RacePlanParseError";
+  }
+}
+
 /** Athlete-authored race plan document (not a workout prescription). */
 export type RacePlanBlock = {
   mileStart: number;

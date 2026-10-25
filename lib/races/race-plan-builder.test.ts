@@ -33,3 +33,32 @@ test("parseRacePlanDocument reads blocks with cue and pace band", () => {
   assert.match(doc.goal, /Controlled opening/i);
   assert.match(doc.primaryRule, /Do not bank time early/i);
 });
+
+const MCM_CSV = `mile_start,mile_end,target_pace,pace_min,pace_max,focus
+0,1,6:58,6:53,7:03,"Clear congestion, establish rhythm"
+1,2,7:07,7:02,7:12,"Rosslyn ascent"
+25,26,6:35,6:30,6:40,"Kick if available"
+26,26.2,,,,"Finish hill, by effort"
+`;
+
+test("parseRacePlanDocument reads mile CSV with quoted focus and skips empty pace row", () => {
+  const doc = parseRacePlanDocument(MCM_CSV);
+  assert.equal(doc.blocks.length, 3);
+  assert.equal(doc.goal, "");
+  assert.equal(doc.primaryRule, "");
+  assert.equal(doc.blocks[0]?.mileStart, 0);
+  assert.equal(doc.blocks[0]?.mileEnd, 1);
+  assert.equal(doc.blocks[0]?.paceLow, "6:53");
+  assert.equal(doc.blocks[0]?.paceHigh, "7:03");
+  assert.equal(doc.blocks[0]?.cue, "Clear congestion, establish rhythm");
+  assert.equal(doc.blocks[2]?.cue, "Kick if available");
+});
+
+test("parseRacePlanDocument rejects mile CSV with no valid pace rows", () => {
+  assert.throws(
+    () =>
+      parseRacePlanDocument(`mile_start,mile_end,target_pace,pace_min,pace_max,focus
+26,26.2,,,,"Finish only"`),
+    /Could not parse mile CSV/
+  );
+});
