@@ -734,6 +734,12 @@ export default function TrainingHubPage() {
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               <Link
+                href="/workouts/create?back=/training"
+                className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-700"
+              >
+                Build a workout
+              </Link>
+              <Link
                 href="/training/past-plans"
                 className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm hover:border-gray-300 hover:text-gray-900"
               >

@@ -15,7 +15,11 @@ import {
   secondsPerMileToSecondsPerKm,
   storedPaceSecondsKmToSecondsPerMile,
 } from "@/lib/workout-generator/pace-calculator";
-import { workoutDetailPathWithBackHref } from "@/lib/training/workout-nav-query";
+import {
+  backLabelFromPath,
+  isSafeInternalBackPath,
+  workoutDetailPathWithBackHref,
+} from "@/lib/training/workout-nav-query";
 import { formatSegmentDistance } from "@/lib/training/segment-summary";
 import {
   suggestRaceBlocksFromGoal,
@@ -231,10 +235,20 @@ function slotOneLine(slot: SlotData): string {
         ? `${slot.durationValue} min`
         : formatSegmentDistance(slot.durationValue)
       : "";
+  const reps =
+    slot.repeatCount != null && slot.repeatCount > 1 ? `${slot.repeatCount}× ` : "";
   const low = slot.paceValueLow != null ? secPerKmToPaceDisplay(slot.paceValueLow) : "";
   const high = slot.paceValueHigh != null ? secPerKmToPaceDisplay(slot.paceValueHigh) : "";
   const pace = low && high ? (low === high ? `${low}/mi` : `${low}-${high}/mi`) : "";
-  return [dist, pace].filter(Boolean).join(" — ") || "—";
+  let recovery = "";
+  if (slot.recoveryDurationValue != null && slot.recoveryDurationValue > 0) {
+    recovery =
+      slot.recoveryDurationType === "TIME"
+        ? ` / ${slot.recoveryDurationValue} min easy`
+        : ` / ${formatSegmentDistance(slot.recoveryDurationValue)} easy`;
+  }
+  const body = [`${reps}${dist}`.trim(), pace].filter(Boolean).join(" — ");
+  return `${body || "—"}${recovery}`;
 }
 
 function slotToPaceSplitState(slot: SlotData | null): {
@@ -314,6 +328,10 @@ function CreateWorkoutPageInner() {
   const racePlanId = searchParams.get("planId")?.trim() ?? "";
   const raceDateKey = searchParams.get("date")?.trim() ?? "";
   const raceDayBackHref = searchParams.get("back")?.trim() || "/training";
+  const rawBuilderBack = searchParams.get("back")?.trim() ?? "";
+  const builderBackHref = isSafeInternalBackPath(rawBuilderBack)
+    ? rawBuilderBack
+    : "/training";
   const [workoutType, setWorkoutType] = useState<string>("Easy");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -606,6 +624,14 @@ function CreateWorkoutPageInner() {
     setCooldown(slots.cooldown);
     setName(params.suggestedTitle);
     setDescription(params.suggestedDescription);
+    if (!raceDayMode) {
+      setWorkoutType(inferWorkoutTypeFromApiSegments(params.segments));
+    }
+    requestAnimationFrame(() => {
+      document
+        .getElementById("workout-builder-segments")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   /** Paste / derive / catalogue → save once, open workout detail cards, not create-page segment builder. */
@@ -648,7 +674,7 @@ function CreateWorkoutPageInner() {
       router.push(`/host-a-run?workoutId=${encodeURIComponent(id)}`);
       return;
     }
-    const detailBase = workoutDetailPathWithBackHref(id, "/workouts");
+      const detailBase = workoutDetailPathWithBackHref(id, builderBackHref);
     const detailUrl = detailBase.includes("?") ? `${detailBase}&created=1` : `${detailBase}?created=1`;
     router.push(detailUrl);
   };
@@ -675,11 +701,7 @@ function CreateWorkoutPageInner() {
           suggestedTitle: `${workoutType} — ${totalMi.toFixed(1)} mi`,
           suggestedDescription: `Pasted splits (${tabular.length} segments).`,
         };
-        if (raceDayMode) {
-          applyDerivedSegmentsToCreateForm(derived);
-          return;
-        }
-        await createWorkoutFromDerivedSegments(derived);
+        applyDerivedSegmentsToCreateForm(derived);
         return;
       }
 
@@ -688,15 +710,7 @@ function CreateWorkoutPageInner() {
         suggestedTitle: string;
         suggestedDescription: string;
       }>("workouts/ai-generate", { workoutType, sourceText: text });
-      if (raceDayMode) {
-        applyDerivedSegmentsToCreateForm({
-          segments: data.segments,
-          suggestedTitle: data.suggestedTitle,
-          suggestedDescription: data.suggestedDescription,
-        });
-        return;
-      }
-      await createWorkoutFromDerivedSegments({
+      applyDerivedSegmentsToCreateForm({
         segments: data.segments,
         suggestedTitle: data.suggestedTitle,
         suggestedDescription: data.suggestedDescription,
@@ -941,7 +955,7 @@ function CreateWorkoutPageInner() {
         );
         return;
       }
-      const detailBase = workoutDetailPathWithBackHref(workout.id, "/workouts");
+      const detailBase = workoutDetailPathWithBackHref(workout.id, builderBackHref);
       const detailUrl = detailBase.includes("?")
         ? `${detailBase}&created=1`
         : `${detailBase}?created=1`;
@@ -962,7 +976,7 @@ function CreateWorkoutPageInner() {
         <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <Link
-          href={raceDayMode ? raceDayBackHref : fromHostRun ? hostRunBackHref : "/workouts"}
+          href={raceDayMode ? raceDayBackHref : fromHostRun ? hostRunBackHref : builderBackHref}
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -970,7 +984,7 @@ function CreateWorkoutPageInner() {
             ? "Back to race day"
             : fromHostRun
               ? "Back to Create a run"
-              : "Back to Workouts"}
+              : backLabelFromPath(builderBackHref)}
         </Link>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6">
@@ -1183,8 +1197,7 @@ function CreateWorkoutPageInner() {
           </details>
           ) : null}
 
-          {!hasSlots && (
-            <div className="mb-8">
+          <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">
                 {raceDayMode ? "Paste pacing blocks" : "Paste your workout"}
               </h2>
@@ -1197,8 +1210,8 @@ function CreateWorkoutPageInner() {
                   </>
                 ) : (
                   <>
-                    Paste coach notes (blocks, repeats, recovery). We parse it, save the workout, and
-                    open your usual workout editor — not a segment-by-segment form here. Tabular splits:{" "}
+                    Paste coach notes (blocks, repeats, recovery). We fill warmup, work, and cooldown
+                    below so you can fix a 3 mile warmup or the repeats before saving. Tabular splits:{" "}
                     <span className="font-mono text-gray-800">miles pace pace</span> per line (e.g.{" "}
                     <span className="font-mono text-gray-800">5 7:00 7:20</span>).
                   </>
@@ -1219,13 +1232,12 @@ function CreateWorkoutPageInner() {
                 className="mt-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 <FileText className="w-4 h-4" />
-                {deriving ? "Saving…" : "Build workout"}
+                {deriving ? "Building…" : "Build workout"}
               </button>
             </div>
-          )}
 
-          {hasSlots && (
-            <>
+          <>
+            {hasSlots ? (
               <div className="mb-6 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
@@ -1235,6 +1247,7 @@ function CreateWorkoutPageInner() {
                   Clear segments and paste a workout instead
                 </button>
               </div>
+            ) : null}
 
               <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1258,11 +1271,11 @@ function CreateWorkoutPageInner() {
                 </div>
               </div>
 
-              <div className="mb-6">
+              <div className="mb-6" id="workout-builder-segments">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Segments</h2>
                 <p className="text-sm text-gray-500 mb-4">
-                  Optional warmup and cooldown; one or more main segments (intervals, splits, or a single
-                  block).
+                  Add a warmup (starts at 3 miles), the main work, and a cooldown. Paste above fills
+                  these in so you can adjust them before saving.
                 </p>
                 {selectedCatalogueId != null && (
                   <div
@@ -1297,8 +1310,20 @@ function CreateWorkoutPageInner() {
                               type="button"
                               onClick={() => {
                                 setSelectedCatalogueId(null);
-                                if (kind === "warmup") setWarmup(emptySlot());
-                                else setCooldown(emptySlot());
+                                if (!name.trim()) setName("Workout");
+                                if (kind === "warmup") {
+                                  setWarmup({
+                                    ...emptySlot(),
+                                    durationValue: 3,
+                                    segmentTitle: "Warmup",
+                                  });
+                                } else {
+                                  setCooldown({
+                                    ...emptySlot(),
+                                    durationValue: 1,
+                                    segmentTitle: "Cooldown",
+                                  });
+                                }
                                 setEditingTarget({ kind });
                                 setEditingPaceLowMin("");
                                 setEditingPaceLowSec("");
@@ -1307,7 +1332,7 @@ function CreateWorkoutPageInner() {
                               }}
                               className="text-sm px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
                             >
-                              Add
+                              {kind === "warmup" ? "Add warmup" : "Add cooldown"}
                             </button>
                           ) : (
                             <button
@@ -1535,6 +1560,63 @@ function CreateWorkoutPageInner() {
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                             />
                           </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Repeats</label>
+                            <input
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={slot.repeatCount ?? ""}
+                              onChange={(e) => {
+                                const n = parseInt(e.target.value, 10);
+                                const repeatCount = Number.isFinite(n) && n > 1 ? n : undefined;
+                                setSelectedCatalogueId(null);
+                                setMainSegments((prev) => {
+                                  const copy = [...prev];
+                                  copy[index] = { ...copy[index], repeatCount };
+                                  return copy;
+                                });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                              placeholder="e.g. 8"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Recovery between reps (mi)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={
+                                slot.recoveryDurationType === "TIME"
+                                  ? ""
+                                  : slot.recoveryDurationValue ?? ""
+                              }
+                              onChange={(e) => {
+                                const recoveryDurationValue = parseFloat(e.target.value);
+                                setSelectedCatalogueId(null);
+                                setMainSegments((prev) => {
+                                  const copy = [...prev];
+                                  copy[index] = {
+                                    ...copy[index],
+                                    recoveryDurationType:
+                                      Number.isFinite(recoveryDurationValue) && recoveryDurationValue > 0
+                                        ? "DISTANCE"
+                                        : null,
+                                    recoveryDurationValue:
+                                      Number.isFinite(recoveryDurationValue) && recoveryDurationValue > 0
+                                        ? recoveryDurationValue
+                                        : null,
+                                  };
+                                  return copy;
+                                });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                              placeholder="e.g. 1"
+                            />
+                          </div>
                           <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                               <span className="text-xs font-semibold uppercase text-gray-500 block mb-1">
@@ -1658,7 +1740,7 @@ function CreateWorkoutPageInner() {
                       ? raceDayBackHref
                       : fromHostRun
                         ? hostRunBackHref
-                        : "/workouts"
+                        : builderBackHref
                   }
                   className="px-4 py-2 text-gray-700 hover:text-gray-900"
                 >
@@ -1673,7 +1755,6 @@ function CreateWorkoutPageInner() {
                 </button>
               </div>
             </>
-          )}
         </form>
           </div>
         </main>

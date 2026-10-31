@@ -132,6 +132,27 @@ test("materializes Block 2 at athlete 5K from DB anchor", () => {
   assert.ok(gotKm != null && Math.abs(gotKm - expectedKm) < 15);
 });
 
+test("parses a 3 mile warmup and mile repeats with slash recovery", () => {
+  const note =
+    "Start with a 3 mile warm up then 8 x 1-mile at marathon pace/1-mile st";
+  const parsed = tryParsePastedWorkoutText(note, "Intervals");
+  assert.ok(parsed);
+  assert.equal(parsed.segments.length, 2);
+  assert.equal(parsed.segments[0]?.title, "Warmup");
+  assert.equal(parsed.segments[0]?.durationType, "DISTANCE");
+  assert.equal(parsed.segments[0]?.durationValue, 3);
+  assert.equal(parsed.segments[0]?.repeatCount, undefined);
+
+  const work = parsed.segments[1];
+  assert.ok(work);
+  assert.equal(work.repeatCount, 8);
+  assert.equal(work.durationValue, 1);
+  assert.equal(work.paceOffsetSecPerMile, 45);
+  assert.equal(work.recoveryDurationType, "DISTANCE");
+  assert.equal(work.recoveryDurationValue, 1);
+  assert.equal(parsed.suggestedTitle, "Marathon pace repeats");
+});
+
 test("parses 800m repeats with between-rep recovery and explicit pace band", () => {
   const note =
     "800m repeats 4 x 800m at 7:00–7:30/mile pace (3:29–3:44 per 800m), with 400m easy jog recovery between repeats";

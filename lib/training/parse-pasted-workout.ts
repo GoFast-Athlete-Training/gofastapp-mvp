@@ -93,6 +93,12 @@ export function parseBetweenRepRecoveryFromText(text: string): ParsedBetweenRepR
     }
   }
 
+  if (!m) {
+    m = normalized.match(
+      /\/\s*(\d+(?:\.\d+)?)\s*-?\s*(mi\b|mile|miles|km\b|m\b|meter|meters|min(?:ute)?s?)\b/i
+    );
+  }
+
   if (!m) return null;
 
   const raw = parseFloat(m[1]);
@@ -230,7 +236,7 @@ function scanPrescriptionMatches(text: string): ScanMatch[] {
   }
 
   const distRe =
-    /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(k\b|m\b|meter|meters|mi\b|mile|miles|km\b)?(?!\s*(?:min(?:ute)?s?)\b)/gi;
+    /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*-?\s*(k\b|m\b|meter|meters|mi\b|mile|miles|km\b)?(?!\s*-?\s*(?:min(?:ute)?s?)\b)/gi;
   while ((m = distRe.exec(text)) !== null) {
     const repeatCount = parseInt(m[1], 10);
     const amount = parseFloat(m[2]);
@@ -322,6 +328,59 @@ function tryParseCoachBlockWorkout(text: string): ParsedPasteWorkout | null {
   };
 }
 
+function bookendDuration(
+  amount: number,
+  unitRaw: string
+): { durationType: "DISTANCE" | "TIME"; durationValue: number } | null {
+  const unit = unitRaw.toLowerCase();
+  if (unit.startsWith("min")) {
+    return { durationType: "TIME", durationValue: amount };
+  }
+  const miles = distanceTokenToMiles(amount, unitRaw);
+  if (miles == null) return null;
+  return { durationType: "DISTANCE", durationValue: miles };
+}
+
+/** "3 mile warm up" / "warmup of 2 miles" and the cooldown equivalents. */
+function scanBookendSegments(
+  text: string
+): Array<{ index: number; segment: ParsedPasteSegment }> {
+  const specs: Array<{ title: "Warmup" | "Cooldown"; label: string }> = [
+    { title: "Warmup", label: "warm[\\s-]?ups?|wu\\b" },
+    { title: "Cooldown", label: "cool[\\s-]?downs?|cd\\b" },
+  ];
+  const unit =
+    "minutes|minute|mins|min|miles|mile|mi|kilometers|km|meters|meter|m";
+  const out: Array<{ index: number; segment: ParsedPasteSegment }> = [];
+
+  for (const spec of specs) {
+    const re = new RegExp(
+      `(\\d+(?:\\.\\d+)?)\\s*-?\\s*(${unit})\\s+(?:easy\\s+)?(?:${spec.label})|(?:${spec.label})\\s+(?:of\\s+|for\\s+)?(\\d+(?:\\.\\d+)?)\\s*-?\\s*(${unit})`,
+      "gi"
+    );
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const amount = parseFloat(m[1] ?? m[3] ?? "");
+      const unitRaw = m[2] ?? m[4];
+      if (!unitRaw || !Number.isFinite(amount) || amount <= 0) continue;
+      const dur = bookendDuration(amount, unitRaw);
+      if (!dur) continue;
+      out.push({
+        index: m.index,
+        segment: {
+          title: spec.title,
+          durationType: dur.durationType,
+          durationValue: dur.durationValue,
+          paceOffsetSecPerMile: null,
+          effortContext: m[0],
+        },
+      });
+    }
+  }
+
+  return out;
+}
+
 /**
  * Returns structured segments when prose contains at least one N×duration prescription.
  */
@@ -338,27 +397,47 @@ export function tryParsePastedWorkoutText(
   const raw = scanPrescriptionMatches(text);
   if (raw.length === 0) return null;
 
-  const segments: ParsedPasteSegment[] = raw.map((hit) => {
+  const workPieces: Array<{ index: number; segment: ParsedPasteSegment }> = raw.map((hit) => {
     const offset = effortTextToPaceOffsetSecPerMile(hit.effortContext);
     const recovery =
       hit.repeatCount > 1 ? parseBetweenRepRecoveryFromText(hit.effortContext) : null;
     return {
-      title: titleForSegment(hit.durationType, hit.effortContext, offset),
-      durationType: hit.durationType,
-      durationValue: hit.durationValue,
-      repeatCount: hit.repeatCount > 1 ? hit.repeatCount : undefined,
-      paceOffsetSecPerMile: offset,
-      recoveryDurationType: recovery?.recoveryDurationType ?? null,
-      recoveryDurationValue: recovery?.recoveryDurationValue ?? null,
-      effortContext: hit.effortContext,
+      index: hit.index,
+      segment: {
+        title: titleForSegment(hit.durationType, hit.effortContext, offset),
+        durationType: hit.durationType,
+        durationValue: hit.durationValue,
+        repeatCount: hit.repeatCount > 1 ? hit.repeatCount : undefined,
+        paceOffsetSecPerMile: offset,
+        recoveryDurationType: recovery?.recoveryDurationType ?? null,
+        recoveryDurationValue: recovery?.recoveryDurationValue ?? null,
+        effortContext: hit.effortContext,
+      },
     };
   });
 
+  const bookends = scanBookendSegments(text).filter(
+    (bookend) =>
+      !workPieces.some(
+        (hit) => bookend.index >= hit.index && bookend.index < hit.index + 18
+      )
+  );
+
+  const segments = [...workPieces, ...bookends]
+    .sort((a, b) => a.index - b.index)
+    .map((piece) => piece.segment);
+
   const summary = text.replace(/\s+/g, " ").slice(0, 160);
-  const hasTempo = segments.some((s) => s.title === "Tempo" || s.durationType === "TIME");
+  const hasTempo = segments.some((s) => s.title === "Tempo" || (s.durationType === "TIME" && s.title !== "Warmup" && s.title !== "Cooldown"));
   const hasIntervals = segments.some((s) => s.title === "Intervals");
+  const hasMarathonRepeats = workPieces.some(
+    (hit) =>
+      (hit.segment.repeatCount ?? 0) > 1 &&
+      /\bmarathon\b|\bmp\b/i.test(hit.segment.effortContext ?? "")
+  );
   let suggestedTitle = "Parsed workout";
-  if (hasTempo && hasIntervals) suggestedTitle = "Tempo + intervals";
+  if (hasMarathonRepeats) suggestedTitle = "Marathon pace repeats";
+  else if (hasTempo && hasIntervals) suggestedTitle = "Tempo + intervals";
   else if (hasTempo || workoutTypeHint === "Tempo") suggestedTitle = "Tempo workout";
   else if (hasIntervals || workoutTypeHint === "Intervals") suggestedTitle = "Track intervals";
 

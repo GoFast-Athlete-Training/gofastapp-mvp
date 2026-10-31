@@ -1113,7 +1113,7 @@ export default function WorkoutDetailPage() {
     };
   }, [workoutId]);
 
-  const startEdit = useCallback(() => {
+  const startEdit = useCallback((kind?: "warmup" | "cooldown") => {
     if (!workout) return;
     setEditError(null);
     setEditDistanceMi(
@@ -1123,7 +1123,28 @@ export default function WorkoutDetailPage() {
         : ""
     );
     const sorted = [...(workout.segments ?? [])].sort((a, b) => a.stepOrder - b.stepOrder);
-    setEditSegments(sorted.map((s) => segmentToEditable(s)));
+    const rows = sorted.map((s) => segmentToEditable(s));
+    const bookend = (title: string, miles: string): EditableSegment => ({
+      clientKey: newClientKey(),
+      title,
+      durationType: "DISTANCE",
+      durationValue: miles,
+      repeatCount: "",
+      recoveryDurationType: "",
+      recoveryDurationValue: "",
+      paceLowMin: "",
+      paceLowSec: "",
+      paceHighMin: "",
+      paceHighSec: "",
+      notes: "",
+    });
+    const next =
+      kind === "warmup"
+        ? [bookend("Warmup", "3"), ...rows]
+        : kind === "cooldown"
+          ? [...rows, bookend("Cooldown", "1")]
+          : rows;
+    setEditSegments(next);
     setIsEditing(true);
     requestAnimationFrame(() => {
       document
@@ -1206,24 +1227,22 @@ export default function WorkoutDetailPage() {
     }
   };
 
-  const addEditSegment = () => {
-    setEditSegments((prev) => [
-      ...prev,
-      {
-        clientKey: newClientKey(),
-        title: "Workout part",
-        durationType: "DISTANCE",
-        durationValue: "1",
-        repeatCount: "",
-        recoveryDurationType: "",
-        recoveryDurationValue: "",
-        paceLowMin: "",
-        paceLowSec: "",
-        paceHighMin: "",
-        paceHighSec: "",
-        notes: "",
-      },
-    ]);
+  const addEditSegment = (kind: "warmup" | "cooldown" | "part" = "part") => {
+    const row = {
+      clientKey: newClientKey(),
+      title: kind === "warmup" ? "Warmup" : kind === "cooldown" ? "Cooldown" : "Workout part",
+      durationType: "DISTANCE" as const,
+      durationValue: kind === "warmup" ? "3" : kind === "cooldown" ? "1" : "1",
+      repeatCount: "",
+      recoveryDurationType: "",
+      recoveryDurationValue: "",
+      paceLowMin: "",
+      paceLowSec: "",
+      paceHighMin: "",
+      paceHighSec: "",
+      notes: "",
+    };
+    setEditSegments((prev) => (kind === "warmup" ? [row, ...prev] : [...prev, row]));
   };
 
   const removeEditSegment = (key: string) => {
@@ -1578,7 +1597,7 @@ export default function WorkoutDetailPage() {
     setDeletingRecordedRun(true);
     try {
       await api.delete(`/training/workout/${workoutId}`);
-      router.push("/workouts");
+      router.push("/training");
     } catch (error: unknown) {
       console.error("Error deleting recorded run:", error);
       const err = error as { response?: { data?: { error?: string } } };
@@ -1873,10 +1892,10 @@ export default function WorkoutDetailPage() {
                 <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">Workout not found</p>
                 <Link
-                  href="/workouts"
+                  href="/training"
                   className="mt-4 inline-block text-orange-600 hover:text-orange-700"
                 >
-                  Back to Workouts
+                  Back to Train
                 </Link>
               </div>
             </div>
@@ -1908,7 +1927,9 @@ export default function WorkoutDetailPage() {
   function normalizeTrainingHubBack(href: string | null | undefined): string | null {
     if (!href) return null;
     const base = href.split("?")[0] ?? href;
-    if (base === "/training" || base.startsWith("/training/day/")) return "/training";
+    if (base === "/training" || base.startsWith("/training/day/") || base === "/workouts") {
+      return "/training";
+    }
     return href;
   }
 
@@ -1916,14 +1937,14 @@ export default function WorkoutDetailPage() {
     normalizeTrainingHubBack(simpleBackHref) ??
     normalizeTrainingHubBack(planPreviewBackFromStash) ??
     (goTrainCtx ? backHrefFromGoTrainContext(goTrainCtx) : null) ??
-    "/workouts";
+    "/training";
   const backLabel = simpleBackHref
     ? backLabelFromPath(simpleBackHref)
     : planPreviewBackFromStash
       ? backLabelFromPath(planPreviewBackFromStash)
       : goTrainCtx
         ? backLabelFromGoTrainContext(goTrainCtx)
-        : "Back to Workouts";
+        : "Back to Train";
 
   const structuredTotals = structuredSegmentTotals(sortedSegments);
   const structuredParts = [
@@ -2370,7 +2391,27 @@ export default function WorkoutDetailPage() {
                 </p>
               )}
             </div>
-            {isEditing && (
+              {!isEditing && !isLogged ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => startEdit("warmup")}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                  >
+                    <Plus className="w-4 h-4 shrink-0" />
+                    Add warmup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startEdit("cooldown")}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                  >
+                    <Plus className="w-4 h-4 shrink-0" />
+                    Add cooldown
+                  </button>
+                </div>
+              ) : null}
+            {isEditing ? (
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -2390,7 +2431,7 @@ export default function WorkoutDetailPage() {
                   Cancel
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
           {isEditing && (
             <p className="text-sm text-gray-600 mb-3">
@@ -2418,14 +2459,32 @@ export default function WorkoutDetailPage() {
                   placeholder="e.g. 6.5"
                 />
               </label>
-              <button
-                type="button"
-                onClick={addEditSegment}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-orange-300 bg-orange-50/50 text-sm font-medium text-orange-900 hover:bg-orange-50"
-              >
-                <Plus className="w-4 h-4 shrink-0" />
-                Add workout part
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => addEditSegment("warmup")}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
+                >
+                  <Plus className="w-4 h-4 shrink-0" />
+                  Add warmup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addEditSegment("part")}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-orange-300 bg-orange-50/50 text-sm font-medium text-orange-900 hover:bg-orange-50"
+                >
+                  <Plus className="w-4 h-4 shrink-0" />
+                  Add workout part
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addEditSegment("cooldown")}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50"
+                >
+                  <Plus className="w-4 h-4 shrink-0" />
+                  Add cooldown
+                </button>
+              </div>
               {editSegments.map((segment, segIdx) => (
                 <div
                   key={segment.clientKey}
@@ -3336,7 +3395,7 @@ export default function WorkoutDetailPage() {
               </p>
               <button
                 type="button"
-                onClick={startEdit}
+                onClick={() => startEdit()}
                 className="text-sm text-gray-600 underline underline-offset-2 hover:text-gray-900"
               >
                 Edit individual segments

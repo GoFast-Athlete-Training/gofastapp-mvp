@@ -29,7 +29,9 @@ function planHubMatch(p: string | null): boolean {
   return (
     p === '/training' ||
     p.startsWith('/training/') ||
-    p.startsWith('/training-setup')
+    p.startsWith('/training-setup') ||
+    p === '/workouts/create' ||
+    p.startsWith('/workouts/create/')
   );
 }
 
@@ -43,9 +45,7 @@ function gorunMatch(p: string | null): boolean {
   if (p === '/discoverruns') return true;
   return (
     p === '/build-a-run' ||
-    p === '/host-a-run' ||
-    p === '/workouts/create' ||
-    p.startsWith('/workouts/create/')
+    p === '/host-a-run'
   );
 }
 
