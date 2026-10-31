@@ -275,6 +275,11 @@ export async function upsertRaceRegistryFromPayload(
         readOptionalTrimmedString(racePayload, "charitySupports") ?? null;
     }
     const charityUrlExtra = readOptionalTrimmedString(racePayload, "charityUrl");
+    const charityLogoExtra = readOptionalTrimmedString(racePayload, "charityLogo");
+    const charityProceedsNote = readOptionalTrimmedString(
+      racePayload,
+      "charityProceedsNote",
+    );
     const officialWebsiteUrl = readOptionalTrimmedString(racePayload, "raceUrl");
     const registrationOpenDate = readOptionalDateTime(
       racePayload,
@@ -377,6 +382,8 @@ export async function upsertRaceRegistryFromPayload(
         ? { charityName: charityNameResolved }
         : {}),
       ...(charityUrlExtra !== undefined ? { charityUrl: charityUrlExtra } : {}),
+      ...(charityLogoExtra !== undefined ? { charityLogo: charityLogoExtra } : {}),
+      ...(charityProceedsNote !== undefined ? { charityProceedsNote } : {}),
       ...(officialWebsiteUrl !== undefined
         ? { officialWebsiteUrl }
         : {}),

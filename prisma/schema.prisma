@@ -911,6 +911,8 @@ model race_registry {
   updatedAt               DateTime
   charityName             String?
   charityUrl              String?
+  charityLogo             String?
+  charityProceedsNote     String?
   courseMapUrl            String?
   /// Start line display (name or city snap from Race Manage course).
   startLineLabel          String?
