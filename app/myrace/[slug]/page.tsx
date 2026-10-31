@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { formatRaceListDate, daysUntilRace } from "@/lib/races-display";
 import { RacePaceHubTabs } from "@/components/races/RacePaceHubTabs";
-import { MyRaceInfoPackets } from "@/components/races/MyRaceInfoPackets";
 import {
   getPublicCoursePageUrl,
   getPublicRacePageUrl,
@@ -525,7 +524,6 @@ export default function MyRacePage() {
         </div>
       ) : (
         <>
-          <MyRaceInfoPackets raceRegistryId={race.id} />
           {hasCourseSection ? (
             <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="text-sm font-bold uppercase tracking-wide text-gray-800 flex items-center gap-2">

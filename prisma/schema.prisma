@@ -958,12 +958,6 @@ model race_registry {
   logoUrl                 String?
   /// Distance label from registration or pipe-joined snapshot from company sync.
   distanceLabel           String?
-  /// Source-accuracy readiness from Race Manage publish push.
-  sourceDiscoveryReady     Boolean                   @default(false)
-  sourceRegistrationReady  Boolean                   @default(false)
-  sourceTrainingReady      Boolean                   @default(false)
-  sourceRaceWeekReady      Boolean                   @default(false)
-  lifecycleHorizonOverrides Json?
   /// Racer-facing snapshot from Company; set by sync only.
   packetPickupLocation     String?
   packetPickupDate         DateTime?
