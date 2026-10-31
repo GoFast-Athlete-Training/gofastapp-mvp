@@ -1,5 +1,13 @@
 import { daysUntilRace } from "@/lib/races-display";
 import {
+  computeRaceLifecyclePhase,
+  lifecycleToInfoPacketPhase,
+} from "@/lib/races/race-lifecycle/race-lifecycle-phase";
+import {
+  DEFAULT_SOURCE_TRUST,
+  type RegistrySourceTrust,
+} from "@/lib/races/race-lifecycle/race-source-trust";
+import {
   currentTrainingWeekNumber,
   effectiveTrainingWeekCount,
 } from "@/lib/training/plan-utils";
@@ -11,7 +19,21 @@ import type {
   RaceInfoPacketRaceInput,
   RaceInfoPacketsResponse,
   RaceInfoSourceCompleteness,
+  RaceLifecyclePhase,
 } from "./race-info-packet-types";
+
+function resolveTrust(athlete: RaceInfoPacketAthleteContext): RegistrySourceTrust {
+  return athlete.sourceTrust ?? DEFAULT_SOURCE_TRUST;
+}
+
+function coursePhaseAllows(lifecycle: RaceLifecyclePhase): boolean {
+  return (
+    lifecycle === "trainingCycle" ||
+    lifecycle === "deepPrep" ||
+    lifecycle === "raceWeek" ||
+    lifecycle === "raceDay"
+  );
+}
 
 function trim(s: string | null | undefined): string | null {
   const t = s?.trim();
@@ -48,7 +70,8 @@ function completenessFromFields(present: number, total: number): RaceInfoSourceC
 function buildRegistrationPacket(
   race: RaceInfoPacketRaceInput,
   athlete: RaceInfoPacketAthleteContext,
-  daysUntil: number
+  daysUntil: number,
+  trust: RegistrySourceTrust,
 ): RaceInfoPacket {
   const url = trim(race.registrationUrl);
   const openLabel = race.registrationOpenNow
@@ -70,7 +93,8 @@ function buildRegistrationPacket(
   if (feeLabel) items.push({ label: "Fee", value: feeLabel });
 
   const hasData = Boolean(url || items.length > 0);
-  const visible = !athlete.isSignedUp && hasData && daysUntil >= 0;
+  const visible =
+    !athlete.isSignedUp && hasData && daysUntil >= 0 && trust.sourceRegistrationReady;
 
   return {
     kind: "registration",
@@ -92,7 +116,10 @@ function buildRegistrationPacket(
 function buildCoursePacket(
   race: RaceInfoPacketRaceInput,
   daysUntil: number,
-  phase: RaceInfoPacketPhase
+  phase: RaceInfoPacketPhase,
+  lifecycle: RaceLifecyclePhase,
+  athlete: RaceInfoPacketAthleteContext,
+  trust: RegistrySourceTrust,
 ): RaceInfoPacket {
   const segments = (race.courseSegments ?? [])
     .slice()
@@ -116,7 +143,17 @@ function buildCoursePacket(
   const hasData = Boolean(
     courseSlug || courseMapUrl || segments.length > 0 || tagline || description
   );
-  const visible = hasData && daysUntil >= 0;
+  const visible =
+    hasData &&
+    daysUntil >= 0 &&
+    trust.sourceTrainingReady &&
+    coursePhaseAllows(lifecycle);
+
+  const emphasized =
+    visible &&
+    (lifecycle === "deepPrep" ||
+      lifecycle === "raceWeek" ||
+      lifecycle === "trainingCycle");
 
   return {
     kind: "course",
@@ -126,7 +163,7 @@ function buildCoursePacket(
     summary: tagline ?? "Know the route before race week.",
     priority: phase === "raceWeek" || phase === "raceDay" ? 35 : 30,
     visible,
-    emphasized: visible && (phase === "preRace" || phase === "raceWeek"),
+    emphasized,
     items: description ? [{ label: "Overview", value: description }] : [],
     segments: segments.length > 0 ? segments : undefined,
     courseMapUrl,
@@ -140,26 +177,31 @@ function buildCoursePacket(
 
 function buildTrainingTipsPacket(
   _race: RaceInfoPacketRaceInput,
-  _athlete: RaceInfoPacketAthleteContext,
-  phase: RaceInfoPacketPhase,
-  _daysUntil: number
+  athlete: RaceInfoPacketAthleteContext,
+  lifecycle: RaceLifecyclePhase,
+  trust: RegistrySourceTrust,
 ): RaceInfoPacket {
+  const visible =
+    athlete.isSignedUp &&
+    trust.sourceTrainingReady &&
+    (lifecycle === "trainingCycle" || lifecycle === "deepPrep");
   return {
     kind: "trainingTips",
-    title: phase === "raceWeek" ? "Race-week prep" : "Training tips",
-    summary: "Review the course guide on the full course page.",
-    priority: phase === "raceWeek" ? 25 : 20,
-    visible: false,
-    emphasized: false,
+    title: "Training for this race",
+    summary: "Set a goal time and build your plan toward race day.",
+    priority: 22,
+    visible,
+    emphasized: visible,
     items: [],
-    sourceCompleteness: "empty",
+    sourceCompleteness: visible ? "partial" : "empty",
   };
 }
 
 function buildPacketPickupPacket(
   race: RaceInfoPacketRaceInput,
   phase: RaceInfoPacketPhase,
-  daysUntil: number
+  daysUntil: number,
+  trust: RegistrySourceTrust,
 ): RaceInfoPacket {
   const location = trim(race.packetPickupLocation);
   const time = trim(race.packetPickupTime);
@@ -177,7 +219,8 @@ function buildPacketPickupPacket(
   if (notes) items.push({ label: "Notes", value: notes });
 
   const hasData = items.length > 0;
-  const visible = hasData && daysUntil >= 0 && daysUntil <= 7;
+  const visible =
+    hasData && daysUntil >= 0 && daysUntil <= 7 && trust.sourceRaceWeekReady;
   const emphasized = visible && (phase === "raceWeek" || phase === "raceDay");
 
   return {
@@ -196,7 +239,8 @@ function buildPacketPickupPacket(
 function buildArrivalPacket(
   race: RaceInfoPacketRaceInput,
   phase: RaceInfoPacketPhase,
-  daysUntil: number
+  daysUntil: number,
+  trust: RegistrySourceTrust,
 ): RaceInfoPacket {
   const logistics = trim(race.logisticsInfo);
   const gear = trim(race.gearDropInstructions);
@@ -208,7 +252,8 @@ function buildArrivalPacket(
   if (spectators) items.push({ label: "Spectators", value: spectators });
 
   const hasData = items.length > 0;
-  const visible = hasData && daysUntil >= 0 && daysUntil <= 7;
+  const visible =
+    hasData && daysUntil >= 0 && daysUntil <= 7 && trust.sourceRaceWeekReady;
   const emphasized = visible && daysUntil <= 3;
 
   return {
@@ -286,13 +331,28 @@ export function buildRaceInfoPackets(
 ): RaceInfoPacketsResponse {
   const raceDateIso = race.raceDate.toISOString();
   const daysUntil = daysUntilRace(raceDateIso);
-  const phase = raceInfoPhase(daysUntil);
+  const lifecycleSnap = computeRaceLifecyclePhase({
+    raceDate: race.raceDate,
+    distanceMeters: race.distanceMeters,
+    lifecycleHorizonOverrides: race.lifecycleHorizonOverrides,
+    now,
+  });
+  const lifecycle = lifecycleSnap.phase;
+  const phase = lifecycleToInfoPacketPhase(lifecycle);
+  const trust = resolveTrust(athlete);
 
-  const registration = buildRegistrationPacket(race, athlete, daysUntil);
-  const course = buildCoursePacket(race, daysUntil, phase);
-  const trainingTips = buildTrainingTipsPacket(race, athlete, phase, daysUntil);
-  const packetPickup = buildPacketPickupPacket(race, phase, daysUntil);
-  const arrival = buildArrivalPacket(race, phase, daysUntil);
+  const registration = buildRegistrationPacket(race, athlete, daysUntil, trust);
+  const course = buildCoursePacket(
+    race,
+    daysUntil,
+    phase,
+    lifecycle,
+    athlete,
+    trust,
+  );
+  const trainingTips = buildTrainingTipsPacket(race, athlete, lifecycle, trust);
+  const packetPickup = buildPacketPickupPacket(race, phase, daysUntil, trust);
+  const arrival = buildArrivalPacket(race, phase, daysUntil, trust);
   const raceDayGuide = buildRaceDayGuidePacket(
     race,
     athlete,
@@ -312,6 +372,7 @@ export function buildRaceInfoPackets(
     raceDate: raceDateIso,
     daysUntilRace: daysUntil,
     phase,
+    lifecyclePhase: lifecycle,
     isSignedUp: athlete.isSignedUp,
     primaryPacketKind: pickPrimaryPacket(all),
     packets,

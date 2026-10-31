@@ -4,6 +4,7 @@ import {
   buildRaceInfoPackets,
   trainingWeekContextFromPlan,
 } from "@/lib/races/race-info-packets";
+import { trustFromRegistry } from "@/lib/races/race-lifecycle/race-source-trust";
 import type {
   RaceInfoPacketAthleteContext,
   RaceInfoPacketRaceInput,
@@ -68,6 +69,8 @@ export async function loadRaceInfoPacketsForAthlete(
     name: race.name,
     slug: race.slug,
     raceDate: race.raceDate,
+    distanceMeters: race.distanceMeters,
+    lifecycleHorizonOverrides: race.lifecycleHorizonOverrides,
     startTime: race.startTime,
     distanceLabel: race.distanceLabel,
     summaryPhrase: race.summaryPhrase,
@@ -100,6 +103,7 @@ export async function loadRaceInfoPacketsForAthlete(
 
   const athleteContext: RaceInfoPacketAthleteContext = {
     isSignedUp: Boolean(signup),
+    sourceTrust: trustFromRegistry(race),
     training: {
       hasActivePlan: weekCtx.hasActivePlan,
       planName: plan?.name ?? null,
@@ -142,6 +146,8 @@ export async function loadRaceInfoPacketsForStaffView(
     name: race.name,
     slug: race.slug,
     raceDate: race.raceDate,
+    distanceMeters: race.distanceMeters,
+    lifecycleHorizonOverrides: race.lifecycleHorizonOverrides,
     startTime: race.startTime,
     distanceLabel: race.distanceLabel,
     summaryPhrase: race.summaryPhrase,
@@ -165,6 +171,7 @@ export async function loadRaceInfoPacketsForStaffView(
 
   const athleteContext: RaceInfoPacketAthleteContext = {
     isSignedUp: false,
+    sourceTrust: trustFromRegistry(race),
     training: {
       hasActivePlan: false,
       planName: null,

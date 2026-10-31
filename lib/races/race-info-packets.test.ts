@@ -8,12 +8,13 @@ import type {
 
 function baseRace(overrides: Partial<RaceInfoPacketRaceInput> = {}): RaceInfoPacketRaceInput {
   const raceDate = new Date();
-  raceDate.setDate(raceDate.getDate() + 10);
+  raceDate.setDate(raceDate.getDate() + 100);
   return {
     id: "race-1",
     name: "Demo Marathon",
     raceDate,
     distanceLabel: "Marathon",
+    distanceMeters: 42_195,
     ...overrides,
   };
 }
@@ -139,7 +140,7 @@ test("course packet passes guide card fields on segments", () => {
   assert.equal(seg?.guideElevation, "Gentle climb");
 });
 
-test("training tips packet is retired (never visible)", () => {
+test("training tips packet shows in training cycle when signed up", () => {
   const race = baseRace({
     courseSegments: [{ order: 1, name: "Mile 20", runTip: "Break up the wall." }],
   });
@@ -153,12 +154,12 @@ test("training tips packet is retired (never visible)", () => {
       training: { hasActivePlan: true, planName: "Marathon Build", weekNumber: 12, totalWeeks: 16 },
     })
   );
-  assert.ok(!signed.packets.some((p) => p.kind === "trainingTips"));
+  assert.ok(signed.packets.some((p) => p.kind === "trainingTips"));
 });
 
-test("course guide is primary before race week when segments exist", () => {
+test("course guide is primary in training cycle when segments exist", () => {
   const raceDate = new Date();
-  raceDate.setDate(raceDate.getDate() + 10);
+  raceDate.setDate(raceDate.getDate() + 100);
   const race = baseRace({
     raceDate,
     logisticsInfo: "Metro recommended.",
@@ -180,10 +181,11 @@ test("course guide is primary before race week when segments exist", () => {
     })
   );
 
+  assert.equal(result.lifecyclePhase, "trainingCycle");
   assert.equal(result.phase, "preRace");
-  assert.equal(result.primaryPacketKind, "course");
+  assert.equal(result.primaryPacketKind, "trainingTips");
   assert.ok(result.packets.some((p) => p.kind === "course"));
-  assert.ok(!result.packets.some((p) => p.kind === "trainingTips"));
+  assert.ok(result.packets.some((p) => p.kind === "trainingTips"));
   assert.ok(!result.packets.some((p) => p.kind === "arrival"));
   assert.ok(!result.packets.some((p) => p.kind === "packetPickup"));
 });
