@@ -10,6 +10,15 @@ export type RaceInfoPacketKind =
 
 export type RaceInfoPacketPhase = "preRace" | "raceWeek" | "raceDay" | "past";
 
+export type RaceLifecyclePhase =
+  | "past"
+  | "raceDay"
+  | "raceWeek"
+  | "deepPrep"
+  | "trainingCycle"
+  | "discovery"
+  | "noDate";
+
 export type RaceInfoSourceCompleteness = "full" | "partial" | "empty";
 
 export type RaceInfoPacketItem = {
@@ -58,11 +67,20 @@ export type RaceInfoTrainingContext = {
   goalTime?: string | null;
 };
 
+export type RaceInfoSourceTrust = {
+  sourceDiscoveryReady: boolean;
+  sourceRegistrationReady: boolean;
+  sourceTrainingReady: boolean;
+  sourceRaceWeekReady: boolean;
+};
+
 export type RaceInfoPacketRaceInput = {
   id: string;
   name: string;
   slug?: string | null;
   raceDate: Date;
+  distanceMeters?: number | null;
+  lifecycleHorizonOverrides?: unknown;
   startTime?: string | null;
   distanceLabel?: string | null;
   summaryPhrase?: string | null;
@@ -96,6 +114,7 @@ export type RaceInfoPacketRaceInput = {
 export type RaceInfoPacketAthleteContext = {
   isSignedUp: boolean;
   training?: RaceInfoTrainingContext | null;
+  sourceTrust?: RaceInfoSourceTrust;
 };
 
 export type RaceInfoPacketsResponse = {
@@ -103,6 +122,7 @@ export type RaceInfoPacketsResponse = {
   raceDate: string;
   daysUntilRace: number;
   phase: RaceInfoPacketPhase;
+  lifecyclePhase: RaceLifecyclePhase;
   isSignedUp: boolean;
   /** Best packet to open for a contextual CTA (race-week instructions, etc.). */
   primaryPacketKind: RaceInfoPacketKind | null;

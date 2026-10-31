@@ -11,6 +11,7 @@ export function discoverCatalogWhere(
     isActive: true,
     isCancelled: false,
     companyRaceId: { not: null },
+    sourceDiscoveryReady: true,
     ...extra,
   };
 }

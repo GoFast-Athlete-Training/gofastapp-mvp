@@ -296,6 +296,27 @@ export async function upsertRaceRegistryFromPayload(
       "transferDeadline"
     );
 
+    const sourceDiscoveryReady = readOptionalBoolean(
+      racePayload,
+      "sourceDiscoveryReady"
+    );
+    const sourceRegistrationReady = readOptionalBoolean(
+      racePayload,
+      "sourceRegistrationReady"
+    );
+    const sourceTrainingReady = readOptionalBoolean(
+      racePayload,
+      "sourceTrainingReady"
+    );
+    const sourceRaceWeekReady = readOptionalBoolean(
+      racePayload,
+      "sourceRaceWeekReady"
+    );
+    let lifecycleHorizonOverrides: unknown | undefined = undefined;
+    if ("lifecycleHorizonOverrides" in racePayload) {
+      lifecycleHorizonOverrides = racePayload.lifecycleHorizonOverrides ?? null;
+    }
+
     let registrationFee: number | null | undefined = undefined;
     if ("priceCents" in racePayload) {
       const raw = racePayload.priceCents;
@@ -374,6 +395,17 @@ export async function upsertRaceRegistryFromPayload(
         ? { companyRegistrationId }
         : {}),
       ...(parentRaceId !== undefined ? { parentRaceId } : {}),
+      ...(sourceDiscoveryReady !== undefined
+        ? { sourceDiscoveryReady }
+        : {}),
+      ...(sourceRegistrationReady !== undefined
+        ? { sourceRegistrationReady }
+        : {}),
+      ...(sourceTrainingReady !== undefined ? { sourceTrainingReady } : {}),
+      ...(sourceRaceWeekReady !== undefined ? { sourceRaceWeekReady } : {}),
+      ...(lifecycleHorizonOverrides !== undefined
+        ? { lifecycleHorizonOverrides }
+        : {}),
       updatedAt: new Date(),
     };
 
