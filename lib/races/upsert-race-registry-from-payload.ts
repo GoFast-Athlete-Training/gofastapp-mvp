@@ -10,6 +10,7 @@ import {
   serializeRegistryMirror,
 } from "@/lib/races/registry-mirror-select";
 import { randomUUID } from "crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   calendarDayWritePair,
@@ -450,7 +451,7 @@ export async function upsertRaceRegistryFromPayload(
         data: {
           ...updateData,
           slug: slugVal ?? target.slug ?? slugFinal,
-        },
+        } as Prisma.race_registryUncheckedUpdateInput,
       });
     } else {
       if (!slugVal) {
@@ -471,7 +472,7 @@ export async function upsertRaceRegistryFromPayload(
           data: {
             ...updateData,
             slug: slugVal ?? collision.slug ?? slugFinal,
-          },
+          } as Prisma.race_registryUncheckedUpdateInput,
         });
       } else {
         registryIdOut = newId;
@@ -482,7 +483,7 @@ export async function upsertRaceRegistryFromPayload(
             isCancelled: false,
             ...updateData,
             slug: slugVal,
-          },
+          } as Prisma.race_registryUncheckedCreateInput,
         });
       }
     }

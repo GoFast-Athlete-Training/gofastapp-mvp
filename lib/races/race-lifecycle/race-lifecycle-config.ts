@@ -20,6 +20,16 @@ export const OTHER_HORIZON_DEFAULTS = {
   raceWeekDaysBefore: 7,
 };
 
+export type MarathonHorizons = {
+  trainingCycleDaysBefore: number;
+  deepPrepDaysBefore: number;
+  raceWeekDaysBefore: number;
+};
+
+export type OtherHorizons = {
+  raceWeekDaysBefore: number;
+};
+
 export function classifyRaceDistance(
   distanceMeters: number | null | undefined,
 ): RaceDistanceClass {
@@ -31,9 +41,21 @@ export function classifyRaceDistance(
 }
 
 export function resolveHorizons(
+  distanceClass: "marathon",
+  overrides?: LifecycleHorizonOverrides | null,
+): MarathonHorizons;
+export function resolveHorizons(
+  distanceClass: "other",
+  overrides?: LifecycleHorizonOverrides | null,
+): OtherHorizons;
+export function resolveHorizons(
   distanceClass: RaceDistanceClass,
   overrides?: LifecycleHorizonOverrides | null,
-) {
+): MarathonHorizons | OtherHorizons;
+export function resolveHorizons(
+  distanceClass: RaceDistanceClass,
+  overrides?: LifecycleHorizonOverrides | null,
+): MarathonHorizons | OtherHorizons {
   if (distanceClass === "other") {
     return {
       raceWeekDaysBefore:

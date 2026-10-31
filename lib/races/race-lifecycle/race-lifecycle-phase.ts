@@ -34,8 +34,6 @@ export function computeRaceLifecyclePhase(input: {
   const daysUntil = raceCalendarDaysFromTodayUtc(raceDateIso);
   const distanceClass = classifyRaceDistance(input.distanceMeters);
   const overrides = parseLifecycleHorizonOverrides(input.lifecycleHorizonOverrides);
-  const horizons = resolveHorizons(distanceClass, overrides);
-
   if (daysUntil === null) {
     return { daysUntilRace: null, distanceClass, phase: "noDate" };
   }
@@ -46,16 +44,18 @@ export function computeRaceLifecyclePhase(input: {
     return { daysUntilRace: 0, distanceClass, phase: "raceDay" };
   }
 
-  const raceWeekDays = horizons.raceWeekDaysBefore ?? 7;
+  const horizons = resolveHorizons(distanceClass, overrides);
+  const raceWeekDays = horizons.raceWeekDaysBefore;
   if (daysUntil <= raceWeekDays) {
     return { daysUntilRace: daysUntil, distanceClass, phase: "raceWeek" };
   }
 
-  if (distanceClass === "marathon" && "deepPrepDaysBefore" in horizons) {
-    if (daysUntil <= horizons.deepPrepDaysBefore) {
+  if (distanceClass === "marathon") {
+    const marathonHorizons = resolveHorizons("marathon", overrides);
+    if (daysUntil <= marathonHorizons.deepPrepDaysBefore) {
       return { daysUntilRace: daysUntil, distanceClass, phase: "deepPrep" };
     }
-    if (daysUntil <= horizons.trainingCycleDaysBefore) {
+    if (daysUntil <= marathonHorizons.trainingCycleDaysBefore) {
       return {
         daysUntilRace: daysUntil,
         distanceClass,
