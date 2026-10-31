@@ -153,6 +153,24 @@ test("parses a 3 mile warmup and mile repeats with slash recovery", () => {
   assert.equal(parsed.suggestedTitle, "Marathon pace repeats");
 });
 
+test("parses bookends with alternating marathon-pace work as long-run pairs", () => {
+  const note =
+    "3 mile warmup, 8 miles alternating marathon pace and slightly above, 2 mile cooldown";
+  const parsed = tryParsePastedWorkoutText(note, "LongRun");
+  assert.ok(parsed);
+  assert.equal(parsed.segments.length, 3);
+  assert.equal(parsed.segments[0]?.title, "Warmup");
+  assert.equal(parsed.segments[0]?.durationValue, 3);
+  const work = parsed.segments[1];
+  assert.ok(work);
+  assert.equal(work.durationValue, 1);
+  assert.equal(work.repeatCount, 4);
+  assert.equal(work.paceOffsetSecPerMile, 45);
+  assert.equal(work.recoveryDurationValue, 1);
+  assert.equal(parsed.segments[2]?.title, "Cooldown");
+  assert.match(parsed.suggestedTitle, /alternating MP/i);
+});
+
 test("parses 800m repeats with between-rep recovery and explicit pace band", () => {
   const note =
     "800m repeats 4 x 800m at 7:00–7:30/mile pace (3:29–3:44 per 800m), with 400m easy jog recovery between repeats";

@@ -331,7 +331,11 @@ function CreateWorkoutPageInner() {
   const rawBuilderBack = searchParams.get("back")?.trim() ?? "";
   const builderBackHref = isSafeInternalBackPath(rawBuilderBack)
     ? rawBuilderBack
-    : "/training";
+    : fromHostRun
+      ? hostRunBackHref
+      : raceDayMode
+        ? raceDayBackHref
+        : "/gorun";
   const [workoutType, setWorkoutType] = useState<string>("Easy");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -351,6 +355,8 @@ function CreateWorkoutPageInner() {
   const [saving, setSaving] = useState(false);
   /** YYYY-MM-DD from date input; optional, shown on home & workout cards */
   const [scheduledDate, setScheduledDate] = useState("");
+  const [buildLane, setBuildLane] = useState<"presets" | "manual" | "ai" | null>(null);
+  const [presetTypeFilter, setPresetTypeFilter] = useState<string>("");
   /** Optional override for POST gofast-generate (same idea as Race distance presets). */
   const [templateDistanceMi, setTemplateDistanceMi] = useState("");
   const [catalogueItems, setCatalogueItems] = useState<CatalogueBrowseItem[]>([]);
@@ -468,12 +474,12 @@ function CreateWorkoutPageInner() {
   }, [raceDayMode, racePlanId]);
 
   useEffect(() => {
-    if (raceDayMode) return;
+    if (raceDayMode || buildLane !== "presets" || !presetTypeFilter) return;
     let cancelled = false;
     (async () => {
       try {
         const { data } = await api.get<{ items?: CatalogueBrowseItem[] }>(
-          "workouts/catalogue-browse"
+          `workouts/catalogue-browse?workoutType=${encodeURIComponent(presetTypeFilter)}`
         );
         if (!cancelled && Array.isArray(data?.items)) {
           setCatalogueItems(data.items);
@@ -488,7 +494,7 @@ function CreateWorkoutPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [raceDayMode]);
+  }, [raceDayMode, buildLane, presetTypeFilter]);
 
   useEffect(() => {
     if (!editingTarget) return;
@@ -605,9 +611,34 @@ function CreateWorkoutPageInner() {
     setSelectedCatalogueId(null);
   };
 
+  const totalDistanceMiFromApiSegments = (segments: ApiSegment[]): number => {
+    let mi = 0;
+    for (const s of segments) {
+      if (s.durationType !== "DISTANCE") continue;
+      const reps = s.repeatCount != null && s.repeatCount > 1 ? s.repeatCount : 1;
+      mi += s.durationValue * reps;
+      if (
+        s.repeatCount != null &&
+        s.repeatCount > 1 &&
+        s.recoveryDurationType === "DISTANCE" &&
+        s.recoveryDurationValue != null &&
+        s.recoveryDurationValue > 0
+      ) {
+        mi += s.recoveryDurationValue * s.repeatCount;
+      }
+    }
+    return mi;
+  };
+
   const inferWorkoutTypeFromApiSegments = (segments: ApiSegment[]): string => {
-    if (segments.some((s) => (s.repeatCount ?? 0) > 1)) return "Intervals";
     const titles = segments.map((s) => (s.title ?? "").toLowerCase()).join(" ");
+    const marathonPaced = /\bmarathon\b|\bmp\b/.test(titles);
+    const totalMi = totalDistanceMiFromApiSegments(segments);
+    if (marathonPaced && totalMi >= 11.5 && totalMi <= 15) return "LongRun";
+    if (segments.some((s) => (s.repeatCount ?? 0) > 1)) {
+      if (marathonPaced && totalMi >= 10) return "LongRun";
+      return "Intervals";
+    }
     if (/\btempo\b|\bthreshold\b/.test(titles)) return "Tempo";
     if (/\blong\b/.test(titles)) return "LongRun";
     return workoutType || "Easy";
@@ -622,8 +653,9 @@ function CreateWorkoutPageInner() {
     setWarmup(slots.warmup);
     setMainSegments(slots.mainSegments);
     setCooldown(slots.cooldown);
-    setName(params.suggestedTitle);
-    setDescription(params.suggestedDescription);
+    setName((prev) => prev.trim() || params.suggestedTitle);
+    setDescription((prev) => prev.trim() || params.suggestedDescription);
+    setBuildLane("manual");
     if (!raceDayMode) {
       setWorkoutType(inferWorkoutTypeFromApiSegments(params.segments));
     }
@@ -669,6 +701,13 @@ function CreateWorkoutPageInner() {
     if (!id) {
       setDeriveError("Workout saved but id was missing — check your workouts list.");
       return;
+    }
+    if (!fromHostRun && !raceDayMode) {
+      try {
+        await api.post(`workouts/${id}/push-to-garmin`);
+      } catch {
+        /* detail page reflects push state */
+      }
     }
     if (fromHostRun) {
       router.push(`/host-a-run?workoutId=${encodeURIComponent(id)}`);
@@ -949,6 +988,13 @@ function CreateWorkoutPageInner() {
 
       const response = await api.post("workouts", workoutData);
       const { workout } = response.data;
+      if (!fromHostRun && !raceDayMode) {
+        try {
+          await api.post(`workouts/${workout.id}/push-to-garmin`);
+        } catch {
+          /* detail page reflects push state */
+        }
+      }
       if (fromHostRun) {
         router.push(
           `/host-a-run?workoutId=${encodeURIComponent(workout.id)}`
@@ -989,8 +1035,65 @@ function CreateWorkoutPageInner() {
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">
-            {raceDayMode ? "Plan pacing blocks" : "Create Workout"}
+            {raceDayMode ? "Plan pacing blocks" : "Build a run"}
           </h1>
+
+          {!raceDayMode ? (
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description (optional)
+                </label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {!raceDayMode ? (
+            <div className="mb-8">
+              <p className="text-sm font-medium text-gray-900 mb-3">How do you want to build it?</p>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["presets", "Choose presets by type"],
+                    ["manual", "Manual"],
+                    ["ai", "AI Build"],
+                  ] as const
+                ).map(([lane, label]) => (
+                  <button
+                    key={lane}
+                    type="button"
+                    onClick={() => {
+                      setBuildLane(lane);
+                      if (lane !== "presets") setPresetTypeFilter("");
+                    }}
+                    className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
+                      buildLane === lane
+                        ? "border-orange-500 bg-orange-50 text-orange-900"
+                        : "border-gray-200 bg-white text-gray-800 hover:border-orange-200"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {raceDayMode ? (
             <>
@@ -1059,9 +1162,29 @@ function CreateWorkoutPageInner() {
           </div>
           ) : null}
 
-          {!raceDayMode ? (
+          {!raceDayMode && buildLane === "presets" ? (
           <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Coach catalogue presets</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Presets by type</h2>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {(["Easy", "Tempo", "Intervals", "LongRun"] as const).map((wt) => (
+                <button
+                  key={wt}
+                  type="button"
+                  onClick={() => {
+                    setPresetTypeFilter(wt);
+                    setWorkoutType(wt);
+                    setCatalogueItems([]);
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium border ${
+                    presetTypeFilter === wt
+                      ? "border-orange-600 bg-orange-600 text-white"
+                      : "border-gray-300 bg-white text-gray-800"
+                  }`}
+                >
+                  {wt === "LongRun" ? "Long run" : wt}
+                </button>
+              ))}
+            </div>
             <p className="text-sm text-gray-600 mb-3">
               Structured prescriptions (reps and recovery match plan materialization). Zones come from your active
               goal or profile 5K pace.
@@ -1069,7 +1192,9 @@ function CreateWorkoutPageInner() {
             {catalogueBrowseError != null && (
               <p className="text-sm text-amber-800 mb-2">{catalogueBrowseError}</p>
             )}
-            {catalogueItems.length === 0 && catalogueBrowseError == null ? (
+            {!presetTypeFilter ? (
+              <p className="text-sm text-gray-500">Pick Easy, Tempo, Intervals, or Long run above.</p>
+            ) : catalogueItems.length === 0 && catalogueBrowseError == null ? (
               <p className="text-sm text-gray-500">Loading presets…</p>
             ) : (
               <div className="space-y-6">
@@ -1107,7 +1232,7 @@ function CreateWorkoutPageInner() {
           </div>
           ) : null}
 
-          {!raceDayMode ? (
+          {false && !raceDayMode ? (
           <details className="mb-8 rounded-lg border border-orange-100 bg-orange-50/50 p-4">
             <summary className="text-lg font-semibold text-gray-900 cursor-pointer">
               Generic mileage template <span className="text-xs font-normal text-gray-500">(optional)</span>
@@ -1197,9 +1322,10 @@ function CreateWorkoutPageInner() {
           </details>
           ) : null}
 
+          {(raceDayMode || buildLane === "ai") && (
           <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                {raceDayMode ? "Paste pacing blocks" : "Paste your workout"}
+                {raceDayMode ? "Paste pacing blocks" : "AI Build — paste your workout"}
               </h2>
               <p className="text-sm text-gray-600 mb-3">
                 {raceDayMode ? (
@@ -1235,7 +1361,9 @@ function CreateWorkoutPageInner() {
                 {deriving ? "Building…" : "Build workout"}
               </button>
             </div>
+          )}
 
+          {(raceDayMode || buildLane === "manual" || hasSlots) && (
           <>
             {hasSlots ? (
               <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -1248,28 +1376,6 @@ function CreateWorkoutPageInner() {
                 </button>
               </div>
             ) : null}
-
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                  <input
-                    type="text"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  />
-                </div>
-              </div>
 
               <div className="mb-6" id="workout-builder-segments">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Segments</h2>
@@ -1751,10 +1857,11 @@ function CreateWorkoutPageInner() {
                   disabled={saving || !name || !hasPositiveDuration}
                   className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {saving ? "Saving…" : "Create workout"}
+                  {saving ? "Saving…" : raceDayMode ? "Create workout" : "Save run"}
                 </button>
               </div>
             </>
+          )}
         </form>
           </div>
         </main>

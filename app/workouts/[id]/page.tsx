@@ -1907,9 +1907,13 @@ export default function WorkoutDetailPage() {
 
   const workoutPushed = workout.workoutPushed === true;
   const workoutEditedAfterPush = workout.workoutEditedAfterPush === true;
+  const isStandaloneRun = !workout.planId;
   const showGarminReadyCta =
-    !isLogged && garminConnected === true && (!workoutPushed || workoutEditedAfterPush);
-  const showGarminHeaderCard = !isLogged;
+    !isLogged &&
+    !isStandaloneRun &&
+    garminConnected === true &&
+    (!workoutPushed || workoutEditedAfterPush);
+  const showGarminHeaderCard = !isLogged && !isStandaloneRun;
   const scheduleLabel = formatWorkoutScheduleLong(workout.date);
   const workoutDateKey = workoutCalendarYmd(workout.date);
   const dayRel = dayRelativeToToday(workout.date);
@@ -1927,6 +1931,7 @@ export default function WorkoutDetailPage() {
   function normalizeTrainingHubBack(href: string | null | undefined): string | null {
     if (!href) return null;
     const base = href.split("?")[0] ?? href;
+    if (base === "/gorun" || base.startsWith("/gorun/")) return href;
     if (base === "/training" || base.startsWith("/training/day/") || base === "/workouts") {
       return "/training";
     }
@@ -1937,14 +1942,16 @@ export default function WorkoutDetailPage() {
     normalizeTrainingHubBack(simpleBackHref) ??
     normalizeTrainingHubBack(planPreviewBackFromStash) ??
     (goTrainCtx ? backHrefFromGoTrainContext(goTrainCtx) : null) ??
-    "/training";
+    (isStandaloneRun ? "/gorun" : "/training");
   const backLabel = simpleBackHref
     ? backLabelFromPath(simpleBackHref)
     : planPreviewBackFromStash
       ? backLabelFromPath(planPreviewBackFromStash)
       : goTrainCtx
         ? backLabelFromGoTrainContext(goTrainCtx)
-        : "Back to Train";
+        : isStandaloneRun
+          ? "Back to Run"
+          : "Back to Train";
 
   const structuredTotals = structuredSegmentTotals(sortedSegments);
   const structuredParts = [
@@ -2012,8 +2019,8 @@ export default function WorkoutDetailPage() {
   const dateLineDisplay = navDateLine ?? scheduleLabel;
   const weekAndDateLine = [weekLineDisplay, dateLineDisplay].filter(Boolean).join(" · ");
   const showStandaloneCopyAction = !workout.planId;
-  const showHostMeetupNextStep =
-    !workout.planId && !(workout.city_runs?.length) && !isLogged;
+  const showStandaloneRunSuccess = isStandaloneRun && !isLogged;
+  const planThisRunHref = `/workouts/${workoutId}/plan?back=${encodeURIComponent(backHref)}`;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -2031,20 +2038,9 @@ export default function WorkoutDetailPage() {
           <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-2 text-sm sm:text-base font-medium">
               <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-              <span>
-                Workout saved. Send to Garmin below, or invite others with a map meetup.
-              </span>
+              <span>Run saved.</span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {!workout.planId ? (
-                <Link
-                  href={`/host-a-run?workoutId=${encodeURIComponent(workoutId)}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/25"
-                >
-                  <Users className="w-4 h-4" />
-                  Invite others
-                </Link>
-              ) : null}
               <button
                 type="button"
                 onClick={() => setShowCreatedBanner(false)}
@@ -2089,31 +2085,39 @@ export default function WorkoutDetailPage() {
           {backLabel}
         </Link>
 
-        {showHostMeetupNextStep ? (
-          <div className="mb-6 rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-5 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-orange-100 p-2 shrink-0">
-                <MapPin className="h-5 w-5 text-orange-700" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
-                  Next step
-                </p>
-                <h2 className="text-base font-semibold text-gray-900 mt-0.5">
-                  Create a run &amp; invite others
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Attach this workout to a public meetup — set the map pin, time, and share link
-                  (same as mobile GoRun).
-                </p>
-                <Link
-                  href={`/host-a-run?workoutId=${encodeURIComponent(workoutId)}`}
-                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
-                >
-                  <Users className="h-4 w-4" />
-                  Host with map meetup
-                </Link>
-              </div>
+        {showStandaloneRunSuccess ? (
+          <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">
+                Your planned run
+              </p>
+              <h2 className="text-xl font-bold text-gray-900 mt-1">{workout.title}</h2>
+              {weekAndDateLine ? (
+                <p className="text-sm font-medium text-gray-800 mt-1">{weekAndDateLine}</p>
+              ) : null}
+              {workout.description ? (
+                <p className="text-sm text-gray-600 mt-2">{workout.description}</p>
+              ) : null}
+            </div>
+            {workoutPushed ? (
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-green-800">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                Sent to Connection on File
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={planThisRunHref}
+                className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+              >
+                Plan this run
+              </Link>
+              <a
+                href="#segment-sequencer"
+                className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Edit run
+              </a>
             </div>
           </div>
         ) : null}

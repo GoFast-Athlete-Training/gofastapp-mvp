@@ -16,6 +16,7 @@ import {
   type RunnerAgendaItem,
   type RunnerAgendaPayload,
   type RunnerJoinedRun,
+  type RunnerStandaloneWorkoutRun,
 } from '@/lib/runner/build-runner-agenda';
 
 export type {
@@ -25,6 +26,7 @@ export type {
   RunnerJoinedRun,
   RunnerPlanSession,
   RunnerPlannedWorkoutPreview,
+  RunnerStandaloneWorkoutRun,
 } from '@/lib/runner/build-runner-agenda';
 
 export { buildRunnerAgenda };
@@ -262,6 +264,43 @@ export async function fetchRunnerAgendaForAthlete(
 
   const pastItems = pastRuns.map((run) => joinedRunToAgendaItem(run));
 
+  const todayStart = new Date(`${todayKey}T00:00:00.000Z`);
+  const standaloneRows = await prisma.workouts.findMany({
+    where: {
+      athleteId,
+      planId: null,
+      date: { gte: todayStart },
+      skippedAt: null,
+      NOT: {
+        OR: [
+          { actualDistanceMeters: { gt: 0 } },
+          { actualDurationSeconds: { gt: 0 } },
+        ],
+      },
+    },
+    select: {
+      id: true,
+      title: true,
+      workoutType: true,
+      date: true,
+      description: true,
+      estimatedDistanceInMeters: true,
+    },
+    orderBy: { date: 'asc' },
+    take: 40,
+  });
+
+  const upcomingStandaloneRuns: RunnerStandaloneWorkoutRun[] = standaloneRows
+    .filter((w) => w.date != null)
+    .map((w) => ({
+      id: w.id,
+      title: w.title?.trim() || 'Run',
+      workoutType: w.workoutType,
+      dateKey: ymdFromDate(w.date!),
+      description: w.description?.trim() || null,
+      estimatedDistanceInMeters: w.estimatedDistanceInMeters,
+    }));
+
   return {
     todayKey,
     hasActivePlan: false,
@@ -269,5 +308,6 @@ export async function fetchRunnerAgendaForAthlete(
     memberItems,
     items: allItems,
     pastItems,
+    upcomingStandaloneRuns,
   };
 }

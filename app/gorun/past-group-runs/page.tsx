@@ -16,7 +16,8 @@ export default function GoRunPastGroupRunsPage() {
             <Link href="/gorun" className="text-sm font-semibold text-gray-600 hover:text-gray-900">
               ← Back to Run
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">My Past Group Runs</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Past Meetups</h1>
+            <p className="text-sm text-gray-600">Meetups you hosted or joined.</p>
             <GoRunPastSections expanded mode="group" />
           </div>
         </main>

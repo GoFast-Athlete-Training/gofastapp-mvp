@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Compass, Dumbbell, Users } from "lucide-react";
+import { Compass, Map, Route } from "lucide-react";
 import TopNav from "@/components/shared/TopNav";
 import AthleteSidebar from "@/components/athlete/AthleteSidebar";
 import GoRunUpcomingRunsPanel from "@/components/runs/GoRunUpcomingRunsPanel";
@@ -18,30 +18,30 @@ export default function GoRunPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Run</p>
               <h1 className="text-3xl font-bold text-gray-900 mt-1 mb-2">Run</h1>
               <p className="text-gray-600">
-                Build a workout, create a run invite, or find a club run in your area.
+                Build a run, save a route, or find a club run in your area.
               </p>
             </div>
 
             <section className="grid gap-4 grid-cols-1 sm:grid-cols-3">
               <Link
-                href="/workouts/create"
+                href="/workouts/create?back=/gorun"
                 className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:border-orange-300 transition group h-full"
               >
                 <div className="rounded-xl bg-orange-100 p-2.5 w-fit mb-3">
-                  <Dumbbell className="h-6 w-6 text-orange-700" />
+                  <Route className="h-6 w-6 text-orange-700" />
                 </div>
-                <h2 className="text-base font-semibold text-gray-900">Build a Workout</h2>
-                <p className="text-sm text-gray-600 mt-1">Prescribe segments or attach when you host.</p>
+                <h2 className="text-base font-semibold text-gray-900">Build a Run</h2>
+                <p className="text-sm text-gray-600 mt-1">Title, segments, and send to your connection.</p>
               </Link>
               <Link
-                href="/host-a-run"
+                href="/gorun/routes/new"
                 className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:border-orange-300 transition group h-full"
               >
-                <div className="rounded-xl bg-orange-100 p-2.5 w-fit mb-3">
-                  <Users className="h-6 w-6 text-orange-700" />
+                <div className="rounded-xl bg-emerald-100 p-2.5 w-fit mb-3">
+                  <Map className="h-6 w-6 text-emerald-800" />
                 </div>
-                <h2 className="text-base font-semibold text-gray-900">Create a Run</h2>
-                <p className="text-sm text-gray-600 mt-1">Meetup, time, optional workout.</p>
+                <h2 className="text-base font-semibold text-gray-900">Build a route</h2>
+                <p className="text-sm text-gray-600 mt-1">Strava link, map, and distance — on its own.</p>
               </Link>
               <Link
                 href="/discoverruns"

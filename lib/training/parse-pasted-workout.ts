@@ -21,6 +21,8 @@ export type ParsedPasteSegment = {
   paceOffsetSecPerMile?: number | null;
   recoveryDurationType?: "DISTANCE" | "TIME" | null;
   recoveryDurationValue?: number | null;
+  /** Sec/mi vs 5K for between-rep / alternating slow leg when set. */
+  recoveryPaceOffsetSecPerMile?: number | null;
   /** Local clause after the rep match — used for pace/recovery parsing at materialize. */
   effortContext?: string;
 };
@@ -274,6 +276,57 @@ function distanceTokenToMiles(amount: number, unitRaw: string): number | null {
   return null;
 }
 
+/** Bookends + "8 miles alternating marathon pace and slightly slower" (1 mi / 1 mi pairs). */
+function tryParseAlternatingMarathonBlock(text: string): ParsedPasteWorkout | null {
+  const normalized = text.trim().replace(/\s+/g, " ");
+  if (!/\balternating\b/i.test(normalized)) return null;
+  if (!/\b(?:marathon\s*pace|\bmp\b)/i.test(normalized)) return null;
+
+  const workM =
+    normalized.match(
+      /(\d+(?:\.\d+)?)\s*(?:mi|mile|miles)\b[^,.]*\balternating/i
+    ) ??
+    normalized.match(
+      /(\d+(?:\.\d+)?)\s*(?:mi|mile|miles)\b[^,.]*(?:marathon\s*pace|\bmp\b)/i
+    );
+  if (!workM) return null;
+  const workMi = parseFloat(workM[1]);
+  if (!Number.isFinite(workMi) || workMi <= 0) return null;
+
+  const bookends = scanBookendSegments(normalized).map((b) => b.segment);
+  const warmup = bookends.find((s) => s.title === "Warmup");
+  const cooldown = bookends.find((s) => s.title === "Cooldown");
+
+  const pairMi = 2;
+  const repeatCount = Math.max(1, Math.round(workMi / pairMi));
+
+  const segments: ParsedPasteSegment[] = [];
+  if (warmup) segments.push(warmup);
+  segments.push({
+    title: "Marathon pace",
+    durationType: "DISTANCE",
+    durationValue: 1,
+    repeatCount,
+    paceOffsetSecPerMile: 45,
+    recoveryDurationType: "DISTANCE",
+    recoveryDurationValue: 1,
+    recoveryPaceOffsetSecPerMile: 60,
+    effortContext: "1 mile marathon pace, 1 mile slightly slower",
+  });
+  if (cooldown) segments.push(cooldown);
+
+  const warmupMi = warmup?.durationType === "DISTANCE" ? warmup.durationValue : 0;
+  const cooldownMi = cooldown?.durationType === "DISTANCE" ? cooldown.durationValue : 0;
+  const totalMi = Math.round((warmupMi + workMi + cooldownMi) * 10) / 10;
+  const summary = normalized.slice(0, 160);
+
+  return {
+    segments,
+    suggestedTitle: `alternating MP - ${totalMi} miles`,
+    suggestedDescription: summary,
+  };
+}
+
 /** Coach block lists: "Block 1: Repeat 3 times:" with Run / Jog bullets. */
 function tryParseCoachBlockWorkout(text: string): ParsedPasteWorkout | null {
   if (!/repeat\s+\d+\s+times/i.test(text)) return null;
@@ -390,6 +443,9 @@ export function tryParsePastedWorkoutText(
 ): ParsedPasteWorkout | null {
   const text = sourceText.trim();
   if (!text) return null;
+
+  const alternating = tryParseAlternatingMarathonBlock(text);
+  if (alternating) return alternating;
 
   const blockParsed = tryParseCoachBlockWorkout(text);
   if (blockParsed) return blockParsed;

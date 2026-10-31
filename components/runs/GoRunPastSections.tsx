@@ -77,11 +77,11 @@ export default function GoRunPastSections({ expanded = false, mode = "all" }: Pr
       }
     >
       {showGroup ? (
-      <section aria-label="My past group runs">
+      <section aria-label="Past meetups">
         <div className="flex items-end justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">My Past Group Runs</h2>
-            <p className="text-sm text-gray-600 mt-0.5">Runs you hosted or joined.</p>
+            <h2 className="text-lg font-semibold text-gray-900">Past Meetups</h2>
+            <p className="text-sm text-gray-600 mt-0.5">Meetups you hosted or joined.</p>
           </div>
           {!expanded && groupRuns.length > PAST_RUN_PREVIEW_LIMIT ? (
             <Link

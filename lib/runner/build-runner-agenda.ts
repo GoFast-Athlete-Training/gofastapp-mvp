@@ -74,6 +74,16 @@ export type RunnerAgendaItem = {
   joinedRun: RunnerJoinedRun | null;
 };
 
+/** Standalone workout session on Run hub (planId null, still upcoming). */
+export type RunnerStandaloneWorkoutRun = {
+  id: string;
+  title: string;
+  workoutType: string;
+  dateKey: string;
+  description: string | null;
+  estimatedDistanceInMeters: number | null;
+};
+
 export type RunnerAgendaPayload = {
   todayKey: string;
   hasActivePlan: boolean;
@@ -85,6 +95,8 @@ export type RunnerAgendaPayload = {
   items: RunnerAgendaItem[];
   /** Dates before today — same runs list, opens CityRunRsvpGroup. */
   pastItems: RunnerAgendaItem[];
+  /** Standalone workouts the athlete created — Run hub “My Upcoming Runs”. */
+  upcomingStandaloneRuns: RunnerStandaloneWorkoutRun[];
 };
 
 type JoinedRunInput = RunnerJoinedRun;

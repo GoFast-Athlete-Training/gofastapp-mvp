@@ -16,7 +16,8 @@ export default function GoRunUpcomingRunsPage() {
             <Link href="/gorun" className="text-sm font-semibold text-gray-600 hover:text-gray-900">
               ← Back to Run
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">Upcoming Runs</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Upcoming</h1>
+            <p className="text-sm text-gray-600">Your standalone runs and meetups.</p>
             <GoRunUpcomingRunsPanel mode="full" />
           </div>
         </main>
