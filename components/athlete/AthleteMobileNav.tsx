@@ -1,19 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { Activity, LayoutDashboard, Link2, MapPin, PenLine, Trophy, Users, X } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Activity, LayoutDashboard, MapPin, PenLine, Trophy, Users, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
   BUILD_CONTENT_LABEL,
   BUILD_CONTENT_PATH,
   COMMUNITY_HUB_PATH,
-  GOFAST_LINKS_LABEL,
-  GOFAST_LINKS_PATH,
   MANAGE_COMMUNITY_LABEL,
   isCommunityHubPath,
   isContentStudioPath,
-  isGoFastLinksPath,
 } from '@/lib/athlete/community-nav';
 
 type NavItem = {
@@ -21,10 +18,18 @@ type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
-  match: (pathname: string | null) => boolean;
+  match: (pathname: string | null, backParam: string | null) => boolean;
 };
 
-function planHubMatch(p: string | null): boolean {
+function isRunScopedWorkoutPath(p: string | null, backParam: string | null): boolean {
+  if (!p) return false;
+  if (p === '/workouts/create' || p.startsWith('/workouts/create/')) return false;
+  if (!/^\/workouts\/[^/]+$/.test(p)) return false;
+  const back = backParam?.trim() ?? '';
+  return back === '/gorun' || back.startsWith('/gorun/');
+}
+
+function planHubMatch(p: string | null, _backParam: string | null): boolean {
   if (!p) return false;
   return (
     p === '/training' ||
@@ -35,8 +40,10 @@ function planHubMatch(p: string | null): boolean {
   );
 }
 
-function gorunMatch(p: string | null): boolean {
+function gorunMatch(p: string | null, backParam: string | null): boolean {
   if (!p) return false;
+  if (isRunScopedWorkoutPath(p, backParam)) return true;
+  if (/^\/workouts\/[^/]+\/(plan|let-others-join)$/.test(p)) return true;
   if (p === '/gorun' || p.startsWith('/gorun/')) return true;
   if (p.startsWith('/runrsvp/')) return true;
   if (p.startsWith('/cityruntogether/')) return true;
@@ -55,9 +62,10 @@ function racesMatch(p: string | null): boolean {
   );
 }
 
-function activityHubMatch(p: string | null): boolean {
+function activityHubMatch(p: string | null, backParam: string | null): boolean {
   if (!p) return false;
   if (p === '/workouts/create' || p.startsWith('/workouts/create/')) return false;
+  if (isRunScopedWorkoutPath(p, backParam)) return false;
   return (
     p === '/activities' ||
     p.startsWith('/activities/') ||
@@ -79,21 +87,14 @@ const moreItems: NavItem[] = [
     label: BUILD_CONTENT_LABEL,
     href: BUILD_CONTENT_PATH,
     icon: PenLine,
-    match: isContentStudioPath,
-  },
-  {
-    id: 'gofast-links',
-    label: GOFAST_LINKS_LABEL,
-    href: GOFAST_LINKS_PATH,
-    icon: Link2,
-    match: isGoFastLinksPath,
+    match: (p) => isContentStudioPath(p),
   },
   {
     id: 'community-hub',
     label: MANAGE_COMMUNITY_LABEL,
     href: COMMUNITY_HUB_PATH,
     icon: Users,
-    match: isCommunityHubPath,
+    match: (p) => isCommunityHubPath(p),
   },
 ];
 
@@ -104,9 +105,11 @@ const moreItems: NavItem[] = [
 export default function AthleteMobileNav() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const backParam = searchParams.get('back');
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const moreActive = moreItems.some((item) => item.match(pathname));
+  const moreActive = moreItems.some((item) => item.match(pathname, backParam));
 
   useEffect(() => {
     setMoreOpen(false);
@@ -150,7 +153,7 @@ export default function AthleteMobileNav() {
             </div>
             {moreItems.map((item) => {
               const Icon = item.icon;
-              const active = item.match(pathname);
+              const active = item.match(pathname, backParam);
               const isHub = item.id === 'community-hub';
               return (
                 <button
@@ -181,7 +184,7 @@ export default function AthleteMobileNav() {
         <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1">
           {primaryTabs.map((item) => {
             const Icon = item.icon;
-            const active = item.match(pathname);
+            const active = item.match(pathname, backParam);
             return (
               <button
                 key={item.id}

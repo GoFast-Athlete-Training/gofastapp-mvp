@@ -13,17 +13,12 @@ import { athleteLinksPublicUrl } from "@/lib/content/athlete-links-public-url";
 import GoFastWithMeWelcomePanel from "@/components/gofast-with-me/GoFastWithMeWelcomePanel";
 import GoFastWithMeRunnerStoryPanel from "@/components/gofast-with-me/GoFastWithMeRunnerStoryPanel";
 import GoFastWithMeTrainingReflectionsPanel from "@/components/gofast-with-me/GoFastWithMeTrainingReflectionsPanel";
-import GoFastWithMePayoutsPanel from "@/components/gofast-with-me/GoFastWithMePayoutsPanel";
 import GoFastWithMeTipsPanel from "@/components/gofast-with-me/GoFastWithMeTipsPanel";
 import GoFastWithMeRoutesPanel from "@/components/gofast-with-me/GoFastWithMeRoutesPanel";
 import GoFastWithMeBuildContentHub from "@/components/gofast-with-me/GoFastWithMeBuildContentHub";
 import GoFastWithMeStudioAppShell from "@/components/gofast-with-me/GoFastWithMeStudioAppShell";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
-import {
-  COMMUNITY_HUB_PATH,
-  contentBuilderPayoutsPath,
-  studioContentPath,
-} from "@/lib/athlete/community-nav";
+import { COMMUNITY_HUB_PATH, studioContentPath } from "@/lib/athlete/community-nav";
 import {
   type ContentEditorFocus,
   type StudioSection,
@@ -109,8 +104,8 @@ export default function GoFastWithOthersDashboard() {
   const handleViewChange = useCallback(
     (view: StudioView, options?: { contentFocus?: ContentEditorFocus }) => {
       if (view === "payouts") {
-        setActiveView("payouts");
-        router.replace(contentBuilderPayoutsPath());
+        setActiveView("page");
+        router.replace(studioContentPath("page"));
         return;
       }
       const section = view as StudioSection;
@@ -128,7 +123,7 @@ export default function GoFastWithOthersDashboard() {
   useEffect(() => {
     const view = searchParams.get("view");
     if (view === "payouts") {
-      setActiveView("payouts");
+      router.replace(studioContentPath("page"));
       return;
     }
     if (!isContentEditorFromParams(searchParams)) {
@@ -146,7 +141,7 @@ export default function GoFastWithOthersDashboard() {
     } else {
       setContentFocus(null);
     }
-  }, [searchParams]);
+  }, [router, searchParams]);
 
   useEffect(() => {
     const id = LocalStorageAPI.getAthleteId();
@@ -191,8 +186,10 @@ export default function GoFastWithOthersDashboard() {
             return;
           }
           if (searchParams.get("view") === "payouts") {
-            setActiveView("payouts");
-          } else if (isContentEditorFromParams(searchParams)) {
+            router.replace(studioContentPath("page"));
+            return;
+          }
+          if (isContentEditorFromParams(searchParams)) {
             const view = viewFromSearchParam(searchParams.get("view"))!;
             setActiveView(view);
             if (view === "content") {
@@ -227,24 +224,6 @@ export default function GoFastWithOthersDashboard() {
         <div className="flex flex-1 items-center justify-center min-h-[40vh]">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
         </div>
-      </AthleteAppShell>
-    );
-  }
-
-  if (activeView === "payouts" && athleteId) {
-    return (
-      <AthleteAppShell>
-        <main className="px-4 sm:px-6 py-6">
-          <div className="max-w-3xl mx-auto space-y-4">
-            <Link
-              href={COMMUNITY_HUB_PATH}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900"
-            >
-              ← Manage Community
-            </Link>
-            <GoFastWithMePayoutsPanel />
-          </div>
-        </main>
       </AthleteAppShell>
     );
   }
@@ -284,8 +263,7 @@ export default function GoFastWithOthersDashboard() {
   const communityHubUrl = shellSlug ? athleteCommunityAppPath(shellSlug) : "/athlete-home";
 
   const inContentEditor = isContentEditorFromParams(searchParams);
-  const editorSection =
-    activeView === "payouts" ? "page" : (activeView as StudioSection);
+  const editorSection = activeView as StudioSection;
 
   const studioShell = (content: React.ReactNode) => (
     <AthleteAppShell>
@@ -356,10 +334,6 @@ export default function GoFastWithOthersDashboard() {
   }
 
   const renderStudioContent = () => {
-    if (activeView === "payouts") {
-      return null;
-    }
-
     switch (activeView) {
       case "page":
         return (

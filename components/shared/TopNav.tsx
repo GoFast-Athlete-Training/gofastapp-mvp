@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -14,8 +14,8 @@ import {
   rememberAthleteChrome,
   resolveChromePhotoSrc,
 } from '@/lib/athlete-chrome-cache';
-import { Settings, Wallet, Footprints } from 'lucide-react';
-import { contentBuilderPayoutsPath } from '@/lib/athlete/community-nav';
+import { Settings, Footprints, Link2 } from 'lucide-react';
+import { GOFAST_LINKS_PATH, isGoFastLinksPath } from '@/lib/athlete/community-nav';
 
 type TopNavAthleteChrome = {
   firstName?: string;
@@ -30,6 +30,8 @@ interface TopNavProps {
 
 export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }: TopNavProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const linksActive = isGoFastLinksPath(pathname);
   const [athleteProfile, setAthleteProfile] = useState<TopNavAthleteChrome | null>(null);
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
   const blobPhotoSrcRef = useRef<string | null>(null);
@@ -137,16 +139,6 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
 
           {/* Right: quick links not duplicated in left rail, profile & actions */}
           <div className="flex items-center gap-1 sm:gap-3">
-            <Suspense
-              fallback={
-                <span className="p-2 text-gray-600 rounded-lg" aria-hidden>
-                  <Wallet className="h-5 w-5" />
-                </span>
-              }
-            >
-              <TopNavEarningsLink />
-            </Suspense>
-
             <Link
               href="/myruns"
               className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
@@ -155,7 +147,19 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
               <Footprints className="h-5 w-5" />
             </Link>
 
-            {/* Settings Icon */}
+            <Link
+              href={GOFAST_LINKS_PATH}
+              className={`p-2 rounded-lg transition ${
+                linksActive
+                  ? 'bg-gray-100 text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+              title="Links"
+              aria-current={linksActive ? 'page' : undefined}
+            >
+              <Link2 className="h-5 w-5" />
+            </Link>
+
             <Link
               href="/settings"
               className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition"
@@ -200,26 +204,3 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
     </header>
   );
 }
-
-function TopNavEarningsLink() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const active =
-    pathname === '/gofast-contentbuilder' && searchParams.get('view') === 'payouts';
-
-  return (
-    <Link
-      href={contentBuilderPayoutsPath()}
-      className={`p-2 rounded-lg transition ${
-        active
-          ? 'bg-gray-100 text-gray-900'
-          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-      }`}
-      title="Earnings"
-      aria-current={active ? 'page' : undefined}
-    >
-      <Wallet className="h-5 w-5" />
-    </Link>
-  );
-}
-

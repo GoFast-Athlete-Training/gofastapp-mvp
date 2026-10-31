@@ -1,33 +1,30 @@
 "use client";
 
 import { Suspense } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, LayoutDashboard, Link2, MapPin, PenLine, Trophy, Users } from "lucide-react";
+import { Activity, LayoutDashboard, MapPin, PenLine, Trophy, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import AthleteMobileNav from "@/components/athlete/AthleteMobileNav";
 import {
   BUILD_CONTENT_LABEL,
   BUILD_CONTENT_PATH,
   COMMUNITY_HUB_PATH,
-  GOFAST_LINKS_LABEL,
-  GOFAST_LINKS_PATH,
   MANAGE_COMMUNITY_LABEL,
   isCommunityHubPath,
   isContentStudioPath,
-  isGoFastLinksPath,
 } from "@/lib/athlete/community-nav";
 
 type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
-  match?: (pathname: string | null) => boolean;
+  match?: (pathname: string | null, backParam: string | null) => boolean;
 };
 
 /** Training hub: schedule, setup, tri-work sandbox, day detail */
-function planHubMatch(p: string | null): boolean {
+function planHubMatch(p: string | null, _backParam: string | null): boolean {
   if (!p) return false;
   return (
     p === "/training" ||
@@ -38,9 +35,18 @@ function planHubMatch(p: string | null): boolean {
   );
 }
 
-function activityHubMatch(p: string | null): boolean {
+function isRunScopedWorkoutPath(p: string | null, backParam: string | null): boolean {
   if (!p) return false;
   if (p === "/workouts/create" || p.startsWith("/workouts/create/")) return false;
+  if (!/^\/workouts\/[^/]+$/.test(p)) return false;
+  const back = backParam?.trim() ?? "";
+  return back === "/gorun" || back.startsWith("/gorun/");
+}
+
+function activityHubMatch(p: string | null, backParam: string | null): boolean {
+  if (!p) return false;
+  if (p === "/workouts/create" || p.startsWith("/workouts/create/")) return false;
+  if (isRunScopedWorkoutPath(p, backParam)) return false;
   return (
     p === "/activities" ||
     p.startsWith("/activities/") ||
@@ -49,10 +55,12 @@ function activityHubMatch(p: string | null): boolean {
   );
 }
 
-function gorunMatch(p: string | null): boolean {
+function gorunMatch(p: string | null, backParam: string | null): boolean {
   if (!p) return false;
+  if (isRunScopedWorkoutPath(p, backParam)) return true;
   if (p === "/gorun") return true;
   if (p.startsWith("/gorun/")) return true;
+  if (/^\/workouts\/[^/]+\/(plan|let-others-join)$/.test(p)) return true;
   if (p.startsWith("/runrsvp/")) return true;
   if (p.startsWith("/cityruntogether/")) return true;
   if (p.startsWith("/runcomplete/")) return true;
@@ -96,8 +104,9 @@ const primaryNavItems: NavItem[] = [
 function AthleteSidebarInner() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const backParam = searchParams.get("back");
   const contentStudioActive = isContentStudioPath(pathname);
-  const linksActive = isGoFastLinksPath(pathname);
   const hubActive = isCommunityHubPath(pathname);
 
   return (
@@ -127,7 +136,7 @@ function AthleteSidebarInner() {
             {primaryNavItems.map((item) => {
               const { label, href, icon: Icon, match } = item;
               const active = match
-                ? match(pathname)
+                ? match(pathname, backParam)
                 : pathname === href || !!pathname?.startsWith(`${href}/`);
               return (
                 <button
@@ -159,18 +168,6 @@ function AthleteSidebarInner() {
             >
               <PenLine className="h-5 w-5 shrink-0" />
               <span className="text-left">{BUILD_CONTENT_LABEL}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(GOFAST_LINKS_PATH)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                linksActive
-                  ? "bg-orange-50 text-orange-700 border border-orange-200"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              <Link2 className="h-5 w-5 shrink-0" />
-              <span className="text-left">{GOFAST_LINKS_LABEL}</span>
             </button>
           </div>
 
