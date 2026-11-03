@@ -19,6 +19,7 @@ export const athleteRaceGoalSelect = {
   ...goalAthleteRaceSelect,
   athleteId: true,
   isPrimaryRace: true,
+  notifyEnabled: true,
   goalName: true,
   goalDescription: true,
   goalDistance: true,
@@ -37,6 +38,8 @@ export type AthleteRaceGoalRow = {
   id: string;
   athleteId: string;
   raceRegistryId: string;
+  isPrimaryRace: boolean;
+  notifyEnabled: boolean;
   name: string;
   raceDate: Date;
   distanceMeters: number | null;
