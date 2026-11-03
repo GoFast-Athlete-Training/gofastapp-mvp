@@ -383,6 +383,13 @@ export default function MyRacesPage() {
   }, [loadAll]);
 
   useEffect(() => {
+    if (loading || typeof window === "undefined") return;
+    if (window.location.hash === "#race-calendar") {
+      document.getElementById("race-calendar")?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [loading]);
+
+  useEffect(() => {
     const unsub = auth.onAuthStateChanged((user) => {
       if (!user) router.replace("/signup");
     });
@@ -561,28 +568,6 @@ export default function MyRacesPage() {
               >
                 Find more races →
               </Link>
-              {pastRaces.length > 0 ? (
-                <details className="group rounded-lg border border-gray-200 bg-white px-2 py-1.5 sm:max-w-xs sm:text-right">
-                  <summary className="cursor-pointer list-none text-xs font-medium text-gray-600 hover:text-gray-900 [&::-webkit-details-marker]:hidden">
-                    Past races ({pastRaces.length})
-                  </summary>
-                  <ul className="mt-2 space-y-1 text-left border-t border-gray-100 pt-2 max-h-40 overflow-y-auto">
-                    {[...pastRaces]
-                      .sort(
-                        (a, b) =>
-                          new Date(b.raceDate).getTime() - new Date(a.raceDate).getTime()
-                      )
-                      .map((row) => (
-                        <li key={row.athleteRaceId} className="text-xs text-gray-700">
-                          <span className="text-gray-400 tabular-nums mr-1">
-                            {formatRaceListDate(row.raceDate)}
-                          </span>
-                          {row.name}
-                        </li>
-                      ))}
-                  </ul>
-                </details>
-              ) : null}
             </div>
           </div>
 
@@ -761,6 +746,69 @@ export default function MyRacesPage() {
               <NextSixMonthsRaceCards upcomingRaces={upcomingRaces} />
             </section>
           ) : null}
+
+          <section id="race-calendar" className="pt-6 border-t border-gray-100 scroll-mt-6">
+            <h2 className="text-sm font-semibold text-gray-700">Your race calendar</h2>
+            <p className="text-xs text-gray-500 mt-0.5 mb-4">
+              Upcoming and past races you&apos;ve added to My Races — not the public race catalog.
+            </p>
+            {upcomingSorted.length > 0 ? (
+              <div className="mb-5">
+                <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
+                  Upcoming
+                </h3>
+                <ul className="space-y-2">
+                  {upcomingSorted.map((row) => (
+                    <li key={row.athleteRaceId}>
+                      <Link
+                        href={personalRaceHref(row)}
+                        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:border-orange-200 hover:bg-orange-50/40"
+                      >
+                        <span className="text-gray-500 tabular-nums text-xs shrink-0">
+                          {formatRaceListDate(row.raceDate)}
+                        </span>
+                        <span className="font-medium text-gray-900">{row.name}</span>
+                        {row.isPrimaryRace ? (
+                          <span className="text-[10px] font-semibold uppercase text-orange-700">
+                            Goal race
+                          </span>
+                        ) : null}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {pastRaces.length > 0 ? (
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
+                  Past
+                </h3>
+                <ul className="space-y-2">
+                  {[...pastRaces]
+                    .sort(
+                      (a, b) => new Date(b.raceDate).getTime() - new Date(a.raceDate).getTime()
+                    )
+                    .map((row) => (
+                      <li key={row.athleteRaceId}>
+                        <Link
+                          href={personalRaceHref(row)}
+                          className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2 text-sm hover:border-gray-200 hover:bg-gray-50"
+                        >
+                          <span className="text-gray-400 tabular-nums text-xs shrink-0">
+                            {formatRaceListDate(row.raceDate)}
+                          </span>
+                          <span className="font-medium text-gray-800">{row.name}</span>
+                        </Link>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+            {upcomingSorted.length === 0 && pastRaces.length === 0 ? (
+              <p className="text-sm text-gray-500">No races on your calendar yet.</p>
+            ) : null}
+          </section>
 
           <DiscoverRacesSection
             signedRaceIds={signedRaceIds}

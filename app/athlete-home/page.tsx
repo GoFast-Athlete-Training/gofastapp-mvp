@@ -718,6 +718,7 @@ export default function AthleteHomePage() {
   const goalRaceIsoStr = raceDateToIsoString(goalRace?.raceDate);
   const goalPhase = getRacePhaseLocal(goalRaceIsoStr);
   const goalIsPastRace = goalPhase === 'post_early' || goalPhase === 'post_cooled';
+  const showPostRaceHomePhase = goalIsPastRace || goalIsCompleteForModal;
   const goalDaysUntil = raceCalendarDaysFromTodayLocal(goalRaceIsoStr);
 
   const nextTrainingIncomplete =
@@ -1167,12 +1168,31 @@ export default function AthleteHomePage() {
                       Analyze your plan
                     </Link>
                   ) : null}
-                  <Link
-                    href={`/race-hub/${primaryRaceRegistryId}#log-result`}
-                    className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
-                  >
-                    Log result
-                  </Link>
+                  {primaryRaceResult?.officialFinishTime ? (
+                    <button
+                      type="button"
+                      onClick={() => setLogResultOpen(true)}
+                      className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
+                    >
+                      Update your result
+                    </button>
+                  ) : (
+                    <>
+                      <Link
+                        href="/activities?view=all"
+                        className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
+                      >
+                        Find your activity
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => setLogResultOpen(true)}
+                        className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                      >
+                        Log time manually
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ) : !primaryGoal && signupPostEarlyNoGoal ? (
@@ -1358,6 +1378,60 @@ export default function AthleteHomePage() {
                       </Link>
                     </div>
                   </div>
+                ) : primaryGoal && showPostRaceHomePhase ? (
+                  <div className="rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm h-full flex flex-col">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                      {goalPhase === 'post_cooled' ? 'Race complete' : 'You just raced'}
+                    </p>
+                    <h2 className="mt-2 text-2xl font-bold text-gray-900 leading-tight">
+                      {raceName || 'Your race'}
+                    </h2>
+                    {goalDistanceNorm ? (
+                      <p className="text-sm text-gray-600 mt-1">{goalDistanceNorm}</p>
+                    ) : null}
+                    <p className="text-sm text-gray-700 mt-2 flex-1">
+                      {primaryRaceResult?.officialFinishTime
+                        ? 'Your finish is saved. Pick what you want to train for next.'
+                        : 'Match your race-day activity in Activity, then choose your next goal when you are ready.'}
+                    </p>
+                    {nextUpcomingSignupForPlan ? (
+                      <Link
+                        href={
+                          nextUpcomingSignupForPlan.goalTime?.trim()
+                            ? `/training-setup?athleteRaceId=${encodeURIComponent(nextUpcomingSignupForPlan.id)}`
+                            : nextUpcomingSignupForPlan.race_registry.slug
+                              ? `/myrace/${nextUpcomingSignupForPlan.race_registry.slug}`
+                              : '/races'
+                        }
+                        className="mt-4 inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 w-full sm:w-auto"
+                      >
+                        Train for {signupDisplayName(nextUpcomingSignupForPlan)}
+                      </Link>
+                    ) : (
+                      <Link
+                        href="/races"
+                        className="mt-4 inline-flex justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 w-full sm:w-auto"
+                      >
+                        Find your next race →
+                      </Link>
+                    )}
+                    {!primaryRaceResult?.officialFinishTime ? (
+                      <Link
+                        href="/activities?view=all"
+                        className="mt-3 inline-flex justify-center rounded-xl border-2 border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 w-full sm:w-auto"
+                      >
+                        Find your activity
+                      </Link>
+                    ) : null}
+                    {activePlanIdForPostRace ? (
+                      <Link
+                        href={`/training-setup/${activePlanIdForPostRace}`}
+                        className="mt-3 text-sm font-semibold text-emerald-900 hover:text-emerald-950"
+                      >
+                        Analyze your plan →
+                      </Link>
+                    ) : null}
+                  </div>
                 ) : primaryGoal ? (
                   <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm h-full flex flex-col">
                     <p className="text-xs font-semibold uppercase tracking-wide text-orange-900">
@@ -1453,13 +1527,31 @@ export default function AthleteHomePage() {
                       </div>
                     </div>
                     {primaryRaceRegistryId && primaryRaceYmdForSheet ? (
-                      <button
-                        type="button"
-                        onClick={() => setLogResultOpen(true)}
-                        className="mt-3 inline-flex justify-center rounded-xl border-2 border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 w-full"
-                      >
-                        {primaryRaceResult ? 'Update your result' : 'Find activity to match'}
-                      </button>
+                      primaryRaceResult?.officialFinishTime ? (
+                        <button
+                          type="button"
+                          onClick={() => setLogResultOpen(true)}
+                          className="mt-3 inline-flex justify-center rounded-xl border-2 border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 w-full"
+                        >
+                          Update your result
+                        </button>
+                      ) : (
+                        <>
+                          <Link
+                            href="/activities?view=all"
+                            className="mt-3 inline-flex justify-center rounded-xl border-2 border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 w-full"
+                          >
+                            Find your activity
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => setLogResultOpen(true)}
+                            className="mt-2 inline-flex justify-center rounded-xl px-4 py-2 text-sm font-semibold text-emerald-900 hover:text-emerald-950 w-full"
+                          >
+                            Log time manually
+                          </button>
+                        </>
+                      )
                     ) : null}
                     <Link
                       href="/races"

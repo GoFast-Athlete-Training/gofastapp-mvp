@@ -34,7 +34,7 @@ function PlanThisRunInner() {
 
             <div className="flex items-center gap-2 mb-2">
               <CalendarClock className="w-6 h-6 text-orange-600" />
-              <h1 className="text-2xl font-bold text-gray-900">Plan this run</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Plan additional details of this run</h1>
             </div>
             <p className="text-sm text-gray-600 mb-6">
               Set date, start time, meetup spot, and optional route. Invite people when you are ready.

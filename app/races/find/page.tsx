@@ -22,10 +22,6 @@ import { getPublicRacePageUrl } from "@/lib/public-race-url";
 
 const BOSTON_TAG = "boston-qualifier";
 
-const COMPANY_APP_ORIGIN = (
-  process.env.NEXT_PUBLIC_COMPANY_APP_URL || "https://gofasthq.gofastcrushgoals.com"
-).replace(/\/$/, "");
-
 type CatalogRace = {
   id: string;
   name: string;
@@ -75,9 +71,6 @@ export default function RacesFindPage() {
   const [dateTo, setDateTo] = useState("");
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
-  const [pastCatalog, setPastCatalog] = useState<CatalogRace[]>([]);
-  const [loadingPast, setLoadingPast] = useState(true);
-  const [pastOpen, setPastOpen] = useState(false);
   const [submittingRaceId, setSubmittingRaceId] = useState<string | null>(null);
   const addIntentHandled = useRef(false);
 
@@ -152,27 +145,6 @@ export default function RacesFindPage() {
     }
   }, [debouncedSearch, cityFilter, bostonOnly, dateFrom, dateTo]);
 
-  const loadPast = useCallback(async () => {
-    setLoadingPast(true);
-    try {
-      const params = new URLSearchParams();
-      params.set("pastWindow", "true");
-      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
-      if (cityFilter.trim()) params.set("city", cityFilter.trim());
-      if (bostonOnly) params.set("bostonQualifier", "true");
-
-      const { data } = await api.get<{ success?: boolean; race_registry?: CatalogRace[] }>(
-        `/race/search?${params.toString()}`
-      );
-      setPastCatalog(data.race_registry ?? []);
-    } catch (e) {
-      console.error(e);
-      setPastCatalog([]);
-    } finally {
-      setLoadingPast(false);
-    }
-  }, [debouncedSearch, cityFilter, bostonOnly]);
-
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 400);
     return () => clearTimeout(t);
@@ -186,10 +158,6 @@ export default function RacesFindPage() {
   useEffect(() => {
     loadCatalog();
   }, [loadCatalog]);
-
-  useEffect(() => {
-    loadPast();
-  }, [loadPast]);
 
   const onClaimRace = useCallback(
     async (raceRegistryId: string) => {
@@ -313,17 +281,6 @@ export default function RacesFindPage() {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {isPast ? (
-            <a
-              href={`${COMPANY_APP_ORIGIN}/dashboard/races`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:underline"
-            >
-              Copy for next year (Company)
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          ) : null}
           {signedUp ? (
             <>
               <Link
@@ -433,7 +390,12 @@ export default function RacesFindPage() {
             goal or skip for now.{" "}
             <Link href="/races" className="text-orange-600 font-medium hover:underline">
               My Races
-            </Link>
+            </Link>{" "}
+            or{" "}
+            <Link href="/races#race-calendar" className="text-orange-600 font-medium hover:underline">
+              your race calendar
+            </Link>{" "}
+            for upcoming and past races you&apos;ve added.
           </p>
         </div>
         <Link
@@ -543,57 +505,12 @@ export default function RacesFindPage() {
           </>
         ) : null}
 
-        <div className="rounded-xl border border-dashed border-orange-200 bg-orange-50/50 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-gray-900">Don&apos;t see your race?</p>
-            <p className="text-sm text-gray-600 mt-0.5">
-              Race director? Get your event in front of GoFast runners.
-            </p>
-          </div>
-          <a
-            href={`${COMPANY_APP_ORIGIN}/dashboard/races`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-1 rounded-lg bg-white border border-orange-300 px-4 py-2 text-sm font-semibold text-orange-800 hover:bg-orange-50 shrink-0"
-          >
-            List your race
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-        </div>
-
-        <div className="mt-10 border-t border-gray-200 pt-8">
-          <button
-            type="button"
-            onClick={() => setPastOpen((o) => !o)}
-            className="flex w-full items-center justify-between gap-3 rounded-lg text-left"
-          >
-            <span>
-              <span className="text-lg font-semibold text-gray-900">Past races</span>
-              <span className="ml-2 text-sm font-normal text-gray-500">
-                (last 90 days, before today
-                {loadingPast ? " — loading…" : ` — ${pastCatalog.length} shown`})
-              </span>
-            </span>
-            <ChevronDown
-              className={`h-5 w-5 shrink-0 text-gray-500 transition-transform ${pastOpen ? "rotate-180" : ""}`}
-            />
-          </button>
-          {pastOpen && (
-            <div className="mt-4">
-              {loadingPast ? (
-                <p className="text-gray-500 text-sm">Loading past races…</p>
-              ) : pastCatalog.length === 0 ? (
-                <p className="text-gray-600 text-sm">
-                  No past races in the last 90 days match your name, city, or Boston filter.
-                </p>
-              ) : (
-                <ul className="grid gap-4 sm:grid-cols-2">
-                  {pastCatalog.map((race) => renderCatalogCard(race, "past"))}
-                </ul>
-              )}
-            </div>
-          )}
-        </div>
+        <p className="text-sm text-gray-600 pt-2 border-t border-gray-100">
+          <Link href="/races#race-calendar" className="font-semibold text-orange-700 hover:underline">
+            See your race calendar
+          </Link>{" "}
+          — upcoming and past races you&apos;ve added to My Races.
+        </p>
       </section>
     </div>
   );

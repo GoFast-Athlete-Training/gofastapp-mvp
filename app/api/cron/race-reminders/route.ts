@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/cron/verify-cron-secret";
+import { processPostRaceNotifications } from "@/lib/race-post-race-notifications";
 import { processRaceReminders } from "@/lib/race-reminders";
 import {
   syncRaceTriggerForRegistry,
@@ -40,7 +41,8 @@ export async function GET(request: NextRequest) {
     }
 
     const out = await processRaceReminders(new Date());
-    return NextResponse.json({ ok: true, ...out });
+    const postRace = await processPostRaceNotifications(new Date());
+    return NextResponse.json({ ok: true, ...out, postRace });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
     console.error("race-reminders cron:", e);

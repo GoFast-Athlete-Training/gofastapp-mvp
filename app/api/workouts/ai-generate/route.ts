@@ -16,12 +16,17 @@ import {
   parsedPasteToAiGenerateResponse,
   tryParsePastedWorkoutText,
 } from "@/lib/training/parse-pasted-workout";
+import { coachGenerateStandaloneWorkout } from "@/lib/training/coach-generate-standalone-workout";
 
 export const dynamic = "force-dynamic";
 
 export interface AiGenerateRequestBody {
   /** Paste from Runna, coach, Strava, etc. — "15 miles today doing x, y, z". When set, we parse with AI and match to our segment model. */
   sourceText?: string;
+  /** Build-a-run AI lane: generate from athlete threshold, 5K, and recent runs (not pasted text). */
+  coachGenerate?: boolean;
+  /** Optional one-line ask for coachGenerate (e.g. "tempo 8"). */
+  generatePrompt?: string;
   workoutType?: string;
   totalMiles?: number;
   goalPace?: string;
@@ -388,6 +393,8 @@ export async function POST(request: NextRequest) {
       raceTime,
       raceDistance,
       freeformPrompt,
+      coachGenerate,
+      generatePrompt,
     } = body;
 
     const { sourceText, workoutType } = normalizeBlobRequest(body);
@@ -396,6 +403,19 @@ export async function POST(request: NextRequest) {
       totalMiles != null &&
       totalMiles > 0 &&
       (goalPace != null && String(goalPace).trim() || (raceTime != null && raceDistance != null));
+
+    if (coachGenerate === true && !hasSourceText) {
+      const asOfDateKey = new Date().toISOString().slice(0, 10);
+      const result = await coachGenerateStandaloneWorkout({
+        athleteId: athlete.id,
+        fiveKPace: athlete.fiveKPace,
+        thresholdPace: athlete.thresholdPace,
+        workoutType,
+        generatePrompt: generatePrompt?.trim() ?? "",
+        asOfDateKey,
+      });
+      return NextResponse.json(result);
+    }
 
     if (hasSourceText) {
       const deterministic = tryParsePastedWorkoutText(sourceText, workoutType);
@@ -414,7 +434,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Provide either a pasted workout description (sourceText) or totalMiles plus goal pace or race time.",
+            "Provide sourceText (paste), coachGenerate: true (AI build), or totalMiles plus goal pace or race time.",
         },
         { status: 400 }
       );

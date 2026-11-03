@@ -2100,17 +2100,30 @@ export default function WorkoutDetailPage() {
               ) : null}
             </div>
             {workoutPushed ? (
-              <p className="inline-flex items-center gap-2 text-sm font-semibold text-green-800">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-                Sent to Connection on File
-              </p>
+              <div className="rounded-lg border border-sky-100 bg-sky-50/80 px-3 py-2.5 space-y-1">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <img
+                    src="/Garmin_Connect_app_1024x1024-02.png"
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="w-5 h-5 rounded shrink-0"
+                  />
+                  Garmin Connect
+                  <CheckCircle2 className="w-4 h-4 text-green-600" aria-hidden />
+                </p>
+                <p className="text-sm text-gray-700">
+                  This run was sent when you saved — open Garmin Connect on your phone to sync your
+                  watch and you&apos;ll see it on your training calendar.
+                </p>
+              </div>
             ) : null}
             <div className="flex flex-wrap gap-3">
               <Link
                 href={planThisRunHref}
                 className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
               >
-                Plan this run
+                Plan additional details of this run
               </Link>
               <a
                 href="#segment-sequencer"

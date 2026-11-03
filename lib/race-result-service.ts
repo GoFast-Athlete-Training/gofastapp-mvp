@@ -3,6 +3,7 @@ import { parseRaceTimeToSeconds, raceTimeToGoalPaceSecondsPerMile } from "@/lib/
 import { normalizeDistanceForPace } from "@/lib/pace-utils";
 import type { athlete_race_results } from "@prisma/client";
 import { athleteRaceGoalSelect, type AthleteRaceGoalRow } from "@/lib/athlete-race-goal";
+import { maybeSendPrCongratsPush } from "@/lib/race-post-race-notifications";
 
 export type RaceResultAnalysis = {
   headline: string;
@@ -199,6 +200,7 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
       howFeltRating: true,
       reflection: true,
       racePhotoUrls: true,
+      prCongratsNotifiedAt: true,
     },
   });
 
@@ -388,11 +390,26 @@ export async function saveRaceResultExtended(athleteId: string, input: SaveRaceR
       ? analyzeRaceResult(result, athleteRace, athleteRace.name ?? reg.name)
       : null;
 
+  const raceNameForNotify = athleteRace?.name ?? reg.name;
+  void maybeSendPrCongratsPush({
+    athleteId,
+    resultId: result.id,
+    prAchieved: result.prAchieved,
+    alreadyNotifiedAt: existingRow?.prCongratsNotifiedAt ?? result.prCongratsNotifiedAt,
+    athleteRaceId: resolvedAthleteRaceId ?? result.athleteRaceId,
+    raceRegistryId,
+    raceName: raceNameForNotify,
+    officialFinishTime: result.officialFinishTime,
+    notifyEnabled: athleteRace?.notifyEnabled,
+  }).catch((err) => {
+    console.warn("[saveRaceResultExtended] PR congrats push failed:", err);
+  });
+
   return {
     result,
     analysis,
     athleteRace,
-    raceName: athleteRace?.name ?? reg.name,
+    raceName: raceNameForNotify,
   };
 }
 

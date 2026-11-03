@@ -1063,6 +1063,8 @@ model athlete_races {
   raceWeekOutNotifiedAt    DateTime?
   raceDayBeforeNotifiedAt  DateTime?
   raceDayNotifiedAt        DateTime?
+  /// Post-race push dedupe — "ready for next plan" (~day 7).
+  nextPlanReadyNotifiedAt  DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -1191,6 +1193,8 @@ model athlete_race_results {
   /// Optional link to a synced `athlete_activities` row (e.g. Garmin).
   garminActivityId       String?  @unique
   notes                  String?  @db.Text
+  /// Push dedupe — PR congrats after result save.
+  prCongratsNotifiedAt   DateTime?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 

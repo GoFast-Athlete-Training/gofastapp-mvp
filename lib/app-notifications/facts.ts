@@ -144,6 +144,26 @@ export async function loadNotificationFacts(params: {
         distanceMi,
       };
     }
+    case 'race.prCongrats':
+    case 'race.nextPlanReady': {
+      const athleteRace = await prisma.athlete_races.findFirst({
+        where: { id: params.objectId, athleteId: params.athleteId },
+        select: {
+          name: true,
+          raceRegistryId: true,
+          athlete_race_result: {
+            select: { officialFinishTime: true },
+          },
+        },
+      });
+      if (!athleteRace) return null;
+      return {
+        firstName,
+        raceName: athleteRace.name,
+        finishTime: athleteRace.athlete_race_result?.officialFinishTime ?? undefined,
+        raceRegistryId: athleteRace.raceRegistryId,
+      };
+    }
     default:
       return params.payload ?? null;
   }

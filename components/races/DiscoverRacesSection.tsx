@@ -134,7 +134,11 @@ export default function DiscoverRacesSection({
         <div>
           <h2 className="text-sm font-semibold text-gray-700">Discover races</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Upcoming races — tap when you&apos;re running one
+            Upcoming catalog races — tap when you&apos;re running one.{" "}
+            <Link href="#race-calendar" className="font-semibold text-orange-700 hover:underline">
+              See your race calendar
+            </Link>{" "}
+            for upcoming and past races you&apos;ve added.
           </p>
         </div>
         <Link

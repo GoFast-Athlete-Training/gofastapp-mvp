@@ -164,6 +164,24 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
       return `Go crush it at ${name}! Your race plan is one tap away.`;
     },
   },
+  'race.prCongrats': {
+    title: () => "You PR'd!",
+    body: ({ raceName, finishTime }) => {
+      const name =
+        typeof raceName === 'string' && raceName.trim() ? raceName.trim() : 'Your race';
+      const time =
+        typeof finishTime === 'string' && finishTime.trim() ? finishTime.trim() : 'a new finish';
+      return `${name} — ${time}. Congrats — that's a new PR.`;
+    },
+  },
+  'race.nextPlanReady': {
+    title: () => 'Ready for the next plan?',
+    body: ({ raceName }) => {
+      const name =
+        typeof raceName === 'string' && raceName.trim() ? raceName.trim() : 'Your race';
+      return `${name} is a week in the books. Pick your next race and start the next block.`;
+    },
+  },
 };
 
 function renderHardcoded(

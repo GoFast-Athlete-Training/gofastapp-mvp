@@ -11,7 +11,9 @@ export type NotificationTemplateKey =
   | 'sponsorship.received'
   | 'race.weekOut'
   | 'race.dayBefore'
-  | 'race.raceDay';
+  | 'race.raceDay'
+  | 'race.prCongrats'
+  | 'race.nextPlanReady';
 
 export type AppNotificationObjectType =
   | 'workout'
@@ -77,6 +79,10 @@ export function templateKeyToMobileType(templateKey: NotificationTemplateKey): s
       return 'race_day_before';
     case 'race.raceDay':
       return 'race_race_day';
+    case 'race.prCongrats':
+      return 'race_pr_congrats';
+    case 'race.nextPlanReady':
+      return 'race_next_plan_ready';
     default:
       return templateKey;
   }
