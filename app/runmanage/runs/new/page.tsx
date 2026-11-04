@@ -18,6 +18,7 @@ import runmanageApi from "@/lib/runmanage/api-client";
 import {
   runInstanceEditPath,
   RUN_MANAGE_DASHBOARD_PATH,
+  RUN_MANAGE_SERIES_PATH,
   runManageCreateFromSeriesPath,
 } from "@/lib/runmanage/paths";
 import {
@@ -35,11 +36,16 @@ import RunManageCreateRunModeFork, {
 import {
   seriesBaselineFromRow,
   wizardValuesFromSeries,
+  wizardValuesWithPriorRun,
   type SeriesWizardSeedSource,
 } from "@/lib/runmanage/series-wizard-seed";
 import type { RunSeriesContext } from "@/lib/runInstanceContent";
 import type { OperationalSeriesRow } from "@/lib/runmanage/series-operational-list";
 import { formatDayLabel } from "@/lib/runmanage/format-day-label";
+import {
+  acqRunClubToPublicSources,
+  type RunClubPublicSources,
+} from "@/components/runmanage/runInstanceWizard/RunClubPublicSourcesCard";
 
 type LoadedSeries = SeriesWizardSeedSource & {
   runClubId: string | null;
@@ -79,8 +85,14 @@ export default function RunManageCreateRunPage() {
   const [imprintedCompanyRaceId, setImprintedCompanyRaceId] = useState<string | null>(null);
   const [imprintedRaceLabel, setImprintedRaceLabel] = useState<string | null>(null);
   const [frontDoorReady, setFrontDoorReady] = useState(false);
+  const [seriesOperational, setSeriesOperational] = useState<OperationalSeriesRow | null>(null);
+  const [useLastRunSeed, setUseLastRunSeed] = useState(false);
+  const [seriesPublicSources, setSeriesPublicSources] = useState<RunClubPublicSources | null>(
+    null
+  );
 
   const isSeriesCreate = createMode === "series" && Boolean(seriesId);
+  const priorRunId = seriesOperational?.latestPriorRun?.id ?? null;
 
   const applySeriesSeed = useCallback(
     (s: LoadedSeries, operational: OperationalSeriesRow | null, dateOverride?: string | null) => {
@@ -195,7 +207,9 @@ export default function RunManageCreateRunPage() {
           return;
         }
         setSeriesRow(s);
+        setSeriesOperational(operational);
         applySeriesSeed(s, operational);
+        setUseLastRunSeed(false);
         setError(null);
       } catch (e: unknown) {
         const err = e as { response?: { data?: { error?: string } }; message?: string };
@@ -205,6 +219,42 @@ export default function RunManageCreateRunPage() {
       }
     })();
   }, [seriesId, router, applySeriesSeed, createMode]);
+
+  useEffect(() => {
+    const clubId = seriesRow?.runClubId?.trim();
+    if (!isSeriesCreate || !clubId) {
+      setSeriesPublicSources(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await runmanageApi.get(`/api/runmanage/run-clubs/${clubId}`);
+        if (res.data?.success && res.data.runClub) {
+          setSeriesPublicSources(
+            acqRunClubToPublicSources(res.data.runClub as Record<string, unknown>)
+          );
+        } else {
+          setSeriesPublicSources(null);
+        }
+      } catch {
+        setSeriesPublicSources(null);
+      }
+    })();
+  }, [isSeriesCreate, seriesRow?.runClubId]);
+
+  useEffect(() => {
+    if (!isSeriesCreate || !useLastRunSeed || !priorRunId || !seriesRow) return;
+    void (async () => {
+      try {
+        const res = await runmanageApi.get(`/api/runs/manage/${encodeURIComponent(priorRunId)}`);
+        const run = res.data?.run;
+        if (!run) return;
+        setWizardValues((current) => wizardValuesWithPriorRun(current, run));
+      } catch {
+        setError("Could not load the last run to copy from.");
+      }
+    })();
+  }, [useLastRunSeed, priorRunId, isSeriesCreate, seriesRow]);
 
   const seriesContext: RunSeriesContext | null = useMemo(() => {
     if (!seriesRow) return null;
@@ -271,19 +321,27 @@ export default function RunManageCreateRunPage() {
         endState: wizardValues.endPointSameAsStart ? null : wizardValues.endState.trim() || null,
         routeNeighborhood: trackRouteNulls ? null : wizardValues.routeNeighborhood.trim() || null,
         runType: normalizeRunType(wizardValues.runType) || wizardValues.runType.trim() || null,
-        workoutDescription: isTrack
-          ? wizardValues.trackWorkoutDescription.trim() || null
-          : wizardValues.routeDescription.trim() || null,
-        directionsText: trackRouteNulls ? null : wizardValues.directionsText.trim() || null,
+        workoutDescription: isSeriesCreate
+          ? isTrack
+            ? null
+            : wizardValues.routeDescription.trim() || null
+          : isTrack
+            ? wizardValues.trackWorkoutDescription.trim() || null
+            : wizardValues.routeDescription.trim() || null,
+        directionsText:
+          isSeriesCreate || trackRouteNulls ? null : wizardValues.directionsText.trim() || null,
         totalMiles: isTrack
           ? null
           : wizardValues.totalMiles.trim()
             ? parseFloat(wizardValues.totalMiles)
             : null,
         pace: isTrack ? null : wizardValues.pace.trim() || null,
-        stravaMapUrl: trackRouteNulls ? null : wizardValues.stravaMapUrl.trim() || null,
-        mapImageUrl: trackRouteNulls ? null : wizardValues.mapImageUrl.trim() || null,
-        routePhotos: trackRouteNulls ? [] : wizardValues.routePhotos.filter((u) => u.trim()),
+        stravaMapUrl:
+          isSeriesCreate || trackRouteNulls ? null : wizardValues.stravaMapUrl.trim() || null,
+        mapImageUrl:
+          isSeriesCreate || trackRouteNulls ? null : wizardValues.mapImageUrl.trim() || null,
+        routePhotos:
+          isSeriesCreate || trackRouteNulls ? [] : wizardValues.routePhotos.filter((u) => u.trim()),
         description: wizardValues.description.trim() || null,
         postRunActivity: wizardValues.postRunActivity.trim() || null,
         stravaEventUrl: wizardValues.stravaEventUrl.trim() || null,
@@ -291,6 +349,9 @@ export default function RunManageCreateRunPage() {
         webUrl: wizardValues.webUrl.trim() || null,
         webText: wizardValues.webText.trim() || null,
         igPostText: wizardValues.igPostText.trim() || null,
+        ...(!isSeriesCreate && wizardValues.routeId?.trim()
+          ? { routeId: wizardValues.routeId.trim() }
+          : {}),
         published: false,
       };
 
@@ -299,10 +360,15 @@ export default function RunManageCreateRunPage() {
       if (!runId) {
         throw new Error(res.data?.error || "Run created but no id returned.");
       }
-      const editUrl =
-        returnTo !== RUN_MANAGE_DASHBOARD_PATH
-          ? `${runInstanceEditPath(String(runId))}&returnTo=${encodeURIComponent(returnTo)}`
-          : runInstanceEditPath(String(runId));
+      let editUrl = runInstanceEditPath(String(runId));
+      if (isSeriesCreate) {
+        editUrl = `${editUrl}&step=route&built=1`;
+        if (useLastRunSeed && priorRunId) {
+          editUrl = `${editUrl}&copyFrom=${encodeURIComponent(priorRunId)}`;
+        }
+      } else if (returnTo !== RUN_MANAGE_DASHBOARD_PATH) {
+        editUrl = `${editUrl}&returnTo=${encodeURIComponent(returnTo)}`;
+      }
       router.push(editUrl);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } }; message?: string };
@@ -312,15 +378,8 @@ export default function RunManageCreateRunPage() {
     }
   };
 
-  const headerSlot = (
+  const headerSlot = isSeriesCreate ? null : (
     <div className="mb-4 space-y-3 border-b border-gray-100 pb-4">
-      {isSeriesCreate && seriesRow ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-950">
-          Building from weekly series — {formatDayLabel(seriesRow.dayOfWeek)}
-          {seriesRow.runClub?.name ? ` · ${seriesRow.runClub.name}` : ""}. Confirm date, time, and
-          meet-up before saving.
-        </div>
-      ) : null}
       <RunPublicDescriptionField
         values={wizardValues}
         onDescriptionChange={(description) => setWizardValues((v) => ({ ...v, description }))}
@@ -370,41 +429,82 @@ export default function RunManageCreateRunPage() {
   return (
     <div className="py-2">
       <Link
-        href={returnTo}
+        href={isSeriesCreate ? RUN_MANAGE_SERIES_PATH : returnTo}
         className="mb-4 inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="h-4 w-4" />
-        {returnTo !== RUN_MANAGE_DASHBOARD_PATH ? "Back" : "Back to dashboard"}
+        {isSeriesCreate ? "Back to weekly slots" : returnTo !== RUN_MANAGE_DASHBOARD_PATH ? "Back" : "Back to dashboard"}
       </Link>
-      <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Run builder</p>
-      <label className="mt-2 block">
-        <span className="sr-only">Run title</span>
-        <input
-          type="text"
-          value={wizardValues.title}
-          onChange={(e) => setWizardValues((v) => ({ ...v, title: e.target.value }))}
-          placeholder="Run title"
-          className="w-full max-w-2xl border-0 border-b-2 border-gray-200 bg-transparent pb-1 text-2xl font-bold text-gray-900 placeholder:text-gray-400 focus:border-sky-600 focus:outline-none focus:ring-0"
-        />
-      </label>
-      <p className="mt-2 text-sm text-gray-600">
-        {isSeriesCreate
-          ? "Confirm core details seeded from the series, then save this dated run."
-          : "Pick run type, add title and public description, then fill core details in the wizard."}
-      </p>
 
-      <RunManageCreateRunModeFork
-        mode={createMode}
-        onModeChange={(mode) => {
-          setCreateMode(mode);
-          if (mode === "regular") {
-            setSeriesId(null);
-            setSeriesRow(null);
-            router.replace("/runmanage/runs/new");
-          }
-        }}
-        seriesPicker={seriesPicker}
-      />
+      {isSeriesCreate && seriesRow ? (
+        <div className="mb-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Build dated run</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {seriesRow.runClub?.name ?? "Club"} · {formatDayLabel(seriesRow.dayOfWeek)}
+          </h1>
+          <p className="text-sm text-gray-600">
+            Check club sources first, then confirm date and start time on core details before you
+            save.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setUseLastRunSeed(false);
+                if (seriesRow && seriesOperational) applySeriesSeed(seriesRow, seriesOperational);
+              }}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                !useLastRunSeed
+                  ? "bg-sky-600 text-white"
+                  : "border border-gray-300 bg-white text-gray-800"
+              }`}
+            >
+              From weekly series
+            </button>
+            <button
+              type="button"
+              disabled={!priorRunId}
+              onClick={() => setUseLastRunSeed(true)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${
+                useLastRunSeed
+                  ? "bg-amber-600 text-white"
+                  : "border border-gray-300 bg-white text-gray-800"
+              }`}
+            >
+              Also use last run
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Run builder</p>
+          <label className="mt-2 block">
+            <span className="sr-only">Run title</span>
+            <input
+              type="text"
+              value={wizardValues.title}
+              onChange={(e) => setWizardValues((v) => ({ ...v, title: e.target.value }))}
+              placeholder="Run title"
+              className="w-full max-w-2xl border-0 border-b-2 border-gray-200 bg-transparent pb-1 text-2xl font-bold text-gray-900 placeholder:text-gray-400 focus:border-sky-600 focus:outline-none focus:ring-0"
+            />
+          </label>
+          <p className="mt-2 text-sm text-gray-600">
+            Pick run type, add title and public description, then fill core details in the wizard.
+          </p>
+          <RunManageCreateRunModeFork
+            mode={createMode}
+            onModeChange={(mode) => {
+              setCreateMode(mode);
+              if (mode === "regular") {
+                setSeriesId(null);
+                setSeriesRow(null);
+                router.replace("/runmanage/runs/new");
+              }
+            }}
+            seriesPicker={seriesPicker}
+          />
+        </>
+      )}
 
       {!isSeriesCreate ? (
         <div className="mt-4">
@@ -439,14 +539,14 @@ export default function RunManageCreateRunPage() {
                 seriesBaseline,
                 requireSeriesDay: isSeriesCreate ? seriesRow?.dayOfWeek ?? null : null,
               }}
-              titleInPageHeading
-              initialWizardStep="core"
+              titleInPageHeading={!isSeriesCreate}
+              initialWizardStep="sources"
               onSave={() => void handleCreate()}
               saving={saving}
               error={error}
               onErrorChange={setError}
-              saveLabel={isSeriesCreate ? "Build dated run" : "Create draft run"}
-              publicSources={null}
+              saveLabel={isSeriesCreate ? "Save run" : "Create draft run"}
+              publicSources={isSeriesCreate ? seriesPublicSources : null}
               publicDescriptionContext={{
                 cityRunType: affiliations.cityRunType,
                 clubName: affiliations.runClubLabel,

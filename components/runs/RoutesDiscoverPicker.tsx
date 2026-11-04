@@ -20,6 +20,9 @@ type Props = {
   className?: string;
   /** Do not fetch until the user opens the list (avoids 401 noise on meetup step). */
   deferLoad?: boolean;
+  /** mine = athlete saved routes; catalog = staff name search across routes */
+  routeSearchScope?: 'mine' | 'catalog';
+  citySlug?: string | null;
 };
 
 export default function RoutesDiscoverPicker({
@@ -28,6 +31,8 @@ export default function RoutesDiscoverPicker({
   onClear,
   className = '',
   deferLoad = false,
+  routeSearchScope = 'mine',
+  citySlug = null,
 }: Props) {
   const [routes, setRoutes] = useState<RouteCatalogRow[]>([]);
   const [query, setQuery] = useState('');
@@ -37,8 +42,20 @@ export default function RoutesDiscoverPicker({
   const loadRoutes = useCallback(async (search: string) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ scope: 'mine' });
-      if (search.trim()) params.set('q', search.trim());
+      const params = new URLSearchParams();
+      if (routeSearchScope === 'catalog') {
+        const q = search.trim();
+        if (q.length < 1) {
+          setRoutes([]);
+          return;
+        }
+        params.set('q', q);
+        const slug = citySlug?.trim();
+        if (slug) params.set('citySlug', slug);
+      } else {
+        params.set('scope', 'mine');
+        if (search.trim()) params.set('q', search.trim());
+      }
       const res = await api.get(`/routes?${params.toString()}`);
       setRoutes(Array.isArray(res.data?.routes) ? res.data.routes : []);
     } catch {
@@ -46,7 +63,7 @@ export default function RoutesDiscoverPicker({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [routeSearchScope, citySlug]);
 
   useEffect(() => {
     if (!listOpen) return;
@@ -122,7 +139,7 @@ export default function RoutesDiscoverPicker({
           onClick={() => setListOpen(true)}
           className="w-full rounded-lg border border-dashed border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:border-orange-400 hover:bg-orange-50/40"
         >
-          Search my saved routes
+          {routeSearchScope === 'catalog' ? 'Find a route' : 'Search my saved routes'}
         </button>
       ) : null}
       {listOpen ? (
@@ -133,19 +150,29 @@ export default function RoutesDiscoverPicker({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search your routes…"
+              placeholder={
+                routeSearchScope === 'catalog'
+                  ? 'Search routes by name…'
+                  : 'Search your routes…'
+              }
               className="w-full border border-gray-300 rounded-lg py-2 pl-9 pr-3 text-sm"
             />
           </div>
           {loading ? (
-            <p className="text-xs text-gray-500">Loading your routes…</p>
+            <p className="text-xs text-gray-500">Loading routes…</p>
           ) : routes.length === 0 ? (
             <p className="text-xs text-gray-500">
-              No saved routes yet.{' '}
-              <Link href="/build-a-run/routes/new" className="font-semibold text-orange-700 hover:underline">
-                Build a route
-              </Link>{' '}
-              first.
+              {routeSearchScope === 'catalog'
+                ? 'Type a route name to search the catalog.'
+                : (
+                  <>
+                    No saved routes yet.{' '}
+                    <Link href="/build-a-run/routes/new" className="font-semibold text-orange-700 hover:underline">
+                      Build a route
+                    </Link>{' '}
+                    first.
+                  </>
+                )}
             </p>
           ) : (
             <ul className="max-h-44 overflow-y-auto rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">

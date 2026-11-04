@@ -31,6 +31,8 @@ function RunManageRunDetailContent() {
   const modeParam = searchParams?.get("mode");
   const clubId = searchParams?.get("clubId");
   const initialWizardStep = parseWizardStep(searchParams?.get("step") ?? null);
+  const postCreateFresh = searchParams?.get("built") === "1";
+  const copyFromRunId = searchParams?.get("copyFrom")?.trim() || null;
   const returnTo = searchParams?.get("returnTo")?.trim() || "/runmanage/runs";
   const initialMode: RunInstanceManageMode =
     modeParam === "edit" || modeParam === "rsvps" || modeParam === "view"
@@ -47,6 +49,8 @@ function RunManageRunDetailContent() {
       clubId={clubId}
       initialMode={initialMode}
       initialWizardStep={initialWizardStep ?? (initialMode === "edit" ? "core" : undefined)}
+      postCreateFresh={postCreateFresh}
+      copyFromRunId={copyFromRunId}
       backTo={returnTo}
       showBackButton
     />

@@ -83,11 +83,12 @@ export function RunManageInstanceList({ bucket, backHref, backLabel }: RunManage
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [includePast, setIncludePast] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ upcomingOnly: "false" });
+      const params = new URLSearchParams({ upcomingOnly: includePast ? "false" : "true" });
       const response = await runmanageApi.get(`/api/runs/manage?${params.toString()}`);
       if (response.data.success) {
         const all = (response.data.runs || []) as RunRow[];
@@ -98,7 +99,7 @@ export function RunManageInstanceList({ bucket, backHref, backLabel }: RunManage
     } finally {
       setLoading(false);
     }
-  }, [bucket]);
+  }, [bucket, includePast]);
 
   useEffect(() => {
     void load();
@@ -169,11 +170,20 @@ export function RunManageInstanceList({ bucket, backHref, backLabel }: RunManage
         </h1>
         <p className="mt-1 text-sm text-gray-600">
           {typeMeta?.description ??
-            "Full history across types — select rows to bulk delete or edit one at a time."}
+            "Upcoming runs by default — include past for archive cleanup."}
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={includePast}
+            onChange={(e) => setIncludePast(e.target.checked)}
+            className="rounded border-gray-300"
+          />
+          Include past
+        </label>
         <label className="inline-flex items-center gap-2 text-sm text-gray-700">
           <input
             type="checkbox"

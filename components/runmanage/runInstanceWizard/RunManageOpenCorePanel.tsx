@@ -81,7 +81,9 @@ export default function RunManageOpenCorePanel({
       <div className="border-b border-gray-100 px-4 py-3">
         <h3 className="text-sm font-semibold text-gray-900">Core details</h3>
         <p className="mt-1 text-xs text-gray-600">
-          Title and the public description athletes see, plus date, meet-up, distance, and pace.
+          {isSeries && context.variant === "create-series"
+            ? "Confirm date and start time match the club post you just checked. Save here — route and workout are optional after."
+            : "Title and the public description athletes see, plus date, meet-up, distance, and pace."}
         </p>
       </div>
       <div className="space-y-4 px-4 py-4">

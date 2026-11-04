@@ -1,4 +1,6 @@
 import { titleForAdvancedDate } from "@/lib/advance-club-instances";
+import type { CityRunData } from "@/components/runmanage/RunManageStaffEditor";
+import { cityRunToWizardValues } from "@/lib/runInstanceWizardMappers";
 import type { RunInstanceWizardValues, SeriesBaseline } from "@/components/runmanage/runInstanceWizard/shared";
 import { emptyWizardValues } from "@/components/runmanage/runInstanceWizard/shared";
 import { nextYmdForDayOfWeek } from "@/lib/runmanage/series-operational-list";
@@ -80,5 +82,45 @@ export function wizardValuesFromSeries(
     postRunActivity: baseline.postRunActivity,
     routeDescription: s.workoutDescription?.trim() ?? "",
     description: s.description?.trim() ?? "",
+  };
+}
+
+/** Copy last run’s instance fields onto a new dated slot; keep title and date from the series seed. */
+export function wizardValuesWithPriorRun(
+  base: RunInstanceWizardValues,
+  priorRun: CityRunData
+): RunInstanceWizardValues {
+  const prior = cityRunToWizardValues(priorRun);
+  return {
+    ...prior,
+    title: base.title,
+    date: base.date,
+    dayOfWeek: base.dayOfWeek,
+  };
+}
+
+/** Route, weekly sources, and workout — applied after the dated run exists (edit wizard). */
+export function mergeOptionalAssociationsFromPrior(
+  base: RunInstanceWizardValues,
+  prior: RunInstanceWizardValues
+): RunInstanceWizardValues {
+  return {
+    ...base,
+    routeId: prior.routeId,
+    linkedRouteName: prior.linkedRouteName,
+    directionsText: prior.directionsText,
+    stravaMapUrl: prior.stravaMapUrl,
+    mapImageUrl: prior.mapImageUrl,
+    routePhotos: prior.routePhotos,
+    stravaEventUrl: prior.stravaEventUrl,
+    stravaText: prior.stravaText,
+    webUrl: prior.webUrl,
+    webText: prior.webText,
+    igPostText: prior.igPostText,
+    plannedWorkoutId: prior.plannedWorkoutId,
+    attachedWorkoutTitle: prior.attachedWorkoutTitle,
+    clubWorkoutType: prior.clubWorkoutType,
+    trackWorkoutDescription: prior.trackWorkoutDescription,
+    routeDescription: prior.routeDescription,
   };
 }

@@ -33,6 +33,7 @@ import {
 } from "@/lib/runmanage/paths";
 import type { WizardStep } from "@/components/runmanage/runInstanceWizard/shared";
 import { formatDayLabel } from "@/lib/runmanage/format-day-label";
+import { mergeOptionalAssociationsFromPrior } from "@/lib/runmanage/series-wizard-seed";
 import {
   cityRunToWizardValues,
   serializeWizardSnapshot,
@@ -219,6 +220,10 @@ interface CityRunManageStaffProps {
   initialMode?: RunInstanceManageMode;
   /** Jump to a wizard step in edit mode (e.g. ?step=workout). */
   initialWizardStep?: WizardStep;
+  /** After building a dated run from weekly series — optional steps follow. */
+  postCreateFresh?: boolean;
+  /** Pre-fill optional wizard steps from a prior instance (after series save). */
+  copyFromRunId?: string | null;
 }
 
 const generateRunUrl = (runId: string, citySlug: string, slug?: string | null): string => {
@@ -284,6 +289,8 @@ export default function RunManageStaffEditor({
   clubId = null,
   initialMode = "edit",
   initialWizardStep,
+  postCreateFresh = false,
+  copyFromRunId = null,
 }: CityRunManageStaffProps) {
   const router = useRouter();
   const [run, setRun] = useState<CityRunData | null>(null);
@@ -314,6 +321,7 @@ export default function RunManageStaffEditor({
   const [associateSaving, setAssociateSaving] = useState(false);
   const [associateError, setAssociateError] = useState<string | null>(null);
   const [associateMessage, setAssociateMessage] = useState<string | null>(null);
+  const copyFromAppliedRef = useRef(false);
 
   const isClubContext = Boolean(clubId?.trim());
   const useAssociateTab =
@@ -336,6 +344,7 @@ export default function RunManageStaffEditor({
     setWizardValues(null);
     saveBaselineRef.current = null;
     setAutoSaveStatus("saved");
+    copyFromAppliedRef.current = false;
   }, [runId]);
 
   useEffect(() => {
@@ -362,6 +371,25 @@ export default function RunManageStaffEditor({
       setAutoSaveStatus("saved");
     }
   }, [run, staffMode, wizardValues]);
+
+  useEffect(() => {
+    const copyId = copyFromRunId?.trim();
+    if (!postCreateFresh || !copyId || !wizardValues || copyFromAppliedRef.current) return;
+    void (async () => {
+      try {
+        const res = await runmanageApi.get(`/api/runs/manage/${encodeURIComponent(copyId)}`);
+        const priorRun = res.data?.run as CityRunData | undefined;
+        if (!priorRun) return;
+        const prior = cityRunToWizardValues(priorRun);
+        setWizardValues((current) =>
+          current ? mergeOptionalAssociationsFromPrior(current, prior) : current
+        );
+        copyFromAppliedRef.current = true;
+      } catch {
+        // optional pre-fill only
+      }
+    })();
+  }, [postCreateFresh, copyFromRunId, wizardValues]);
 
   useEffect(() => {
     const acqClubId = clubId?.trim() || run?.runClub?.id;
@@ -936,6 +964,12 @@ export default function RunManageStaffEditor({
             </div>
           </div>
         )}
+
+        {postCreateFresh && staffMode === "edit" ? (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
+            Run saved. Route and workout are optional — attach a map or skip and publish when ready.
+          </div>
+        ) : null}
 
         {staffMode === "edit" && wizardValues && (
           <RunInstanceWizard

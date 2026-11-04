@@ -18,6 +18,8 @@ import {
   X,
 } from "lucide-react";
 import RunManageAssociateStep from "@/components/runmanage/runInstanceWizard/RunManageAssociateStep";
+import RunManageRouteAttachPanel from "@/components/runmanage/runInstanceWizard/RunManageRouteAttachPanel";
+import { generateCitySlugFromParts } from "@/lib/utils/parseAddress";
 import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
 import runmanageApi from "@/lib/runmanage/api-client";
 import GooglePlacesAutocomplete from "@/components/runmanage/GooglePlacesAutocomplete";
@@ -55,6 +57,7 @@ import {
   WIZARD_STEPS,
   ATHLETE_HOSTED_WIZARD_STEP_COPY,
   wizardStepOrderForVariant,
+  CREATE_SERIES_WIZARD_STEP_ORDER,
   buildInstanceContextFromValues,
   fieldChanged,
   formatInstanceDateLabel,
@@ -139,14 +142,22 @@ export default function RunInstanceWizard({
 }: RunInstanceWizardProps) {
   const isAthleteHosted = context.variant === "athlete-hosted";
   const isCreateScratch = context.variant === "create-scratch";
+  const isSeriesCreateEarly = context.variant === "create-series";
   const resolvedInitialStep: WizardStep = (() => {
     const raw =
       initialWizardStep ??
-      (isAthleteHosted ? "core" : isCreateScratch ? "intake" : "sources");
+      (isAthleteHosted
+        ? "core"
+        : isCreateScratch
+          ? "intake"
+          : isSeriesCreateEarly
+            ? "sources"
+            : "sources");
     if (raw === "description") return "core";
     return raw;
   })();
   const [wizardStep, setWizardStep] = useState<WizardStep>(resolvedInitialStep);
+  const [seriesSourcesReviewed, setSeriesSourcesReviewed] = useState(false);
   const [intakeMode, setIntakeMode] = useState<IntakeMode | null>(null);
   const [intakeApplied, setIntakeApplied] = useState(false);
   const [generatingDescription, setGeneratingDescription] = useState(false);
@@ -214,7 +225,12 @@ export default function RunInstanceWizard({
 
   const isRaceShakeout = context.cityRunType === "RACE_SHAKEOUT";
 
+  const isSeriesCreate = context.variant === "create-series";
+
   const visibleWizardSteps = useMemo(() => {
+    if (isSeriesCreate) {
+      return CREATE_SERIES_WIZARD_STEP_ORDER;
+    }
     if (isAthleteHosted) {
       const hosted = isTrack ? stepOrder.filter((s) => s !== "route") : stepOrder;
       return hosted.filter((s) => s !== "description");
@@ -228,7 +244,7 @@ export default function RunInstanceWizard({
       steps = steps.filter((s) => s !== "associate");
     }
     return steps;
-  }, [isAthleteHosted, isCreateScratch, isTrack, isRaceShakeout, stepOrder, showAssociateStep]);
+  }, [isSeriesCreate, isAthleteHosted, isCreateScratch, isTrack, isRaceShakeout, stepOrder, showAssociateStep]);
 
   const lastWizardStep = visibleWizardSteps[visibleWizardSteps.length - 1] ?? "workout";
 
@@ -276,6 +292,17 @@ export default function RunInstanceWizard({
       }
       if (intakeMode !== "manual" && !intakeApplied) {
         onErrorChange?.("Parse or import your row before continuing.");
+        return;
+      }
+      onErrorChange?.(null);
+      goToWizardStep(next);
+      return;
+    }
+    if (wizardStep === "sources" && isSeriesCreate) {
+      if (!seriesSourcesReviewed) {
+        onErrorChange?.(
+          "Open Instagram or Strava from the club links and confirm this week's post, then check the box."
+        );
         return;
       }
       onErrorChange?.(null);
@@ -539,9 +566,11 @@ export default function RunInstanceWizard({
     }
   };
 
-  const coreIntro = isSeries
-    ? "Most fields are pulled from the weekly series. Review the few things that are different this week."
-    : "Title, date, meet-up, distance, and pace for this run instance.";
+  const coreIntro = isSeriesCreate
+    ? "Match date and start time to what you saw on the club post. Save the dated run here — route and workout are optional on the next screen."
+    : isSeries
+      ? "Most fields are pulled from the weekly series. Review the few things that are different this week."
+      : "Title, date, meet-up, distance, and pace for this run instance.";
 
   return (
     <div className="space-y-4">
@@ -638,15 +667,39 @@ export default function RunInstanceWizard({
             <div className="space-y-4">
               {publicSources ? (
                 <RunClubPublicSourcesCard runClub={publicSources} showInstanceSection={false} />
+              ) : isSeriesCreate ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  No club lookup links on file — paste this week&apos;s Strava or IG link below, then
+                  confirm date and time on the next step.
+                </p>
               ) : null}
               <div className="space-y-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Source info</h3>
                   <p className="mt-1 text-xs text-gray-600">
-                    Paste this week&apos;s Strava event, web listing, or IG post for this instance.
+                    {isSeriesCreate
+                      ? "Start here: open the club's Instagram or Strava from above, find this week's post, then paste the event link or caption snippet below."
+                      : "Paste this week's Strava event, web listing, or IG post for this instance."}
                   </p>
                 </div>
                 <RunInstanceSourcesPanel values={values} onChange={patch} />
+                {isSeriesCreate ? (
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={seriesSourcesReviewed}
+                      onChange={(e) => {
+                        setSeriesSourcesReviewed(e.target.checked);
+                        if (e.target.checked) onErrorChange?.(null);
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-sky-600"
+                    />
+                    <span>
+                      I checked this week&apos;s club post (Instagram, Strava, or runs page) for the
+                      correct workout and any time or meet-up changes.
+                    </span>
+                  </label>
+                ) : null}
               </div>
             </div>
           )}
@@ -683,12 +736,61 @@ export default function RunInstanceWizard({
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Route</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  Optional. Add a map or directions when you have them — skip if this event has no
-                  course.
+                  {isAthleteHosted
+                    ? "Optional. Add a map or directions when you have them — skip if this event has no course."
+                    : "Optional. Find a saved route to attach, then add instance-only directions or description if needed."}
                 </p>
               </div>
 
-              {linkedSavedRoute ? (
+              {!isAthleteHosted ? (
+                <>
+                  <RunManageRouteAttachPanel
+                    values={values}
+                    patch={patch}
+                    cityRunId={context.cityRunId}
+                    citySlug={generateCitySlugFromParts(values.meetUpCity, values.meetUpState) || null}
+                    onError={onErrorChange}
+                  />
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-900">Route directions</label>
+                    <textarea
+                      value={values.directionsText}
+                      onChange={(e) => patch({ directionsText: e.target.value })}
+                      rows={4}
+                      placeholder="Paste Strava notes or turn-by-turn bullets…"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Saved with this run and copied forward when the next weekly instance is built.
+                    </p>
+                  </div>
+                  <div>
+                    <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                      <label className="block text-sm font-medium text-gray-900">Route description</label>
+                      <button
+                        type="button"
+                        onClick={() => void handleGenerateRouteDetails()}
+                        disabled={!canGenerateRouteDetails || generatingRouteDetails}
+                        className="inline-flex items-center gap-1 rounded-lg border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+                      >
+                        {generatingRouteDetails ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )}
+                        Generate route description
+                      </button>
+                    </div>
+                    <textarea
+                      value={values.routeDescription}
+                      onChange={(e) => patch({ routeDescription: e.target.value })}
+                      rows={4}
+                      placeholder="Generated or edited prose for this run's route…"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </>
+              ) : linkedSavedRoute ? (
                 <div className="rounded-lg border border-orange-200 bg-orange-50/80 px-4 py-3 space-y-2">
                   <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                     <Route className="h-4 w-4 text-orange-600 shrink-0" />
@@ -709,6 +811,7 @@ export default function RunInstanceWizard({
                 </div>
               ) : null}
 
+              {isAthleteHosted ? (
               <>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-900">Strava route URL</label>
@@ -904,6 +1007,7 @@ export default function RunInstanceWizard({
                     </div>
                   </div>
                 </>
+              ) : null}
             </div>
           )}
 
@@ -915,17 +1019,16 @@ export default function RunInstanceWizard({
                     ? (ATHLETE_HOSTED_WIZARD_STEP_COPY.workout?.title ?? "Distance & pace")
                     : "Workout"}
                 </h3>
-                {isAthleteHosted ? (
-                  ATHLETE_HOSTED_WIZARD_STEP_COPY.workout?.description ? (
-                    <p className="mt-1 text-xs text-gray-600">
-                      {ATHLETE_HOSTED_WIZARD_STEP_COPY.workout.description}
-                    </p>
-                  ) : null
-                ) : (
+                {!isAthleteHosted ? (
                   <p className="mt-1 text-xs text-gray-600">
-                    Optional structured session for this run — intervals, tempo, hills, or progression.
+                    Optional. Leave as Easy with no note, or skip this step — use Save when you are
+                    done.
                   </p>
-                )}
+                ) : ATHLETE_HOSTED_WIZARD_STEP_COPY.workout?.description ? (
+                  <p className="mt-1 text-xs text-gray-600">
+                    {ATHLETE_HOSTED_WIZARD_STEP_COPY.workout.description}
+                  </p>
+                ) : null}
               </div>
               {isAthleteHosted ? (
                 <AthleteHostedWorkoutStep
@@ -975,15 +1078,30 @@ export default function RunInstanceWizard({
             </button>
           ) : null}
           {wizardStep !== lastWizardStep ? (
-            <button
-              type="button"
-              onClick={handleWizardNext}
-              disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-            >
-              Next
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleWizardNext}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+              >
+                Next
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              {context.cityRunId && !instanceToolbar ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!validateCoreStep()) return;
+                    void onSave();
+                  }}
+                  disabled={saving || weekdayMismatch || !coreStepComplete}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {saveLabel}
+                </button>
+              ) : null}
+            </>
           ) : instanceToolbar ? null : (
             <button
               type="button"

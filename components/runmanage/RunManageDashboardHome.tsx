@@ -197,10 +197,12 @@ export function RunManageDashboardHome() {
           const meta = COCKPIT_BUCKET_META[bucket];
           const Icon = BUCKET_ICONS[bucket];
           const count = bucketCounts[bucket];
+          const cardHref = bucket === "club" ? RUN_MANAGE_SERIES_PATH : runManageTypePath(bucket);
+          const cardCta = bucket === "club" ? "Manage clubs →" : "Open list →";
           return (
             <Link
               key={bucket}
-              href={runManageTypePath(bucket)}
+              href={cardHref}
               className={`rounded-xl border-2 p-4 text-left transition-colors ${meta.border} ${meta.bg} hover:brightness-[0.98]`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -209,7 +211,7 @@ export function RunManageDashboardHome() {
               </div>
               <p className="mt-2 text-sm font-semibold text-gray-900">{meta.label}</p>
               <p className="text-xs text-gray-600">{meta.description}</p>
-              <p className="mt-2 text-xs font-medium text-sky-800">Open list →</p>
+              <p className="mt-2 text-xs font-medium text-sky-800">{cardCta}</p>
             </Link>
           );
         })}

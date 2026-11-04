@@ -48,10 +48,14 @@ export const ATHLETE_HOSTED_WIZARD_STEP_ORDER: WizardStep[] = [
   "workout",
 ];
 
+/** Build next run from weekly series — check club sources, confirm details, save, then optional route/workout. */
+export const CREATE_SERIES_WIZARD_STEP_ORDER: WizardStep[] = ["sources", "core"];
+
 export function wizardStepOrderForVariant(
   variant: RunInstanceWizardContext["variant"]
 ): WizardStep[] {
   if (variant === "athlete-hosted") return ATHLETE_HOSTED_WIZARD_STEP_ORDER;
+  if (variant === "create-series") return CREATE_SERIES_WIZARD_STEP_ORDER;
   return variant === "create-scratch" ? CREATE_SCRATCH_WIZARD_STEP_ORDER : WIZARD_STEP_ORDER;
 }
 

@@ -64,7 +64,6 @@ export default function GoRunUpcomingRunsPanel({ mode = "home" }: Props) {
 
   const emptyStandalone = !loading && standaloneRuns.length === 0;
   const emptyMeetups = !loading && meetupItems.length === 0;
-  const allEmpty = emptyStandalone && emptyMeetups;
 
   return (
     <div className="space-y-10 border-t border-gray-200 pt-8">
@@ -85,40 +84,25 @@ export default function GoRunUpcomingRunsPanel({ mode = "home" }: Props) {
         </div>
       ) : null}
 
-      {allEmpty && !loading ? (
-        <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-8 text-center space-y-3">
-          <p className="text-gray-700 font-medium">Nothing on your Run list yet</p>
-          <p className="text-sm text-gray-500">
-            Build a run, plan a meetup from that run, or join one from Find a Run.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-            <Link
-              href="/workouts/create?back=/gorun"
-              className="inline-flex rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
-            >
-              Build a run
-            </Link>
-            <Link
-              href="/discoverruns"
-              className="inline-flex rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              Find a run
-            </Link>
-          </div>
-        </div>
-      ) : null}
-
-      {!allEmpty && !loading ? (
+      {!loading ? (
         <>
-          <section aria-label="My upcoming runs">
+          <section aria-label="Upcoming runs">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">My Upcoming Runs</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Upcoming Runs</h2>
               <p className="text-sm text-gray-600 mt-0.5">
                 Sessions you built — open to plan time, route, or invite people.
               </p>
             </div>
             {emptyStandalone ? (
-              <p className="text-sm text-gray-500">No standalone runs ahead.</p>
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500">No standalone runs ahead.</p>
+                <Link
+                  href="/workouts/create?back=/gorun"
+                  className="inline-flex rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+                >
+                  Build a run
+                </Link>
+              </div>
             ) : (
               <div className="space-y-4">
                 {displayStandalone.map((run) => (
@@ -128,15 +112,23 @@ export default function GoRunUpcomingRunsPanel({ mode = "home" }: Props) {
             )}
           </section>
 
-          <section aria-label="My upcoming meetups">
+          <section aria-label="Upcoming meetups">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">My Upcoming Meetups</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Upcoming Meetups</h2>
               <p className="text-sm text-gray-600 mt-0.5">
                 City runs you host or joined — group page, copy link, check-in.
               </p>
             </div>
             {emptyMeetups ? (
-              <p className="text-sm text-gray-500">No meetups on the calendar yet.</p>
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500">No meetups on the calendar yet.</p>
+                <Link
+                  href="/discoverruns"
+                  className="inline-flex rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Find a run
+                </Link>
+              </div>
             ) : (
               <div className="space-y-4">
                 {displayMeetups.map((item) => (
