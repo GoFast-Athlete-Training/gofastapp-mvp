@@ -58,6 +58,7 @@ export function cityRunToWizardValues(run: CityRunData): RunInstanceWizardValues
     routeId: run.routeId?.trim() || "",
     linkedRouteName: run.route?.name?.trim() || "",
     directionsText: run.directionsText || "",
+    routeNotes: run.routeNotes?.trim() || "",
     runType: run.runType || "",
     routeDescription: isTrack ? "" : run.workoutDescription || "",
     trackWorkoutDescription: isTrack ? run.workoutDescription || "" : "",
@@ -144,6 +145,7 @@ export function wizardValuesToSavePayload(
       ? values.trackWorkoutDescription.trim() || null
       : values.routeDescription.trim() || null,
     directionsText: trackRouteNulls ? null : values.directionsText.trim() || null,
+    routeNotes: trackRouteNulls ? null : values.routeNotes.trim() || null,
     totalMiles: isTrack ? null : parseRunTotalMiles(values.totalMiles),
     pace: isTrack ? null : values.pace.trim() || null,
     stravaMapUrl: trackRouteNulls ? null : values.stravaMapUrl.trim() || null,

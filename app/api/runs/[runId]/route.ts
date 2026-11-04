@@ -826,6 +826,14 @@ export async function PUT(
         startTimeMinute: true,
         startTimePeriod: true,
         timezone: true,
+        meetUpPoint: true,
+        meetUpStreetAddress: true,
+        meetUpCity: true,
+        meetUpState: true,
+        meetUpZip: true,
+        meetUpPlaceId: true,
+        meetUpLat: true,
+        meetUpLng: true,
         runBrandId: true,
         runBrandName: true,
         runBrandLogoUrl: true,
@@ -1018,6 +1026,12 @@ export async function PUT(
         body.directionsText === null || body.directionsText === ''
           ? null
           : String(body.directionsText).trim();
+    }
+    if (body.routeNotes !== undefined) {
+      updateData.routeNotes =
+        body.routeNotes === null || body.routeNotes === ''
+          ? null
+          : String(body.routeNotes).trim();
     }
     if (body.workoutId !== undefined) {
       if (body.workoutId === null || body.workoutId === '') {
@@ -1239,6 +1253,26 @@ export async function PUT(
     if (body.runClubStravaUrl !== undefined) {
       runClubUpdateData.stravaUrl = body.runClubStravaUrl === null || body.runClubStravaUrl === '' ? null : String(body.runClubStravaUrl).trim();
     }
+
+    const { mergeValidationResets } = await import("@/lib/city-run/week-validate-stamps");
+    mergeValidationResets(
+      {
+        date: run.date,
+        runDay: run.runDay ?? null,
+        startTimeHour: run.startTimeHour,
+        startTimeMinute: run.startTimeMinute,
+        startTimePeriod: run.startTimePeriod,
+        meetUpPoint: run.meetUpPoint,
+        meetUpStreetAddress: run.meetUpStreetAddress,
+        meetUpCity: run.meetUpCity,
+        meetUpState: run.meetUpState,
+        meetUpZip: run.meetUpZip,
+        meetUpPlaceId: run.meetUpPlaceId,
+        meetUpLat: run.meetUpLat,
+        meetUpLng: run.meetUpLng,
+      },
+      updateData
+    );
 
     maybeStampCityRunStartsAtOnUpdate(updateData, {
       date: run.date,

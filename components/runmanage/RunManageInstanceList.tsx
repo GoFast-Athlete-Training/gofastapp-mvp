@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { scopeFromSearchParams } from "@/lib/runmanage/scope-query";
 import Link from "next/link";
 import { Calendar, ChevronLeft, Edit, Eye, Loader2, MapPin, Trash2 } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
@@ -78,6 +80,8 @@ type RunManageInstanceListProps = {
 };
 
 export function RunManageInstanceList({ bucket, backHref, backLabel }: RunManageInstanceListProps) {
+  const searchParams = useSearchParams();
+  const scope = scopeFromSearchParams(searchParams);
   const typeMeta = bucket ? COCKPIT_BUCKET_META[bucket] : null;
   const [loading, setLoading] = useState(true);
   const [runs, setRuns] = useState<RunRow[]>([]);
@@ -86,9 +90,23 @@ export function RunManageInstanceList({ bucket, backHref, backLabel }: RunManage
   const [includePast, setIncludePast] = useState(false);
 
   const load = useCallback(async () => {
+    if (!scope.region) {
+      setRuns([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const params = new URLSearchParams({ upcomingOnly: includePast ? "false" : "true" });
+      const params = new URLSearchParams({ region: scope.region });
+      if (scope.city) params.set("city", scope.city);
+      if (includePast) {
+        params.set("upcomingOnly", "false");
+      } else {
+        const { weekWindowContaining } = await import("@/lib/runmanage/calendar-week");
+        const win = weekWindowContaining(new Date(), 0);
+        params.set("weekStart", win.startYmd);
+        params.set("weekEndExclusive", win.endExclusiveYmd);
+      }
       const response = await runmanageApi.get(`/api/runs/manage?${params.toString()}`);
       if (response.data.success) {
         const all = (response.data.runs || []) as RunRow[];
@@ -99,7 +117,7 @@ export function RunManageInstanceList({ bucket, backHref, backLabel }: RunManage
     } finally {
       setLoading(false);
     }
-  }, [bucket, includePast]);
+  }, [bucket, includePast, scope.region, scope.city]);
 
   useEffect(() => {
     void load();
@@ -182,7 +200,7 @@ export function RunManageInstanceList({ bucket, backHref, backLabel }: RunManage
             onChange={(e) => setIncludePast(e.target.checked)}
             className="rounded border-gray-300"
           />
-          Include past
+          All time (522+ dump)
         </label>
         <label className="inline-flex items-center gap-2 text-sm text-gray-700">
           <input

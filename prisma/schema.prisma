@@ -1911,6 +1911,12 @@ model city_runs {
   runType             String?              // Type of run location: "track", "trail", "neighborhood", "park"
   workoutDescription  String?              // Workout focus/description (e.g. "emphasizes speed training for those want to increase threshold")
   directionsText        String?              // Staff pasted route directions — copies forward on series advance
+  /// Instance-only route notes; never copied on series advance. May seed optional route attach.
+  routeNotes          String?
+  /// Staff confirmed this occurrence date matches club sources (weekly validate board).
+  dateValidate        Boolean              @default(false)
+  timeValidate        Boolean              @default(false)
+  meetupValidate      Boolean              @default(false)
   endStreetAddress    String?
   endCity             String?
   endState            String?

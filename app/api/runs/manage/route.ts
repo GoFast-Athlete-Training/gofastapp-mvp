@@ -118,8 +118,18 @@ export async function GET(request: NextRequest) {
     const upcomingOnly = searchParams.get('upcomingOnly') !== 'false';
     const runClubIdFilter = searchParams.get('runClubId')?.trim();
     const runTypeFilter = searchParams.get('runType')?.trim().toLowerCase();
+    const regionSlugFilter =
+      searchParams.get('regionSlug')?.trim() || searchParams.get('region')?.trim() || null;
+    const citySlugFilter =
+      searchParams.get('citySlug')?.trim() || searchParams.get('city')?.trim() || null;
 
     const where: any = {};
+    if (regionSlugFilter) {
+      where.regionSlug = regionSlugFilter;
+    }
+    if (citySlugFilter) {
+      where.citySlug = citySlugFilter;
+    }
     if (workflowStatus && ['DEVELOP', 'PENDING', 'SUBMITTED', 'APPROVED'].includes(workflowStatus)) {
       where.workflowStatus = workflowStatus;
     }
@@ -133,9 +143,17 @@ export async function GET(request: NextRequest) {
       where.runType = runTypeFilter;
     }
     const startOfToday = getStartOfTodayUTC();
-    if (pastOnly) {
+    const weekStartYmd = searchParams.get("weekStart")?.trim();
+    const weekEndExclusiveYmd = searchParams.get("weekEndExclusive")?.trim();
+    if (weekStartYmd && weekEndExclusiveYmd) {
+      const { dateKeyToUtcStartOfDay } = await import("@/lib/calendar-date");
+      where.date = {
+        gte: dateKeyToUtcStartOfDay(weekStartYmd),
+        lt: dateKeyToUtcStartOfDay(weekEndExclusiveYmd),
+      };
+    } else if (pastOnly) {
       where.date = { lt: startOfToday };
-    } else if (upcomingOnly && !runClubIdFilter) {
+    } else if (upcomingOnly) {
       where.date = { gte: startOfToday };
     }
 

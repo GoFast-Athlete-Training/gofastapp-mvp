@@ -761,8 +761,38 @@ export default function RunInstanceWizard({
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      Saved with this run and copied forward when the next weekly instance is built.
+                      Saved on this instance only — not auto-copied when the next week is prepared.
                     </p>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-900">
+                      Route notes (this run only)
+                    </label>
+                    <textarea
+                      value={values.routeNotes}
+                      onChange={(e) => patch({ routeNotes: e.target.value })}
+                      rows={3}
+                      placeholder="Instance notes from IG or Strava — not copied to next week"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const notes = values.routeNotes.trim();
+                        if (!notes) {
+                          onErrorChange?.("Add route notes first.");
+                          return;
+                        }
+                        patch({
+                          directionsText: notes,
+                          routeDescription: values.routeDescription.trim() ? values.routeDescription : notes,
+                        });
+                        onErrorChange?.(null);
+                      }}
+                      className="mt-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50"
+                    >
+                      Use notes to seed route directions
+                    </button>
                   </div>
                   <div>
                     <div className="mb-1 flex flex-wrap items-center justify-between gap-2">

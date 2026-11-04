@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { appendScopeToPath, scopeFromSearchParams } from "@/lib/runmanage/scope-query";
 import {
   Building2,
   ChevronRight,
@@ -89,16 +91,30 @@ function ownerForRun(run: Run): string {
 }
 
 export function RunManageDashboardHome() {
+  const searchParams = useSearchParams();
+  const scope = scopeFromSearchParams(searchParams);
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDayYmd, setSelectedDayYmd] = useState<string | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
 
   useEffect(() => {
+    if (!scope.region) {
+      setRuns([]);
+      setLoading(false);
+      return;
+    }
     void (async () => {
       try {
         setLoading(true);
-        const params = new URLSearchParams({ upcomingOnly: "false" });
+        const { weekWindowContaining } = await import("@/lib/runmanage/calendar-week");
+        const win = weekWindowContaining(new Date(), weekOffset);
+        const params = new URLSearchParams({
+          weekStart: win.startYmd,
+          weekEndExclusive: win.endExclusiveYmd,
+          region: scope.region,
+        });
+        if (scope.city) params.set("city", scope.city);
         const response = await runmanageApi.get(`/api/runs/manage?${params.toString()}`);
         if (response.data.success) {
           setRuns(response.data.runs || []);
@@ -109,7 +125,7 @@ export function RunManageDashboardHome() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [weekOffset, scope.region, scope.city]);
 
   const bucketCounts = useMemo(() => {
     const counts: Record<CockpitBucket, number> = {
@@ -168,6 +184,8 @@ export function RunManageDashboardHome() {
     ? `Runs on ${formatRunDate(selectedDayYmd + "T12:00:00")}`
     : "This week";
 
+  const scoped = (path: string) => appendScopeToPath(path, scope);
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -177,13 +195,13 @@ export function RunManageDashboardHome() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href={RUN_MANAGE_SERIES_PATH}
+            href={scoped(RUN_MANAGE_SERIES_PATH)}
             className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
           >
             Manage recurring runs
           </Link>
           <Link
-            href={runManageCreatePath()}
+            href={scoped(runManageCreatePath())}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
           >
             <Plus className="h-4 w-4" />
@@ -197,7 +215,8 @@ export function RunManageDashboardHome() {
           const meta = COCKPIT_BUCKET_META[bucket];
           const Icon = BUCKET_ICONS[bucket];
           const count = bucketCounts[bucket];
-          const cardHref = bucket === "club" ? RUN_MANAGE_SERIES_PATH : runManageTypePath(bucket);
+          const cardHref =
+            bucket === "club" ? scoped(RUN_MANAGE_SERIES_PATH) : scoped(runManageTypePath(bucket));
           const cardCta = bucket === "club" ? "Manage clubs →" : "Open list →";
           return (
             <Link
@@ -217,6 +236,12 @@ export function RunManageDashboardHome() {
         })}
       </div>
 
+      {!scope.region ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-sm text-amber-950">
+          Select a region in the scope bar to see this week&apos;s runs for your metro.
+        </p>
+      ) : (
+        <>
       <RunManageWeekStrip
         weekStart={weekStart}
         runsByDay={runsByDayInWeek}
@@ -239,11 +264,11 @@ export function RunManageDashboardHome() {
         ) : weekListRuns.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500">
             Nothing this week.{" "}
-            <Link href={RUN_MANAGE_SERIES_PATH} className="font-medium text-sky-700 hover:underline">
+            <Link href={scoped(RUN_MANAGE_SERIES_PATH)} className="font-medium text-sky-700 hover:underline">
               Manage recurring runs
             </Link>
             {" or "}
-            <Link href={runManageCreatePath()} className="font-medium text-sky-700 hover:underline">
+            <Link href={scoped(runManageCreatePath())} className="font-medium text-sky-700 hover:underline">
               create a one-off run
             </Link>
             .
@@ -272,7 +297,7 @@ export function RunManageDashboardHome() {
                     <td className="px-4 py-3 text-gray-700">{ownerForRun(run)}</td>
                     <td className="px-4 py-3 text-right">
                       <Link
-                        href={`/runmanage/runs/${run.id}?mode=edit`}
+                        href={scoped(`/runmanage/runs/${run.id}?mode=edit`)}
                         className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700"
                       >
                         Edit
@@ -286,6 +311,8 @@ export function RunManageDashboardHome() {
           </div>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 }

@@ -309,7 +309,8 @@ export async function resolveClubInstanceLanes(
   return lanes;
 }
 
-async function duplicateRunForward(
+/** Clone a dated occurrence from prior run (route/workout/validate reset — see create payload). */
+export async function duplicateRunForward(
   prior: Awaited<ReturnType<typeof fetchClubSeriesRuns>>[number],
   targetYmd: string,
   staffGeneratedId?: string | null,
@@ -370,7 +371,7 @@ async function duplicateRunForward(
     endState: prior.endState,
     totalMiles: prior.totalMiles,
     pace: prior.pace,
-    stravaMapUrl: prior.stravaMapUrl,
+    stravaMapUrl: null,
     stravaEventUrl: null,
     stravaText: null,
     webUrl: prior.webUrl,
@@ -379,15 +380,19 @@ async function duplicateRunForward(
     igPostGraphic: prior.igPostGraphic,
     description: prior.description,
     postRunActivity: prior.postRunActivity,
-    routePhotos: prior.routePhotos ?? Prisma.JsonNull,
-    mapImageUrl: prior.mapImageUrl,
+    routePhotos: Prisma.JsonNull,
+    mapImageUrl: null,
     staffNotes: prior.staffNotes,
     routeNeighborhood: prior.routeNeighborhood,
     runType: prior.runType,
     workoutDescription: prior.workoutDescription,
-    directionsText: prior.directionsText,
-    routeId: prior.routeId,
-    plannedWorkoutId: prior.plannedWorkoutId,
+    directionsText: null,
+    routeId: null,
+    routeNotes: null,
+    dateValidate: false,
+    timeValidate: false,
+    meetupValidate: false,
+    plannedWorkoutId: null,
     workoutId: null,
     cityRunType: prior.runClubId ? 'CLUB' : prior.cityRunType,
     clubReviewStatus: prior.runClubId ? 'draft' : undefined,

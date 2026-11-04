@@ -34,6 +34,7 @@ import {
 import type { WizardStep } from "@/components/runmanage/runInstanceWizard/shared";
 import { formatDayLabel } from "@/lib/runmanage/format-day-label";
 import { mergeOptionalAssociationsFromPrior } from "@/lib/runmanage/series-wizard-seed";
+import RunManageWeekValidateChecks from "@/components/runmanage/RunManageWeekValidateChecks";
 import {
   cityRunToWizardValues,
   serializeWizardSnapshot,
@@ -174,6 +175,10 @@ export interface CityRunData {
   runType?: string | null;
   workoutDescription?: string | null;
   directionsText?: string | null;
+  routeNotes?: string | null;
+  dateValidate?: boolean;
+  timeValidate?: boolean;
+  meetupValidate?: boolean;
   stravaEventUrl?: string | null;
   stravaText?: string | null;
   webUrl?: string | null;
@@ -968,6 +973,37 @@ export default function RunManageStaffEditor({
         {postCreateFresh && staffMode === "edit" ? (
           <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
             Run saved. Route and workout are optional — attach a map or skip and publish when ready.
+          </div>
+        ) : null}
+
+        {isSeriesInstance && staffMode === "edit" && run ? (
+          <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50/60 px-4 py-3 text-sm">
+            <p className="font-medium text-gray-900">Week validation</p>
+            <p className="mt-1 text-xs text-gray-600">
+              Confirm date, start time, and meet-up match this week&apos;s club post.
+            </p>
+            <div className="mt-3">
+              <RunManageWeekValidateChecks
+                runId={run.id}
+                flags={{
+                  dateValidate: Boolean(run.dateValidate),
+                  timeValidate: Boolean(run.timeValidate),
+                  meetupValidate: Boolean(run.meetupValidate),
+                }}
+                onUpdated={(flags) => {
+                  setRun((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          dateValidate: flags.dateValidate,
+                          timeValidate: flags.timeValidate,
+                          meetupValidate: flags.meetupValidate,
+                        }
+                      : prev
+                  );
+                }}
+              />
+            </div>
           </div>
         ) : null}
 

@@ -18,9 +18,21 @@ function formatSeriesTime(row: OperationalSeriesRow): string {
 
 function StoplightDot({ status }: { status: SeriesStoplight }) {
   const color =
-    status === "ready" ? "bg-emerald-500" : status === "build_first" ? "bg-amber-400" : "bg-amber-500";
+    status === "ready"
+      ? "bg-emerald-500"
+      : status === "needs_validate"
+        ? "bg-amber-500"
+        : status === "needs_prepare"
+          ? "bg-sky-500"
+          : "bg-amber-400";
   const label =
-    status === "ready" ? "Next run built" : status === "build_first" ? "Build first run" : "Build next run";
+    status === "ready"
+      ? "Validated"
+      : status === "needs_validate"
+        ? "Needs validate"
+        : status === "needs_prepare"
+          ? "Prepare slot"
+          : "Build first run";
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-gray-600" title={label}>
       <span className={`h-2 w-2 shrink-0 rounded-full ${color}`} aria-hidden />

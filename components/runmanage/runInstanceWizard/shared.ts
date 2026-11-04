@@ -128,6 +128,8 @@ export type RunInstanceWizardValues = {
   linkedRouteName: string;
   /** Pasted route directions — persisted on city_runs, copies forward on series advance. */
   directionsText: string;
+  /** Instance-only route notes; never copied on series advance. */
+  routeNotes: string;
   runType: string;
   /** Route description persisted as workoutDescription on save. */
   routeDescription: string;
@@ -277,6 +279,7 @@ export function emptyWizardValues(defaultDate?: string): RunInstanceWizardValues
     routeId: "",
     linkedRouteName: "",
     directionsText: "",
+    routeNotes: "",
     runType: "",
     routeDescription: "",
     totalMiles: "",
