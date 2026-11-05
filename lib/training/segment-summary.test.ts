@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  collapseFlatSegmentsForEditor,
+  effectiveRepeatCount,
   expandSegmentsForGarminPush,
   formatBetweenRepeatsRecoveryLabel,
   formatGroupedSegmentDuration,
@@ -133,6 +135,27 @@ test("expandSegmentsForGarminPush stretches collapsed flat reps into repeatCount
   assert.equal(out[1]!.title, "Interval");
   assert.equal(out[1]!.repeatCount, 2);
   assert.equal(out[2]!.title, "Recovery");
+});
+
+test("groups Interval 1 / Recovery 1 / Interval 2 when titles differ only by number", () => {
+  const paceA = [{ type: "PACE", valueLow: 100, valueHigh: 110 }];
+  const segments = [
+    seg(1, "Warmup", 1.5),
+    seg(2, "Interval 1", 1, { targets: paceA }),
+    seg(3, "Recovery 1", 0.25),
+    seg(4, "Interval 2", 1, { targets: paceA }),
+    seg(5, "Recovery 2", 0.25),
+    seg(6, "Interval 3", 1, { targets: paceA }),
+    seg(7, "Cooldown", 1.5),
+  ];
+  const groups = groupSegmentsInDisplayOrder(segments);
+  assert.equal(groups.length, 3);
+  assert.equal(effectiveRepeatCount(groups[1]!), 3);
+  assert.equal(groups[1]!.recovery?.title, "Recovery 1");
+  const collapsed = collapseFlatSegmentsForEditor(segments);
+  assert.equal(collapsed.length, 3);
+  assert.equal(collapsed[1]!.repeatCount, 3);
+  assert.equal(collapsed[1]!.recoveryDurationValue, 0.25);
 });
 
 test("milesToDisplayMeters snaps 400m track reps to 400 not 401", () => {

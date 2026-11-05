@@ -146,9 +146,14 @@ function normalizeTargetsForRepeatMatch(targets: unknown): string {
   return parts.join("|");
 }
 
+/** Strip trailing step numbers so "Interval 1" and "Interval 2" match for grouping. */
+export function normalizeSegmentTitleForRepeatMatch(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+\d+$/, "").trim();
+}
+
 export function segmentsMatchForRepeat(a: SegmentLike, b: SegmentLike): boolean {
-  const titleA = (a.title ?? "").trim().toLowerCase();
-  const titleB = (b.title ?? "").trim().toLowerCase();
+  const titleA = normalizeSegmentTitleForRepeatMatch(a.title ?? "");
+  const titleB = normalizeSegmentTitleForRepeatMatch(b.title ?? "");
   if (titleA !== titleB) return false;
   if (a.durationType !== b.durationType) return false;
   const da = Number(a.durationValue);
@@ -482,6 +487,64 @@ export function formatBetweenRepeatsRecoveryLabel(group: SegmentDisplayGroup): s
   const rec = group.betweenRepeatsRecovery;
   if (!rec) return null;
   return `Between repeats: ${formatSegmentDuration(rec)}`;
+}
+
+/**
+ * Collapse flat per-rep rows (Interval 1, Recovery 1, …) into editor/Garmin-canonical rows
+ * with repeatCount and inline recovery when work+rest repeats are identical.
+ */
+export function collapseFlatSegmentsForEditor<T extends SegmentLike>(
+  segmentsInOrder: T[]
+): T[] {
+  const sorted = [...segmentsInOrder].sort(
+    (a, b) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0)
+  );
+  const groups = groupSegmentsInDisplayOrder(sorted);
+  const out: T[] = [];
+  let stepOrder = 1;
+
+  for (const g of groups) {
+    const reps = effectiveRepeatCount(g);
+    if (isMultiStepRepeatGroup(g) && g.cycleSteps && g.cycleSteps.length > 1) {
+      for (const step of g.cycleSteps) {
+        out.push({ ...step, stepOrder: stepOrder++ } as T);
+      }
+      if (g.betweenRepeatsRecovery) {
+        out.push({ ...g.betweenRepeatsRecovery, stepOrder: stepOrder++ } as T);
+      }
+      continue;
+    }
+
+    const rec = g.recovery ?? g.betweenRepeatsRecovery;
+    const work = { ...g.work } as T & {
+      repeatCount?: number | null;
+      recoveryDurationType?: string | null;
+      recoveryDurationValue?: number | null;
+    };
+    work.stepOrder = stepOrder++;
+    if (reps > 1) {
+      work.repeatCount = reps;
+      if (rec) {
+        work.recoveryDurationType = rec.durationType;
+        work.recoveryDurationValue = Number(rec.durationValue);
+      }
+    } else if (g.work.repeatCount != null && g.work.repeatCount > 1) {
+      work.repeatCount = g.work.repeatCount;
+      if (g.work.recoveryDurationType && g.work.recoveryDurationValue != null) {
+        work.recoveryDurationType = g.work.recoveryDurationType;
+        work.recoveryDurationValue = g.work.recoveryDurationValue;
+      } else if (rec) {
+        work.recoveryDurationType = rec.durationType;
+        work.recoveryDurationValue = Number(rec.durationValue);
+      }
+    }
+    out.push(work as T);
+    if (rec && reps <= 1 && !(g.work.repeatCount != null && g.work.repeatCount > 1)) {
+      out.push({ ...rec, stepOrder: stepOrder++ } as T);
+    }
+  }
+
+  return out;
 }
 
 /**
