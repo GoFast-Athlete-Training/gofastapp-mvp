@@ -56,8 +56,7 @@ import {
   deriveSessionStatus,
   showFindMissingGarminForStatus,
 } from "@/lib/training/session-status";
-import PlanIngestPanel from "@/components/training/PlanIngestPanel";
-import PlanDayBriefPanel from "@/components/training/PlanDayBriefPanel";
+import PlanDayChangeChooser from "@/components/training/PlanDayChangeChooser";
 
 function formatSecPerMile(sec: number | null | undefined): string | null {
   if (sec == null || !Number.isFinite(sec) || sec <= 0) return null;
@@ -198,9 +197,9 @@ export default function TrainingPlanDayPreviewPage() {
   const planIdFromQuery = searchParams.get("planId")?.trim() || null;
   const sourceSetup = searchParams.get("source") === "setup";
   const sourceHome = searchParams.get("source") === "home";
-  const replaceMode = searchParams.get("replace") === "1";
-  const replacePanelRef = useRef<HTMLDivElement | null>(null);
-  const [replacePanelOpen, setReplacePanelOpen] = useState(replaceMode);
+  const changeMode =
+    searchParams.get("change") === "1" || searchParams.get("replace") === "1";
+  const changePanelRef = useRef<HTMLDivElement | null>(null);
 
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -526,13 +525,6 @@ export default function TrainingPlanDayPreviewPage() {
     void load();
   }, [authReady, dateKey, load]);
 
-  const focusReplacePanel = useCallback(() => {
-    setReplacePanelOpen(true);
-    requestAnimationFrame(() => {
-      replacePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }, []);
-
   const refreshWorkoutDetail = useCallback(async () => {
     if (!workoutId) return;
     const u = auth.currentUser;
@@ -546,15 +538,6 @@ export default function TrainingPlanDayPreviewPage() {
       setWorkoutDetailError(e instanceof Error ? e.message : "Could not refresh workout");
     }
   }, [workoutId]);
-
-  useEffect(() => {
-    if (replaceMode) setReplacePanelOpen(true);
-  }, [replaceMode]);
-
-  useEffect(() => {
-    if (!replaceMode || loading || workoutLoading) return;
-    focusReplacePanel();
-  }, [replaceMode, loading, workoutLoading, focusReplacePanel]);
 
   const isRaceDay = workout?.workoutType === "Race" || raceDayOnSchedule;
   const title = workout?.title?.trim() || "Workout";
@@ -787,46 +770,20 @@ export default function TrainingPlanDayPreviewPage() {
               {workout?.description?.trim() ? (
                 <p className="mt-2 text-sm text-gray-600 leading-relaxed">{workout.description}</p>
               ) : null}
-              {!isLogged && planDetail?.id && dateKey ? (
-                <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-gray-100 pt-3">
-                  <button
-                    type="button"
-                    onClick={focusReplacePanel}
-                    className="text-sm font-semibold text-sky-800 hover:text-sky-950 hover:underline"
-                  >
-                    Replace
-                  </button>
-                </div>
-              ) : null}
             </div>
 
             <div className="px-5 py-4 space-y-4">
-              {isCalendarToday && planDetail?.id && dateKey ? (
-                <PlanDayBriefPanel
+              {!isLogged && planDetail?.id && dateKey ? (
+                <PlanDayChangeChooser
                   planId={planDetail.id}
                   dateKey={dateKey}
+                  isCalendarToday={isCalendarToday}
+                  backHref={`/training/day/${dateKey}${querySuffix}`}
                   getToken={getDayToken}
-                  onAccepted={() => void load()}
+                  onDayUpdated={() => void load()}
+                  initialOpen={changeMode}
+                  panelRef={changePanelRef}
                 />
-              ) : null}
-              {!isLogged && planDetail?.id && dateKey ? (
-                <div
-                  ref={replacePanelRef}
-                  className={replaceMode ? "rounded-xl ring-2 ring-sky-300 ring-offset-2" : undefined}
-                >
-                  <PlanIngestPanel
-                    planId={planDetail.id}
-                    scope="workout"
-                    dateKey={dateKey}
-                    weekNumber={weekNumberNumeric}
-                    getToken={getDayToken}
-                    open={replacePanelOpen}
-                    onOpenChange={setReplacePanelOpen}
-                    title="Replace this workout"
-                    description="Paste a replacement for this day only — preview, then confirm."
-                    onCommitted={() => void load()}
-                  />
-                </div>
               ) : null}
               {isLogged ? (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-gray-800 space-y-1">
@@ -895,8 +852,8 @@ export default function TrainingPlanDayPreviewPage() {
                 workout.segments.length === 0 &&
                 !isRaceDay && (
                 <p className="text-sm text-gray-600">
-                  No structured steps yet for this workout type. Use Replace to pick a different day
-                  template if needed.
+                  No structured steps yet for this workout type. Use Change today&apos;s workout to
+                  build a new session for this day.
                 </p>
               )}
               {!isLogged && !workoutLoading && workout && workout.segments.length > 0 && (
@@ -1077,15 +1034,6 @@ export default function TrainingPlanDayPreviewPage() {
                   className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
                 >
                   {pushingGarmin ? "Getting it ready…" : "Looks good, I'm ready"}
-                </button>
-              ) : null}
-              {!isLogged && !isRaceDay && planDetail?.id && dateKey ? (
-                <button
-                  type="button"
-                  onClick={focusReplacePanel}
-                  className="w-full rounded-xl border border-sky-200 bg-white py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50"
-                >
-                  Replace
                 </button>
               ) : null}
               {!isLogged && workoutId && dateKey ? (

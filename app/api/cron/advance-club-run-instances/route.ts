@@ -12,7 +12,7 @@ export const maxDuration = 300;
 
 /**
  * GET /api/cron/advance-club-run-instances
- * Monday 3:00 AM UTC — fill the next 2 weekly city_runs slots when CLUB_RUN_AUTO_ADVANCE=true.
+ * Monday 3:00 AM UTC — fill the next 2 weekly city_runs slots from last run (unpublished, no route).
  * Product-owned; no Firebase or Company proxy.
  */
 export async function GET(request: NextRequest) {

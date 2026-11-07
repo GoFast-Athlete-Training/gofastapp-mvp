@@ -363,9 +363,6 @@ export default function RunManageCreateRunPage() {
       let editUrl = runInstanceEditPath(String(runId));
       if (isSeriesCreate) {
         editUrl = `${editUrl}&step=route&built=1`;
-        if (useLastRunSeed && priorRunId) {
-          editUrl = `${editUrl}&copyFrom=${encodeURIComponent(priorRunId)}`;
-        }
       } else if (returnTo !== RUN_MANAGE_DASHBOARD_PATH) {
         editUrl = `${editUrl}&returnTo=${encodeURIComponent(returnTo)}`;
       }

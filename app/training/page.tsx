@@ -717,7 +717,7 @@ export default function TrainingHubPage() {
 
   function openDayReplace(day: PlanDayCard) {
     router.push(
-      `/training/day/${encodeURIComponent(day.dateKey)}?source=hub&replace=1`
+      `/training/day/${encodeURIComponent(day.dateKey)}?source=hub&change=1`
     );
   }
 

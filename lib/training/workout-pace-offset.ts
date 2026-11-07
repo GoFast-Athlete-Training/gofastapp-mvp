@@ -7,6 +7,13 @@ export const WHAT_PACE_PRESETS = [
   { id: "interval", label: "Interval", offset: -10 },
 ] as const;
 
+/** Goal-race MP blocks — offset is sec/mi vs resolved goal race pace (Marathon = on goal). */
+export const GOAL_RACE_MP_PRESETS = [
+  { id: "goal_mp", label: "Goal marathon pace", offset: 0 },
+  { id: "goal_mp_easy", label: "Slightly slower (+15)", offset: 15 },
+  { id: "goal_mp_faster", label: "Slightly faster (−10)", offset: -10 },
+] as const;
+
 export type WhatPacePresetId = (typeof WHAT_PACE_PRESETS)[number]["id"];
 
 export function presetIdForWorkoutOffset(
@@ -21,6 +28,21 @@ export function formatWorkoutOffsetSummary(offset: number | null): string {
   if (offset == null || !Number.isFinite(offset)) return "";
   const sign = offset > 0 ? "+" : "";
   return `${sign}${offset} sec/mi vs 5K`;
+}
+
+export function formatGoalRaceOffsetSummary(offset: number | null): string {
+  if (offset == null || !Number.isFinite(offset)) return "";
+  if (offset === 0) return "On goal race pace";
+  const sign = offset > 0 ? "+" : "";
+  return `${sign}${offset} sec/mi vs goal race`;
+}
+
+export function presetIdForGoalRaceOffset(
+  offset: number | null
+): (typeof GOAL_RACE_MP_PRESETS)[number]["id"] | "custom" {
+  if (offset == null || !Number.isFinite(offset)) return "custom";
+  const match = GOAL_RACE_MP_PRESETS.find((p) => p.offset === offset);
+  return match?.id ?? "custom";
 }
 
 /** Midpoint pace (sec/mi) minus 5K anchor → intended catalogue offset. */

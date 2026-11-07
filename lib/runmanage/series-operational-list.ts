@@ -39,6 +39,7 @@ export type OperationalSeriesRow = {
   seriesId: string;
   slug: string | null;
   name: string | null;
+  description: string | null;
   dayOfWeek: string;
   startTimeHour: number | null;
   startTimeMinute: number | null;
@@ -235,6 +236,7 @@ export async function buildWeekBoardSeriesList(opts: {
       seriesId: s.id,
       slug: s.slug,
       name: s.name,
+      description: s.description,
       dayOfWeek: s.dayOfWeek,
       startTimeHour: s.startTimeHour,
       startTimeMinute: s.startTimeMinute,
@@ -324,6 +326,7 @@ export async function buildOperationalSeriesList(opts?: {
       seriesId: s.id,
       slug: s.slug,
       name: s.name,
+      description: s.description,
       dayOfWeek: s.dayOfWeek,
       startTimeHour: s.startTimeHour,
       startTimeMinute: s.startTimeMinute,
@@ -348,4 +351,145 @@ export async function buildOperationalSeriesList(opts?: {
 
   rows.sort((a, b) => compareSeriesByWeekdayTime(a, b));
   return rows;
+}
+
+/** Week queue for This week — region/city optional filters (rows render without scope). */
+export async function buildWeekQueueSeriesList(opts: {
+  weekOffset?: number;
+  regionSlug?: string | null;
+  citySlug?: string | null;
+  runClubId?: string | null;
+}): Promise<{ window: WeekWindow; series: OperationalSeriesRow[] }> {
+  const regionSlug = opts.regionSlug?.trim() || "";
+  const citySlug = opts.citySlug?.trim() || "";
+  const runClubId = opts.runClubId?.trim() || null;
+
+  if (regionSlug && citySlug) {
+    return buildWeekBoardSeriesList({
+      regionSlug,
+      citySlug,
+      weekOffset: opts.weekOffset,
+      runClubId,
+    });
+  }
+
+  const window = weekWindowContaining(new Date(), opts.weekOffset ?? 0);
+  const startOfToday = getStartOfTodayUTC();
+
+  let cityIds: string[] | null = null;
+  let citySlugs: string[] | null = null;
+
+  if (regionSlug) {
+    const cities = await prisma.cities.findMany({
+      where: { region: { slug: regionSlug } },
+      select: { id: true, slug: true },
+    });
+    cityIds = cities.map((c) => c.id);
+    citySlugs = cities.map((c) => c.slug);
+    if (cityIds.length === 0) {
+      return { window, series: [] };
+    }
+  }
+
+  if (citySlug && regionSlug) {
+    const city = await prisma.cities.findFirst({
+      where: { slug: citySlug, region: { slug: regionSlug } },
+      select: { id: true, slug: true },
+    });
+    if (!city) return { window, series: [] };
+    cityIds = [city.id];
+    citySlugs = [city.slug];
+  }
+
+  const seriesRows = await prisma.run_series.findMany({
+    where: {
+      runClubId: { not: null },
+      ...(runClubId ? { runClubId } : {}),
+      ...(cityIds
+        ? {
+            OR: [{ cityId: { in: cityIds } }, { citySlug: { in: citySlugs! } }],
+          }
+        : {}),
+    },
+    orderBy: [{ dayOfWeek: "asc" }, { name: "asc" }],
+    include: {
+      runClub: { select: { id: true, name: true, city: true } },
+      cities: { select: { slug: true, region: { select: { slug: true } } } },
+      _count: { select: { city_runs: true } },
+    },
+  });
+
+  const seriesIds = seriesRows.map((s) => s.id);
+  const runs =
+    seriesIds.length === 0
+      ? []
+      : await prisma.city_runs.findMany({
+          where: { runSeriesId: { in: seriesIds } },
+          select: RUN_SELECT,
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        });
+
+  const bySeries = new Map<string, (typeof runs)[number][]>();
+  for (const run of runs) {
+    if (!run.runSeriesId) continue;
+    const list = bySeries.get(run.runSeriesId) ?? [];
+    list.push(run);
+    bySeries.set(run.runSeriesId, list);
+  }
+
+  const rows: OperationalSeriesRow[] = [];
+
+  for (const s of seriesRows) {
+    const seriesRuns = bySeries.get(s.id) ?? [];
+    const weekSlotYmd = ymdForDayInWeek(s.dayOfWeek, window);
+
+    const weekRunRaw = weekSlotYmd
+      ? seriesRuns.find((r) => dateKeyFromDate(r.date) === weekSlotYmd)
+      : undefined;
+    const weekRun = weekRunRaw ? mapWeekRunSummary(weekRunRaw) : null;
+
+    const historical = seriesRuns.filter((r) => r.date < startOfToday);
+    historical.sort((a, b) => b.date.getTime() - a.date.getTime());
+    const latestPriorRun = historical[0] ? mapRunSummary(historical[0]) : null;
+
+    const validationReady = Boolean(
+      weekRun?.dateValidate && weekRun?.timeValidate && weekRun?.meetupValidate
+    );
+
+    let stoplight: SeriesStoplight = "build_first";
+    if (weekRun) {
+      stoplight = validationReady ? "ready" : "needs_validate";
+    } else if (latestPriorRun) {
+      stoplight = "needs_prepare";
+    }
+
+    rows.push({
+      seriesId: s.id,
+      slug: s.slug,
+      name: s.name,
+      description: s.description,
+      dayOfWeek: s.dayOfWeek,
+      startTimeHour: s.startTimeHour,
+      startTimeMinute: s.startTimeMinute,
+      startTimePeriod: s.startTimePeriod,
+      meetUpPoint: s.meetUpPoint,
+      runClubId: s.runClubId,
+      clubName: s.runClub?.name ?? null,
+      clubCity: s.runClub?.city ?? null,
+      regionSlug: s.cities?.region?.slug ?? null,
+      citySlug: s.citySlug ?? s.cities?.slug ?? null,
+      stoplight,
+      weekSlotYmd,
+      weekRun,
+      validationReady,
+      nextRun: weekRun,
+      latestPriorRun,
+      expectedNextDateYmd: weekSlotYmd,
+      suggestedBuildDateYmd: weekSlotYmd ?? nextYmdForDayOfWeek(s.dayOfWeek),
+      runCount: s._count.city_runs,
+    });
+  }
+
+  rows.sort((a, b) => compareSeriesByWeekdayTime(a, b));
+  return { window, series: rows };
 }

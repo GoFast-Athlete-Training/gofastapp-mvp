@@ -1370,11 +1370,20 @@ export async function PUT(
         totalMiles: true,
         pace: true,
         description: true,
+        dayOfWeek: true,
+        startTimeHour: true,
+        startTimeMinute: true,
+        startTimePeriod: true,
         meetUpPoint: true,
         meetUpStreetAddress: true,
         meetUpCity: true,
         meetUpState: true,
         meetUpZip: true,
+        meetUpPlaceId: true,
+        meetUpLat: true,
+        meetUpLng: true,
+        citySlug: true,
+        runSeriesId: true,
         routePhotos: true,
         mapImageUrl: true,
         stravaMapUrl: true,
@@ -1386,6 +1395,57 @@ export async function PUT(
         cityRunType: true,
       },
     });
+
+    const standing = hydrated ?? updated;
+    const standingSyncKeys = [
+      "title",
+      "description",
+      "dayOfWeek",
+      "startTimeHour",
+      "startTimeMinute",
+      "startTimePeriod",
+      "meetUpPoint",
+      "meetUpStreetAddress",
+      "meetUpCity",
+      "meetUpState",
+      "meetUpPlaceId",
+      "meetUpLat",
+      "meetUpLng",
+      "citySlug",
+      "runSeriesId",
+    ] as const;
+    const shouldSyncSeriesStanding = standingSyncKeys.some(
+      (key) => body[key as keyof typeof body] !== undefined
+    );
+    if (standing.runSeriesId && shouldSyncSeriesStanding) {
+      try {
+        const { syncStandingRunFieldsToSeries } = await import(
+          "@/lib/runmanage/sync-standing-run-to-series"
+        );
+        await syncStandingRunFieldsToSeries({
+          runSeriesId: standing.runSeriesId,
+          title: standing.title,
+          description: standing.description,
+          dayOfWeek: standing.dayOfWeek,
+          startTimeHour: standing.startTimeHour,
+          startTimeMinute: standing.startTimeMinute,
+          startTimePeriod: standing.startTimePeriod,
+          meetUpPoint: standing.meetUpPoint,
+          meetUpStreetAddress: standing.meetUpStreetAddress,
+          meetUpCity: standing.meetUpCity,
+          meetUpState: standing.meetUpState,
+          meetUpPlaceId: standing.meetUpPlaceId,
+          meetUpLat: standing.meetUpLat,
+          meetUpLng: standing.meetUpLng,
+          citySlug: standing.citySlug,
+        });
+      } catch (syncErr: unknown) {
+        console.warn(
+          "[PUT /api/runs/[runId]] syncStandingRunFieldsToSeries",
+          syncErr instanceof Error ? syncErr.message : syncErr
+        );
+      }
+    }
 
     return NextResponse.json({
       success: true,

@@ -1,65 +1,46 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { AlertTriangle, Loader2, Pencil, Plus } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
-import { RunManageWeekDayBoard } from "@/components/runmanage/RunManageWeekDayBoard";
-import type { OperationalSeriesRow } from "@/lib/runmanage/series-operational-list";
-import type { WeekWindow } from "@/lib/runmanage/calendar-week";
+import { formatDayLabel } from "@/lib/runmanage/format-day-label";
+import type { SeriesManageRow } from "@/lib/runmanage/series-manage-list";
+import { RunManageSeriesMetaForm } from "@/components/runmanage/RunManageSeriesMetaForm";
 
 export default function RunManageSeriesList() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [loading, setLoading] = useState(true);
-  const [preparing, setPreparing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<OperationalSeriesRow[]>([]);
-  const [window, setWindow] = useState<WeekWindow | null>(null);
-
   const regionFilter = searchParams.get("region")?.trim() ?? "";
   const cityFilter = searchParams.get("city")?.trim() ?? "";
-  const clubFilter = searchParams.get("clubId")?.trim() ?? "";
-  const weekOffset = parseInt(searchParams.get("weekOffset") ?? "0", 10) || 0;
 
-  const setUrlFilters = useCallback(
-    (next: { clubId?: string; weekOffset?: number }) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (next.clubId !== undefined) {
-        if (next.clubId) params.set("clubId", next.clubId);
-        else params.delete("clubId");
-      }
-      if (next.weekOffset !== undefined) {
-        if (next.weekOffset === 0) params.delete("weekOffset");
-        else params.set("weekOffset", String(next.weekOffset));
-      }
-      const q = params.toString();
-      router.replace(q ? `/runmanage/series?${q}` : "/runmanage/series", { scroll: false });
-    },
-    [router, searchParams]
-  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [rows, setRows] = useState<SeriesManageRow[]>([]);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editRow, setEditRow] = useState<SeriesManageRow | null>(null);
 
   const load = useCallback(async () => {
+    if (!regionFilter || !cityFilter) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      if (regionFilter) params.set("region", regionFilter);
-      if (cityFilter) params.set("city", cityFilter);
-      if (clubFilter) params.set("clubId", clubFilter);
-      if (weekOffset) params.set("weekOffset", String(weekOffset));
+      const params = new URLSearchParams({
+        region: regionFilter,
+        city: cityFilter,
+        view: "manage",
+      });
       const res = await runmanageApi.get(`/api/runmanage/run-series?${params.toString()}`);
       if (!res.data?.success) {
         setError(res.data?.error || "Failed to load series");
         setRows([]);
         return;
       }
-      setWindow(res.data.window ?? null);
-      let series = (res.data.series ?? []) as OperationalSeriesRow[];
-      if (clubFilter) {
-        series = series.filter((r) => r.runClubId === clubFilter);
-      }
-      setRows(series);
+      setRows((res.data.manageSeries ?? []) as SeriesManageRow[]);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error || err.message || "Failed to load series");
@@ -67,134 +48,56 @@ export default function RunManageSeriesList() {
     } finally {
       setLoading(false);
     }
-  }, [regionFilter, cityFilter, clubFilter, weekOffset]);
+  }, [regionFilter, cityFilter]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const clubOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const r of rows) {
-      if (!r.runClubId) continue;
-      map.set(r.runClubId, r.clubName?.trim() || "Club");
+  const editSeriesId = searchParams.get("edit")?.trim() ?? "";
+
+  useEffect(() => {
+    if (!editSeriesId || rows.length === 0) return;
+    const match = rows.find((r) => r.id === editSeriesId);
+    if (match) {
+      setEditRow(match);
+      setFormOpen(true);
     }
-    return [...map.entries()].map(([id, name]) => ({ id, name }));
-  }, [rows]);
+  }, [editSeriesId, rows]);
 
   const filtersReady = Boolean(regionFilter && cityFilter);
 
-  const handlePrepareWeek = async () => {
-    if (!regionFilter || !cityFilter) return;
-    setPreparing(true);
-    setError(null);
-    try {
-      const res = await runmanageApi.post("/api/runmanage/prepare-week", {
-        regionSlug: regionFilter,
-        citySlug: cityFilter,
-        weekOffset,
-      });
-      if (!res.data?.success) {
-        setError(res.data?.error || "Prepare failed");
-        return;
-      }
-      await load();
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } }; message?: string };
-      setError(err.response?.data?.error || err.message || "Prepare failed");
-    } finally {
-      setPreparing(false);
-    }
-  };
-
-  const summary = useMemo(() => {
-    return {
-      total: rows.length,
-      needsValidate: rows.filter((r) => r.stoplight === "needs_validate").length,
-      needsPrepare: rows.filter((r) => r.stoplight === "needs_prepare").length,
-      ready: rows.filter((r) => r.stoplight === "ready").length,
-    };
-  }, [rows]);
+  function formatTime(row: SeriesManageRow): string {
+    if (row.startTimeHour == null) return "—";
+    const min = String(row.startTimeMinute ?? 0).padStart(2, "0");
+    const p = row.startTimePeriod?.trim() || "";
+    return `${row.startTimeHour}:${min}${p ? ` ${p}` : ""}`;
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">This week</p>
-          <h1 className="text-2xl font-bold text-gray-900">Weekly validate board</h1>
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Recurring</p>
+          <h1 className="text-2xl font-bold text-gray-900">Series</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Region and city are set in the bar above. Prepare slots from last run, then validate date,
-            time, and meet-up.
+            Define each weekly slot — day, time, and meet-up. Dated runs advance from the last run,
+            not from this form.
           </p>
-          {window ? (
-            <p className="mt-1 text-xs text-gray-500">
-              Week {window.startYmd} – {window.endYmd}
-            </p>
-          ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setUrlFilters({ weekOffset: weekOffset - 1 })}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-          >
-            Previous week
-          </button>
-          <button
-            type="button"
-            onClick={() => setUrlFilters({ weekOffset: weekOffset + 1 })}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-          >
-            Next week
-          </button>
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={() => void handlePrepareWeek()}
-            disabled={!filtersReady || preparing}
-            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-          >
-            {preparing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Prepare this week
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled={!filtersReady}
+          onClick={() => {
+            setEditRow(null);
+            setFormOpen(true);
+          }}
+          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+        >
+          <Plus className="h-4 w-4" />
+          New series
+        </button>
       </div>
-
-      {filtersReady ? (
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="block text-sm">
-            <span className="font-medium text-gray-700">Club</span>
-            <select
-              value={clubFilter}
-              onChange={(e) => setUrlFilters({ clubId: e.target.value })}
-              disabled={clubOptions.length === 0}
-              className="mt-1 block min-w-[240px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm disabled:bg-gray-50"
-            >
-              <option value="">All clubs in city</option>
-              {clubOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      ) : null}
-
-      {filtersReady && !loading ? (
-        <p className="text-sm text-gray-600">
-          {summary.total} slots · {summary.ready} validated · {summary.needsValidate} need validate ·{" "}
-          {summary.needsPrepare} need prepare
-        </p>
-      ) : null}
 
       {error ? (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -209,16 +112,93 @@ export default function RunManageSeriesList() {
         </p>
       ) : !cityFilter ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-8 text-center text-sm text-amber-950">
-          Select a city in the scope bar to load this week&apos;s slots.
+          Select a city in the scope bar to manage series.
         </p>
       ) : loading ? (
         <div className="flex items-center gap-2 py-16 text-gray-500">
           <Loader2 className="h-5 w-5 animate-spin" />
-          Loading this week…
+          Loading series…
         </div>
+      ) : rows.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-gray-300 bg-white py-12 text-center text-sm text-gray-500">
+          No weekly series in this city yet.{" "}
+          <button
+            type="button"
+            className="font-medium text-sky-700 hover:underline"
+            onClick={() => {
+              setEditRow(null);
+              setFormOpen(true);
+            }}
+          >
+            Add one
+          </button>
+          .
+        </p>
       ) : (
-        <RunManageWeekDayBoard rows={rows} onRowsChange={setRows} />
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
+              <tr>
+                <th className="px-4 py-3">Day & time</th>
+                <th className="px-4 py-3">Series</th>
+                <th className="px-4 py-3">Club</th>
+                <th className="px-4 py-3">Meet-up</th>
+                <th className="px-4 py-3 text-right">Runs</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((row) => (
+                <tr key={row.id} className="hover:bg-gray-50/80">
+                  <td className="px-4 py-3 whitespace-nowrap text-gray-800">
+                    {formatDayLabel(row.dayOfWeek)} · {formatTime(row)}
+                  </td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {row.name?.trim() || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">{row.clubName ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 max-w-xs truncate">
+                    {row.meetUpPoint?.trim() || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-600">{row.runCount}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditRow(row);
+                        setFormOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+
+      <p className="text-xs text-gray-500">
+        To build or validate this week&apos;s dated runs, use{" "}
+        <Link href="/runmanage/runs" className="font-medium text-sky-700 hover:underline">
+          This week
+        </Link>
+        .
+      </p>
+
+      <RunManageSeriesMetaForm
+        open={formOpen}
+        onClose={() => {
+          setFormOpen(false);
+          setEditRow(null);
+        }}
+        onSaved={() => void load()}
+        citySlug={cityFilter}
+        initial={editRow}
+      />
     </div>
   );
 }

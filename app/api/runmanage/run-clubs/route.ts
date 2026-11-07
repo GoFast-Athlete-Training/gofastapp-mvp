@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const allClubs = request.nextUrl.searchParams.get("all") === "1";
 
   const clubs = await prisma.run_clubs.findMany({
     where: q
@@ -33,11 +34,11 @@ export async function GET(request: NextRequest) {
     take: 500,
   });
 
-  const withSeries = clubs.filter((c) => c._count.runSeries > 0);
+  const list = allClubs ? clubs : clubs.filter((c) => c._count.runSeries > 0);
 
   return NextResponse.json({
     success: true,
-    clubs: withSeries.map((c) => ({
+    clubs: list.map((c) => ({
       id: c.id,
       name: c.name,
       slug: c.slug,

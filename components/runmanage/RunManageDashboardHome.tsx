@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { appendScopeToPath, scopeFromSearchParams } from "@/lib/runmanage/scope-query";
 import {
   Building2,
@@ -30,6 +30,8 @@ import {
   startOfWeekMonday,
   ymdLocal,
 } from "@/components/runmanage/RunManageWeekStrip";
+import { RunManageWeekSeriesBoard } from "@/components/runmanage/RunManageWeekSeriesBoard";
+import { RunManageThisWeekQueue } from "@/components/runmanage/RunManageThisWeekQueue";
 
 interface RunClub {
   id: string;
@@ -91,19 +93,23 @@ function ownerForRun(run: Run): string {
 }
 
 export function RunManageDashboardHome() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const scope = scopeFromSearchParams(searchParams);
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDayYmd, setSelectedDayYmd] = useState<string | null>(null);
-  const [weekOffset, setWeekOffset] = useState(0);
+  const weekOffset = parseInt(searchParams.get("weekOffset") ?? "0", 10) || 0;
+
+  const setWeekOffset = (next: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === 0) params.delete("weekOffset");
+    else params.set("weekOffset", String(next));
+    const q = params.toString();
+    router.replace(q ? `/runmanage/runs?${q}` : "/runmanage/runs", { scroll: false });
+  };
 
   useEffect(() => {
-    if (!scope.region) {
-      setRuns([]);
-      setLoading(false);
-      return;
-    }
     void (async () => {
       try {
         setLoading(true);
@@ -112,8 +118,9 @@ export function RunManageDashboardHome() {
         const params = new URLSearchParams({
           weekStart: win.startYmd,
           weekEndExclusive: win.endExclusiveYmd,
-          region: scope.region,
+          upcomingOnly: "false",
         });
+        if (scope.region) params.set("region", scope.region);
         if (scope.city) params.set("city", scope.city);
         const response = await runmanageApi.get(`/api/runs/manage?${params.toString()}`);
         if (response.data.success) {
@@ -198,7 +205,7 @@ export function RunManageDashboardHome() {
             href={scoped(RUN_MANAGE_SERIES_PATH)}
             className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
           >
-            Manage recurring runs
+            Manage series
           </Link>
           <Link
             href={scoped(runManageCreatePath())}
@@ -236,23 +243,20 @@ export function RunManageDashboardHome() {
         })}
       </div>
 
-      {!scope.region ? (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-sm text-amber-950">
-          Select a region in the scope bar to see this week&apos;s runs for your metro.
-        </p>
-      ) : (
-        <>
+      <RunManageThisWeekQueue />
+
+      <>
       <RunManageWeekStrip
         weekStart={weekStart}
         runsByDay={runsByDayInWeek}
         selectedDayYmd={selectedDayYmd}
         onSelectDay={setSelectedDayYmd}
         onPrevWeek={() => {
-          setWeekOffset((w) => w - 1);
+          setWeekOffset(weekOffset - 1);
           setSelectedDayYmd(null);
         }}
         onNextWeek={() => {
-          setWeekOffset((w) => w + 1);
+          setWeekOffset(weekOffset + 1);
           setSelectedDayYmd(null);
         }}
       />
@@ -265,7 +269,7 @@ export function RunManageDashboardHome() {
           <p className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500">
             Nothing this week.{" "}
             <Link href={scoped(RUN_MANAGE_SERIES_PATH)} className="font-medium text-sky-700 hover:underline">
-              Manage recurring runs
+              Manage series
             </Link>
             {" or "}
             <Link href={scoped(runManageCreatePath())} className="font-medium text-sky-700 hover:underline">
@@ -311,8 +315,9 @@ export function RunManageDashboardHome() {
           </div>
         )}
       </section>
-        </>
-      )}
+
+      <RunManageWeekSeriesBoard />
+      </>
     </div>
   );
 }

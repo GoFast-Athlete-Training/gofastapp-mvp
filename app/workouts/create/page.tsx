@@ -28,8 +28,25 @@ import {
   suggestRaceBlocksFromGoal,
   type PacingStrategy,
 } from "@/lib/races/race-pacing-blocks";
+import {
+  isMarathonPaceWorkBlockTitle,
+  slotPaceFromGoalRaceBand,
+} from "@/lib/training/marathon-pace-block";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "LongRun", "Intervals", "Race"] as const;
+
+function applyGoalRaceMpPacesToMainSlots(
+  mainSegments: SlotData[],
+  goalRacePaceSecPerMile: number | null
+): SlotData[] {
+  if (goalRacePaceSecPerMile == null || goalRacePaceSecPerMile <= 0) return mainSegments;
+  const band = slotPaceFromGoalRaceBand(goalRacePaceSecPerMile);
+  return mainSegments.map((s) => {
+    const title = (s.segmentTitle ?? "Work").trim();
+    if (!isMarathonPaceWorkBlockTitle(title)) return s;
+    return { ...s, paceValueLow: band.paceValueLow, paceValueHigh: band.paceValueHigh };
+  });
+}
 
 /** Stored PACE targets are sec/km, encoding v2 (same as workout detail / Garmin). */
 const PACE_SLOT_ENC = 2 as const;
@@ -344,6 +361,9 @@ function CreateWorkoutPageInner() {
   const raceDayMode = searchParams.get("raceDay") === "1";
   const racePlanId = searchParams.get("planId")?.trim() ?? "";
   const raceDateKey = searchParams.get("date")?.trim() ?? "";
+  const planDayAssignMode = Boolean(
+    !raceDayMode && racePlanId && raceDateKey && /^\d{4}-\d{2}-\d{2}$/.test(raceDateKey)
+  );
   const raceDayBackHref = searchParams.get("back")?.trim() || "/training";
   const rawBuilderBack = searchParams.get("back")?.trim() ?? "";
   const builderBackHref = isSafeInternalBackPath(rawBuilderBack)
@@ -372,6 +392,8 @@ function CreateWorkoutPageInner() {
   const [saving, setSaving] = useState(false);
   /** YYYY-MM-DD from date input; optional, shown on home & workout cards */
   const [scheduledDate, setScheduledDate] = useState("");
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [assignToPlanDay, setAssignToPlanDay] = useState(false);
   const [buildLane, setBuildLane] = useState<"presets" | "manual" | "ai" | "paste" | null>(null);
   const [aiGeneratePrompt, setAiGeneratePrompt] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -418,6 +440,48 @@ function CreateWorkoutPageInner() {
     setWorkoutType("Race");
     if (raceDateKey) setScheduledDate(raceDateKey);
   }, [raceDayMode, raceDateKey]);
+
+  useEffect(() => {
+    if (planDayAssignMode && raceDateKey) setScheduledDate(raceDateKey);
+  }, [planDayAssignMode, raceDateKey]);
+
+  useEffect(() => {
+    if (planDayAssignMode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get<{ activePlanSummary?: { id?: string } }>("training/upcoming");
+        if (!cancelled) setActivePlanId(data.activePlanSummary?.id?.trim() || null);
+      } catch {
+        if (!cancelled) setActivePlanId(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [planDayAssignMode]);
+
+  const goalPacePlanId = planDayAssignMode ? racePlanId : activePlanId;
+
+  useEffect(() => {
+    if (!goalPacePlanId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get<{
+          goalRacePaceResolved?: { goalPaceSecPerMile?: number | null };
+        }>(`training-plan/${encodeURIComponent(goalPacePlanId)}`);
+        if (cancelled) return;
+        const pace = data.goalRacePaceResolved?.goalPaceSecPerMile;
+        if (pace != null && pace > 0) setRaceGoalPaceSecPerMi(pace);
+      } catch {
+        /* optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [goalPacePlanId]);
 
   useEffect(() => {
     if (!raceDayMode || !racePlanId || !raceDateKey) return;
@@ -670,7 +734,7 @@ function CreateWorkoutPageInner() {
   }) => {
     const slots = apiSegmentsToSlots(params.segments);
     setWarmup(slots.warmup);
-    setMainSegments(slots.mainSegments);
+    setMainSegments(applyGoalRaceMpPacesToMainSlots(slots.mainSegments, raceGoalPaceSecPerMi));
     setCooldown(slots.cooldown);
     const genericTitles = new Set(["Track intervals", "Parsed workout", "Workout"]);
     const titleCandidate = params.suggestedTitle?.trim() ?? "";
@@ -1038,6 +1102,34 @@ function CreateWorkoutPageInner() {
       }
       if (cooldown) pushSlotSegment(cooldown, "Cooldown");
 
+      if (planDayAssignMode) {
+        if (!racePlanId || !raceDateKey) {
+          alert("Missing plan or date — open this builder from your training day.");
+          return;
+        }
+        await api.post("training/plan-day/assign", {
+          planId: racePlanId,
+          date: raceDateKey,
+          title: name.trim() || "Workout",
+          workoutType: workoutType || "Easy",
+          segments,
+        });
+        router.push(builderBackHref);
+        return;
+      }
+
+      if (!raceDayMode && assignToPlanDay && activePlanId && scheduledDate.trim()) {
+        await api.post("training/plan-day/assign", {
+          planId: activePlanId,
+          date: scheduledDate.trim(),
+          title: name.trim() || "Workout",
+          workoutType: workoutType || "Easy",
+          segments,
+        });
+        router.push(builderBackHref);
+        return;
+      }
+
       if (raceDayMode) {
         if (!racePlanId || !raceDateKey) {
           alert("Missing plan or race date — open this builder from your training plan.");
@@ -1238,6 +1330,22 @@ function CreateWorkoutPageInner() {
             <p className="mt-1 text-xs text-gray-500">
               Leave blank to default to today. Pick a date to schedule this for a specific day.
             </p>
+            {!planDayAssignMode && activePlanId && scheduledDate.trim() ? (
+              <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={assignToPlanDay}
+                  onChange={(e) => setAssignToPlanDay(e.target.checked)}
+                />
+                Assign to this plan day (replaces the scheduled workout on your plan)
+              </label>
+            ) : null}
+            {planDayAssignMode ? (
+              <p className="mt-2 text-sm text-sky-800 font-medium">
+                This run will replace the workout on your training plan for{" "}
+                {scheduledDate || raceDateKey}.
+              </p>
+            ) : null}
           </div>
           ) : null}
 
@@ -1586,10 +1694,7 @@ function CreateWorkoutPageInner() {
                 )}
 
                 {(
-                  [
-                    { kind: "warmup" as const, label: "Warmup" },
-                    { kind: "cooldown" as const, label: "Cooldown" },
-                  ] as const
+                  [{ kind: "warmup" as const, label: "Warmup" }] as const
                 ).map(({ kind, label }) => {
                   const slot = kind === "warmup" ? warmup : cooldown;
                   const isEditing = editingTarget?.kind === kind;
@@ -1878,41 +1983,75 @@ function CreateWorkoutPageInner() {
                               placeholder="e.g. 8"
                             />
                           </div>
-                          <div>
+                          <div className="md:col-span-2">
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Recovery between reps (mi)
+                              Recovery between reps
                             </label>
-                            <input
-                              type="number"
-                              min={0}
-                              step={0.01}
-                              value={
-                                slot.recoveryDurationType === "TIME"
-                                  ? ""
-                                  : slot.recoveryDurationValue ?? ""
-                              }
-                              onChange={(e) => {
-                                const recoveryDurationValue = parseFloat(e.target.value);
-                                setSelectedCatalogueId(null);
-                                setMainSegments((prev) => {
-                                  const copy = [...prev];
-                                  copy[index] = {
-                                    ...copy[index],
-                                    recoveryDurationType:
-                                      Number.isFinite(recoveryDurationValue) && recoveryDurationValue > 0
-                                        ? "DISTANCE"
-                                        : null,
-                                    recoveryDurationValue:
-                                      Number.isFinite(recoveryDurationValue) && recoveryDurationValue > 0
-                                        ? recoveryDurationValue
-                                        : null,
-                                  };
-                                  return copy;
-                                });
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                              placeholder="e.g. 1"
-                            />
+                            <div className="flex flex-wrap gap-2">
+                              <select
+                                value={
+                                  slot.recoveryDurationType === "TIME"
+                                    ? "TIME"
+                                    : slot.recoveryDurationType === "DISTANCE"
+                                      ? "DISTANCE"
+                                      : ""
+                                }
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setSelectedCatalogueId(null);
+                                  setMainSegments((prev) => {
+                                    const copy = [...prev];
+                                    if (v !== "TIME" && v !== "DISTANCE") {
+                                      copy[index] = {
+                                        ...copy[index],
+                                        recoveryDurationType: null,
+                                        recoveryDurationValue: null,
+                                      };
+                                    } else {
+                                      copy[index] = {
+                                        ...copy[index],
+                                        recoveryDurationType: v,
+                                        recoveryDurationValue:
+                                          copy[index].recoveryDurationValue ?? (v === "TIME" ? 2 : 0.25),
+                                      };
+                                    }
+                                    return copy;
+                                  });
+                                }}
+                                className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                              >
+                                <option value="">None</option>
+                                <option value="TIME">Time (min)</option>
+                                <option value="DISTANCE">Distance (mi)</option>
+                              </select>
+                              {slot.recoveryDurationType === "TIME" ||
+                              slot.recoveryDurationType === "DISTANCE" ? (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={slot.recoveryDurationType === "TIME" ? 1 : 0.01}
+                                  value={slot.recoveryDurationValue ?? ""}
+                                  onChange={(e) => {
+                                    const recoveryDurationValue = parseFloat(e.target.value);
+                                    setSelectedCatalogueId(null);
+                                    setMainSegments((prev) => {
+                                      const copy = [...prev];
+                                      copy[index] = {
+                                        ...copy[index],
+                                        recoveryDurationValue:
+                                          Number.isFinite(recoveryDurationValue) &&
+                                          recoveryDurationValue > 0
+                                            ? recoveryDurationValue
+                                            : null,
+                                      };
+                                      return copy;
+                                    });
+                                  }}
+                                  className="min-w-[6rem] flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                                  placeholder={slot.recoveryDurationType === "TIME" ? "2" : "0.25"}
+                                />
+                              ) : null}
+                            </div>
                           </div>
                           <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
@@ -2028,6 +2167,179 @@ function CreateWorkoutPageInner() {
                 >
                   + Add main segment
                 </button>
+
+                {(
+                  [{ kind: "cooldown" as const, label: "Cooldown" }] as const
+                ).map(({ kind, label }) => {
+                  const slot = cooldown;
+                  const isEditing = editingTarget?.kind === kind;
+
+                  return (
+                    <div key={kind} className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-medium text-gray-900">{label}</span>
+                        <span className="text-sm text-gray-600">
+                          {slot ? slotOneLine(slot) : "None"}
+                        </span>
+                        <div className="flex gap-2">
+                          {!slot ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedCatalogueId(null);
+                                if (!name.trim()) setName("Workout");
+                                setCooldown({ ...emptySlot(), durationValue: 1, segmentTitle: "Cooldown" });
+                                setEditingTarget({ kind });
+                                setEditingPaceLowMin("");
+                                setEditingPaceLowSec("");
+                                setEditingPaceHighMin("");
+                                setEditingPaceHighSec("");
+                              }}
+                              className="text-sm px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                            >
+                              "Add cooldown"
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isEditing) {
+                                  setEditingTarget(null);
+                                } else {
+                                  setEditingTarget({ kind });
+                                  const sp = slotToPaceSplitState(slot);
+                                  setEditingPaceLowMin(sp.lowMin);
+                                  setEditingPaceLowSec(sp.lowSec);
+                                  setEditingPaceHighMin(sp.highMin);
+                                  setEditingPaceHighSec(sp.highSec);
+                                }
+                              }}
+                              className="text-sm px-3 py-1.5 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 inline-flex items-center gap-1"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              Edit
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {isEditing && slot && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                            <select
+                              value={slot.durationType}
+                              onChange={(e) => {
+                                const durationType =
+                                  e.target.value === "TIME" ? ("TIME" as const) : ("DISTANCE" as const);
+                                setSelectedCatalogueId(null);
+                                const next = { ...slot, durationType, durationValue: 0 };
+                                setCooldown(next);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            >
+                              <option value="DISTANCE">Distance (mi)</option>
+                              <option value="TIME">Time (min)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {slot.durationType === "TIME" ? "Minutes" : "Miles"}
+                            </label>
+                            <input
+                              type="number"
+                              step={slot.durationType === "TIME" ? 1 : 0.01}
+                              min={0}
+                              value={slot.durationValue ?? ""}
+                              onChange={(e) => {
+                                const durationValue = parseFloat(e.target.value) || 0;
+                                setSelectedCatalogueId(null);
+                                const next = { ...slot, durationValue };
+                                setCooldown(next);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            />
+                          </div>
+                          <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-xs font-semibold uppercase text-gray-500 block mb-1">
+                                Pace low
+                              </span>
+                              <PaceMiSplitEditor
+                                minValue={editingPaceLowMin}
+                                secValue={editingPaceLowSec}
+                                onMinChange={setEditingPaceLowMin}
+                                onSecChange={setEditingPaceLowSec}
+                              />
+                            </div>
+                            <div>
+                              <span className="text-xs font-semibold uppercase text-gray-500 block mb-1">
+                                Pace high
+                              </span>
+                              <PaceMiSplitEditor
+                                minValue={editingPaceHighMin}
+                                secValue={editingPaceHighSec}
+                                onMinChange={setEditingPaceHighMin}
+                                onSecChange={setEditingPaceHighSec}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">HR min</label>
+                            <input
+                              type="number"
+                              value={slot.hrMin ?? ""}
+                              onChange={(e) => {
+                                const hrMin = parseInt(e.target.value, 10) || undefined;
+                                setSelectedCatalogueId(null);
+                                setCooldown({ ...slot, hrMin });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">HR max</label>
+                            <input
+                              type="number"
+                              value={slot.hrMax ?? ""}
+                              onChange={(e) => {
+                                const hrMax = parseInt(e.target.value, 10) || undefined;
+                                setSelectedCatalogueId(null);
+                                setCooldown({ ...slot, hrMax });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingTarget(null)}
+                              className="text-sm px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                            >
+                              Done
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedCatalogueId(null);
+                                setCooldown(null);
+                                setEditingTarget(null);
+                                setEditingPaceLowMin("");
+                                setEditingPaceLowSec("");
+                                setEditingPaceHighMin("");
+                                setEditingPaceHighSec("");
+                              }}
+                              className="ml-2 text-sm px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
               </div>
 
               <div className="flex gap-4 justify-end pt-6 border-t border-gray-200">
@@ -2048,7 +2360,15 @@ function CreateWorkoutPageInner() {
                   disabled={saving || !name || !hasPositiveDuration}
                   className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {saving ? "Saving…" : raceDayMode ? "Create workout" : "Save run"}
+                  {saving
+                    ? "Saving…"
+                    : planDayAssignMode
+                      ? "Save to plan day"
+                      : raceDayMode
+                        ? "Create workout"
+                        : assignToPlanDay && activePlanId && scheduledDate.trim()
+                          ? "Assign to plan"
+                          : "Save run"}
                 </button>
               </div>
             </>

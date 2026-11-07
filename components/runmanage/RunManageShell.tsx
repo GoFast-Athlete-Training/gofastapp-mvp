@@ -14,7 +14,7 @@ const NAV_ITEMS = [
   { href: "/runmanage/runs", label: "This week", icon: LayoutGrid, match: (p: string | null) => p === "/runmanage/runs" || p === "/runmanage/runs/" },
   {
     href: RUN_MANAGE_SERIES_PATH,
-    label: "Weekly slots",
+    label: "Series",
     icon: CalendarDays,
     match: (p: string | null) =>
       p === RUN_MANAGE_SERIES_PATH ||

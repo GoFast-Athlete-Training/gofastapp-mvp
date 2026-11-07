@@ -85,42 +85,43 @@ export function wizardValuesFromSeries(
   };
 }
 
-/** Copy last run’s instance fields onto a new dated slot; keep title and date from the series seed. */
+/** Last-run seed for create wizard: time and meet-up only (no route or workout). */
 export function wizardValuesWithPriorRun(
   base: RunInstanceWizardValues,
   priorRun: CityRunData
 ): RunInstanceWizardValues {
   const prior = cityRunToWizardValues(priorRun);
   return {
-    ...prior,
-    title: base.title,
-    date: base.date,
-    dayOfWeek: base.dayOfWeek,
+    ...base,
+    startTimeHour: prior.startTimeHour || base.startTimeHour,
+    startTimeMinute: prior.startTimeMinute || base.startTimeMinute,
+    startTimePeriod: prior.startTimePeriod || base.startTimePeriod,
+    meetUpPoint: prior.meetUpPoint || base.meetUpPoint,
+    meetUpStreetAddress: prior.meetUpStreetAddress || base.meetUpStreetAddress,
+    meetUpCity: prior.meetUpCity || base.meetUpCity,
+    meetUpState: prior.meetUpState || base.meetUpState,
+    meetUpPlaceId: prior.meetUpPlaceId || base.meetUpPlaceId,
+    meetUpLat: prior.meetUpLat || base.meetUpLat,
+    meetUpLng: prior.meetUpLng || base.meetUpLng,
+    totalMiles: prior.totalMiles || base.totalMiles,
+    pace: prior.pace || base.pace,
+    postRunActivity: prior.postRunActivity || base.postRunActivity,
+    description: prior.description || base.description,
+    routeNeighborhood: prior.routeNeighborhood || base.routeNeighborhood,
+    runType: prior.runType || base.runType,
   };
 }
 
-/** Route, weekly sources, and workout — applied after the dated run exists (edit wizard). */
+/** Weekly copy fields after create — sources text only; no route or workout attach. */
 export function mergeOptionalAssociationsFromPrior(
   base: RunInstanceWizardValues,
   prior: RunInstanceWizardValues
 ): RunInstanceWizardValues {
   return {
     ...base,
-    routeId: prior.routeId,
-    linkedRouteName: prior.linkedRouteName,
-    directionsText: prior.directionsText,
-    stravaMapUrl: prior.stravaMapUrl,
-    mapImageUrl: prior.mapImageUrl,
-    routePhotos: prior.routePhotos,
-    stravaEventUrl: prior.stravaEventUrl,
-    stravaText: prior.stravaText,
-    webUrl: prior.webUrl,
-    webText: prior.webText,
-    igPostText: prior.igPostText,
-    plannedWorkoutId: prior.plannedWorkoutId,
-    attachedWorkoutTitle: prior.attachedWorkoutTitle,
-    clubWorkoutType: prior.clubWorkoutType,
-    trackWorkoutDescription: prior.trackWorkoutDescription,
-    routeDescription: prior.routeDescription,
+    stravaText: prior.stravaText || base.stravaText,
+    webUrl: prior.webUrl || base.webUrl,
+    webText: prior.webText || base.webText,
+    igPostText: prior.igPostText || base.igPostText,
   };
 }

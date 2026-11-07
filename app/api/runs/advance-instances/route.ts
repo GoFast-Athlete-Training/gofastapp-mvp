@@ -24,7 +24,7 @@ type Body = {
 
 /**
  * POST /api/runs/advance-instances
- * Product-only find-or-create: fill the next 2 weekly occurrence slots per runSeriesId lane (live by default).
+ * Product-only find-or-create: fill the next 2 weekly occurrence slots per runSeriesId lane (draft, no route).
  */
 export async function POST(request: NextRequest) {
   try {

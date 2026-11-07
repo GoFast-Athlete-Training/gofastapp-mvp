@@ -29,6 +29,7 @@ import {
   getTrainingPaces,
   normalizePaceTargetEncodingVersion,
   parsePaceToSecondsPerMile,
+  paceTargetFromSecondsPerMile,
   secondsPerMileToSecondsPerKm,
   storedPaceSecondsKmToSecondsPerMile,
   workoutTargetTypeLabel,
@@ -36,12 +37,15 @@ import {
 import { PaceMiSplitEditor } from "@/components/workout/PaceMiSplitEditor";
 import { parseSplitPaceToSecPerMile, secPerMileToSplitStrings } from "@/lib/workout/pace-mi-split";
 import {
+  GOAL_RACE_MP_PRESETS,
   WHAT_PACE_PRESETS,
   inferOffsetSecPerMileFromPace,
   isWorkBlockEligibleForPaceOffset,
+  presetIdForGoalRaceOffset,
   presetIdForWorkoutOffset,
   shiftPaceBandSecPerMile,
 } from "@/lib/training/workout-pace-offset";
+import { isMarathonPaceWorkBlockTitle } from "@/lib/training/marathon-pace-block";
 import { garminCalendarSyncState } from "@/lib/garmin-workouts/garmin-calendar-state";
 import { hubBackPathFromStash, readWorkoutDayNav } from "@/lib/training/workout-day-nav";
 import {
@@ -1324,9 +1328,12 @@ export default function WorkoutDetailPage() {
   }, [workout?.id, workout?.title]);
 
   const firstPaceOffsetBlockId = useMemo(() => {
-    if (fiveKAnchorSec == null) return null;
     for (const group of segmentDisplayGroups) {
       const seg = group.work;
+      const mpBlock =
+        workout?.goalRacePaceSecPerMile != null && isMarathonPaceWorkBlockTitle(seg.title);
+      const anchorOk = mpBlock || fiveKAnchorSec != null;
+      if (!anchorOk) continue;
       const { low } = getPaceSecsFromSegment(seg);
       if (
         isWorkBlockEligibleForPaceOffset({
@@ -1339,7 +1346,12 @@ export default function WorkoutDetailPage() {
       }
     }
     return null;
-  }, [segmentDisplayGroups, fiveKAnchorSec, conversationalPaceBySegmentId]);
+  }, [
+    segmentDisplayGroups,
+    fiveKAnchorSec,
+    conversationalPaceBySegmentId,
+    workout?.goalRacePaceSecPerMile,
+  ]);
 
   const swapQuickSegment = useCallback(
     (pairIdx: number, dir: -1 | 1) => {
@@ -1437,10 +1449,16 @@ export default function WorkoutDetailPage() {
   );
 
   const applyWorkBlockOffset = useCallback(
-    (segmentId: string, newOffset: number) => {
-      if (fiveKAnchorSec == null) return;
+    (segmentId: string, newOffset: number, anchorOverrideSecPerMile?: number | null) => {
       const seg = sortedSegments.find((s) => s.id === segmentId);
       if (!seg) return;
+      const mpBlock =
+        workout?.goalRacePaceSecPerMile != null &&
+        isMarathonPaceWorkBlockTitle(seg.title);
+      const anchorSec =
+        anchorOverrideSecPerMile ??
+        (mpBlock ? workout?.goalRacePaceSecPerMile ?? null : fiveKAnchorSec);
+      if (anchorSec == null) return;
       const o = segmentOverrides[segmentId];
       const qStr = quickPaceDisplayStrings(seg, o);
       let lowSec: number;
@@ -1450,15 +1468,24 @@ export default function WorkoutDetailPage() {
         qStr.lowSec.trim() !== "" &&
         !Number.isNaN(parseInt(qStr.lowMin, 10));
 
-      if (!hasQuickPace) {
-        const center = Math.max(1, Math.round(fiveKAnchorSec + newOffset));
-        const lo = secPerMileToSplitStrings(center);
+      const applyBandFromCenter = (centerSecPerMile: number) => {
+        const band = paceTargetFromSecondsPerMile(centerSecPerMile);
+        const enc = normalizePaceTargetEncodingVersion(segmentPaceEncoding(seg));
+        const lowMi = storedPaceSecondsKmToSecondsPerMile(band.valueLow, enc);
+        const highMi = storedPaceSecondsKmToSecondsPerMile(band.valueHigh, enc);
+        const lo = secPerMileToSplitStrings(lowMi);
+        const hi = secPerMileToSplitStrings(highMi);
         patchQuickSegmentOverride(segmentId, {
           quickPaceLowMin: lo.min,
           quickPaceLowSec: lo.sec,
-          quickPaceHighMin: lo.min,
-          quickPaceHighSec: lo.sec,
+          quickPaceHighMin: hi.min,
+          quickPaceHighSec: hi.sec,
         });
+      };
+
+      if (!hasQuickPace) {
+        const center = Math.max(1, Math.round(anchorSec + newOffset));
+        applyBandFromCenter(center);
         return;
       }
 
@@ -1480,10 +1507,15 @@ export default function WorkoutDetailPage() {
       }
       if (!Number.isFinite(lowSec)) return;
       if (!Number.isFinite(highSec)) highSec = lowSec;
-      const oldOffset = inferOffsetSecPerMileFromPace(lowSec, highSec, fiveKAnchorSec);
+      const oldOffset = inferOffsetSecPerMileFromPace(lowSec, highSec, anchorSec);
       if (oldOffset == null) return;
       const delta = newOffset - oldOffset;
       const shifted = shiftPaceBandSecPerMile(lowSec, highSec, delta);
+      if (mpBlock && delta !== 0) {
+        const mid = Math.round((shifted.low + shifted.high) / 2);
+        applyBandFromCenter(mid);
+        return;
+      }
       const lo = secPerMileToSplitStrings(shifted.low);
       const hi = secPerMileToSplitStrings(shifted.high);
       patchQuickSegmentOverride(segmentId, {
@@ -1493,7 +1525,7 @@ export default function WorkoutDetailPage() {
         quickPaceHighSec: hi.sec,
       });
     },
-    [fiveKAnchorSec, sortedSegments, segmentOverrides, patchQuickSegmentOverride]
+    [fiveKAnchorSec, workout?.goalRacePaceSecPerMile, sortedSegments, segmentOverrides, patchQuickSegmentOverride]
   );
 
   const saveQuickSegments = useCallback(async () => {
@@ -2901,10 +2933,16 @@ export default function WorkoutDetailPage() {
                 const recoveryQuickEditable = recoverySeg
                   ? mergedQuickEditable(recoverySeg, segmentOverrides[recoverySeg.id])
                   : null;
+                const mpPaceBlock =
+                  workout?.goalRacePaceSecPerMile != null &&
+                  isMarathonPaceWorkBlockTitle(segment.title);
+                const paceAnchorSec = mpPaceBlock
+                  ? workout!.goalRacePaceSecPerMile!
+                  : fiveKAnchorSec;
                 const showPaceOffsetControls =
                   !isLogged &&
                   !isEditing &&
-                  fiveKAnchorSec != null &&
+                  paceAnchorSec != null &&
                   isWorkBlockEligibleForPaceOffset({
                     title: segment.title,
                     hasPaceTarget,
@@ -2916,7 +2954,7 @@ export default function WorkoutDetailPage() {
                   !conversationalPaceBySegmentId[segment.id] &&
                   (hasEditablePace || showPaceOffsetControls);
                 let blockOffsetSecPerMile: number | null = null;
-                if (showPaceOffsetControls) {
+                if (showPaceOffsetControls && paceAnchorSec != null) {
                   try {
                     const lowSec = parseSplitPaceToSecPerMile(
                       qStr.lowMin,
@@ -2934,14 +2972,16 @@ export default function WorkoutDetailPage() {
                       blockOffsetSecPerMile = inferOffsetSecPerMileFromPace(
                         lowSec,
                         Number.isFinite(highSec) ? highSec : lowSec,
-                        fiveKAnchorSec!
+                        paceAnchorSec
                       );
                     }
                   } catch {
                     blockOffsetSecPerMile = null;
                   }
                 }
-                const blockOffsetPreset = presetIdForWorkoutOffset(blockOffsetSecPerMile);
+                const blockOffsetPreset = mpPaceBlock
+                  ? presetIdForGoalRaceOffset(blockOffsetSecPerMile)
+                  : presetIdForWorkoutOffset(blockOffsetSecPerMile);
                 const applyOffsetToBlock = (newOffset: number) => {
                   const ids =
                     multiStepRepeat && group.cycleSteps
@@ -2949,7 +2989,9 @@ export default function WorkoutDetailPage() {
                           .filter((step) => getPaceSecsFromSegment(step).low != null)
                           .map((step) => step.id)
                       : [segment.id];
-                  ids.forEach((id) => applyWorkBlockOffset(id, newOffset));
+                  ids.forEach((id) =>
+                    applyWorkBlockOffset(id, newOffset, mpPaceBlock ? paceAnchorSec : undefined)
+                  );
                 };
                 return (
                   <div
@@ -3216,18 +3258,27 @@ export default function WorkoutDetailPage() {
                                   <select
                                     value={blockOffsetPreset}
                                     onChange={(e) => {
-                                      const preset = WHAT_PACE_PRESETS.find(
-                                        (p) => p.id === e.target.value
-                                      );
-                                      if (preset) applyOffsetToBlock(preset.offset);
+                                      if (mpPaceBlock) {
+                                        const preset = GOAL_RACE_MP_PRESETS.find(
+                                          (p) => p.id === e.target.value
+                                        );
+                                        if (preset) applyOffsetToBlock(preset.offset);
+                                      } else {
+                                        const preset = WHAT_PACE_PRESETS.find(
+                                          (p) => p.id === e.target.value
+                                        );
+                                        if (preset) applyOffsetToBlock(preset.offset);
+                                      }
                                     }}
                                     className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm bg-white"
                                   >
-                                    {WHAT_PACE_PRESETS.map((p) => (
-                                      <option key={p.id} value={p.id}>
-                                        {p.label}
-                                      </option>
-                                    ))}
+                                    {(mpPaceBlock ? GOAL_RACE_MP_PRESETS : WHAT_PACE_PRESETS).map(
+                                      (p) => (
+                                        <option key={p.id} value={p.id}>
+                                          {p.label}
+                                        </option>
+                                      )
+                                    )}
                                     {blockOffsetPreset === "custom" ? (
                                       <option value="custom">Custom…</option>
                                     ) : null}
@@ -3235,7 +3286,7 @@ export default function WorkoutDetailPage() {
                                 </div>
                                 <div>
                                   <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600">
-                                    5K offset
+                                    {mpPaceBlock ? "Goal race offset" : "5K offset"}
                                   </label>
                                   <input
                                     type="number"
@@ -3253,8 +3304,9 @@ export default function WorkoutDetailPage() {
                               </div>
                               {segment.id === firstPaceOffsetBlockId ? (
                                 <p className="text-xs text-gray-600">
-                                  Based on your 5K already in the system. This offset applies to
-                                  every repeat of this block.
+                                  {mpPaceBlock
+                                    ? "Centered on your goal race pace. Prescribed band uses the standard pace window."
+                                    : "Based on your 5K already in the system. This offset applies to every repeat of this block."}
                                 </p>
                               ) : null}
                             </div>

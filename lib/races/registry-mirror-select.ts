@@ -29,6 +29,10 @@ export const registryMirrorSelect = {
   spectatorInfo: true,
   logisticsInfo: true,
   gearDropInstructions: true,
+  charityName: true,
+  charityUrl: true,
+  charityLogo: true,
+  charityProceedsNote: true,
   course_segments: {
     orderBy: { order: "asc" as const },
     select: {
@@ -67,6 +71,10 @@ export type RegistryMirrorRow = {
   spectatorInfo: string | null;
   logisticsInfo: string | null;
   gearDropInstructions: string | null;
+  charityName: string | null;
+  charityUrl: string | null;
+  charityLogo: string | null;
+  charityProceedsNote: string | null;
   course_segments: Array<{
     sourceSegmentId: string | null;
     order: number;
@@ -103,6 +111,10 @@ export function serializeRegistryMirror(row: RegistryMirrorRow) {
     spectatorInfo: row.spectatorInfo,
     logisticsInfo: row.logisticsInfo,
     gearDropInstructions: row.gearDropInstructions,
+    charityName: row.charityName,
+    charityUrl: row.charityUrl,
+    charityLogo: row.charityLogo,
+    charityProceedsNote: row.charityProceedsNote,
     segmentCount: row.course_segments.length,
     sourceSegmentIds: row.course_segments
       .map((s) => s.sourceSegmentId)
