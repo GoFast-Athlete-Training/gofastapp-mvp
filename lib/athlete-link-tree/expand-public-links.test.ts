@@ -22,6 +22,7 @@ test("expandAthleteLinkTreeLinksForPublic passes custom links through", async ()
       url: "https://instagram.com/runner",
       athleteRaceId: null,
       cityRunId: null,
+      athleteCauseId: null,
       parentSectionId: null,
       sortOrder: 0,
     },

@@ -10,6 +10,7 @@ import {
   linkIdForCityRun,
   linkIdForUrl,
 } from "@/lib/athlete-link-tree/link-tree-race-section";
+import { linkIdForAthleteCause, linkIdForCharityRaceRegistry } from "@/lib/athlete-link-tree/link-tree-charity";
 import {
   athletePublicReflectionUrl,
   athletePublicStoryUrl,
@@ -26,6 +27,15 @@ import {
   type AthleteLinkSourceCardId,
 } from "@/lib/athlete-link-tree/athlete-runner-public-links";
 import type { AthleteRunRoutePayload } from "@/lib/gofast-with-me/athlete-run-routes";
+
+type SerializedAthleteCause = {
+  id: string;
+  name: string;
+  websiteUrl: string;
+  logoUrl: string | null;
+  note: string | null;
+  raceRegistryId: string | null;
+};
 
 function formatRacePickerDate(raceDate: string | Date): string {
   const d = typeof raceDate === "string" ? new Date(raceDate) : raceDate;
@@ -70,6 +80,22 @@ export function AthleteLinkTreeLinkSources({
   const [hostedRuns, setHostedRuns] = useState<AthleteHostedRunInvite[]>([]);
   const [hostedRunsLoading, setHostedRunsLoading] = useState(false);
   const [hostedRunsError, setHostedRunsError] = useState<string | null>(null);
+  const [charityQ, setCharityQ] = useState("");
+  const [charityHits, setCharityHits] = useState<
+    Array<{
+      raceRegistryId: string;
+      raceName: string;
+      charityName: string;
+      charityUrl: string;
+      charityLogo: string | null;
+      athleteCauseId: string | null;
+    }>
+  >([]);
+  const [charityLoading, setCharityLoading] = useState(false);
+  const [charityError, setCharityError] = useState<string | null>(null);
+  const [myCauses, setMyCauses] = useState<SerializedAthleteCause[]>([]);
+  const [myCausesLoading, setMyCausesLoading] = useState(false);
+  const [myCausesError, setMyCausesError] = useState<string | null>(null);
   const [publishedTips, setPublishedTips] = useState<
     Array<{ id: string; title: string; publishedAt: string | null }>
   >([]);
@@ -177,6 +203,70 @@ export function AthleteLinkTreeLinkSources({
         }
       } finally {
         if (!cancelled) setHostedRunsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
+
+  useEffect(() => {
+    if (source !== "charities") return;
+    const q = charityQ.trim();
+    if (!q) {
+      setCharityHits([]);
+      setCharityLoading(false);
+      setCharityError(null);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      void (async () => {
+        setCharityLoading(true);
+        setCharityError(null);
+        try {
+          const res = await api.get(`/athlete/links/charities?q=${encodeURIComponent(q)}`);
+          if (!res.data?.success) {
+            throw new Error(res.data?.error || "Failed to search charities");
+          }
+          if (!cancelled) {
+            setCharityHits(res.data.charities ?? []);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setCharityHits([]);
+            setCharityError(err instanceof Error ? err.message : "Search failed");
+          }
+        } finally {
+          if (!cancelled) setCharityLoading(false);
+        }
+      })();
+    }, 280);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [source, charityQ]);
+
+  useEffect(() => {
+    if (source !== "charities") return;
+    let cancelled = false;
+    void (async () => {
+      setMyCausesLoading(true);
+      setMyCausesError(null);
+      try {
+        const res = await api.get("/athlete/causes");
+        if (!res.data?.success) {
+          throw new Error(res.data?.error || "Failed to load your causes");
+        }
+        if (!cancelled) setMyCauses((res.data.causes as SerializedAthleteCause[]) ?? []);
+      } catch (err) {
+        if (!cancelled) {
+          setMyCauses([]);
+          setMyCausesError(err instanceof Error ? err.message : "Failed to load causes");
+        }
+      } finally {
+        if (!cancelled) setMyCausesLoading(false);
       }
     })();
     return () => {
@@ -393,6 +483,49 @@ export function AthleteLinkTreeLinkSources({
     }
   }
 
+  function linkIdForRegistryCharity(
+    raceRegistryId: string,
+    athleteCauseId: string | null | undefined,
+  ): string | null {
+    if (athleteCauseId) {
+      const byCause = linkIdForAthleteCause(sortedLinks, athleteCauseId);
+      if (byCause) return byCause;
+    }
+    return linkIdForCharityRaceRegistry(sortedLinks, raceRegistryId);
+  }
+
+  async function toggleCauseOnPage(cause: SerializedAthleteCause, checked: boolean) {
+    const existingId = linkIdForAthleteCause(sortedLinks, cause.id);
+    if (checked) {
+      if (existingId) return;
+      if (!activeSectionId) return;
+      await onAddLink({ athleteCauseId: cause.id });
+      return;
+    }
+    if (existingId) await onRemoveLink(existingId);
+  }
+
+  async function toggleCharityOnPage(
+    hit: {
+      raceRegistryId: string;
+      charityName: string;
+      charityUrl: string;
+      athleteCauseId: string | null;
+    },
+    checked: boolean,
+  ) {
+    const existingId = linkIdForRegistryCharity(hit.raceRegistryId, hit.athleteCauseId);
+    if (checked) {
+      if (existingId) return;
+      if (!activeSectionId) return;
+      await onAddLink({ raceRegistryId: hit.raceRegistryId });
+      return;
+    }
+    if (existingId) {
+      await onRemoveLink(existingId);
+    }
+  }
+
   async function addRoute(route: AthleteRunRoutePayload) {
     const url = route.route.stravaUrl?.trim() || route.route.stravaMapUrl?.trim();
     if (!url || urlAlreadyOnPage(url)) return;
@@ -474,6 +607,7 @@ export function AthleteLinkTreeLinkSources({
                   card.id !== "routes" &&
                   card.id !== "races" &&
                   card.id !== "hostedRuns" &&
+                  card.id !== "charities" &&
                   card.id !== "thoughts" &&
                   card.id !== "reflections"
                     ? " · Already added"
@@ -683,6 +817,90 @@ export function AthleteLinkTreeLinkSources({
                       {!race.slug?.trim() ? (
                         <span className="mt-0.5 block text-xs text-gray-500">Missing public slug</span>
                       ) : null}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
+      {source === "charities" ? (
+        <div className="space-y-2">
+          {sectionRequiredBanner()}
+          <p className="text-xs text-gray-500">
+            Save causes on the{" "}
+            <a href="/causes" className="font-medium text-sky-700 hover:underline">
+              Causes
+            </a>{" "}
+            page, then check them here to add buttons under your selected heading.
+          </p>
+          <div className="space-y-1">
+            <span className="text-sm font-medium text-gray-800">Your causes</span>
+            {myCausesLoading ? <p className="text-xs text-gray-500">Loading…</p> : null}
+            {myCausesError ? <p className="text-xs text-red-700">{myCausesError}</p> : null}
+            {!myCausesLoading && !myCausesError && myCauses.length === 0 ? (
+              <p className="text-xs text-gray-500">None yet — add some on the Causes page.</p>
+            ) : null}
+            <ul className="max-h-40 space-y-1.5 overflow-y-auto">
+              {myCauses.map((c) => {
+                const onPage = Boolean(linkIdForAthleteCause(sortedLinks, c.id));
+                const disabled = adding || !activeSectionId;
+                return (
+                  <li key={c.id}>
+                    <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-2 py-2 text-sm hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={onPage}
+                        disabled={disabled}
+                        onChange={(e) => void toggleCauseOnPage(c, e.target.checked)}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="font-medium text-gray-900">{c.name}</span>
+                        <span className="mt-0.5 block truncate text-xs text-gray-500">{c.websiteUrl}</span>
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+          <label className="block text-sm">
+            <span className="font-medium text-gray-800">Search charity name</span>
+            <input
+              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              value={charityQ}
+              onChange={(e) => setCharityQ(e.target.value)}
+              placeholder="e.g. American Red Cross"
+            />
+          </label>
+          {charityLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
+          {charityError ? <p className="text-xs text-red-700">{charityError}</p> : null}
+          {!charityLoading && !charityError && charityQ.trim() && charityHits.length === 0 ? (
+            <p className="text-xs text-gray-500">No charities matched that search in the race registry.</p>
+          ) : null}
+          {!charityQ.trim() ? (
+            <p className="text-xs text-gray-500">Type to search any race with a charity snap — no need to claim that race.</p>
+          ) : null}
+          <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+            {charityHits.map((hit) => {
+              const onPage = Boolean(linkIdForRegistryCharity(hit.raceRegistryId, hit.athleteCauseId));
+              const disabled = adding || !activeSectionId;
+              return (
+                <li key={`${hit.raceRegistryId}-${hit.charityUrl}`}>
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-2 py-2 text-sm hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={onPage}
+                      disabled={disabled}
+                      onChange={(e) => void toggleCharityOnPage(hit, e.target.checked)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium text-gray-900">{hit.charityName}</span>
+                      <span className="mt-0.5 block text-xs text-gray-500">{hit.raceName}</span>
                     </span>
                   </label>
                 </li>

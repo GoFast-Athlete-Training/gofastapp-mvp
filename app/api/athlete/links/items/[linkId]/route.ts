@@ -2,6 +2,7 @@ import {
   loadEditableAthleteTree,
   reloadAthleteLinkTreeDetail,
 } from "@/lib/athlete-link-tree/athlete-link-tree-service";
+import { linkIdsForAthleteTreeDelete } from "@/lib/athlete-link-tree/link-tree-blocks";
 import { normalizeLinkEmoji } from "@/lib/athlete-link-tree/link-emoji";
 import {
   isGeneratedCityRunLinkKind,
@@ -137,12 +138,26 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   if (!loaded.ok) {
     return NextResponse.json({ success: false, error: loaded.error }, { status: loaded.status });
   }
-  const link = await loadLink(loaded.tree.id, linkId);
+  const treeId = loaded.tree.id;
+  const allRows = await prisma.athlete_link_tree_links.findMany({
+    where: { treeId },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    select: {
+      id: true,
+      parentSectionId: true,
+      isSection: true,
+    },
+  });
+  const link = allRows.find((l) => l.id === linkId);
   if (!link) {
     return NextResponse.json({ success: false, error: "Link not found" }, { status: 404 });
   }
 
-  await prisma.athlete_link_tree_links.delete({ where: { id: linkId } });
+  const deleteIds = linkIdsForAthleteTreeDelete(allRows, linkId, link.isSection);
+
+  await prisma.athlete_link_tree_links.deleteMany({
+    where: { id: { in: deleteIds }, treeId },
+  });
   const tree = await reloadAthleteLinkTreeDetail(gate.athlete.id);
   if (!tree) {
     return NextResponse.json({ success: false, error: "Link tree not found" }, { status: 404 });

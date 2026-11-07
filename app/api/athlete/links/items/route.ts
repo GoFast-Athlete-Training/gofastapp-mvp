@@ -5,6 +5,7 @@ import {
 import { isHydratedLinkKind, parseLinkKindInput } from "@/lib/athlete-link-tree/link-kinds";
 import { inferCityRunLinkVisual } from "@/lib/athlete-link-tree/infer-city-run-link-visual";
 import { assertSingleRacesCard, normalizeLinkDestination } from "@/lib/athlete-link-tree/link-validation";
+import { upsertAthleteCauseFromRaceRegistry } from "@/lib/athlete-causes/athlete-cause-service";
 import { athleteRacePublicCardUrl } from "@/lib/athlete-race-public-card-url";
 import { cityRunPublicCardUrl } from "@/lib/city-run-public-card-url";
 import { AthleteLinkTreeLinkKind } from "@prisma/client";
@@ -39,8 +40,10 @@ export async function POST(request: NextRequest) {
     insertAfterId?: string;
     athleteRaceId?: string;
     cityRunId?: string;
+    athleteCauseId?: string;
     sectionId?: string;
     parentSectionId?: string;
+    raceRegistryId?: string;
   };
 
   const parentSectionRaw =
@@ -48,11 +51,26 @@ export async function POST(request: NextRequest) {
 
   const athleteRaceIdInput = body.athleteRaceId?.trim();
   const cityRunIdInput = body.cityRunId?.trim();
+  const athleteCauseIdInput = body.athleteCauseId?.trim();
+  const raceRegistryIdInput = body.raceRegistryId?.trim();
+
+  const exclusiveCount = [athleteRaceIdInput, cityRunIdInput, athleteCauseIdInput, raceRegistryIdInput].filter(
+    Boolean,
+  ).length;
+  if (exclusiveCount > 1) {
+    return NextResponse.json(
+      { success: false, error: "Use only one of athlete race, city run, cause, or registry charity" },
+      { status: 400 },
+    );
+  }
+
   let parsedKind = parseLinkKindInput(body.kind);
   if (athleteRaceIdInput) {
     parsedKind = AthleteLinkTreeLinkKind.ATHLETE_RACE;
   } else if (cityRunIdInput) {
     parsedKind = AthleteLinkTreeLinkKind.CITY_RUN;
+  } else if (athleteCauseIdInput || raceRegistryIdInput) {
+    parsedKind = AthleteLinkTreeLinkKind.CUSTOM;
   }
   if (!parsedKind) {
     return NextResponse.json({ success: false, error: "Invalid link kind" }, { status: 400 });
@@ -85,8 +103,11 @@ export async function POST(request: NextRequest) {
   let url: string | null = null;
   let athleteRaceId: string | null = null;
   let cityRunId: string | null = null;
+  let athleteCauseId: string | null = null;
   let athleteRaceLogoUrl: string | null = null;
   let cityRunVisual: ReturnType<typeof inferCityRunLinkVisual> | null = null;
+  let charityLinkLogoUrl: string | null = null;
+  let charityEmoji: string | null = null;
 
   if (parsedKind === AthleteLinkTreeLinkKind.ATHLETE_RACE) {
     if (!athleteRaceIdInput) {
@@ -165,6 +186,53 @@ export async function POST(request: NextRequest) {
       run.runClub?.slug ?? null,
     );
     cityRunVisual = inferCityRunLinkVisual(run);
+  } else if (athleteCauseIdInput && !isSection) {
+    const cause = await prisma.athlete_causes.findFirst({
+      where: { id: athleteCauseIdInput, athleteId: gate.athlete.id },
+    });
+    if (!cause) {
+      return NextResponse.json({ success: false, error: "Cause not found" }, { status: 404 });
+    }
+    const dup = await prisma.athlete_link_tree_links.findFirst({
+      where: { treeId, athleteCauseId: cause.id },
+      select: { id: true },
+    });
+    if (dup) {
+      return NextResponse.json(
+        { success: false, error: "That cause is already on your link page" },
+        { status: 400 },
+      );
+    }
+    athleteCauseId = cause.id;
+    name = cause.name;
+    url = cause.websiteUrl;
+    charityLinkLogoUrl = cause.logoUrl?.trim() || null;
+    charityEmoji = "❤️";
+  } else if (raceRegistryIdInput && !isSection) {
+    try {
+      const { row: cause } = await upsertAthleteCauseFromRaceRegistry({
+        athleteId: gate.athlete.id,
+        raceRegistryId: raceRegistryIdInput,
+      });
+      const dup = await prisma.athlete_link_tree_links.findFirst({
+        where: { treeId, athleteCauseId: cause.id },
+        select: { id: true },
+      });
+      if (dup) {
+        return NextResponse.json(
+          { success: false, error: "That charity link is already on your link page" },
+          { status: 400 },
+        );
+      }
+      athleteCauseId = cause.id;
+      name = cause.name;
+      url = cause.websiteUrl;
+      charityLinkLogoUrl = cause.logoUrl?.trim() || null;
+      charityEmoji = "❤️";
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to save cause";
+      return NextResponse.json({ success: false, error: message }, { status: 400 });
+    }
   } else if (!isSection) {
     const dest = normalizeLinkDestination({ url: body.url, kind: parsedKind });
     if (dest.error) {
@@ -232,6 +300,7 @@ export async function POST(request: NextRequest) {
       kind: parsedKind,
       athleteRaceId,
       cityRunId,
+      athleteCauseId,
       isSection,
       publicLabel: isSection ? null : body.publicLabel?.trim() || linkName,
       internalDescription: isSection ? null : body.internalDescription?.trim() || null,
@@ -241,13 +310,15 @@ export async function POST(request: NextRequest) {
           ? athleteRaceLogoUrl
           : parsedKind === AthleteLinkTreeLinkKind.CITY_RUN
             ? cityRunVisual?.linkLogoUrl ?? null
-            : null,
+            : athleteCauseId
+              ? charityLinkLogoUrl
+              : null,
       emoji:
         isSection || isHydratedLinkKind(parsedKind)
           ? null
           : parsedKind === AthleteLinkTreeLinkKind.CITY_RUN
             ? cityRunVisual?.emoji ?? null
-            : body.emoji?.trim() || null,
+            : (charityEmoji ?? body.emoji?.trim()) || null,
       url,
       sortOrder,
       parentSectionId,

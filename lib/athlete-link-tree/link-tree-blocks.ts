@@ -47,6 +47,23 @@ export function buildLinkTreeEditorBlocks(links: AthleteLinkTreeLink[]): LinkTre
   return blocks;
 }
 
+export type LinkTreeDeleteRow = {
+  id: string;
+  parentSectionId: string | null;
+  isSection: boolean;
+};
+
+/** Ids to delete: section heading plus every link with parentSectionId = that section. */
+export function linkIdsForAthleteTreeDelete(
+  rows: LinkTreeDeleteRow[],
+  linkId: string,
+  isSection: boolean,
+): string[] {
+  if (!isSection) return [linkId];
+  const childIds = rows.filter((l) => l.parentSectionId === linkId).map((l) => l.id);
+  return [linkId, ...childIds];
+}
+
 /** Infer parentSectionId for legacy rows without FK (nearest preceding section). */
 export function inferParentSectionId(
   link: AthleteLinkTreeLink,

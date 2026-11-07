@@ -7,6 +7,8 @@ export type SegmentLike = {
   durationType: "DISTANCE" | "TIME" | string;
   durationValue: number;
   repeatCount?: number | null;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
   title?: string;
   targets?: unknown;
 };

@@ -32,6 +32,7 @@ function CompactLinkRow({
   onUpdated,
   onRowSaveStatus,
   indent,
+  sectionChildCount,
 }: {
   link: AthleteLinkTreeLink;
   index: number;
@@ -41,6 +42,8 @@ function CompactLinkRow({
   onUpdated: (tree: AthleteLinkTreeDetail) => void;
   onRowSaveStatus: (status: SaveStatus) => void;
   indent?: boolean;
+  /** When `link.isSection`, number of links nested under this heading (for delete confirm). */
+  sectionChildCount?: number;
 }) {
   const isLegacyRaces = !link.isSection && link.kind === AthleteLinkTreeLinkKind.RACES;
   const isGeneratedRace = !link.isSection && link.kind === AthleteLinkTreeLinkKind.ATHLETE_RACE;
@@ -128,7 +131,15 @@ function CompactLinkRow({
   }
 
   async function remove() {
-    if (!window.confirm("Remove this from your page?")) return;
+    let label = "Remove this from your page?";
+    if (link.isSection) {
+      const n = sectionChildCount ?? 0;
+      label =
+        n === 0
+          ? "Delete this section title?"
+          : `Delete this section and its ${n} link${n === 1 ? "" : "s"}?`;
+    }
+    if (!window.confirm(label)) return;
     setBusy(true);
     try {
       const res = await api.delete(`/athlete/links/items/${link.id}`);
@@ -353,6 +364,7 @@ export function AthleteLinkTreePageStructure({
                       onMove={onMove}
                       onUpdated={onUpdated}
                       onRowSaveStatus={onRowSaveStatus}
+                      sectionChildCount={block.children.length}
                     />
                   </div>
                   {block.children.length > 0 ? (

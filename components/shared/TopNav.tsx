@@ -14,8 +14,13 @@ import {
   rememberAthleteChrome,
   resolveChromePhotoSrc,
 } from '@/lib/athlete-chrome-cache';
-import { Settings, Footprints, Link2 } from 'lucide-react';
-import { GOFAST_LINKS_PATH, isGoFastLinksPath } from '@/lib/athlete/community-nav';
+import { Settings, Footprints, Link2, Heart } from 'lucide-react';
+import {
+  GOFAST_CAUSES_PATH,
+  GOFAST_LINKS_PATH,
+  isGoFastCausesPath,
+  isGoFastLinksPath,
+} from '@/lib/athlete/community-nav';
 
 type TopNavAthleteChrome = {
   firstName?: string;
@@ -32,6 +37,7 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
   const router = useRouter();
   const pathname = usePathname();
   const linksActive = isGoFastLinksPath(pathname);
+  const causesActive = isGoFastCausesPath(pathname);
   const [athleteProfile, setAthleteProfile] = useState<TopNavAthleteChrome | null>(null);
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
   const blobPhotoSrcRef = useRef<string | null>(null);
@@ -158,6 +164,19 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
               aria-current={linksActive ? 'page' : undefined}
             >
               <Link2 className="h-5 w-5" />
+            </Link>
+
+            <Link
+              href={GOFAST_CAUSES_PATH}
+              className={`p-2 rounded-lg transition ${
+                causesActive
+                  ? 'bg-gray-100 text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+              title="Causes"
+              aria-current={causesActive ? 'page' : undefined}
+            >
+              <Heart className="h-5 w-5" />
             </Link>
 
             <Link

@@ -18,6 +18,7 @@ export type AthleteLinkSourceCardId =
   | AthleteContentLinkPresetId
   | "races"
   | "hostedRuns"
+  | "charities"
   | "routes"
   | "custom";
 
@@ -49,6 +50,11 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
     hint: "Hosted run invites — not plan workouts (newest first)",
   },
   { id: "races", title: "Races", hint: "Check claimed races under a section heading" },
+  {
+    id: "charities",
+    title: "Charity",
+    hint: "Search race charity snaps from the registry — add under a section heading",
+  },
   { id: "routes", title: "Route", hint: "Pick a saved Strava route" },
   { id: "custom", title: "Custom link", hint: "Any URL" },
 ];

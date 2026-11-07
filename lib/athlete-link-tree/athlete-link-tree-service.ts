@@ -24,6 +24,7 @@ function toLinkRow(link: athlete_link_tree_links): AthleteLinkTreeLink {
     url: link.url,
     athleteRaceId: link.athleteRaceId,
     cityRunId: link.cityRunId,
+    athleteCauseId: link.athleteCauseId,
     parentSectionId: link.parentSectionId,
     sortOrder: link.sortOrder,
   };

@@ -13,6 +13,7 @@ export type AthleteLinkTreeLink = {
   url: string | null;
   athleteRaceId: string | null;
   cityRunId: string | null;
+  athleteCauseId: string | null;
   parentSectionId: string | null;
   sortOrder: number;
 };

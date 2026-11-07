@@ -22,6 +22,16 @@ export const GOFAST_LINKS_PATH = '/links';
 
 export const GOFAST_LINKS_LABEL = 'Links';
 
+/** Athlete causes — charities / fundraising snaps you save */
+export const GOFAST_CAUSES_PATH = '/causes';
+
+export const GOFAST_CAUSES_LABEL = 'Causes';
+
+export function isGoFastCausesPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname === GOFAST_CAUSES_PATH || pathname.startsWith(`${GOFAST_CAUSES_PATH}/`);
+}
+
 export const MANAGE_COMMUNITY_LABEL = 'Manage Community';
 
 export function isGoFastLinksPath(pathname: string | null): boolean {
