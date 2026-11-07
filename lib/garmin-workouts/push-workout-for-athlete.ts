@@ -102,13 +102,18 @@ async function stampPlannedWorkoutPushed(params: {
   });
 }
 
-async function stampStandaloneWorkoutSnapshot(params: {
+async function stampStandaloneWorkoutPushed(params: {
   workoutId: string;
   snapshot: ReturnType<typeof segmentSnapshotFromWorkout>;
 }): Promise<void> {
   await prisma.workouts.update({
     where: { id: params.workoutId },
-    data: { segmentSnapshotJson: params.snapshot },
+    data: {
+      workoutPushed: true,
+      workoutEditedAfterPush: false,
+      segmentSnapshotJson: params.snapshot,
+      updatedAt: new Date(),
+    },
   });
 }
 
@@ -355,6 +360,8 @@ export async function pushWorkoutToGarminForAthlete(
       return { ok: false, code: "no_segments", message: "Workout has no segments" };
     }
 
+    const isUpdatedResend = workout.workoutPushed === true;
+
     let scheduledDate: string;
     if (options.scheduleDateYmdOverride?.trim()) {
       scheduledDate = options.scheduleDateYmdOverride.trim();
@@ -391,7 +398,7 @@ export async function pushWorkoutToGarminForAthlete(
 
     const token = await requireGarminTokenFresh(athleteId);
 
-    const garminTitle =
+    const baseGarminTitle =
       workout.planId != null
         ? garminPushTitleForPlannedWorkout({
             title: workout.title,
@@ -406,6 +413,7 @@ export async function pushWorkoutToGarminForAthlete(
             title: workout.title,
             weekNumber: workout.weekNumber,
           });
+    const garminTitle = withUpdatedGarminTitle(baseGarminTitle, isUpdatedResend);
 
     const garminSegments = expandSegmentsForGarminPush(workout.segments);
 
@@ -447,9 +455,6 @@ export async function pushWorkoutToGarminForAthlete(
       };
     }
 
-    const snapshot = segmentSnapshotFromWorkout(workout.segments);
-    await stampStandaloneWorkoutSnapshot({ workoutId: workout.id, snapshot });
-
     const scheduleResult = await scheduleWorkoutOnCalendar(client, {
       garminWorkoutId,
       scheduledDate,
@@ -464,11 +469,17 @@ export async function pushWorkoutToGarminForAthlete(
       };
     }
 
+    const snapshot = segmentSnapshotFromWorkout(workout.segments);
+    await stampStandaloneWorkoutPushed({
+      workoutId: workout.id,
+      snapshot,
+    });
+
     return {
       ok: true,
       scheduledDate,
       workoutPushed: true,
-      isUpdatedResend: false,
+      isUpdatedResend,
     };
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {

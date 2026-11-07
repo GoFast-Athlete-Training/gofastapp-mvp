@@ -1910,10 +1910,9 @@ export default function WorkoutDetailPage() {
   const isStandaloneRun = !workout.planId;
   const showGarminReadyCta =
     !isLogged &&
-    !isStandaloneRun &&
     garminConnected === true &&
     (!workoutPushed || workoutEditedAfterPush);
-  const showGarminHeaderCard = !isLogged && !isStandaloneRun;
+  const showGarminHeaderCard = !isLogged;
   const scheduleLabel = formatWorkoutScheduleLong(workout.date);
   const workoutDateKey = workoutCalendarYmd(workout.date);
   const dayRel = dayRelativeToToday(workout.date);
@@ -2038,7 +2037,11 @@ export default function WorkoutDetailPage() {
           <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-2 text-sm sm:text-base font-medium">
               <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-              <span>Run saved.</span>
+              <span>
+                {workoutPushed
+                  ? "Run saved and sent to Garmin — open Garmin Connect to sync your watch."
+                  : "Run saved."}
+              </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button

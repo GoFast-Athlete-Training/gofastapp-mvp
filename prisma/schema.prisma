@@ -208,6 +208,7 @@ model Athlete {
   sponsorships                sponsorships[]
   athlete_coach_profile         athlete_coach_profiles?
   athlete_coach_programs        athlete_coach_programs[]
+  athlete_causes                athlete_causes[]
 }
 
 enum AthleteCoachProgramType {
@@ -530,6 +531,7 @@ model athlete_link_tree_links {
   kind                AthleteLinkTreeLinkKind  @default(CUSTOM)
   athleteRaceId       String?
   cityRunId           String?
+  athleteCauseId      String?
   /// When set, row renders under that section on public page (section row id).
   parentSectionId     String?
   isSection           Boolean                  @default(false)
@@ -539,6 +541,7 @@ model athlete_link_tree_links {
   tree                athlete_link_trees @relation(fields: [treeId], references: [id], onDelete: Cascade)
   athlete_race        athlete_races?           @relation(fields: [athleteRaceId], references: [id], onDelete: Cascade)
   city_run            city_runs?               @relation(fields: [cityRunId], references: [id], onDelete: Cascade)
+  athlete_cause       athlete_causes?          @relation(fields: [athleteCauseId], references: [id], onDelete: SetNull)
   parentSection       athlete_link_tree_links? @relation("LinkTreeSectionChildren", fields: [parentSectionId], references: [id], onDelete: SetNull)
   sectionChildren     athlete_link_tree_links[] @relation("LinkTreeSectionChildren")
 
@@ -546,7 +549,29 @@ model athlete_link_tree_links {
   @@index([treeId, sortOrder])
   @@index([parentSectionId])
   @@index([cityRunId])
+  @@index([athleteCauseId])
   @@map("athlete_link_tree_links")
+}
+
+/// Athlete-owned cause / charity record (manual or from race registry snap).
+model athlete_causes {
+  id             String   @id @default(cuid())
+  athleteId      String
+  name           String
+  /// Normalized URL key for dedupe (lowercase origin + path, no trailing slash).
+  websiteUrl     String
+  logoUrl        String?
+  note           String?  @db.Text
+  /// Optional provenance when created from race_registry charity snap.
+  raceRegistryId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  athlete        Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  link_tree_links athlete_link_tree_links[]
+
+  @@unique([athleteId, websiteUrl])
+  @@index([athleteId])
+  @@map("athlete_causes")
 }
 
 /// Athlete-owned business entity — logo, name, website for GoFast With Me (not go_fast_companies tenant).
@@ -3197,6 +3222,10 @@ model workouts {
   segmentExecutionSegmentCount    Int?
   /// Frozen prescription segments at last materialize/send (segments table remains FK source for edits).
   segmentSnapshotJson               Json?
+  /// Stack stamp: encoder fired for this standalone run (same meaning as planned_workouts.workoutPushed).
+  workoutPushed                     Boolean             @default(false)
+  /// Athlete edited prescribe after push — show ready CTA again for (Updated) re-send.
+  workoutEditedAfterPush            Boolean             @default(false)
   /// Normalized copy of ingest summary payload (`athlete_activities.summaryData`).
   completedActivitySummaryJson      Json?
   /// Full detail payload when hydrated (`athlete_activities.detailData`).

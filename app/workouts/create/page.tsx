@@ -20,7 +20,10 @@ import {
   isSafeInternalBackPath,
   workoutDetailPathWithBackHref,
 } from "@/lib/training/workout-nav-query";
-import { formatSegmentDistance } from "@/lib/training/segment-summary";
+import {
+  collapseFlatSegmentsForEditor,
+  formatSegmentDistance,
+} from "@/lib/training/segment-summary";
 import {
   suggestRaceBlocksFromGoal,
   type PacingStrategy,
@@ -163,11 +166,25 @@ function apiSegmentsToSlots(segments: ApiSegment[]): {
   mainSegments: SlotData[];
   cooldown: SlotData | null;
 } {
+  const collapsed = collapseFlatSegmentsForEditor(
+    segments.map((s, i) => ({
+      ...s,
+      stepOrder: s.stepOrder ?? i + 1,
+      title: s.title ?? "",
+      durationType: s.durationType ?? "DISTANCE",
+      durationValue: s.durationValue,
+      targets: s.targets,
+      repeatCount: s.repeatCount ?? null,
+      recoveryDurationType: s.recoveryDurationType ?? null,
+      recoveryDurationValue: s.recoveryDurationValue ?? null,
+    }))
+  ) as ApiSegment[];
+
   let warmup: SlotData | null = null;
   const mainSegments: SlotData[] = [];
   let cooldown: SlotData | null = null;
 
-  for (const seg of segments) {
+  for (const seg of collapsed) {
     const title = (seg.title ?? "").toLowerCase();
     const durationType =
       String(seg.durationType ?? "DISTANCE").toUpperCase() === "TIME" ? "TIME" : "DISTANCE";
@@ -356,12 +373,6 @@ function CreateWorkoutPageInner() {
   /** YYYY-MM-DD from date input; optional, shown on home & workout cards */
   const [scheduledDate, setScheduledDate] = useState("");
   const [buildLane, setBuildLane] = useState<"presets" | "manual" | "ai" | "paste" | null>(null);
-  /** After paste parse or AI generate — review title then save to workout detail. */
-  const [pendingDerived, setPendingDerived] = useState<{
-    segments: ApiSegment[];
-    suggestedTitle: string;
-    suggestedDescription: string;
-  } | null>(null);
   const [aiGeneratePrompt, setAiGeneratePrompt] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
   const [presetTypeFilter, setPresetTypeFilter] = useState<string>("");
@@ -661,8 +672,15 @@ function CreateWorkoutPageInner() {
     setWarmup(slots.warmup);
     setMainSegments(slots.mainSegments);
     setCooldown(slots.cooldown);
-    setName((prev) => prev.trim() || params.suggestedTitle);
-    setDescription((prev) => prev.trim() || params.suggestedDescription);
+    const genericTitles = new Set(["Track intervals", "Parsed workout", "Workout"]);
+    const titleCandidate = params.suggestedTitle?.trim() ?? "";
+    const descCandidate = params.suggestedDescription?.trim() ?? "";
+    const resolvedTitle =
+      titleCandidate && !genericTitles.has(titleCandidate)
+        ? titleCandidate
+        : descCandidate.slice(0, 80) || titleCandidate || "Workout";
+    setName((prev) => prev.trim() || resolvedTitle);
+    setDescription((prev) => prev.trim() || descCandidate);
     if (!raceDayMode) {
       setWorkoutType(inferWorkoutTypeFromApiSegments(params.segments));
     }
@@ -673,18 +691,7 @@ function CreateWorkoutPageInner() {
     });
   };
 
-  const applyParsedForStandaloneSave = (params: {
-    segments: ApiSegment[];
-    suggestedTitle: string;
-    suggestedDescription: string;
-  }) => {
-    setPendingDerived(params);
-    setName(params.suggestedTitle);
-    setDescription(params.suggestedDescription);
-    setWorkoutType(inferWorkoutTypeFromApiSegments(params.segments));
-  };
-
-  /** Paste / derive / catalogue → save once, open workout detail cards, not create-page segment builder. */
+  /** Catalogue quick-save → workout detail (segments already materialized server-side). */
   const createWorkoutFromDerivedSegments = async (params: {
     segments: ApiSegment[];
     suggestedTitle: string;
@@ -720,13 +727,6 @@ function CreateWorkoutPageInner() {
       setDeriveError("Workout saved but id was missing — check your workouts list.");
       return;
     }
-    if (!fromHostRun && !raceDayMode) {
-      try {
-        await api.post(`workouts/${id}/push-to-garmin`);
-      } catch {
-        /* detail page reflects push state */
-      }
-    }
     if (fromHostRun) {
       router.push(`/host-a-run?workoutId=${encodeURIComponent(id)}`);
       return;
@@ -758,11 +758,7 @@ function CreateWorkoutPageInner() {
           suggestedTitle: `${workoutType} — ${totalMi.toFixed(1)} mi`,
           suggestedDescription: `Pasted splits (${tabular.length} segments).`,
         };
-        if (raceDayMode) {
-          applyDerivedSegmentsToCreateForm(derived);
-        } else {
-          applyParsedForStandaloneSave(derived);
-        }
+        applyDerivedSegmentsToCreateForm(derived);
         return;
       }
 
@@ -771,19 +767,11 @@ function CreateWorkoutPageInner() {
         suggestedTitle: string;
         suggestedDescription: string;
       }>("workouts/ai-generate", { workoutType, sourceText: text });
-      if (raceDayMode) {
-        applyDerivedSegmentsToCreateForm({
-          segments: data.segments,
-          suggestedTitle: data.suggestedTitle,
-          suggestedDescription: data.suggestedDescription,
-        });
-      } else {
-        applyParsedForStandaloneSave({
-          segments: data.segments,
-          suggestedTitle: data.suggestedTitle,
-          suggestedDescription: data.suggestedDescription,
-        });
-      }
+      applyDerivedSegmentsToCreateForm({
+        segments: data.segments,
+        suggestedTitle: data.suggestedTitle,
+        suggestedDescription: data.suggestedDescription,
+      });
     } catch (err: unknown) {
       let display = "Failed to derive workout";
       if (err && typeof err === "object" && "response" in err) {
@@ -808,7 +796,6 @@ function CreateWorkoutPageInner() {
 
   const handleAiCoachGenerate = async () => {
     setDeriveError(null);
-    setPendingDerived(null);
     setAiGenerating(true);
     try {
       const { data } = await api.post<{
@@ -820,7 +807,7 @@ function CreateWorkoutPageInner() {
         workoutType,
         generatePrompt: aiGeneratePrompt.trim(),
       });
-      applyParsedForStandaloneSave({
+      applyDerivedSegmentsToCreateForm({
         segments: data.segments,
         suggestedTitle: data.suggestedTitle,
         suggestedDescription: data.suggestedDescription,
@@ -842,34 +829,6 @@ function CreateWorkoutPageInner() {
       setDeriveError(display);
     } finally {
       setAiGenerating(false);
-    }
-  };
-
-  const handleSavePendingDerived = async () => {
-    if (!pendingDerived) return;
-    setSaving(true);
-    setDeriveError(null);
-    try {
-      await createWorkoutFromDerivedSegments({
-        segments: pendingDerived.segments,
-        suggestedTitle: name.trim() || pendingDerived.suggestedTitle,
-        suggestedDescription: description.trim() || pendingDerived.suggestedDescription,
-        workoutTypeOverride: workoutType,
-      });
-    } catch (err: unknown) {
-      let display = "Failed to save workout";
-      if (err && typeof err === "object" && "response" in err) {
-        const res = (err as { response?: { data?: unknown } }).response;
-        const data = res?.data;
-        const serverMessage =
-          typeof data === "object" && data !== null && "error" in data && typeof (data as { error?: unknown }).error === "string"
-            ? (data as { error: string }).error
-            : null;
-        if (serverMessage) display = serverMessage;
-      }
-      setDeriveError(display);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -1023,7 +982,7 @@ function CreateWorkoutPageInner() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!raceDayMode) return;
+    if (!raceDayMode && !hasPositiveDuration) return;
     if (!hasPositiveDuration) {
       alert("Build a workout first, or add at least one segment.");
       return;
@@ -1109,17 +1068,11 @@ function CreateWorkoutPageInner() {
         segments,
         ...(scheduledDate.trim() ? { date: scheduledDate.trim() } : {}),
         ...(selectedCatalogueId ? { catalogueWorkoutId: selectedCatalogueId } : {}),
+        ...(fromHostRun ? { skipGarminPush: true } : {}),
       };
 
       const response = await api.post("workouts", workoutData);
       const { workout } = response.data;
-      if (!fromHostRun && !raceDayMode) {
-        try {
-          await api.post(`workouts/${workout.id}/push-to-garmin`);
-        } catch {
-          /* detail page reflects push state */
-        }
-      }
       if (fromHostRun) {
         router.push(
           `/host-a-run?workoutId=${encodeURIComponent(workout.id)}`
@@ -1181,7 +1134,6 @@ function CreateWorkoutPageInner() {
                     onClick={() => {
                       setBuildLane(lane);
                       if (lane !== "presets") setPresetTypeFilter("");
-                      setPendingDerived(null);
                       setDeriveError(null);
                     }}
                     className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
@@ -1507,7 +1459,7 @@ function CreateWorkoutPageInner() {
                 ) : (
                   <>
                     Paste from another coach or LLM (Runna, ChatGPT, etc.). We parse it into
-                    segments — you confirm the title, then save and edit blocks on the workout page.
+                    warmup, work, and cooldown blocks below — review, then save.
                     Tabular splits: <span className="font-mono text-gray-800">miles pace pace</span>{" "}
                     per line (e.g. <span className="font-mono text-gray-800">5 7:00 7:20</span>).
                   </>
@@ -1536,7 +1488,7 @@ function CreateWorkoutPageInner() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 placeholder="e.g. 15 miles today — 2 mile warmup, 10 at marathon pace, 3 mile cooldown — or paste split lines: 5 7:00 7:20"
               />
-              {deriveError && !pendingDerived ? <p className="text-sm text-red-600 mt-1">{deriveError}</p> : null}
+              {deriveError ? <p className="text-sm text-red-600 mt-1">{deriveError}</p> : null}
               <button
                 type="button"
                 onClick={handleDerive}
@@ -1549,60 +1501,7 @@ function CreateWorkoutPageInner() {
             </div>
           )}
 
-          {!raceDayMode && pendingDerived && (buildLane === "paste" || buildLane === "ai") ? (
-            <div className="mb-8 rounded-lg border border-green-200 bg-green-50/50 p-4 space-y-4">
-              <p className="text-sm font-medium text-green-900">
-                Parsed {pendingDerived.segments.length} segment
-                {pendingDerived.segments.length === 1 ? "" : "s"}. Confirm title, then save — edit
-                warmup and blocks on the next screen.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description (optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white"
-                  />
-                </div>
-              </div>
-              {deriveError ? <p className="text-sm text-red-600">{deriveError}</p> : null}
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => void handleSavePendingDerived()}
-                  disabled={saving || !name.trim()}
-                  className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50"
-                >
-                  {saving ? "Saving…" : "Save run"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPendingDerived(null);
-                    setDeriveError(null);
-                  }}
-                  className="px-4 py-2 text-gray-700 hover:text-gray-900"
-                >
-                  Start over
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {!raceDayMode && buildLane === "manual" ? (
+          {!raceDayMode && buildLane === "manual" && !hasSlots ? (
             <div className="flex gap-4 justify-end pt-6 border-t border-gray-200 mb-6">
               <Link
                 href={fromHostRun ? hostRunBackHref : builderBackHref}
@@ -1621,9 +1520,9 @@ function CreateWorkoutPageInner() {
             </div>
           ) : null}
 
-          {raceDayMode && (
+          {(raceDayMode || hasSlots) && (
           <>
-            {hasSlots ? (
+            {raceDayMode && hasSlots ? (
               <div className="mb-6 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
@@ -1632,6 +1531,40 @@ function CreateWorkoutPageInner() {
                 >
                   Clear segments and paste a workout instead
                 </button>
+              </div>
+            ) : null}
+
+            {!raceDayMode && hasSlots ? (
+              <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50/80 p-4 space-y-4">
+                <p className="text-sm text-gray-700">
+                  These are saved on this run. Saving also sends the workout to Garmin when you are
+                  connected.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Saved name (title) *
+                    </label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Saved description (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white"
+                    />
+                  </div>
+                </div>
               </div>
             ) : null}
 
