@@ -1,5 +1,7 @@
 # Preset miles canon
 
+> **Current SOT:** After the `training_plan_preset` column cleanup, see [TRAINING_PLAN_PRESET_GENERATE_READOUT.md](./TRAINING_PLAN_PRESET_GENERATE_READOUT.md) for what lives on the preset row and what generate reads. This doc is historical for the five-number mental model.
+
 Staff and athletes confirm **five numbers** on a preset. Weekly min/max bands and persona essays are not the product surface.
 
 ## Preset core
