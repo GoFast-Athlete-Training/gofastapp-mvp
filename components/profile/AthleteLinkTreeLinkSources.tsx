@@ -27,6 +27,26 @@ import {
   type AthleteLinkSourceCardId,
 } from "@/lib/athlete-link-tree/athlete-runner-public-links";
 import type { AthleteRunRoutePayload } from "@/lib/gofast-with-me/athlete-run-routes";
+import {
+  getPublicRaceCharityUrl,
+  getPublicRacePageUrl,
+  registryRowHasPublicCharity,
+} from "@/lib/public-race-url";
+
+type CatalogRaceHit = {
+  id: string;
+  name: string;
+  slug: string | null;
+  logoUrl: string | null;
+  raceDate: string;
+  city: string | null;
+  state: string | null;
+  distanceLabel: string | null;
+  charityName: string | null;
+  charityUrl: string | null;
+  charityLogo: string | null;
+  charityProceedsNote: string | null;
+};
 
 type SerializedAthleteCause = {
   id: string;
@@ -77,6 +97,10 @@ export function AthleteLinkTreeLinkSources({
   const [claimedRaces, setClaimedRaces] = useState<SerializedAthleteRace[]>([]);
   const [racesLoading, setRacesLoading] = useState(false);
   const [racesError, setRacesError] = useState<string | null>(null);
+  const [raceCatalogQ, setRaceCatalogQ] = useState("");
+  const [raceCatalogHits, setRaceCatalogHits] = useState<CatalogRaceHit[]>([]);
+  const [raceCatalogLoading, setRaceCatalogLoading] = useState(false);
+  const [raceCatalogError, setRaceCatalogError] = useState<string | null>(null);
   const [hostedRuns, setHostedRuns] = useState<AthleteHostedRunInvite[]>([]);
   const [hostedRunsLoading, setHostedRunsLoading] = useState(false);
   const [hostedRunsError, setHostedRunsError] = useState<string | null>(null);
@@ -184,6 +208,34 @@ export function AthleteLinkTreeLinkSources({
       cancelled = true;
     };
   }, [source]);
+
+  useEffect(() => {
+    if (source !== "races") return;
+    const q = raceCatalogQ.trim();
+    if (q.length < 2) {
+      setRaceCatalogHits([]);
+      setRaceCatalogError(null);
+      return;
+    }
+    const handle = window.setTimeout(async () => {
+      setRaceCatalogLoading(true);
+      setRaceCatalogError(null);
+      try {
+        const res = await api.get(`/race/search?q=${encodeURIComponent(q)}`);
+        if (!res.data?.success) {
+          throw new Error(res.data?.error || "Failed to search races");
+        }
+        const rows = (res.data.race_registry as CatalogRaceHit[] | undefined) ?? [];
+        setRaceCatalogHits(rows.filter((r) => r.slug?.trim()));
+      } catch (err) {
+        setRaceCatalogHits([]);
+        setRaceCatalogError(err instanceof Error ? err.message : "Failed to search races");
+      } finally {
+        setRaceCatalogLoading(false);
+      }
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [source, raceCatalogQ]);
 
   useEffect(() => {
     if (source !== "hostedRuns") return;
@@ -465,6 +517,36 @@ export function AthleteLinkTreeLinkSources({
       emoji: "📖",
     });
     setSource(null);
+  }
+
+  async function addCatalogRacePage(hit: CatalogRaceHit) {
+    const slug = hit.slug?.trim();
+    if (!slug || !activeSectionId) return;
+    const url = getPublicRacePageUrl(slug);
+    if (!url || urlAlreadyOnPage(url)) return;
+    await onAddLink({
+      name: hit.name.trim(),
+      publicLabel: hit.name.trim(),
+      url,
+      linkLogoUrl: hit.logoUrl?.trim() || null,
+      emoji: "🏁",
+    });
+  }
+
+  async function addCatalogCharityPage(hit: CatalogRaceHit) {
+    const slug = hit.slug?.trim();
+    if (!slug || !activeSectionId) return;
+    const url = getPublicRaceCharityUrl(slug);
+    if (!url || urlAlreadyOnPage(url)) return;
+    const charityLabel = hit.charityName?.trim() || "Charity";
+    const title = `${charityLabel} · ${hit.name.trim()}`;
+    await onAddLink({
+      name: title,
+      publicLabel: title,
+      url,
+      linkLogoUrl: hit.charityLogo?.trim() || hit.logoUrl?.trim() || null,
+      emoji: "❤️",
+    });
   }
 
   async function toggleRaceOnPage(race: SerializedAthleteRace, checked: boolean) {
@@ -787,12 +869,88 @@ export function AthleteLinkTreeLinkSources({
       ) : null}
 
       {source === "races" ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {sectionRequiredBanner()}
+          <label className="block text-sm">
+            <span className="font-medium text-gray-800">Search race catalog</span>
+            <input
+              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              value={raceCatalogQ}
+              onChange={(e) => setRaceCatalogQ(e.target.value)}
+              placeholder="e.g. CIM, Boston Marathon"
+            />
+          </label>
+          <p className="text-xs text-gray-500">
+            Add the public race page — no need to claim the race in My Races first.
+          </p>
+          {raceCatalogLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
+          {raceCatalogError ? <p className="text-xs text-red-700">{raceCatalogError}</p> : null}
+          {!raceCatalogLoading &&
+          !raceCatalogError &&
+          raceCatalogQ.trim().length >= 2 &&
+          raceCatalogHits.length === 0 ? (
+            <p className="text-xs text-gray-500">No races matched.</p>
+          ) : null}
+          <ul className="max-h-48 space-y-1.5 overflow-y-auto">
+            {raceCatalogHits.map((hit) => {
+              const slug = hit.slug?.trim() ?? "";
+              const raceUrl = getPublicRacePageUrl(slug);
+              const charityUrl = getPublicRaceCharityUrl(slug);
+              const raceOnPage = raceUrl ? urlAlreadyOnPage(raceUrl) : true;
+              const charityOnPage = charityUrl ? urlAlreadyOnPage(charityUrl) : true;
+              const hasCharity = registryRowHasPublicCharity(hit);
+              const meta = [
+                formatRacePickerDate(hit.raceDate),
+                hit.distanceLabel?.trim(),
+                [hit.city, hit.state].filter(Boolean).join(", "),
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              const disabledBase = adding || !activeSectionId;
+              return (
+                <li
+                  key={hit.id}
+                  className="rounded-lg border border-gray-200 px-2 py-2 text-sm space-y-1.5"
+                >
+                  <span className="font-medium text-gray-900">{hit.name}</span>
+                  {meta ? <span className="block text-xs text-gray-500">{meta}</span> : null}
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      disabled={disabledBase || raceOnPage}
+                      onClick={() => void addCatalogRacePage(hit)}
+                      className="rounded-md bg-orange-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      {raceOnPage ? "Race on page" : "Add race page"}
+                    </button>
+                    {hasCharity ? (
+                      <button
+                        type="button"
+                        disabled={disabledBase || charityOnPage}
+                        onClick={() => void addCatalogCharityPage(hit)}
+                        className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {charityOnPage ? "Charity on page" : "Add charity page"}
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="border-t border-gray-200 pt-2">
+            <span className="text-sm font-medium text-gray-800">My Races on your profile</span>
+          </div>
           {racesLoading ? <p className="text-xs text-gray-500">Loading races…</p> : null}
           {racesError ? <p className="text-xs text-red-700">{racesError}</p> : null}
           {!racesLoading && !racesError && upcomingRaces.length === 0 ? (
-            <p className="text-xs text-gray-500">No upcoming races on your profile.</p>
+            <p className="text-xs text-gray-500">
+              No upcoming claimed races. Search above for any race, or add one from{" "}
+              <a href="/races/find" className="font-medium text-sky-700 hover:underline">
+                Find races
+              </a>
+              .
+            </p>
           ) : null}
           <ul className="max-h-64 space-y-1.5 overflow-y-auto">
             {upcomingRaces.map((race) => {

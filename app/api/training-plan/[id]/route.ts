@@ -34,6 +34,11 @@ import {
   parsePaceStringToSecPerMile,
   projectRaceGoFast,
 } from "@/lib/training/race-projection";
+import {
+  presetWeeklyBandErrorLabel,
+  presetWeeklyMilesBand,
+  weeklyMileageTargetWithinPresetBand,
+} from "@/lib/training/preset-weekly-mileage-band";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -424,7 +429,27 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       if (body.weeklyMileageTarget != null) {
         const n = Number(body.weeklyMileageTarget);
         if (Number.isFinite(n)) {
-          data.weeklyMileageTarget = Math.max(25, Math.min(100, Math.round(n)));
+          const rounded = Math.round(n);
+          let band = presetWeeklyMilesBand(null);
+          if (existing.presetId) {
+            const { catalogPresetSummaryForApi } = await import(
+              "@/lib/training/hydrate-catalog-preset-from-training-manage"
+            );
+            const presetBand = await catalogPresetSummaryForApi(
+              existing.presetId,
+              request.headers.get("authorization"),
+            );
+            band = presetWeeklyMilesBand(presetBand);
+          }
+          if (!weeklyMileageTargetWithinPresetBand(rounded, band)) {
+            return NextResponse.json(
+              {
+                error: `weeklyMileageTarget must be within this plan's band (${presetWeeklyBandErrorLabel(band)}).`,
+              },
+              { status: 400 }
+            );
+          }
+          data.weeklyMileageTarget = Math.max(25, Math.min(100, rounded));
         }
       }
       if (body.peakLongRunPoolMiles != null) {

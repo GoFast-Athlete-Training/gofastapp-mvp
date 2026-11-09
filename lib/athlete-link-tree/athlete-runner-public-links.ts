@@ -49,7 +49,11 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
     title: "Runs I created",
     hint: "Hosted run invites — not plan workouts (newest first)",
   },
-  { id: "races", title: "Races", hint: "Check claimed races under a section heading" },
+  {
+    id: "races",
+    title: "Races",
+    hint: "Search the race catalog or add races from My Races under a section heading",
+  },
   {
     id: "charities",
     title: "Charity",

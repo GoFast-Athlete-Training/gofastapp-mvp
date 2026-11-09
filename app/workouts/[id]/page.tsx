@@ -378,12 +378,12 @@ function garminBannerStatusCopy(params: {
   }
   if (workoutEditedAfterPush) {
     return scheduleLabel
-      ? `You edited this workout — tap Looks good, I'm ready to send the update for ${scheduleLabel}.`
-      : "You edited this workout — tap Looks good, I'm ready to send the update.";
+      ? `You edited this workout — tap Send to Garmin to update your watch for ${scheduleLabel}.`
+      : "You edited this workout — tap Send to Garmin to update your watch.";
   }
   return scheduleLabel
-    ? `Review your workout for ${scheduleLabel}, then tap Looks good, I'm ready.`
-    : "Review your workout, then tap Looks good, I'm ready.";
+    ? `Review your workout for ${scheduleLabel}, then tap Send to Garmin when you want it on your watch. Today's workout also sends around 5 AM Eastern if you skip this.`
+    : "Review your workout, then tap Send to Garmin when you want it on your watch. Today's workout also sends around 5 AM Eastern if you skip this.";
 }
 
 /** Left accent for segment cards (readability, not step numbers). */
@@ -2407,10 +2407,10 @@ export default function WorkoutDetailPage() {
                   {pushing ? (
                     <>
                       <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white" />
-                      Getting it ready…
+                      Sending to Garmin…
                     </>
                   ) : (
-                    <>Looks good, I&apos;m ready</>
+                    <>Send to Garmin</>
                   )}
                 </button>
               )}

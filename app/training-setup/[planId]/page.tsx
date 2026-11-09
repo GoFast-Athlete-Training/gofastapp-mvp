@@ -53,6 +53,10 @@ import {
   planTitleRaceMismatch,
 } from "@/lib/training/plan-display-title";
 import { resolveGoalRaceMetersInput } from "@/lib/training/resolve-goal-race-meters";
+import {
+  clampWeeklyMilesToPresetBand,
+  presetWeeklyMilesBand,
+} from "@/lib/training/preset-weekly-mileage-band";
 
 type PlanWeekRow =
   | { weekNumber: number; phase: string; schedule: string }
@@ -309,18 +313,23 @@ export default function TrainingSetupPlanPage({
     } else {
       setPreferredDaysLocal([]);
     }
+    const band = presetWeeklyMilesBand(plan.training_plan_preset);
+    let rawWeekly: number | null = null;
     if (
       plan.weeklyMileageTarget != null &&
       Number.isFinite(Number(plan.weeklyMileageTarget))
     ) {
-      setWeeklyMilesTarget(String(Math.round(Number(plan.weeklyMileageTarget))));
+      rawWeekly = Math.round(Number(plan.weeklyMileageTarget));
     } else if (
       athleteWeeklyTargetPreference != null &&
       Number.isFinite(athleteWeeklyTargetPreference)
     ) {
-      setWeeklyMilesTarget(String(Math.round(athleteWeeklyTargetPreference)));
-    } else {
+      rawWeekly = Math.round(athleteWeeklyTargetPreference);
+    }
+    if (rawWeekly == null) {
       setWeeklyMilesTarget("");
+    } else {
+      setWeeklyMilesTarget(String(clampWeeklyMilesToPresetBand(rawWeekly, band)));
     }
     const pld = plan.preferredLongRunDow;
     if (pld === 6 || pld === 7) {
@@ -337,6 +346,9 @@ export default function TrainingSetupPlanPage({
     plan?.preferredTempoDow,
     plan?.preferredIntervalDow,
     plan?.weeklyMileageTarget,
+    plan?.training_plan_preset?.minWeeklyMiles,
+    (plan?.training_plan_preset as { maxWeeklyMiles?: number | null } | null)
+      ?.maxWeeklyMiles,
     athleteWeeklyTargetPreference,
   ]);
 
@@ -440,22 +452,10 @@ export default function TrainingSetupPlanPage({
     [preferredDaysLocal]
   );
 
-  const presetMinWeeklyMiles = useMemo(() => {
-    const raw = plan?.training_plan_preset?.minWeeklyMiles;
-    if (raw != null && Number.isFinite(Number(raw))) {
-      return Math.max(1, Math.round(Number(raw)));
-    }
-    return 40;
-  }, [plan?.training_plan_preset?.minWeeklyMiles]);
-
-  const presetMaxWeeklyMiles = useMemo(() => {
-    const raw = (plan?.training_plan_preset as { maxWeeklyMiles?: number | null } | null)
-      ?.maxWeeklyMiles;
-    if (raw != null && Number.isFinite(Number(raw))) {
-      return Math.max(presetMinWeeklyMiles, Math.round(Number(raw)));
-    }
-    return null;
-  }, [plan?.training_plan_preset, presetMinWeeklyMiles]);
+  const { min: presetMinWeeklyMiles, max: presetMaxWeeklyMiles } = useMemo(
+    () => presetWeeklyMilesBand(plan?.training_plan_preset),
+    [plan?.training_plan_preset]
+  );
 
   const trajectoryContext = useMemo(
     () => (plan ? trajectoryContextFromPlanDetail(plan) : null),

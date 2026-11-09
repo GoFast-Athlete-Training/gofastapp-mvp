@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
     description?: string | null;
     emoji?: string | null;
     url?: string | null;
+    linkLogoUrl?: string | null;
     insertAfterId?: string;
     athleteRaceId?: string;
     cityRunId?: string;
@@ -312,7 +313,7 @@ export async function POST(request: NextRequest) {
             ? cityRunVisual?.linkLogoUrl ?? null
             : athleteCauseId
               ? charityLinkLogoUrl
-              : null,
+              : body.linkLogoUrl?.trim() || null,
       emoji:
         isSection || isHydratedLinkKind(parsedKind)
           ? null

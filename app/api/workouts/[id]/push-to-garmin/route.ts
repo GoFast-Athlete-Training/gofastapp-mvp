@@ -11,7 +11,7 @@ import { pushWorkoutToGarminForAthlete } from "@/lib/garmin-workouts/push-workou
 
 /**
  * POST /api/workouts/[id]/push-to-garmin
- * Auth: Firebase Bearer + x-athlete-id. Athlete taps "Looks good, I'm ready".
+ * Auth: Firebase Bearer + x-athlete-id. Athlete taps "Send to Garmin" (early send / after edits).
  */
 export async function POST(
   request: NextRequest,

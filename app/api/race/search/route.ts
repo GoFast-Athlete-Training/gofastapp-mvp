@@ -26,6 +26,10 @@ const raceSearchSelect = {
   slug: true,
   summaryPhrase: true,
   description: true,
+  charityName: true,
+  charityUrl: true,
+  charityLogo: true,
+  charityProceedsNote: true,
 } satisfies Prisma.race_registrySelect;
 
 async function searchRaces(

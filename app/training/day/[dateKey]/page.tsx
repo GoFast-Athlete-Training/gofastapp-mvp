@@ -1027,14 +1027,20 @@ export default function TrainingPlanDayPreviewPage() {
                 </Link>
               ) : null}
               {!isLogged && isActionableWorkout && !isRaceDay ? (
-                <button
-                  type="button"
-                  onClick={() => void handlePushToGarmin()}
-                  disabled={pushingGarmin || workoutLoading || !!workoutError}
-                  className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-                >
-                  {pushingGarmin ? "Getting it ready…" : "Looks good, I'm ready"}
-                </button>
+                <>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Tap below to put this workout on your Garmin watch now. Today&apos;s workout
+                    also sends around 5 AM Eastern if you skip this.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handlePushToGarmin()}
+                    disabled={pushingGarmin || workoutLoading || !!workoutError}
+                    className="w-full rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    {pushingGarmin ? "Sending to Garmin…" : "Send to Garmin"}
+                  </button>
+                </>
               ) : null}
               {!isLogged && workoutId && dateKey ? (
                 <Link

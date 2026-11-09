@@ -12,6 +12,25 @@ export function getPublicRacePageUrl(slug: string | null | undefined): string | 
   return `${base}/race/${encodeURIComponent(s)}`;
 }
 
+/** Charity slice on the public race site — /race/{slug}/charity */
+export function getPublicRaceCharityUrl(raceSlug: string | null | undefined): string | null {
+  const s = raceSlug?.trim();
+  if (!s) return null;
+  const base =
+    process.env.NEXT_PUBLIC_CONTENT_PUBLIC_URL?.replace(/\/$/, "") ||
+    process.env.NEXT_PUBLIC_CONTENT_SITE_URL?.replace(/\/$/, "") ||
+    "https://races.gofastcrushgoals.com";
+  return `${base}/race/${encodeURIComponent(s)}/charity`;
+}
+
+/** Registry row has beneficiary text we can surface on the public charity page. */
+export function registryRowHasPublicCharity(row: {
+  charityName?: string | null;
+  charityProceedsNote?: string | null;
+}): boolean {
+  return Boolean(row.charityName?.trim() || row.charityProceedsNote?.trim());
+}
+
 /**
  * Standalone public course page (gofast-contentpublic) — /course/[slug].
  * Uses same base URL as race pages; courseSlug comes from Company race_courses.slug via prodpush.
