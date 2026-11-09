@@ -13,7 +13,7 @@ export async function GET(_request: NextRequest) {
     orderBy: { name: "asc" },
     include: {
       _count: {
-        select: { positions: true, usedByPresets: true },
+        select: { positions: true, usedByBuildPresets: true },
       },
     },
   });
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     },
     include: {
-      _count: { select: { positions: true, usedByPresets: true } },
+      _count: { select: { positions: true, usedByBuildPresets: true } },
     },
   });
   return NextResponse.json({ success: true, item: config });

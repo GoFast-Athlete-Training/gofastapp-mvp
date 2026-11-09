@@ -102,16 +102,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (buildId !== undefined) {
     if (buildId === null) {
       data.buildPresetId = null;
-      data.snapPeakLongRunMiles = null;
-      data.snapPeakWeeklyMiles = null;
     } else {
       const build = await prisma.build_preset.findUnique({ where: { id: buildId } });
       if (!build) {
         return NextResponse.json({ success: false, error: "Build preset not found" }, { status: 404 });
       }
       data.buildPresetId = build.id;
-      data.snapPeakLongRunMiles = build.peakLongRunMiles;
-      data.snapPeakWeeklyMiles = build.maxWeeklyMiles;
     }
   }
 
@@ -119,20 +115,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (taperId !== undefined) {
     if (taperId === null) {
       data.taperPresetId = null;
-      data.snapTaperWeek1TotalMiles = null;
-      data.snapTaperWeek1LongRunMiles = null;
-      data.snapTaperWeek2TotalMiles = null;
-      data.snapTaperWeek2LongRunMiles = null;
     } else {
       const taper = await prisma.taper_preset.findUnique({ where: { id: taperId } });
       if (!taper) {
         return NextResponse.json({ success: false, error: "Taper preset not found" }, { status: 404 });
       }
       data.taperPresetId = taper.id;
-      data.snapTaperWeek1TotalMiles = taper.week1TotalMiles;
-      data.snapTaperWeek1LongRunMiles = taper.week1LongRunMiles;
-      data.snapTaperWeek2TotalMiles = taper.week2TotalMiles;
-      data.snapTaperWeek2LongRunMiles = taper.week2LongRunMiles;
     }
   }
 

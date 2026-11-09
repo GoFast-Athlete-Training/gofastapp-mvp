@@ -139,9 +139,15 @@ export async function applyWorkoutPickerToPreset(
   intervalsConfigId: string | null;
   tempoConfigId: string | null;
 }> {
-  const preset = await prisma.training_plan_preset.findUnique({ where: { id: presetId } });
+  const preset = await prisma.training_plan_preset.findUnique({
+    where: { id: presetId },
+    select: { id: true, buildPresetId: true },
+  });
   if (!preset) {
     throw new Error("Preset not found");
+  }
+  if (!preset.buildPresetId) {
+    throw new Error("Catalog preset has no linked build — link a build preset first");
   }
 
   const longRunConfigId = await createConfigWithPositions({
@@ -178,10 +184,9 @@ export async function applyWorkoutPickerToPreset(
     });
   }
 
-  await prisma.training_plan_preset.update({
-    where: { id: presetId },
+  await prisma.build_preset.update({
+    where: { id: preset.buildPresetId },
     data: {
-      longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
       longRunConfigId,
       easyConfigId,
       intervalsConfigId,

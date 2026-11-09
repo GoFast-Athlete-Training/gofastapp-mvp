@@ -423,21 +423,6 @@ async function upsertShakeout(tx: Tx, raw: Record<string, unknown>): Promise<str
   return id;
 }
 
-function poolMilesFromBuild(build: Record<string, unknown> | null): {
-  baseLongRunPoolMiles: number;
-  peakLongRunPoolMiles: number;
-  taperLongRunPoolMiles: number;
-} {
-  const peakSingle = build ? num(build.peakLongRunMiles) : undefined;
-  const peakPool =
-    peakSingle != null && Number.isFinite(peakSingle) ? peakSingle * 4 : 0;
-  return {
-    baseLongRunPoolMiles: peakPool > 0 ? peakPool * 0.6 : 24,
-    peakLongRunPoolMiles: peakPool > 0 ? peakPool : 32,
-    taperLongRunPoolMiles: peakPool > 0 ? peakPool * 0.5 : 16,
-  };
-}
-
 export async function upsertPresetFromProdPush(
   body: PresetProdPushBody,
 ): Promise<{ presetId: string }> {
@@ -479,7 +464,6 @@ export async function upsertPresetFromProdPush(
       raceWeekPresetId = await upsertRaceWeekPreset(tx, raceRaw);
     }
 
-    const pools = poolMilesFromBuild(buildRaw);
     let slug = slugIn;
     const existing = await tx.training_plan_preset.findUnique({
       where: { id },
@@ -513,30 +497,14 @@ export async function upsertPresetFromProdPush(
       athletePersonaDedication:
         (plan.athletePersonaDedication as Prisma.training_plan_presetUncheckedCreateInput["athletePersonaDedication"]) ??
         null,
-      coachPlanOverview: (plan.coachPlanOverview as Prisma.InputJsonValue) ?? undefined,
-      workoutStructure: (plan.workoutStructure as Prisma.InputJsonValue) ?? undefined,
-      easyRunConfig: (plan.easyRunConfig as Prisma.InputJsonValue) ?? undefined,
-      longRunCycleWeeks: num(plan.longRunCycleWeeks) ?? 4,
       minWeeklyMiles: int(plan.minWeeklyMiles, 40),
       maxWeeklyMiles: num(plan.maxWeeklyMiles) ?? null,
-      baseLongRunPoolMiles: num(plan.baseLongRunPoolMiles) ?? pools.baseLongRunPoolMiles,
-      peakLongRunPoolMiles: num(plan.peakLongRunPoolMiles) ?? pools.peakLongRunPoolMiles,
-      taperLongRunPoolMiles: num(plan.taperLongRunPoolMiles) ?? pools.taperLongRunPoolMiles,
       tempoIdealDow: int(plan.tempoIdealDow, 2),
       intervalIdealDow: int(plan.intervalIdealDow, 4),
       longRunDefaultDow: int(plan.longRunDefaultDow, 6),
       buildPresetId: buildPresetId ?? str(plan.buildPresetId) ?? null,
       taperPresetId: taperPresetId ?? str(plan.taperPresetId) ?? null,
       raceWeekPresetId: raceWeekPresetId ?? str(plan.raceWeekPresetId) ?? null,
-      snapPeakLongRunMiles: num(plan.snapPeakLongRunMiles) ?? null,
-      snapPeakWeeklyMiles: num(plan.snapPeakWeeklyMiles) ?? null,
-      snapTaperWeek1TotalMiles: num(plan.snapTaperWeek1TotalMiles) ?? null,
-      snapTaperWeek1LongRunMiles: num(plan.snapTaperWeek1LongRunMiles) ?? null,
-      snapTaperWeek2TotalMiles: num(plan.snapTaperWeek2TotalMiles) ?? null,
-      snapTaperWeek2LongRunMiles: num(plan.snapTaperWeek2LongRunMiles) ?? null,
-      presetPhaseGenerateJson: body.phaseGenerate
-        ? (body.phaseGenerate as unknown as Prisma.InputJsonValue)
-        : undefined,
       lastSyncedByStaffId: body.lastSyncedByStaffId?.trim() || null,
     };
 

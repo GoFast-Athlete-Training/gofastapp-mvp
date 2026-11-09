@@ -10,7 +10,7 @@ const includeBlock = {
     orderBy: { cyclePosition: "asc" as const },
     include: { workout_catalogue: { select: runTypeCatalogueSelect } },
   },
-  _count: { select: { usedByPresets: true } },
+  _count: { select: { usedByBuildPresets: true } },
 } as const;
 
 export async function GET(
@@ -24,7 +24,13 @@ export async function GET(
     where: { id },
     include: {
       ...includeBlock,
-      usedByPresets: { select: { id: true, title: true, slug: true } },
+      usedByBuildPresets: {
+        select: {
+          id: true,
+          name: true,
+          presets: { select: { id: true, title: true, slug: true } },
+        },
+      },
     },
   });
   if (!item) {
@@ -80,7 +86,16 @@ export async function PATCH(
   const item = await prisma.tempo_config.update({
     where: { id },
     data,
-    include: { ...includeBlock, usedByPresets: { select: { id: true, title: true, slug: true } } },
+    include: {
+      ...includeBlock,
+      usedByBuildPresets: {
+        select: {
+          id: true,
+          name: true,
+          presets: { select: { id: true, title: true, slug: true } },
+        },
+      },
+    },
   });
   return NextResponse.json({ success: true, item });
 }

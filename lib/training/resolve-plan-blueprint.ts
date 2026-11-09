@@ -14,7 +14,6 @@ import {
   isAthletePresetBlueprintComplete,
 } from "@/lib/training/athlete-preset-blueprint";
 import type { AthletePresetFitnessPhase, training_plan_preset } from "@prisma/client";
-import { trainingPlanPresetInclude } from "@/lib/training/plan-generate-presets-loader";
 import { loadPresetForGenerateFromProd } from "@/lib/training/load-preset-for-generate-prod";
 import { resolvedBlueprintFromTrainingManage } from "@/lib/training/training-manage-blueprint";
 
@@ -93,7 +92,15 @@ export async function loadPlanBlueprintForGenerate(params: {
   if (plan.presetId) {
     const preset = await prisma.training_plan_preset.findUnique({
       where: { id: plan.presetId },
-      include: trainingPlanPresetInclude,
+      select: {
+        minWeeklyMiles: true,
+        maxWeeklyMiles: true,
+        tempoIdealDow: true,
+        intervalIdealDow: true,
+        longRunDefaultDow: true,
+        slug: true,
+        title: true,
+      },
     });
     const phase = await loadPresetForGenerateFromProd(plan.presetId);
     if (!preset || !phase?.build) return null;
@@ -101,20 +108,10 @@ export async function loadPlanBlueprintForGenerate(params: {
     const base = resolvedBlueprintFromTrainingManage(phase);
     return {
       ...base,
-      rotationPreset: {
-        ...preset,
-        coachPlanOverview: phase.coachPlanOverview ?? preset.coachPlanOverview,
-        workoutStructure: phase.workoutStructure ?? preset.workoutStructure,
-        easyRunConfig: phase.easyRunConfig ?? preset.easyRunConfig,
-        slug: preset.slug,
-        title: preset.title,
-      } as RotationBlueprintSource,
       volumePreset: {
+        ...base.volumePreset,
         minWeeklyMiles: preset.minWeeklyMiles,
         maxWeeklyMiles: preset.maxWeeklyMiles,
-        baseLongRunPoolMiles: preset.baseLongRunPoolMiles,
-        peakLongRunPoolMiles: preset.peakLongRunPoolMiles,
-        taperLongRunPoolMiles: preset.taperLongRunPoolMiles,
         tempoIdealDow: preset.tempoIdealDow,
         intervalIdealDow: preset.intervalIdealDow,
         longRunDefaultDow: preset.longRunDefaultDow,

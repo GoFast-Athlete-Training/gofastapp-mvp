@@ -7,7 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { CATALOGUE_ROTATION_SLOTS } from "@/lib/training/athlete-rotation-constants";
 import { newEntityId } from "@/lib/training/new-entity-id";
 import { reorderPositionRows } from "@/lib/training/reorder-position-rows";
-import { trainingPlanPresetInclude } from "@/lib/training/plan-generate-presets-loader";
+import {
+  asLoadedPresetRotation,
+  trainingPlanPresetInclude,
+} from "@/lib/training/plan-generate-presets-loader";
 
 type ConfigPositionRow = {
   id: string;
@@ -250,18 +253,22 @@ export async function setupAthleteRotationsFromSource(params: {
   if (!athlete || !source) {
     throw new Error("Athlete preset or source template not found");
   }
-  if (!source.longRunConfigId || !source.easyConfigId) {
-    throw new Error("Source preset is missing long-run or easy rotation configs");
+
+  const catalog = asLoadedPresetRotation(source);
+  const sourceLongRunConfigId = source.buildPreset?.longRunConfigId;
+  const sourceEasyConfigId = source.buildPreset?.easyConfigId;
+  if (!sourceLongRunConfigId || !sourceEasyConfigId) {
+    throw new Error("Source preset build is missing long-run or easy rotation configs");
   }
 
-  const sourceLrPositions = source.longRunConfig?.positions ?? [];
-  const sourceEasyPositions = source.easyConfig?.positions ?? [];
+  const sourceLrPositions = catalog.longRunConfig?.positions ?? [];
+  const sourceEasyPositions = catalog.easyConfig?.positions ?? [];
 
   const lrIsClone =
     athlete.longRunConfigId != null &&
-    athlete.longRunConfigId !== source.longRunConfigId;
+    athlete.longRunConfigId !== sourceLongRunConfigId;
   const easyIsClone =
-    athlete.easyConfigId != null && athlete.easyConfigId !== source.easyConfigId;
+    athlete.easyConfigId != null && athlete.easyConfigId !== sourceEasyConfigId;
 
   if (lrIsClone && athlete.longRunConfig?.positions?.length) {
     await remapCloneOrderToSource({
@@ -291,8 +298,8 @@ export async function setupAthleteRotationsFromSource(params: {
     });
   }
 
-  const tempoSeed = catalogueIdsFromPositions(source.tempoConfig?.positions ?? []);
-  const intervalSeed = catalogueIdsFromPositions(source.intervalsConfig?.positions ?? []);
+  const tempoSeed = catalogueIdsFromPositions(catalog.tempoConfig?.positions ?? []);
+  const intervalSeed = catalogueIdsFromPositions(catalog.intervalsConfig?.positions ?? []);
 
   await upsertAthleteLaneConfig({
     athletePresetId: params.athletePresetId,
@@ -308,8 +315,8 @@ export async function setupAthleteRotationsFromSource(params: {
   await prisma.athlete_presets.update({
     where: { id: params.athletePresetId },
     data: {
-      longRunConfigId: source.longRunConfigId,
-      easyConfigId: source.easyConfigId,
+      longRunConfigId: sourceLongRunConfigId,
+      easyConfigId: sourceEasyConfigId,
       intervalsConfigId: null,
       tempoConfigId: null,
       updatedAt: new Date(),

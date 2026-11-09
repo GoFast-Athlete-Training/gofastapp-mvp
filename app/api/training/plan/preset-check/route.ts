@@ -3,7 +3,12 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
-import { trainingPlanPresetInclude } from "@/lib/training/plan-generate-presets-loader";
+import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
+import {
+  asLoadedPresetRotation,
+  trainingPlanPresetInclude,
+} from "@/lib/training/plan-generate-presets-loader";
+import { poolsFromBuildPeakLongRun } from "@/lib/training/catalog-preset-rotation";
 
 type PositionRow = {
   cyclePosition: number;
@@ -90,6 +95,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const preset = asLoadedPresetRotation(rawPreset);
+    const pools = poolsFromBuildPeakLongRun(rawPreset.buildPreset?.peakLongRunMiles ?? null);
+
     return NextResponse.json({
       planId: planRow.id,
       planName: planRow.name,
@@ -97,19 +105,19 @@ export async function GET(request: NextRequest) {
       resolvedPresetId,
       presetSlug: rawPreset.slug ?? "",
       presetTitle: rawPreset.title ?? "",
-      longRunCycleWeeks: rawPreset.longRunCycleWeeks,
+      longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
       minWeeklyMiles: rawPreset.minWeeklyMiles,
       maxWeeklyMiles: rawPreset.maxWeeklyMiles,
-      baseLongRunPoolMiles: rawPreset.baseLongRunPoolMiles,
-      peakLongRunPoolMiles: rawPreset.peakLongRunPoolMiles,
-      taperLongRunPoolMiles: rawPreset.taperLongRunPoolMiles,
+      baseLongRunPoolMiles: pools.baseLongRunPoolMiles,
+      peakLongRunPoolMiles: pools.peakLongRunPoolMiles,
+      taperLongRunPoolMiles: pools.taperLongRunPoolMiles,
       tempoIdealDow: rawPreset.tempoIdealDow,
       intervalIdealDow: rawPreset.intervalIdealDow,
       longRunDefaultDow: rawPreset.longRunDefaultDow,
       positions: {
-        longRun: mapConfigPositions(rawPreset.longRunConfig?.positions),
-        intervals: mapConfigPositions(rawPreset.intervalsConfig?.positions),
-        tempo: mapConfigPositions(rawPreset.tempoConfig?.positions),
+        longRun: mapConfigPositions(preset.longRunConfig?.positions),
+        intervals: mapConfigPositions(preset.intervalsConfig?.positions),
+        tempo: mapConfigPositions(preset.tempoConfig?.positions),
       },
     });
   } catch (e: unknown) {

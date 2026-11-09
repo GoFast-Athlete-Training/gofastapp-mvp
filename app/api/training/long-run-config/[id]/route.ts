@@ -5,13 +5,15 @@ import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { runTypeCatalogueSelect } from "@/lib/training/run-type-config-parser";
 import { distributePoolToPositions, generateCyclePoolTotals } from "@/lib/training/cycle-pool";
+import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
+import { poolsFromBuildPeakLongRun } from "@/lib/training/catalog-preset-rotation";
 
 const includeBlock = {
   positions: {
     orderBy: { cyclePosition: "asc" as const },
     include: { workout_catalogue: { select: runTypeCatalogueSelect } },
   },
-  _count: { select: { usedByPresets: true } },
+  _count: { select: { usedByBuildPresets: true } },
 } as const;
 
 export async function GET(
@@ -25,7 +27,13 @@ export async function GET(
     where: { id },
     include: {
       ...includeBlock,
-      usedByPresets: { select: { id: true, title: true, slug: true } },
+      usedByBuildPresets: {
+        select: {
+          id: true,
+          name: true,
+          presets: { select: { id: true, title: true, slug: true } },
+        },
+      },
     },
   });
   if (!item) {
@@ -47,22 +55,17 @@ export async function GET(
 
   if (presetId) {
     const preset = await prisma.training_plan_preset.findFirst({
-      where: { id: presetId, longRunConfigId: id },
+      where: { id: presetId, buildPreset: { longRunConfigId: id } },
+      include: { buildPreset: { select: { peakLongRunMiles: true } } },
     });
-    if (
-      preset &&
-      item.positions.length > 0 &&
-      preset.baseLongRunPoolMiles != null &&
-      preset.peakLongRunPoolMiles != null &&
-      preset.taperLongRunPoolMiles != null
-    ) {
-      const v = preset;
+    const pools = poolsFromBuildPeakLongRun(preset?.buildPreset?.peakLongRunMiles ?? null);
+    if (preset && item.positions.length > 0) {
       const { poolMilesByCycle, nCycles } = generateCyclePoolTotals({
         totalWeeks,
-        longRunCycleWeeks: v.longRunCycleWeeks,
-        baseLongRunPoolMiles: v.baseLongRunPoolMiles,
-        peakLongRunPoolMiles: v.peakLongRunPoolMiles,
-        taperLongRunPoolMiles: v.taperLongRunPoolMiles,
+        longRunCycleWeeks: LONG_RUN_BLOCK_WEEKS,
+        baseLongRunPoolMiles: pools.baseLongRunPoolMiles,
+        peakLongRunPoolMiles: pools.peakLongRunPoolMiles,
+        taperLongRunPoolMiles: pools.taperLongRunPoolMiles,
       });
       const posRows = item.positions.map((p) => ({
         cyclePosition: p.cyclePosition,
@@ -131,7 +134,16 @@ export async function PATCH(
   const item = await prisma.long_run_config.update({
     where: { id },
     data,
-    include: { ...includeBlock, usedByPresets: { select: { id: true, title: true, slug: true } } },
+    include: {
+      ...includeBlock,
+      usedByBuildPresets: {
+        select: {
+          id: true,
+          name: true,
+          presets: { select: { id: true, title: true, slug: true } },
+        },
+      },
+    },
   });
   return NextResponse.json({ success: true, item });
 }

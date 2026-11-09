@@ -149,6 +149,14 @@ export async function linkRotationToPreset(
   rotationType: RotationType,
   configId: string
 ) {
+  const preset = await prisma.training_plan_preset.findUnique({
+    where: { id: presetId },
+    select: { buildPresetId: true },
+  });
+  if (!preset?.buildPresetId) {
+    throw new Error("Catalog preset has no linked build — link a build preset first");
+  }
+
   const data =
     rotationType === "LongRun"
       ? { longRunConfigId: configId }
@@ -158,8 +166,8 @@ export async function linkRotationToPreset(
           ? { tempoConfigId: configId }
           : { intervalsConfigId: configId };
 
-  return prisma.training_plan_preset.update({
-    where: { id: presetId },
+  return prisma.build_preset.update({
+    where: { id: preset.buildPresetId },
     data,
   });
 }

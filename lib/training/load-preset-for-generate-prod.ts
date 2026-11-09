@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { phaseWeekRowsFromLegacyTaper } from "@/lib/training/phase-week-pins";
-import { mergePresetWithPhaseGenerateJson } from "@/lib/training/merge-preset-phase-generate-json";
 import { parseRaceWeekSlots } from "@/lib/training/race-week-slots";
 import { parseTaperWeekSlots } from "@/lib/training/taper-week-slots";
 import type { TrainingManagePresetForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
@@ -16,13 +15,6 @@ const rotationInclude = {
       },
     },
   },
-} as const;
-
-const planLegacyRotationInclude = {
-  longRunConfig: rotationInclude,
-  easyConfig: rotationInclude,
-  tempoConfig: rotationInclude,
-  intervalsConfig: rotationInclude,
 } as const;
 
 function mapRotation(config: {
@@ -53,7 +45,6 @@ export async function loadPresetForGenerateFromProd(
   const row = await prisma.training_plan_preset.findUnique({
     where: { id: presetId },
     include: {
-      ...planLegacyRotationInclude,
       buildPreset: {
         include: {
           longRunConfig: rotationInclude,
@@ -75,11 +66,6 @@ export async function loadPresetForGenerateFromProd(
   const buildTempo = mapRotation(build?.tempoConfig ?? null);
   const buildIntervals = mapRotation(build?.intervalsConfig ?? null);
 
-  const legacyLongRun = mapRotation(row.longRunConfig);
-  const legacyEasy = mapRotation(row.easyConfig);
-  const legacyTempo = mapRotation(row.tempoConfig);
-  const legacyIntervals = mapRotation(row.intervalsConfig);
-
   const taperSlots = row.taperPreset
     ? parseTaperWeekSlots(row.taperPreset.slots)
     : [];
@@ -95,9 +81,9 @@ export async function loadPresetForGenerateFromProd(
     tempoIdealDow: row.tempoIdealDow,
     intervalIdealDow: row.intervalIdealDow,
     longRunDefaultDow: row.longRunDefaultDow,
-    coachPlanOverview: row.coachPlanOverview,
-    workoutStructure: row.workoutStructure,
-    easyRunConfig: row.easyRunConfig,
+    coachPlanOverview: null,
+    workoutStructure: null,
+    easyRunConfig: null,
     build: build
       ? {
           startLongRunMiles: build.startLongRunMiles,
@@ -108,27 +94,12 @@ export async function loadPresetForGenerateFromProd(
           easyConfigId: build.easyConfigId,
           tempoConfigId: build.tempoConfigId,
           intervalsConfigId: build.intervalsConfigId,
-          longRunConfig: buildLongRun ?? legacyLongRun,
-          easyConfig: buildEasy ?? legacyEasy,
-          tempoConfig: buildTempo ?? legacyTempo,
-          intervalsConfig: buildIntervals ?? legacyIntervals,
+          longRunConfig: buildLongRun,
+          easyConfig: buildEasy,
+          tempoConfig: buildTempo,
+          intervalsConfig: buildIntervals,
         }
-      : legacyLongRun || legacyEasy || legacyTempo || legacyIntervals
-        ? {
-            startLongRunMiles: null,
-            peakLongRunMiles: row.snapPeakLongRunMiles,
-            peakWeeklyMiles: row.snapPeakWeeklyMiles,
-            longRunCutback: null,
-            longRunConfigId: row.longRunConfigId,
-            easyConfigId: row.easyConfigId,
-            tempoConfigId: row.tempoConfigId,
-            intervalsConfigId: row.intervalsConfigId,
-            longRunConfig: legacyLongRun,
-            easyConfig: legacyEasy,
-            tempoConfig: legacyTempo,
-            intervalsConfig: legacyIntervals,
-          }
-        : null,
+      : null,
     taper: row.taperPreset
       ? {
           name: row.taperPreset.name,
@@ -144,5 +115,5 @@ export async function loadPresetForGenerateFromProd(
       : null,
   };
 
-  return mergePresetWithPhaseGenerateJson(loaded, row.presetPhaseGenerateJson);
+  return loaded;
 }

@@ -47,11 +47,7 @@ export async function seedWorkoutBlueprintFromSource(params: {
   const [source, athlete] = await Promise.all([
     prisma.training_plan_preset.findUnique({
       where: { id: params.sourcePresetId },
-      select: {
-        workoutStructure: true,
-        coachPlanOverview: true,
-        easyRunConfig: true,
-      },
+      select: { id: true },
     }),
     prisma.athlete_presets.findUnique({
       where: { id: params.athletePresetId },
@@ -62,24 +58,12 @@ export async function seedWorkoutBlueprintFromSource(params: {
     throw new Error("Source preset not found");
   }
 
-  const sourceOverview =
-    source.coachPlanOverview != null &&
-    typeof source.coachPlanOverview === "object" &&
-    !Array.isArray(source.coachPlanOverview)
-      ? (source.coachPlanOverview as Record<string, unknown>)
-      : null;
-
   const generationPatch: Record<string, unknown> = { easyConfirmed: true };
-  if (sourceOverview?.weeklyWorkoutComposition != null) {
-    generationPatch.weeklyWorkoutComposition = sourceOverview.weeklyWorkoutComposition;
-  }
 
   await prisma.athlete_presets.update({
     where: { id: params.athletePresetId },
     data: {
-      workoutStructure: source.workoutStructure ?? undefined,
       coachPlanOverview: mergeCoachPlanOverview(athlete?.coachPlanOverview, generationPatch),
-      easyRunConfig: source.easyRunConfig ?? undefined,
       updatedAt: new Date(),
     },
   });

@@ -9,6 +9,12 @@ import {
   catalogueSelectForGeneration,
   positionsInclude,
 } from "@/lib/training/preset-positions-include";
+import {
+  catalogPresetBuildInclude,
+  rotationFromCatalogPreset,
+  type CatalogPresetRotationFields,
+  type CatalogPresetWithBuild,
+} from "@/lib/training/catalog-preset-rotation";
 
 export { catalogueSelectForGeneration, positionsInclude };
 
@@ -28,19 +34,20 @@ export function presetToPlanGenConfig(
     training_plan_preset,
     | "minWeeklyMiles"
     | "maxWeeklyMiles"
-    | "baseLongRunPoolMiles"
-    | "peakLongRunPoolMiles"
-    | "taperLongRunPoolMiles"
     | "tempoIdealDow"
     | "intervalIdealDow"
     | "longRunDefaultDow"
-  >
+  > & {
+    baseLongRunPoolMiles?: number | null;
+    peakLongRunPoolMiles?: number | null;
+    taperLongRunPoolMiles?: number | null;
+  }
 ): PlanGenConfig {
   return {
     minWeeklyMiles: preset.minWeeklyMiles,
-    baseLongRunPoolMiles: preset.baseLongRunPoolMiles,
-    peakLongRunPoolMiles: preset.peakLongRunPoolMiles,
-    taperLongRunPoolMiles: preset.taperLongRunPoolMiles,
+    baseLongRunPoolMiles: preset.baseLongRunPoolMiles ?? null,
+    peakLongRunPoolMiles: preset.peakLongRunPoolMiles ?? null,
+    taperLongRunPoolMiles: preset.taperLongRunPoolMiles ?? null,
     maxWeeklyMiles: preset.maxWeeklyMiles,
     tempoIdealDow: preset.tempoIdealDow,
     intervalIdealDow: preset.intervalIdealDow,
@@ -48,18 +55,16 @@ export function presetToPlanGenConfig(
   };
 }
 
-export const trainingPlanPresetInclude = {
-  longRunConfig: { include: { positions: positionsInclude } },
-  intervalsConfig: { include: { positions: positionsInclude } },
-  tempoConfig: { include: { positions: positionsInclude } },
-  easyConfig: { include: { positions: positionsInclude } },
-} as const;
+export const trainingPlanPresetInclude = catalogPresetBuildInclude;
 
-export type LoadedPresetInclude = NonNullable<
-  Prisma.training_plan_presetGetPayload<{
-    include: typeof trainingPlanPresetInclude;
-  }>
->;
+export type LoadedPresetInclude = CatalogPresetWithBuild & CatalogPresetRotationFields;
+
+/** Flatten build_preset rotations onto the include shape generators expect. */
+export function asLoadedPresetRotation(
+  preset: CatalogPresetWithBuild,
+): LoadedPresetInclude {
+  return { ...preset, ...rotationFromCatalogPreset(preset) };
+}
 
 export const athletePresetInclude = athletePresetRotationInclude;
 
