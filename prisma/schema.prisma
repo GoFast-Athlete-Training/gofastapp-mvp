@@ -209,6 +209,7 @@ model Athlete {
   athlete_coach_profile         athlete_coach_profiles?
   athlete_coach_programs        athlete_coach_programs[]
   athlete_causes                athlete_causes[]
+  athlete_charities             athlete_charities[]
 }
 
 enum AthleteCoachProgramType {
@@ -572,6 +573,47 @@ model athlete_causes {
   @@unique([athleteId, websiteUrl])
   @@index([athleteId])
   @@map("athlete_causes")
+}
+
+/// Universal charity catalog (same id as Race Manage racem_charities).
+model charities {
+  id                String   @id
+  name              String
+  email             String?
+  phone             String?
+  charityWebsiteUrl String?
+  city              String?
+  state             String?
+  address           String?
+  description       String?  @db.Text
+  mission           String?  @db.Text
+  charitySupports   String?  @db.Text
+  charityLogo       String?
+  notes             String?  @db.Text
+  syncedAt          DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  athlete_charities athlete_charities[]
+
+  @@index([name])
+  @@map("charities")
+}
+
+/// Athlete alignment with a universal charity (claim).
+model athlete_charities {
+  id        String   @id @default(cuid())
+  athleteId String
+  charityId String
+  createdAt DateTime @default(now())
+
+  athlete Athlete    @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  charity charities  @relation(fields: [charityId], references: [id], onDelete: Cascade)
+
+  @@unique([athleteId, charityId])
+  @@index([athleteId])
+  @@index([charityId])
+  @@map("athlete_charities")
 }
 
 /// Athlete-owned business entity — logo, name, website for GoFast With Me (not go_fast_companies tenant).
