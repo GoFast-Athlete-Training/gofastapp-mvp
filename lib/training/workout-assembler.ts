@@ -79,13 +79,33 @@ export function assembleWorkoutStepsFromPacedShape(shape: PacedWorkoutShape): Wo
   return out;
 }
 
+/** API / AI segments may use plain `string` for durationType before editor hydration. */
+export type AiSegmentLike = {
+  stepOrder: number;
+  title: string;
+  durationType: string;
+  durationValue: number;
+  targets?: WorkoutStep["targets"];
+  repeatCount?: number;
+  recoveryDurationType?: string | null;
+  recoveryDurationValue?: number | null;
+};
+
+function asWorkoutStep(s: AiSegmentLike): WorkoutStep {
+  return {
+    ...s,
+    durationType: s.durationType === "TIME" ? "TIME" : "DISTANCE",
+  };
+}
+
 /** Fold AI pairs: same repeatCount on two consecutive TIME steps → flat cycle rows. */
-export function normalizeAiSegmentsForAssembler(segments: WorkoutStep[]): WorkoutStep[] {
+export function normalizeAiSegmentsForAssembler(segments: AiSegmentLike[]): WorkoutStep[] {
+  const steps = segments.map(asWorkoutStep);
   const out: WorkoutStep[] = [];
   let i = 0;
-  while (i < segments.length) {
-    const a = segments[i]!;
-    const b = segments[i + 1];
+  while (i < steps.length) {
+    const a = steps[i]!;
+    const b = steps[i + 1];
     const repsA = a.repeatCount ?? 1;
     const repsB = b?.repeatCount ?? 1;
     const sameTime =

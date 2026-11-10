@@ -922,7 +922,7 @@ function CreateWorkoutPageInner() {
         suggestedDescription: string;
       }>("workouts/ai-generate", { workoutType, sourceText: text });
       applyDerivedSegmentsToCreateForm({
-        segments: normalizeAiSegmentsForAssembler(data.segments as ApiSegment[]),
+        segments: normalizeAiSegmentsForAssembler(data.segments),
         suggestedTitle: data.suggestedTitle,
         suggestedDescription: data.suggestedDescription,
       });
