@@ -17,6 +17,8 @@ export type ParsedPasteSegment = {
   durationType: "DISTANCE" | "TIME";
   durationValue: number;
   repeatCount?: number;
+  /** Multi-step cycle inside one repeat (e.g. 1′ @ 10K / 1′ steady). */
+  cycleSteps?: ParsedPasteSegment[];
   /** Sec/mi vs athlete 5K anchor; omit targets when null or no anchor on materialize. */
   paceOffsetSecPerMile?: number | null;
   recoveryDurationType?: "DISTANCE" | "TIME" | null;
@@ -61,7 +63,7 @@ export function parseBetweenRepRecoveryFromText(text: string): ParsedBetweenRepR
   if (!normalized) return null;
 
   const withPattern =
-    /(?:w\/|with)\s*(\d+(?:\.\d+)?)\s*(m\b|meter|meters|mi\b|mile|miles|km\b|min(?:ute)?s?)?\s*(?:easy\s*)?(?:jog\s*)?(?:recovery|rest)?(?:\s*between|\s*between\s*repeat)?/i;
+    /(?:w\/|with)\s*(\d+(?:\.\d+)?)\s*(sec(?:ond)?s?|s\b|m\b|meter|meters|mi\b|mile|miles|km\b|min(?:ute)?s?)?\s*(?:easy\s*)?(?:jog\s*)?(?:recovery|rest)?(?:\s*between|\s*between\s*repeat)?/i;
   let m = normalized.match(withPattern);
 
   if (!m) {
@@ -101,12 +103,49 @@ export function parseBetweenRepRecoveryFromText(text: string): ParsedBetweenRepR
     );
   }
 
+  if (!m) {
+    const secWith = normalized.match(
+      /(?:w\/|with)\s*(\d+(?:\.\d+)?)\s*second(?:s)?\s*(?:of\s*)?(?:rest|recovery)?/i
+    );
+    if (secWith) {
+      const sec = parseFloat(secWith[1]);
+      if (Number.isFinite(sec) && sec > 0) {
+        return { recoveryDurationType: "TIME", recoveryDurationValue: Math.round((sec / 60) * 100) / 100 };
+      }
+    }
+  }
+
+  if (!m) {
+    const clockRest = normalized.match(
+      /(\d{1,2}):(\d{2})\s*(?:second(?:s)?\s*)?(?:rest|recovery)/i
+    );
+    if (clockRest) {
+      const minutes = parseInt(clockRest[1], 10);
+      const seconds = parseInt(clockRest[2], 10);
+      if (Number.isFinite(minutes) && Number.isFinite(seconds)) {
+        const totalMin = minutes + seconds / 60;
+        if (totalMin > 0) {
+          return { recoveryDurationType: "TIME", recoveryDurationValue: Math.round(totalMin * 100) / 100 };
+        }
+      }
+    }
+  }
+
   if (!m) return null;
 
   const raw = parseFloat(m[1]);
-  const unit = (m[2] || "m").toLowerCase();
+  const unitRaw = (m[2] || "").toLowerCase();
+  const unit =
+    unitRaw ||
+    (/\bsecond/.test(m[0]) ? "sec" : /\bmin/.test(m[0]) ? "min" : "m");
   if (!Number.isFinite(raw) || raw <= 0) return null;
 
+  if (unit.startsWith("sec") || unit === "s") {
+    return {
+      recoveryDurationType: "TIME",
+      recoveryDurationValue: Math.round((raw / 60) * 100) / 100,
+    };
+  }
   if (unit.startsWith("min")) {
     return { recoveryDurationType: "TIME", recoveryDurationValue: raw };
   }
@@ -168,6 +207,7 @@ export function effortTextToPaceOffsetSecPerMile(text: string): number | null {
   if (/\btempo\b|\bthreshold\b/.test(t)) return 15;
   if (/\bmarathon\b|\bmp\b/.test(t)) return 45;
   if (/\binterval\b|\bspeed\b/.test(t)) return -10;
+  if (/\bsteady\b|\beasy\b/.test(t)) return 90;
   return null;
 }
 
@@ -204,6 +244,57 @@ export function inferRepDistanceMiles(amount: number, unitRaw: string | undefine
   return amount;
 }
 
+/** `20 × (1' @ 10K / 1' steady)` → one repeat with two timed effort legs. */
+function tryParseTimeCycleRepeatBlock(text: string): ParsedPasteWorkout | null {
+  const m = text.match(/(\d+)\s*[x×]\s*\(\s*([^)]+)\)/i);
+  if (!m) return null;
+  const repeatCount = parseInt(m[1], 10);
+  const inner = m[2] ?? "";
+  if (!Number.isFinite(repeatCount) || repeatCount < 1) return null;
+
+  const legs = inner.split(/\s*\/\s*/).filter(Boolean);
+  if (legs.length < 2) return null;
+
+  const legRe =
+    /(\d+(?:\.\d+)?)\s*(?:'|”|″|min(?:ute)?s?|")\s*(?:@|at)?\s*([^\s/]+(?:\s+[^\s/]+)*)/i;
+  const cycleSteps: ParsedPasteSegment[] = [];
+
+  for (const leg of legs) {
+    const lm = leg.trim().match(legRe);
+    if (!lm) return null;
+    const amount = parseFloat(lm[1]);
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    const effort = (lm[2] ?? "").trim();
+    const minutes =
+      /'|”|″|"/.test(leg) && !/\bmin/i.test(leg) ? amount : amount;
+    const offset = effortTextToPaceOffsetSecPerMile(effort);
+    cycleSteps.push({
+      title: titleForSegment("TIME", effort, offset),
+      durationType: "TIME",
+      durationValue: minutes,
+      paceOffsetSecPerMile: offset,
+      effortContext: effort,
+    });
+  }
+
+  const bookends = scanBookendSegments(text).map((b) => b.segment);
+  const segments: ParsedPasteSegment[] = [...bookends];
+  segments.push({
+    title: "Intervals",
+    durationType: "TIME",
+    durationValue: cycleSteps[0]!.durationValue,
+    repeatCount,
+    cycleSteps,
+    paceOffsetSecPerMile: cycleSteps[0]!.paceOffsetSecPerMile,
+    effortContext: inner,
+  });
+
+  const summary = text.replace(/\s+/g, " ").slice(0, 160);
+  const title = /\bfartlek\b/i.test(text) ? "Fartlek" : "Track intervals";
+
+  return { segments, suggestedTitle: title, suggestedDescription: summary };
+}
+
 function titleForSegment(
   durationType: "DISTANCE" | "TIME",
   context: string,
@@ -220,7 +311,8 @@ function titleForSegment(
 function scanPrescriptionMatches(text: string): ScanMatch[] {
   const matches: ScanMatch[] = [];
 
-  const timeRe = /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(?:minutes|minute|mins|min)\b/gi;
+  const timeRe =
+    /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(?:minutes|minute|mins|min|'|”|″)\b/gi;
   let m: RegExpExecArray | null;
   while ((m = timeRe.exec(text)) !== null) {
     const repeatCount = parseInt(m[1], 10);
@@ -450,6 +542,9 @@ export function tryParsePastedWorkoutText(
   const blockParsed = tryParseCoachBlockWorkout(text);
   if (blockParsed) return blockParsed;
 
+  const timeCycle = tryParseTimeCycleRepeatBlock(text);
+  if (timeCycle) return timeCycle;
+
   const raw = scanPrescriptionMatches(text);
   if (raw.length === 0) return null;
 
@@ -576,8 +671,10 @@ export function parsedPasteToAiGenerateResponse(
   suggestedTitle: string;
   suggestedDescription: string;
 } {
+  const { parsedPasteToWorkoutSteps } =
+    require("@/lib/training/paste-workout-pipeline") as typeof import("@/lib/training/paste-workout-pipeline");
   return {
-    segments: materializeParsedPasteWorkoutSteps(parsed, fiveKPaceDisplay),
+    segments: parsedPasteToWorkoutSteps(parsed, fiveKPaceDisplay),
     suggestedTitle: parsed.suggestedTitle,
     suggestedDescription: parsed.suggestedDescription,
   };

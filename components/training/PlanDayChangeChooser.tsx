@@ -56,7 +56,7 @@ export default function PlanDayChangeChooser({
         <button
           type="button"
           onClick={openChooser}
-          className="text-sm font-semibold text-sky-800 hover:text-sky-950 hover:underline"
+          className="w-full rounded-xl border border-sky-200 bg-sky-50 py-2.5 text-sm font-semibold text-sky-900 hover:bg-sky-100"
         >
           Change today&apos;s workout
         </button>

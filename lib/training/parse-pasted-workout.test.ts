@@ -171,6 +171,29 @@ test("parses bookends with alternating marathon-pace work as long-run pairs", ()
   assert.match(parsed.suggestedTitle, /alternating MP/i);
 });
 
+test("parses fartlek time cycle 20 x (1' @ 10K / 1' steady)", () => {
+  const note = "20 × (1' @ 10K / 1' steady) — 40 min fartlek";
+  const parsed = tryParsePastedWorkoutText(note, "Intervals");
+  assert.ok(parsed);
+  const work = parsed.segments.find((s) => (s.repeatCount ?? 0) > 1);
+  assert.ok(work);
+  assert.equal(work!.repeatCount, 20);
+  assert.equal(work!.cycleSteps?.length, 2);
+  assert.equal(work!.cycleSteps?.[0]?.durationValue, 1);
+  assert.equal(work!.cycleSteps?.[1]?.durationValue, 1);
+});
+
+test("parses 2 x 3 miles at marathon pace with 120 second rest", () => {
+  const note = "6 miles easy, 2 x 3 miles at marathon pace with 120 second rest";
+  const parsed = tryParsePastedWorkoutText(note, "LongRun");
+  assert.ok(parsed);
+  const work = parsed.segments.find((s) => (s.repeatCount ?? 0) === 2);
+  assert.ok(work);
+  assert.equal(work!.durationValue, 3);
+  assert.equal(work!.recoveryDurationType, "TIME");
+  assert.ok(Math.abs((work!.recoveryDurationValue ?? 0) - 2) < 0.01);
+});
+
 test("parses 800m repeats with between-rep recovery and explicit pace band", () => {
   const note =
     "800m repeats 4 x 800m at 7:00–7:30/mile pace (3:29–3:44 per 800m), with 400m easy jog recovery between repeats";

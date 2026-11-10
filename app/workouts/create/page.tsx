@@ -24,6 +24,14 @@ import {
   collapseFlatSegmentsForEditor,
   formatSegmentDistance,
 } from "@/lib/training/segment-summary";
+import WorkoutShapeConfirmPanel from "@/components/training/WorkoutShapeConfirmPanel";
+import type { WorkoutShape } from "@/lib/training/workout-shape-service";
+import {
+  assembleWorkoutStepsFromPacedShape,
+  pacedShapeFromConfirmed,
+  buildShapeFromPasteText,
+} from "@/lib/training/paste-workout-pipeline";
+import { normalizeAiSegmentsForAssembler } from "@/lib/training/workout-assembler";
 import {
   suggestRaceBlocksFromGoal,
   type PacingStrategy,
@@ -394,7 +402,17 @@ function CreateWorkoutPageInner() {
   const [scheduledDate, setScheduledDate] = useState("");
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [assignToPlanDay, setAssignToPlanDay] = useState(false);
-  const [buildLane, setBuildLane] = useState<"presets" | "manual" | "ai" | "paste" | null>(null);
+  const [pendingShape, setPendingShape] = useState<WorkoutShape | null>(null);
+  const [pendingShapeMeta, setPendingShapeMeta] = useState<{
+    suggestedTitle: string;
+    suggestedDescription: string;
+  } | null>(null);
+  const [applyingPaces, setApplyingPaces] = useState(false);
+  const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
+  const [builtWorkouts, setBuiltWorkouts] = useState<
+    Array<{ id: string; title: string; workoutType: string; date: string | null }>
+  >([]);
+  const [builtWorkoutsLoading, setBuiltWorkoutsLoading] = useState(false);
   const [aiGeneratePrompt, setAiGeneratePrompt] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
   const [presetTypeFilter, setPresetTypeFilter] = useState<string>("");
@@ -557,7 +575,7 @@ function CreateWorkoutPageInner() {
   }, [raceDayMode, racePlanId]);
 
   useEffect(() => {
-    if (raceDayMode || buildLane !== "presets" || !presetTypeFilter) return;
+    if (raceDayMode || !presetTypeFilter) return;
     let cancelled = false;
     (async () => {
       try {
@@ -577,7 +595,49 @@ function CreateWorkoutPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [raceDayMode, buildLane, presetTypeFilter]);
+  }, [raceDayMode, presetTypeFilter]);
+
+  useEffect(() => {
+    if (raceDayMode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get<{ athlete?: { fiveKPace?: string | null } }>("athlete/me");
+        if (!cancelled) setAthleteFiveKPace(data.athlete?.fiveKPace?.trim() || null);
+      } catch {
+        if (!cancelled) setAthleteFiveKPace(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [raceDayMode]);
+
+  useEffect(() => {
+    if (raceDayMode) return;
+    let cancelled = false;
+    setBuiltWorkoutsLoading(true);
+    (async () => {
+      try {
+        const { data } = await api.get<{
+          workouts: Array<{
+            id: string;
+            title: string;
+            workoutType: string;
+            date: string | null;
+          }>;
+        }>("workouts?standalone=1&paged=1&limit=20");
+        if (!cancelled) setBuiltWorkouts(data.workouts ?? []);
+      } catch {
+        if (!cancelled) setBuiltWorkouts([]);
+      } finally {
+        if (!cancelled) setBuiltWorkoutsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [raceDayMode]);
 
   useEffect(() => {
     if (!editingTarget) return;
@@ -800,6 +860,24 @@ function CreateWorkoutPageInner() {
     router.push(detailUrl);
   };
 
+  const applyShapeWithPaces = () => {
+    if (!pendingShape || !pendingShapeMeta) return;
+    setApplyingPaces(true);
+    try {
+      const paced = pacedShapeFromConfirmed(pendingShape, athleteFiveKPace);
+      const steps = assembleWorkoutStepsFromPacedShape(paced);
+      applyDerivedSegmentsToCreateForm({
+        segments: steps as ApiSegment[],
+        suggestedTitle: pendingShapeMeta.suggestedTitle,
+        suggestedDescription: pendingShapeMeta.suggestedDescription,
+      });
+      setPendingShape(null);
+      setPendingShapeMeta(null);
+    } finally {
+      setApplyingPaces(false);
+    }
+  };
+
   const handleDerive = async () => {
     const text = sourceText.trim();
     if (!text) {
@@ -826,13 +904,23 @@ function CreateWorkoutPageInner() {
         return;
       }
 
+      const localShape = buildShapeFromPasteText(text, workoutType);
+      if (localShape) {
+        setPendingShape(localShape);
+        setPendingShapeMeta({
+          suggestedTitle: localShape.suggestedTitle,
+          suggestedDescription: localShape.suggestedDescription,
+        });
+        return;
+      }
+
       const { data } = await api.post<{
         segments: ApiSegment[];
         suggestedTitle: string;
         suggestedDescription: string;
       }>("workouts/ai-generate", { workoutType, sourceText: text });
       applyDerivedSegmentsToCreateForm({
-        segments: data.segments,
+        segments: normalizeAiSegmentsForAssembler(data.segments as ApiSegment[]),
         suggestedTitle: data.suggestedTitle,
         suggestedDescription: data.suggestedDescription,
       });
@@ -1209,39 +1297,34 @@ function CreateWorkoutPageInner() {
           </h1>
 
           {!raceDayMode ? (
-            <div className="mb-8">
-              <p className="text-sm font-medium text-gray-900 mb-3">How do you want to build it?</p>
-              <div className="flex flex-wrap gap-2">
-                {(
-                  [
-                    ["presets", "Choose presets by type"],
-                    ["manual", "Manual"],
-                    ["ai", "AI"],
-                    ["paste", "Drop in text"],
-                  ] as const
-                ).map(([lane, label]) => (
-                  <button
-                    key={lane}
-                    type="button"
-                    onClick={() => {
-                      setBuildLane(lane);
-                      if (lane !== "presets") setPresetTypeFilter("");
-                      setDeriveError(null);
-                    }}
-                    className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
-                      buildLane === lane
-                        ? "border-orange-500 bg-orange-50 text-orange-900"
-                        : "border-gray-200 bg-white text-gray-800 hover:border-orange-200"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+            <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+              <h2 className="text-sm font-semibold text-gray-900 mb-2">Workouts you&apos;ve built</h2>
+              {builtWorkoutsLoading ? (
+                <p className="text-sm text-gray-500">Loading…</p>
+              ) : builtWorkouts.length === 0 ? (
+                <p className="text-sm text-gray-600">No standalone workouts yet — paste or pick a preset below.</p>
+              ) : (
+                <ul className="space-y-2 list-none pl-0 m-0">
+                  {builtWorkouts.map((w) => (
+                    <li key={w.id}>
+                      <Link
+                        href={workoutDetailPathWithBackHref(w.id, builderBackHref)}
+                        className="text-sm font-medium text-sky-800 hover:text-sky-950 hover:underline"
+                      >
+                        {w.title}
+                      </Link>
+                      <span className="text-xs text-gray-500 ml-2">
+                        {w.workoutType}
+                        {w.date ? ` · ${String(w.date).slice(0, 10)}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           ) : null}
 
-          {!raceDayMode && buildLane === "manual" ? (
+          {!raceDayMode && !hasSlots ? (
             <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
@@ -1349,7 +1432,45 @@ function CreateWorkoutPageInner() {
           </div>
           ) : null}
 
-          {!raceDayMode && buildLane === "presets" ? (
+          {!raceDayMode ? (
+          <div className="mb-8">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Paste your workout</h2>
+              <p className="text-sm text-gray-600 mb-3">
+                Paste from a coach, Runna, or ChatGPT. We read the shape first, then you confirm before paces land.
+              </p>
+              <textarea
+                value={sourceText}
+                onChange={(e) => setSourceText(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                placeholder="e.g. 20 × (1' @ 10K / 1' steady) — 40 min fartlek"
+              />
+              {deriveError ? <p className="text-sm text-red-600 mt-1">{deriveError}</p> : null}
+              {pendingShape ? (
+                <WorkoutShapeConfirmPanel
+                  shape={pendingShape}
+                  onConfirm={applyShapeWithPaces}
+                  onBack={() => {
+                    setPendingShape(null);
+                    setPendingShapeMeta(null);
+                  }}
+                  applying={applyingPaces}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleDerive}
+                  disabled={deriving}
+                  className="mt-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  {deriving ? "Parsing…" : "Parse workout"}
+                </button>
+              )}
+            </div>
+          ) : null}
+
+          {!raceDayMode ? (
           <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Presets by type</h2>
             <div className="flex flex-wrap gap-2 mb-4">
@@ -1509,7 +1630,7 @@ function CreateWorkoutPageInner() {
           </details>
           ) : null}
 
-          {!raceDayMode && buildLane === "ai" ? (
+          {!raceDayMode ? (
             <div className="mb-8 rounded-lg border border-orange-100 bg-orange-50/40 p-4">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">AI — build from your training</h2>
               <p className="text-sm text-gray-600 mb-3">
@@ -1552,49 +1673,20 @@ function CreateWorkoutPageInner() {
             </div>
           ) : null}
 
-          {(raceDayMode || buildLane === "paste") && (
+          {raceDayMode ? (
           <div className="mb-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                {raceDayMode ? "Paste pacing blocks" : "Drop in text — paste your workout"}
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Paste pacing blocks</h2>
               <p className="text-sm text-gray-600 mb-3">
-                {raceDayMode ? (
-                  <>
-                    Paste coach notes (AI turns them into blocks) or one line per block:{" "}
-                    <span className="font-mono text-gray-800">miles pace pace</span> (e.g.{" "}
-                    <span className="font-mono text-gray-800">8 7:05 7:25</span> = 8-mile block).
-                  </>
-                ) : (
-                  <>
-                    Paste from another coach or LLM (Runna, ChatGPT, etc.). We parse it into
-                    warmup, work, and cooldown blocks below — review, then save.
-                    Tabular splits: <span className="font-mono text-gray-800">miles pace pace</span>{" "}
-                    per line (e.g. <span className="font-mono text-gray-800">5 7:00 7:20</span>).
-                  </>
-                )}
+                Paste coach notes (AI turns them into blocks) or one line per block:{" "}
+                <span className="font-mono text-gray-800">miles pace pace</span> (e.g.{" "}
+                <span className="font-mono text-gray-800">8 7:05 7:25</span> = 8-mile block).
               </p>
-              {!raceDayMode ? (
-                <div className="mb-3 max-w-xs">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Workout type hint</label>
-                  <select
-                    value={workoutType}
-                    onChange={(e) => setWorkoutType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-500"
-                  >
-                    {WORKOUT_TYPES.filter((t) => t !== "Race").map((t) => (
-                      <option key={t} value={t}>
-                        {t === "LongRun" ? "Long run" : t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
               <textarea
                 value={sourceText}
                 onChange={(e) => setSourceText(e.target.value)}
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                placeholder="e.g. 15 miles today — 2 mile warmup, 10 at marathon pace, 3 mile cooldown — or paste split lines: 5 7:00 7:20"
+                placeholder="e.g. 15 miles today — 2 mile warmup, 10 at marathon pace, 3 mile cooldown"
               />
               {deriveError ? <p className="text-sm text-red-600 mt-1">{deriveError}</p> : null}
               <button
@@ -1604,12 +1696,12 @@ function CreateWorkoutPageInner() {
                 className="mt-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 <FileText className="w-4 h-4" />
-                {deriving ? "Parsing…" : raceDayMode ? "Build workout" : "Parse workout"}
+                {deriving ? "Parsing…" : "Build workout"}
               </button>
             </div>
-          )}
+          ) : null}
 
-          {!raceDayMode && buildLane === "manual" && !hasSlots ? (
+          {!raceDayMode && !hasSlots ? (
             <div className="flex gap-4 justify-end pt-6 border-t border-gray-200 mb-6">
               <Link
                 href={fromHostRun ? hostRunBackHref : builderBackHref}
