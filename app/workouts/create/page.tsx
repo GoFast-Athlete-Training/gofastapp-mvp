@@ -27,11 +27,13 @@ import {
 import WorkoutShapeConfirmPanel from "@/components/training/WorkoutShapeConfirmPanel";
 import type { WorkoutShape } from "@/lib/training/workout-shape-service";
 import {
-  assembleWorkoutStepsFromPacedShape,
   pacedShapeFromConfirmed,
   buildShapeFromPasteText,
 } from "@/lib/training/paste-workout-pipeline";
-import { normalizeAiSegmentsForAssembler } from "@/lib/training/workout-assembler";
+import {
+  assembleWorkoutStepsFromPacedShape,
+  normalizeAiSegmentsForAssembler,
+} from "@/lib/training/workout-assembler";
 import {
   suggestRaceBlocksFromGoal,
   type PacingStrategy,
