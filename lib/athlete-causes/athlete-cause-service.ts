@@ -126,3 +126,68 @@ export async function upsertAthleteCauseFromRaceRegistry(input: {
   });
   return { row, created: true };
 }
+
+/** From universal `charities` catalog (Race Manage snap). Also stamps `athlete_charities`. */
+export async function upsertAthleteCauseFromCharityCatalog(input: {
+  athleteId: string;
+  charityId: string;
+}): Promise<{ row: AthleteCauseRow; created: boolean }> {
+  const charityId = input.charityId.trim();
+  const charity = await prisma.charities.findUnique({
+    where: { id: charityId },
+    select: {
+      id: true,
+      name: true,
+      charityWebsiteUrl: true,
+      charityLogo: true,
+    },
+  });
+  if (!charity) {
+    throw new Error("Charity not found in catalog");
+  }
+  const charityName = charity.name.trim();
+  const charityUrl = charity.charityWebsiteUrl?.trim();
+  if (!charityName) {
+    throw new Error("Charity name is required");
+  }
+  if (!charityUrl || !/^https?:\/\//i.test(charityUrl)) {
+    throw new Error("This charity needs an https website URL before you can add it");
+  }
+  const normalized = normalizeCauseWebsiteUrl(charityUrl);
+  if (!normalized) {
+    throw new Error("Invalid charity URL");
+  }
+
+  await prisma.athlete_charities.upsert({
+    where: {
+      athleteId_charityId: { athleteId: input.athleteId, charityId: charity.id },
+    },
+    create: { athleteId: input.athleteId, charityId: charity.id },
+    update: {},
+  });
+
+  const existing = await prisma.athlete_causes.findFirst({
+    where: { athleteId: input.athleteId, websiteUrl: normalized },
+  });
+  if (existing) {
+    const logoUrl = charity.charityLogo?.trim() || null;
+    const updated =
+      existing.name !== charityName || existing.logoUrl !== logoUrl
+        ? await prisma.athlete_causes.update({
+            where: { id: existing.id },
+            data: { name: charityName, logoUrl },
+          })
+        : existing;
+    return { row: updated, created: false };
+  }
+
+  const row = await prisma.athlete_causes.create({
+    data: {
+      athleteId: input.athleteId,
+      name: charityName,
+      websiteUrl: normalized,
+      logoUrl: charity.charityLogo?.trim() || null,
+    },
+  });
+  return { row, created: true };
+}

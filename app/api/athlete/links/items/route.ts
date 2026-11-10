@@ -5,7 +5,10 @@ import {
 import { isHydratedLinkKind, parseLinkKindInput } from "@/lib/athlete-link-tree/link-kinds";
 import { inferCityRunLinkVisual } from "@/lib/athlete-link-tree/infer-city-run-link-visual";
 import { assertSingleRacesCard, normalizeLinkDestination } from "@/lib/athlete-link-tree/link-validation";
-import { upsertAthleteCauseFromRaceRegistry } from "@/lib/athlete-causes/athlete-cause-service";
+import {
+  upsertAthleteCauseFromCharityCatalog,
+  upsertAthleteCauseFromRaceRegistry,
+} from "@/lib/athlete-causes/athlete-cause-service";
 import { athleteRacePublicCardUrl } from "@/lib/athlete-race-public-card-url";
 import { cityRunPublicCardUrl } from "@/lib/city-run-public-card-url";
 import { AthleteLinkTreeLinkKind } from "@prisma/client";
@@ -45,6 +48,7 @@ export async function POST(request: NextRequest) {
     sectionId?: string;
     parentSectionId?: string;
     raceRegistryId?: string;
+    charityId?: string;
   };
 
   const parentSectionRaw =
@@ -54,13 +58,21 @@ export async function POST(request: NextRequest) {
   const cityRunIdInput = body.cityRunId?.trim();
   const athleteCauseIdInput = body.athleteCauseId?.trim();
   const raceRegistryIdInput = body.raceRegistryId?.trim();
+  const charityIdInput = body.charityId?.trim();
 
-  const exclusiveCount = [athleteRaceIdInput, cityRunIdInput, athleteCauseIdInput, raceRegistryIdInput].filter(
-    Boolean,
-  ).length;
+  const exclusiveCount = [
+    athleteRaceIdInput,
+    cityRunIdInput,
+    athleteCauseIdInput,
+    raceRegistryIdInput,
+    charityIdInput,
+  ].filter(Boolean).length;
   if (exclusiveCount > 1) {
     return NextResponse.json(
-      { success: false, error: "Use only one of athlete race, city run, cause, or registry charity" },
+      {
+        success: false,
+        error: "Use only one of athlete race, city run, cause, registry charity, or catalog charity",
+      },
       { status: 400 },
     );
   }
@@ -70,7 +82,7 @@ export async function POST(request: NextRequest) {
     parsedKind = AthleteLinkTreeLinkKind.ATHLETE_RACE;
   } else if (cityRunIdInput) {
     parsedKind = AthleteLinkTreeLinkKind.CITY_RUN;
-  } else if (athleteCauseIdInput || raceRegistryIdInput) {
+  } else if (athleteCauseIdInput || raceRegistryIdInput || charityIdInput) {
     parsedKind = AthleteLinkTreeLinkKind.CUSTOM;
   }
   if (!parsedKind) {
@@ -81,7 +93,10 @@ export async function POST(request: NextRequest) {
   if (
     !name &&
     parsedKind !== AthleteLinkTreeLinkKind.ATHLETE_RACE &&
-    parsedKind !== AthleteLinkTreeLinkKind.CITY_RUN
+    parsedKind !== AthleteLinkTreeLinkKind.CITY_RUN &&
+    !athleteCauseIdInput &&
+    !raceRegistryIdInput &&
+    !charityIdInput
   ) {
     return NextResponse.json({ success: false, error: "name is required" }, { status: 400 });
   }
@@ -146,6 +161,31 @@ export async function POST(request: NextRequest) {
       claim.logoUrl?.trim() || claim.race_registry?.logoUrl?.trim() || null;
     name = claim.name;
     url = athleteRacePublicCardUrl(raceSlug, gate.handle);
+  } else if (charityIdInput && !isSection) {
+    try {
+      const { row: cause } = await upsertAthleteCauseFromCharityCatalog({
+        athleteId: gate.athlete.id,
+        charityId: charityIdInput,
+      });
+      const dup = await prisma.athlete_link_tree_links.findFirst({
+        where: { treeId, athleteCauseId: cause.id },
+        select: { id: true },
+      });
+      if (dup) {
+        return NextResponse.json(
+          { success: false, error: "That charity link is already on your link page" },
+          { status: 400 },
+        );
+      }
+      athleteCauseId = cause.id;
+      name = cause.name;
+      url = cause.websiteUrl;
+      charityLinkLogoUrl = cause.logoUrl?.trim() || null;
+      charityEmoji = "❤️";
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to save charity";
+      return NextResponse.json({ success: false, error: message }, { status: 400 });
+    }
   } else if (parsedKind === AthleteLinkTreeLinkKind.CITY_RUN) {
     if (!cityRunIdInput) {
       return NextResponse.json({ success: false, error: "cityRunId is required" }, { status: 400 });

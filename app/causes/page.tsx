@@ -18,8 +18,7 @@ type Cause = {
 };
 
 type CharityHit = {
-  raceRegistryId: string;
-  raceName: string;
+  charityId: string;
   charityName: string;
   charityUrl: string;
   charityLogo: string | null;
@@ -62,19 +61,15 @@ export default function AthleteCausesPage() {
 
   useEffect(() => {
     const q = searchQ.trim();
-    if (!q) {
-      setHits([]);
-      setSearchLoading(false);
-      setSearchError(null);
-      return;
-    }
     let cancelled = false;
     const t = setTimeout(() => {
       void (async () => {
         setSearchLoading(true);
         setSearchError(null);
         try {
-          const res = await api.get(`/athlete/links/charities?q=${encodeURIComponent(q)}`);
+          const res = await api.get(
+            `/athlete/links/charities${q ? `?q=${encodeURIComponent(q)}` : ""}`,
+          );
           if (!res.data?.success) throw new Error(res.data?.error || "Search failed");
           if (!cancelled) setHits(res.data.charities ?? []);
         } catch (e) {
@@ -93,11 +88,11 @@ export default function AthleteCausesPage() {
     };
   }, [searchQ]);
 
-  async function addFromRegistry(hit: CharityHit) {
+  async function addFromCatalog(hit: CharityHit) {
     setSaving(true);
     setError(null);
     try {
-      const res = await api.post("/athlete/causes", { raceRegistryId: hit.raceRegistryId });
+      const res = await api.post("/athlete/causes", { charityId: hit.charityId });
       if (!res.data?.success) throw new Error(res.data?.error || "Failed to save");
       await load();
     } catch (e) {
@@ -208,8 +203,10 @@ export default function AthleteCausesPage() {
         </section>
 
         <section className="mb-8 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-gray-900">From race registry</h2>
-          <p className="mt-1 text-xs text-gray-500">Search charity snaps on any race (you do not need to claim the race).</p>
+          <h2 className="text-sm font-semibold text-gray-900">GoFast charity catalog</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Browse charities synced from Race Manage. Filter by name — no need to claim a race.
+          </p>
           <input
             className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             value={searchQ}
@@ -223,17 +220,17 @@ export default function AthleteCausesPage() {
               const already = Boolean(h.athleteCauseId);
               return (
                 <li
-                  key={`${h.raceRegistryId}-${h.charityUrl}`}
+                  key={h.charityId}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-2 py-2 text-sm"
                 >
                   <div className="min-w-0">
                     <span className="font-medium text-gray-900">{h.charityName}</span>
-                    <span className="mt-0.5 block text-xs text-gray-500">{h.raceName}</span>
+                    <span className="mt-0.5 block truncate text-xs text-gray-500">{h.charityUrl}</span>
                   </div>
                   <button
                     type="button"
                     disabled={saving || already}
-                    onClick={() => void addFromRegistry(h)}
+                    onClick={() => void addFromCatalog(h)}
                     className="shrink-0 rounded-md bg-gray-900 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
                   >
                     {already ? "Saved" : "Save"}

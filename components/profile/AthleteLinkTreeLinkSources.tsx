@@ -10,7 +10,7 @@ import {
   linkIdForCityRun,
   linkIdForUrl,
 } from "@/lib/athlete-link-tree/link-tree-race-section";
-import { linkIdForAthleteCause, linkIdForCharityRaceRegistry } from "@/lib/athlete-link-tree/link-tree-charity";
+import { linkIdForAthleteCause } from "@/lib/athlete-link-tree/link-tree-charity";
 import {
   athletePublicReflectionUrl,
   athletePublicStoryUrl,
@@ -107,8 +107,7 @@ export function AthleteLinkTreeLinkSources({
   const [charityQ, setCharityQ] = useState("");
   const [charityHits, setCharityHits] = useState<
     Array<{
-      raceRegistryId: string;
-      raceName: string;
+      charityId: string;
       charityName: string;
       charityUrl: string;
       charityLogo: string | null;
@@ -265,19 +264,15 @@ export function AthleteLinkTreeLinkSources({
   useEffect(() => {
     if (source !== "charities") return;
     const q = charityQ.trim();
-    if (!q) {
-      setCharityHits([]);
-      setCharityLoading(false);
-      setCharityError(null);
-      return;
-    }
     let cancelled = false;
     const t = setTimeout(() => {
       void (async () => {
         setCharityLoading(true);
         setCharityError(null);
         try {
-          const res = await api.get(`/athlete/links/charities?q=${encodeURIComponent(q)}`);
+          const res = await api.get(
+            `/athlete/links/charities${q ? `?q=${encodeURIComponent(q)}` : ""}`,
+          );
           if (!res.data?.success) {
             throw new Error(res.data?.error || "Failed to search charities");
           }
@@ -565,17 +560,6 @@ export function AthleteLinkTreeLinkSources({
     }
   }
 
-  function linkIdForRegistryCharity(
-    raceRegistryId: string,
-    athleteCauseId: string | null | undefined,
-  ): string | null {
-    if (athleteCauseId) {
-      const byCause = linkIdForAthleteCause(sortedLinks, athleteCauseId);
-      if (byCause) return byCause;
-    }
-    return linkIdForCharityRaceRegistry(sortedLinks, raceRegistryId);
-  }
-
   async function toggleCauseOnPage(cause: SerializedAthleteCause, checked: boolean) {
     const existingId = linkIdForAthleteCause(sortedLinks, cause.id);
     if (checked) {
@@ -589,18 +573,20 @@ export function AthleteLinkTreeLinkSources({
 
   async function toggleCharityOnPage(
     hit: {
-      raceRegistryId: string;
+      charityId: string;
       charityName: string;
       charityUrl: string;
       athleteCauseId: string | null;
     },
     checked: boolean,
   ) {
-    const existingId = linkIdForRegistryCharity(hit.raceRegistryId, hit.athleteCauseId);
+    const existingId = hit.athleteCauseId
+      ? linkIdForAthleteCause(sortedLinks, hit.athleteCauseId)
+      : null;
     if (checked) {
       if (existingId) return;
       if (!activeSectionId) return;
-      await onAddLink({ raceRegistryId: hit.raceRegistryId });
+      await onAddLink({ charityId: hit.charityId });
       return;
     }
     if (existingId) {
@@ -1036,18 +1022,26 @@ export function AthleteLinkTreeLinkSources({
           </label>
           {charityLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
           {charityError ? <p className="text-xs text-red-700">{charityError}</p> : null}
-          {!charityLoading && !charityError && charityQ.trim() && charityHits.length === 0 ? (
-            <p className="text-xs text-gray-500">No charities matched that search in the race registry.</p>
+          {!charityLoading && !charityError && charityHits.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              {charityQ.trim()
+                ? "No charities in the GoFast catalog matched that name."
+                : "No charities in the catalog yet with an https website URL."}
+            </p>
           ) : null}
-          {!charityQ.trim() ? (
-            <p className="text-xs text-gray-500">Type to search any race with a charity snap — no need to claim that race.</p>
+          {!charityQ.trim() && charityHits.length > 0 ? (
+            <p className="text-xs text-gray-500">
+              GoFast charity catalog — filter by name, then check to add under your heading.
+            </p>
           ) : null}
           <ul className="max-h-64 space-y-1.5 overflow-y-auto">
             {charityHits.map((hit) => {
-              const onPage = Boolean(linkIdForRegistryCharity(hit.raceRegistryId, hit.athleteCauseId));
+              const onPage = Boolean(
+                hit.athleteCauseId && linkIdForAthleteCause(sortedLinks, hit.athleteCauseId),
+              );
               const disabled = adding || !activeSectionId;
               return (
-                <li key={`${hit.raceRegistryId}-${hit.charityUrl}`}>
+                <li key={hit.charityId}>
                   <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-2 py-2 text-sm hover:bg-gray-50">
                     <input
                       type="checkbox"
@@ -1058,7 +1052,7 @@ export function AthleteLinkTreeLinkSources({
                     />
                     <span className="min-w-0 flex-1">
                       <span className="font-medium text-gray-900">{hit.charityName}</span>
-                      <span className="mt-0.5 block text-xs text-gray-500">{hit.raceName}</span>
+                      <span className="mt-0.5 block truncate text-xs text-gray-500">{hit.charityUrl}</span>
                     </span>
                   </label>
                 </li>

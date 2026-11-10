@@ -1,5 +1,6 @@
 import {
   listAthleteCauses,
+  upsertAthleteCauseFromCharityCatalog,
   upsertAthleteCauseFromRaceRegistry,
   upsertAthleteCauseManual,
 } from "@/lib/athlete-causes/athlete-cause-service";
@@ -48,8 +49,20 @@ export async function POST(request: NextRequest) {
 
   const raceRegistryId =
     typeof body.raceRegistryId === "string" ? body.raceRegistryId.trim() : "";
+  const charityId = typeof body.charityId === "string" ? body.charityId.trim() : "";
 
   try {
+    if (charityId) {
+      const { row, created } = await upsertAthleteCauseFromCharityCatalog({
+        athleteId: gate.athlete.id,
+        charityId,
+      });
+      return NextResponse.json(
+        { success: true, cause: serialize(row), created },
+        { status: created ? 201 : 200 },
+      );
+    }
+
     if (raceRegistryId) {
       const { row, created } = await upsertAthleteCauseFromRaceRegistry({
         athleteId: gate.athlete.id,
