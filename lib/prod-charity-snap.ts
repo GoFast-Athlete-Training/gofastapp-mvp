@@ -61,6 +61,24 @@ export async function upsertProdCharitySnap(c: ProdCharitySnapInput) {
   return { ok: true as const, charity };
 }
 
+export const prodCharityStaffSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  charityWebsiteUrl: true,
+  charityLogo: true,
+  city: true,
+  state: true,
+  address: true,
+  mission: true,
+  charitySupports: true,
+  description: true,
+  notes: true,
+  syncedAt: true,
+  updatedAt: true,
+} as const;
+
 export const prodCharityPublicSelect = {
   id: true,
   name: true,
@@ -74,3 +92,62 @@ export const prodCharityPublicSelect = {
   syncedAt: true,
   updatedAt: true,
 } as const;
+
+const MAX_BATCH_CHARITY_IDS = 50;
+
+export async function getProdCharitySnapById(charityId: string) {
+  const id = charityId.trim();
+  if (!id) {
+    return { ok: false as const, status: 400, error: "charityId required" };
+  }
+
+  const charity = await prisma.charities.findUnique({
+    where: { id },
+    select: prodCharityStaffSelect,
+  });
+
+  if (!charity) {
+    return { ok: true as const, exists: false as const, charity: null };
+  }
+
+  return { ok: true as const, exists: true as const, charity };
+}
+
+export async function getProdCharitySnapsByIds(charityIds: string[]) {
+  const ids = [
+    ...new Set(charityIds.map((x) => x.trim()).filter(Boolean)),
+  ].slice(0, MAX_BATCH_CHARITY_IDS);
+  if (ids.length === 0) {
+    return { ok: true as const, charities: [] as Array<{
+      id: string;
+      exists: boolean;
+      syncedAt: string | null;
+      updatedAt: string | null;
+    }> };
+  }
+
+  const rows = await prisma.charities.findMany({
+    where: { id: { in: ids } },
+    select: {
+      id: true,
+      syncedAt: true,
+      updatedAt: true,
+    },
+  });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+
+  const charities = ids.map((id) => {
+    const row = byId.get(id);
+    if (!row) {
+      return { id, exists: false, syncedAt: null, updatedAt: null };
+    }
+    return {
+      id,
+      exists: true,
+      syncedAt: row.syncedAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
+
+  return { ok: true as const, charities };
+}
