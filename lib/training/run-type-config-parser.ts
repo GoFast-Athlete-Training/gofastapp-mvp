@@ -5,6 +5,14 @@ export const runTypeCatalogueSelect = {
   slug: true,
 } as const;
 
+/** Nested select for build_preset rows on rotation config GET/PATCH (base + peak preset links). */
+export const buildPresetUsageSelect = {
+  id: true,
+  name: true,
+  presetsAsBaseBuild: { select: { id: true, title: true, slug: true } },
+  presetsAsPeakBuild: { select: { id: true, title: true, slug: true } },
+} as const;
+
 export type RunTypePositionInput = {
   cyclePosition: number;
   distributionWeight: number;

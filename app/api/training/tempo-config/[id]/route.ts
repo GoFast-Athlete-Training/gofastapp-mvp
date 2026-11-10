@@ -3,7 +3,10 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
-import { runTypeCatalogueSelect } from "@/lib/training/run-type-config-parser";
+import {
+  buildPresetUsageSelect,
+  runTypeCatalogueSelect,
+} from "@/lib/training/run-type-config-parser";
 
 const includeBlock = {
   positions: {
@@ -24,13 +27,7 @@ export async function GET(
     where: { id },
     include: {
       ...includeBlock,
-      usedByBuildPresets: {
-        select: {
-          id: true,
-          name: true,
-          presets: { select: { id: true, title: true, slug: true } },
-        },
-      },
+      usedByBuildPresets: { select: buildPresetUsageSelect },
     },
   });
   if (!item) {
@@ -88,13 +85,7 @@ export async function PATCH(
     data,
     include: {
       ...includeBlock,
-      usedByBuildPresets: {
-        select: {
-          id: true,
-          name: true,
-          presets: { select: { id: true, title: true, slug: true } },
-        },
-      },
+      usedByBuildPresets: { select: buildPresetUsageSelect },
     },
   });
   return NextResponse.json({ success: true, item });

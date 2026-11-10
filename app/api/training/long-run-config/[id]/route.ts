@@ -3,7 +3,10 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
-import { runTypeCatalogueSelect } from "@/lib/training/run-type-config-parser";
+import {
+  buildPresetUsageSelect,
+  runTypeCatalogueSelect,
+} from "@/lib/training/run-type-config-parser";
 import { distributePoolToPositions, generateCyclePoolTotals } from "@/lib/training/cycle-pool";
 import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
 import { poolsFromBuildPeakLongRun } from "@/lib/training/catalog-preset-rotation";
@@ -27,13 +30,7 @@ export async function GET(
     where: { id },
     include: {
       ...includeBlock,
-      usedByBuildPresets: {
-        select: {
-          id: true,
-          name: true,
-          presets: { select: { id: true, title: true, slug: true } },
-        },
-      },
+      usedByBuildPresets: { select: buildPresetUsageSelect },
     },
   });
   if (!item) {
@@ -136,13 +133,7 @@ export async function PATCH(
     data,
     include: {
       ...includeBlock,
-      usedByBuildPresets: {
-        select: {
-          id: true,
-          name: true,
-          presets: { select: { id: true, title: true, slug: true } },
-        },
-      },
+      usedByBuildPresets: { select: buildPresetUsageSelect },
     },
   });
   return NextResponse.json({ success: true, item });
