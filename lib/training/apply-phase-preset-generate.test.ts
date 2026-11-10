@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  applyBuildPhaseLongRunMiles,
   applyPhaseTaperLongRunMiles,
   applyPhaseTaperWeekTotalCaps,
   applyRaceWeekSlotsFromPreset,
@@ -32,6 +33,32 @@ function taperOnlySchedule(): PlanWeekSchedule[] {
     },
   ];
 }
+
+test("hold weeks use flat long run; ramp weeks climb in last 8 build weeks", () => {
+  const schedule: PlanWeekSchedule[] = Array.from({ length: 16 }, (_, i) => ({
+    weekNumber: i + 1,
+    days: [{ dow: 6, workoutType: "LongRun", miles: 0, catalogueWorkoutId: "lr", planCycleIndex: 0 }],
+  }));
+
+  applyBuildPhaseLongRunMiles({
+    planSchedule: schedule,
+    taperStartWeekNumber: 17,
+    peakWeekNumber: 16,
+    startLongRunMiles: 10,
+    peakLongRunMiles: 20,
+    longRunCutback: 0,
+    longRunPositions: [{ cyclePosition: 0, catalogueWorkoutId: "lr", distributionWeight: 1 }],
+    holdWeekNumbers: [1, 2, 3, 4, 5, 6, 7, 8],
+    holdLongRunMiles: 10,
+    rampStartWeekNumber: 9,
+  });
+
+  assert.equal(schedule.find((w) => w.weekNumber === 1)!.days[0]!.miles, 10);
+  assert.equal(schedule.find((w) => w.weekNumber === 8)!.days[0]!.miles, 10);
+  const mid = schedule.find((w) => w.weekNumber === 12)!.days[0]!.miles!;
+  assert.ok(mid > 10 && mid < 20);
+  assert.equal(schedule.find((w) => w.weekNumber === 16)!.days[0]!.miles, 20);
+});
 
 test("taper caps only: ensure LR day then set cap; week total trimmed; hard days remain", () => {
   const schedule = taperOnlySchedule();

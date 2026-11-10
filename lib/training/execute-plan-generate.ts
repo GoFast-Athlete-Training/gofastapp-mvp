@@ -47,6 +47,7 @@ import { resolveGoalRaceMetersForGenerate } from "@/lib/training/resolve-goal-ra
 import { loadPresetPhaseForGenerateFromProd } from "@/lib/training/load-preset-phase-from-prod";
 import { buildWeeklyMileageTargetsByWeek } from "@/lib/training/build-weekly-mileage-curve";
 import {
+  applyBuildCatalogueRotationsForWeeks,
   applyBuildPhaseLongRunMiles,
   applyPhaseTaperLongRunMiles,
   applyPhaseTaperWeekTotalCaps,
@@ -58,7 +59,7 @@ import {
 } from "@/lib/training/apply-phase-preset-generate";
 import { presetTaperHasVolumeCaps } from "@/lib/training/phase-week-pins";
 import { weeklyVolumePeakFromPreset } from "@/lib/training/preset-core";
-import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
+import { splitBuildRampToPeak, splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
 import { stampPhaseOnPlanSchedule } from "@/lib/training/plan-week-phase-key";
 
 export async function executePlanGenerate(params: {
@@ -148,6 +149,8 @@ export async function executePlanGenerate(params: {
     );
   }
   const phaseBuild = phasePreset?.build ?? null;
+  const phaseBaseBuild = phasePreset?.baseBuild ?? null;
+  const buildRampSplit = splitBuildRampToPeak(phaseSplit.buildWeekNumbers);
 
   let longRunPositions =
     rawPreset.longRunConfig?.positions.map(mapPositionRow) ?? [];
@@ -186,10 +189,24 @@ export async function executePlanGenerate(params: {
   }
 
   const catalogueIds = catalogueIdsFromPreset(rawPreset as LoadedPresetInclude);
+  const extraCatalogueIds = new Set<string>();
+  if (phaseBaseBuild) {
+    for (const cfg of [
+      phaseBaseBuild.longRunConfig,
+      phaseBaseBuild.easyConfig,
+      phaseBaseBuild.tempoConfig,
+      phaseBaseBuild.intervalsConfig,
+    ]) {
+      for (const p of cfg?.positions ?? []) {
+        if (p.catalogueWorkoutId) extraCatalogueIds.add(p.catalogueWorkoutId);
+      }
+    }
+  }
+  const allCatalogueIds = [...new Set([...catalogueIds, ...extraCatalogueIds])];
   const catalogueRowsFull: CatalogueGenerationRowSelection[] =
-    catalogueIds.length > 0
+    allCatalogueIds.length > 0
       ? await prisma.workout_catalogue.findMany({
-          where: { id: { in: catalogueIds } },
+          where: { id: { in: allCatalogueIds } },
           select: catalogueSelectForGeneration,
         })
       : [];
@@ -348,7 +365,29 @@ export async function executePlanGenerate(params: {
   });
 
   if (phaseBuild) {
+    if (needsBuildPhase && buildRampSplit.holdWeekNumbers.length > 0) {
+      const baseLongRun = positionsFromPhaseRotation(phaseBaseBuild?.longRunConfig ?? null);
+      const baseIntervals = positionsFromPhaseRotation(
+        phaseBaseBuild?.intervalsConfig ?? phaseBuild.intervalsConfig,
+      );
+      const baseTempo = positionsFromPhaseRotation(
+        phaseBaseBuild?.tempoConfig ?? phaseBuild.tempoConfig,
+      );
+      const baseEasy = positionsFromPhaseRotation(phaseBaseBuild?.easyConfig ?? phaseBuild.easyConfig);
+      if (phaseBaseBuild) {
+        applyBuildCatalogueRotationsForWeeks({
+          planSchedule: schedule,
+          weekNumbers: buildRampSplit.holdWeekNumbers,
+          longRunPositions: baseLongRun.length ? baseLongRun : longRunPositions,
+          intervalsPositions: baseIntervals.length ? baseIntervals : intervalsPositions,
+          tempoPositions: baseTempo.length ? baseTempo : tempoPositions,
+          easyPositions: baseEasy.length ? baseEasy : easyPositions,
+        });
+      }
+    }
     if (needsBuildPhase) {
+      const holdLongRunMiles =
+        phaseBaseBuild?.startLongRunMiles ?? phaseBuild.startLongRunMiles ?? 8;
       applyBuildPhaseLongRunMiles({
         planSchedule: schedule,
         taperStartWeekNumber: placement.taperStartWeekNumber,
@@ -360,6 +399,9 @@ export async function executePlanGenerate(params: {
         peakLongRunMiles: phaseBuild.peakLongRunMiles,
         longRunCutback: phaseBuild.longRunCutback ?? null,
         longRunPositions,
+        holdWeekNumbers: buildRampSplit.holdWeekNumbers,
+        holdLongRunMiles,
+        rampStartWeekNumber: buildRampSplit.rampStartWeekNumber,
       });
     }
     ensureTaperLongRunDays({
@@ -456,6 +498,11 @@ export async function executePlanGenerate(params: {
   const usePresetWeeklyMileageCurve =
     phaseBuild != null || presetTaperHasVolumeCaps(phasePreset?.taper?.weeks);
 
+  const holdWeeklyMiles =
+    phaseBaseBuild?.peakWeeklyMiles != null
+      ? Math.max(Math.max(minWeeklyFromPreset, bandMin), phaseBaseBuild.peakWeeklyMiles)
+      : Math.max(minWeeklyFromPreset, bandMin, weeklyMileageTarget);
+
   const weeklyMileageByWeek = usePresetWeeklyMileageCurve
     ? buildWeeklyMileageTargetsByWeek({
         totalWeeks: weekCount,
@@ -467,6 +514,9 @@ export async function executePlanGenerate(params: {
         taperWeeks: phasePreset?.taper?.weeks,
         raceWeek: phasePreset?.raceWeek?.slots ?? null,
         taperWeekNumbers,
+        holdWeekNumbers: buildRampSplit.holdWeekNumbers,
+        holdWeeklyMiles,
+        rampStartWeekNumber: buildRampSplit.rampStartWeekNumber,
       })
     : null;
 

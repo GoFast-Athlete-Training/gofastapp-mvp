@@ -7,13 +7,14 @@ import {
   athletePresetInclude,
   presetToPlanGenConfig,
   type LoadedAthletePresetInclude,
+  type PlanVolumePreset,
   type RotationBlueprintSource,
 } from "@/lib/training/plan-generate-presets-loader";
 import {
   athletePresetAsRotationSource,
   isAthletePresetBlueprintComplete,
 } from "@/lib/training/athlete-preset-blueprint";
-import type { AthletePresetFitnessPhase, training_plan_preset } from "@prisma/client";
+import type { AthletePresetFitnessPhase } from "@prisma/client";
 import { loadPresetForGenerateFromProd } from "@/lib/training/load-preset-for-generate-prod";
 import { resolvedBlueprintFromTrainingManage } from "@/lib/training/training-manage-blueprint";
 
@@ -23,19 +24,7 @@ export type ResolvedPlanBlueprint = {
   athletePresetId: string | null;
   /** Rotation + strategy source for generate / materialize. */
   rotationPreset: RotationBlueprintSource;
-  volumePreset: Pick<
-    training_plan_preset,
-    | "minWeeklyMiles"
-    | "maxWeeklyMiles"
-    | "baseLongRunPoolMiles"
-    | "peakLongRunPoolMiles"
-    | "taperLongRunPoolMiles"
-    | "tempoIdealDow"
-    | "intervalIdealDow"
-    | "longRunDefaultDow"
-    | "slug"
-    | "title"
-  >;
+  volumePreset: PlanVolumePreset;
   label: string;
   fitnessPhase: AthletePresetFitnessPhase;
 };

@@ -15,6 +15,40 @@ export type PlanWeekPhaseSplit = {
 
 const MAX_TAPER_WEEKS = 2;
 
+/** Calendar build weeks that ramp start → peak before taper. */
+export const BUILD_TO_PEAK_WEEKS = 8;
+
+export type BuildRampSplit = {
+  holdWeekNumbers: number[];
+  rampWeekNumbers: number[];
+  rampStartWeekNumber: number | null;
+};
+
+/**
+ * Split build weeks into optional hold (persistent build) and the last N ramp weeks.
+ */
+export function splitBuildRampToPeak(buildWeekNumbers: number[]): BuildRampSplit {
+  const sorted = [...buildWeekNumbers].sort((a, b) => a - b);
+  const n = sorted.length;
+  if (n === 0) {
+    return { holdWeekNumbers: [], rampWeekNumbers: [], rampStartWeekNumber: null };
+  }
+  if (n <= BUILD_TO_PEAK_WEEKS) {
+    return {
+      holdWeekNumbers: [],
+      rampWeekNumbers: sorted,
+      rampStartWeekNumber: sorted[0] ?? null,
+    };
+  }
+  const hold = sorted.slice(0, n - BUILD_TO_PEAK_WEEKS);
+  const ramp = sorted.slice(n - BUILD_TO_PEAK_WEEKS);
+  return {
+    holdWeekNumbers: hold,
+    rampWeekNumbers: ramp,
+    rampStartWeekNumber: ramp[0] ?? null,
+  };
+}
+
 /**
  * Split `totalWeeks` into build, taper, and race slices.
  * Race week is always week `totalWeeks`. Up to two weeks immediately before it are taper.

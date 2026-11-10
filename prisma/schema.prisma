@@ -2336,13 +2336,16 @@ model training_plan_preset {
   /// Training manager id from last Training Manage → prod prodpush sync.
   lastSyncedByStaffId     String?
 
-  buildPresetId    String?
-  taperPresetId    String?
-  raceWeekPresetId String?
-  buildPreset      build_preset?     @relation(fields: [buildPresetId], references: [id], onDelete: SetNull)
+  baseBuildPresetId String?
+  buildPresetId     String?
+  taperPresetId     String?
+  raceWeekPresetId  String?
+  baseBuildPreset   build_preset?     @relation("TrainingPresetBaseBuild", fields: [baseBuildPresetId], references: [id], onDelete: SetNull)
+  buildPreset       build_preset?     @relation("TrainingPresetPeakBuild", fields: [buildPresetId], references: [id], onDelete: SetNull)
   taperPreset      taper_preset?     @relation(fields: [taperPresetId], references: [id], onDelete: SetNull)
   raceWeekPreset   race_week_preset? @relation(fields: [raceWeekPresetId], references: [id], onDelete: SetNull)
 
+  @@index([baseBuildPresetId])
   @@index([buildPresetId])
   @@index([taperPresetId])
   @@index([raceWeekPresetId])
@@ -2368,7 +2371,8 @@ model build_preset {
   tempoConfig     tempo_config?     @relation("BuildTempo", fields: [tempoConfigId], references: [id], onDelete: SetNull)
   easyConfig      easy_config?      @relation("BuildEasy", fields: [easyConfigId], references: [id], onDelete: SetNull)
 
-  presets training_plan_preset[]
+  presetsAsBaseBuild training_plan_preset[] @relation("TrainingPresetBaseBuild")
+  presetsAsPeakBuild training_plan_preset[] @relation("TrainingPresetPeakBuild")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

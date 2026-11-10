@@ -1,37 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
+import { BUILD_TO_PEAK_WEEKS, splitBuildRampToPeak } from "@/lib/training/plan-week-phase-split";
 
-test("two-week plan: one taper week and race week, empty build", () => {
-  const s = splitPlanWeekPhases(2);
-  assert.deepEqual(s.buildWeekNumbers, []);
-  assert.deepEqual(s.taperWeekNumbers, [1]);
-  assert.equal(s.raceWeekNumber, 2);
-  assert.equal(s.taperStartWeekNumber, 1);
-  assert.equal(s.peakWeekNumber, null);
+test("splitBuildRampToPeak holds early weeks when build exceeds ramp length", () => {
+  const buildWeeks = Array.from({ length: 16 }, (_, i) => i + 1);
+  const split = splitBuildRampToPeak(buildWeeks);
+  assert.equal(split.holdWeekNumbers.length, 8);
+  assert.equal(split.rampWeekNumbers.length, BUILD_TO_PEAK_WEEKS);
+  assert.deepEqual(split.holdWeekNumbers, [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(split.rampWeekNumbers, [9, 10, 11, 12, 13, 14, 15, 16]);
+  assert.equal(split.rampStartWeekNumber, 9);
 });
 
-test("three-week plan: two taper weeks and race week, empty build", () => {
-  const s = splitPlanWeekPhases(3);
-  assert.deepEqual(s.buildWeekNumbers, []);
-  assert.deepEqual(s.taperWeekNumbers, [1, 2]);
-  assert.equal(s.raceWeekNumber, 3);
-  assert.equal(s.taperStartWeekNumber, 1);
-});
-
-test("sixteen-week plan: thirteen build, two taper, one race", () => {
-  const s = splitPlanWeekPhases(16);
-  assert.deepEqual(s.buildWeekNumbers, Array.from({ length: 13 }, (_, i) => i + 1));
-  assert.deepEqual(s.taperWeekNumbers, [14, 15]);
-  assert.equal(s.raceWeekNumber, 16);
-  assert.equal(s.taperStartWeekNumber, 14);
-  assert.equal(s.peakWeekNumber, 13);
-});
-
-test("single-week plan: race week only", () => {
-  const s = splitPlanWeekPhases(1);
-  assert.deepEqual(s.buildWeekNumbers, []);
-  assert.deepEqual(s.taperWeekNumbers, []);
-  assert.equal(s.raceWeekNumber, 1);
-  assert.equal(s.taperStartWeekNumber, 2);
+test("splitBuildRampToPeak uses full span when build is short", () => {
+  const split = splitBuildRampToPeak([1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(split.holdWeekNumbers, []);
+  assert.deepEqual(split.rampWeekNumbers, [1, 2, 3, 4, 5, 6, 7, 8]);
 });

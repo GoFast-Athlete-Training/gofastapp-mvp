@@ -32,22 +32,36 @@ export function applyBuildPhaseLongRunMiles(input: {
   peakLongRunMiles: number | null;
   longRunCutback: number | null;
   longRunPositions: readonly RunTypePosition[];
+  holdWeekNumbers?: number[];
+  holdLongRunMiles?: number | null;
+  rampStartWeekNumber?: number | null;
 }): void {
   const start = input.startLongRunMiles ?? 8;
   const peak = Math.max(start, input.peakLongRunMiles ?? 20);
   const peakWeek = Math.max(1, input.peakWeekNumber);
   const cutback = Math.max(0, Math.min(1, input.longRunCutback ?? 0));
   const rows = [...input.longRunPositions].sort((a, b) => a.cyclePosition - b.cyclePosition);
+  const holdWeeks = new Set(input.holdWeekNumbers ?? []);
+  const holdLong = input.holdLongRunMiles ?? start;
+  const rampStart = input.rampStartWeekNumber ?? 1;
 
   for (const week of input.planSchedule) {
     if (week.weekNumber >= input.taperStartWeekNumber) continue;
     const w = week.weekNumber;
-    const denom = Math.max(1, peakWeek - 1);
-    const t = w >= peakWeek ? 1 : (w - 1) / denom;
-    let lrMi = round1(start + (peak - start) * t);
+    let lrMi: number;
     const isPeakWeek = w === peakWeek;
-    if (cutback > 0 && w % 4 === 0 && !isPeakWeek) {
-      lrMi = round1(lrMi * (1 - cutback));
+    if (holdWeeks.has(w)) {
+      lrMi = round1(holdLong);
+      if (cutback > 0 && w % 4 === 0) {
+        lrMi = round1(lrMi * (1 - cutback));
+      }
+    } else {
+      const denom = Math.max(1, peakWeek - rampStart);
+      const t = w >= peakWeek ? 1 : (w - rampStart) / denom;
+      lrMi = round1(start + (peak - start) * t);
+      if (cutback > 0 && w % 4 === 0 && !isPeakWeek) {
+        lrMi = round1(lrMi * (1 - cutback));
+      }
     }
     const cyclePos = (w - 1) % Math.max(1, rows.length);
     const catId = rows[cyclePos]?.catalogueWorkoutId ?? null;
@@ -58,6 +72,41 @@ export function applyBuildPhaseLongRunMiles(input: {
       if (catId) d.catalogueWorkoutId = catId;
       d.planCycleIndex = cyclePos;
       break;
+    }
+  }
+}
+
+/** Swap quality-day catalogue rotations on selected build weeks (e.g. base vs peak build). */
+export function applyBuildCatalogueRotationsForWeeks(input: {
+  planSchedule: PlanWeekSchedule[];
+  weekNumbers: number[];
+  longRunPositions: readonly RunTypePosition[];
+  intervalsPositions: readonly RunTypePosition[];
+  tempoPositions: readonly RunTypePosition[];
+  easyPositions: readonly RunTypePosition[];
+}): void {
+  const weeks = new Set(input.weekNumbers);
+  for (const week of input.planSchedule) {
+    if (!weeks.has(week.weekNumber)) continue;
+    const cycleBase = week.weekNumber - 1;
+    for (const d of week.days) {
+      if (d.workoutType === "LongRun") {
+        const cyclePos = cycleBase % Math.max(1, input.longRunPositions.length);
+        const id = catalogueIdForRotation(input.longRunPositions, cyclePos);
+        if (id) {
+          d.catalogueWorkoutId = id;
+          d.planCycleIndex = cyclePos;
+        }
+      } else if (d.workoutType === "Tempo") {
+        const id = catalogueIdForRotation(input.tempoPositions, cycleBase);
+        if (id) d.catalogueWorkoutId = id;
+      } else if (d.workoutType === "Intervals") {
+        const id = catalogueIdForRotation(input.intervalsPositions, cycleBase);
+        if (id) d.catalogueWorkoutId = id;
+      } else if (d.workoutType === "Easy") {
+        const id = catalogueIdForRotation(input.easyPositions, cycleBase);
+        if (id) d.catalogueWorkoutId = id;
+      }
     }
   }
 }

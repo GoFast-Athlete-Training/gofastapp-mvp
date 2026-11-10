@@ -22,6 +22,9 @@ export function buildWeeklyMileageTargetsByWeek(params: {
   taperWeeks: PhaseWeekRow[] | null | undefined;
   raceWeek: RaceWeekSlotForGenerate[] | PhaseWeekRow[] | null | undefined;
   taperWeekNumbers?: number[];
+  holdWeekNumbers?: number[];
+  holdWeeklyMiles?: number | null;
+  rampStartWeekNumber?: number | null;
 }): Map<number, number> {
   const out = new Map<number, number>();
   const taperStart = Math.max(1, Math.floor(params.taperStartWeekNumber));
@@ -30,10 +33,17 @@ export function buildWeeklyMileageTargetsByWeek(params: {
     clamp(params.athleteStartMiles, params.presetMinMiles, params.presetPeakMiles),
   );
   const peak = Math.max(start, params.presetPeakMiles);
+  const holdWeeks = new Set(params.holdWeekNumbers ?? []);
+  const holdMiles = round2(params.holdWeeklyMiles ?? start);
+  const rampStart = params.rampStartWeekNumber ?? 1;
 
   for (let w = 1; w < taperStart; w++) {
-    const denom = Math.max(1, peakWeek - 1);
-    const t = w >= peakWeek ? 1 : (w - 1) / denom;
+    if (holdWeeks.has(w)) {
+      out.set(w, holdMiles);
+      continue;
+    }
+    const denom = Math.max(1, peakWeek - rampStart);
+    const t = w >= peakWeek ? 1 : (w - rampStart) / denom;
     out.set(w, round2(start + (peak - start) * t));
   }
 

@@ -98,6 +98,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     data.goalId = typeof body.goalId === "string" && body.goalId.trim() ? body.goalId.trim() : null;
   }
 
+  if ("baseBuildPresetId" in body) {
+    if (body.baseBuildPresetId === null || body.baseBuildPresetId === "") {
+      data.baseBuildPresetId = null;
+    } else if (typeof body.baseBuildPresetId === "string" && body.baseBuildPresetId.trim()) {
+      const build = await prisma.build_preset.findUnique({
+        where: { id: body.baseBuildPresetId.trim() },
+      });
+      if (!build) {
+        return NextResponse.json(
+          { success: false, error: "Base build preset not found" },
+          { status: 404 },
+        );
+      }
+      data.baseBuildPresetId = build.id;
+    }
+  }
+
   const buildId = linkBuildPresetId(body);
   if (buildId !== undefined) {
     if (buildId === null) {

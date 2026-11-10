@@ -42,29 +42,47 @@ function mapRotation(config: {
 export async function loadPresetForGenerateFromProd(
   presetId: string,
 ): Promise<TrainingManagePresetForGenerate | null> {
+  const buildInclude = {
+    include: {
+      longRunConfig: rotationInclude,
+      easyConfig: rotationInclude,
+      tempoConfig: rotationInclude,
+      intervalsConfig: rotationInclude,
+    },
+  } as const;
+
   const row = await prisma.training_plan_preset.findUnique({
     where: { id: presetId },
     include: {
-      buildPreset: {
-        include: {
-          longRunConfig: rotationInclude,
-          easyConfig: rotationInclude,
-          tempoConfig: rotationInclude,
-          intervalsConfig: rotationInclude,
-        },
-      },
+      baseBuildPreset: buildInclude,
+      buildPreset: buildInclude,
       taperPreset: true,
       raceWeekPreset: true,
     },
   });
   if (!row) return null;
 
-  const build = row.buildPreset;
+  function phaseBuildFrom(
+    build: typeof row.buildPreset | typeof row.baseBuildPreset,
+  ): TrainingManagePresetForGenerate["build"] {
+    if (!build) return null;
+    return {
+      startLongRunMiles: build.startLongRunMiles,
+      peakLongRunMiles: build.peakLongRunMiles,
+      peakWeeklyMiles: build.maxWeeklyMiles,
+      longRunCutback: build.longRunCutback,
+      longRunConfigId: build.longRunConfigId,
+      easyConfigId: build.easyConfigId,
+      tempoConfigId: build.tempoConfigId,
+      intervalsConfigId: build.intervalsConfigId,
+      longRunConfig: mapRotation(build.longRunConfig),
+      easyConfig: mapRotation(build.easyConfig),
+      tempoConfig: mapRotation(build.tempoConfig),
+      intervalsConfig: mapRotation(build.intervalsConfig),
+    };
+  }
 
-  const buildLongRun = mapRotation(build?.longRunConfig ?? null);
-  const buildEasy = mapRotation(build?.easyConfig ?? null);
-  const buildTempo = mapRotation(build?.tempoConfig ?? null);
-  const buildIntervals = mapRotation(build?.intervalsConfig ?? null);
+  const build = row.buildPreset;
 
   const taperSlots = row.taperPreset
     ? parseTaperWeekSlots(row.taperPreset.slots)
@@ -84,22 +102,8 @@ export async function loadPresetForGenerateFromProd(
     coachPlanOverview: null,
     workoutStructure: null,
     easyRunConfig: null,
-    build: build
-      ? {
-          startLongRunMiles: build.startLongRunMiles,
-          peakLongRunMiles: build.peakLongRunMiles,
-          peakWeeklyMiles: build.maxWeeklyMiles,
-          longRunCutback: build.longRunCutback,
-          longRunConfigId: build.longRunConfigId,
-          easyConfigId: build.easyConfigId,
-          tempoConfigId: build.tempoConfigId,
-          intervalsConfigId: build.intervalsConfigId,
-          longRunConfig: buildLongRun,
-          easyConfig: buildEasy,
-          tempoConfig: buildTempo,
-          intervalsConfig: buildIntervals,
-        }
-      : null,
+    baseBuild: phaseBuildFrom(row.baseBuildPreset),
+    build: phaseBuildFrom(build),
     taper: row.taperPreset
       ? {
           name: row.taperPreset.name,

@@ -1,15 +1,18 @@
 import type { Prisma } from "@prisma/client";
 import { poolsFromBuildPeakLongRun } from "@/lib/training/catalog-preset-rotation";
 
-export const staffPlanPresetInclude = {
-  buildPreset: {
-    include: {
-      longRunConfig: { include: { positions: { orderBy: { cyclePosition: "asc" as const } } } },
-      easyConfig: true,
-      tempoConfig: true,
-      intervalsConfig: true,
-    },
+const buildPresetStaffInclude = {
+  include: {
+    longRunConfig: { include: { positions: { orderBy: { cyclePosition: "asc" as const } } } },
+    easyConfig: true,
+    tempoConfig: true,
+    intervalsConfig: true,
   },
+} as const;
+
+export const staffPlanPresetInclude = {
+  baseBuildPreset: buildPresetStaffInclude,
+  buildPreset: buildPresetStaffInclude,
   taperPreset: {
     select: {
       id: true,
@@ -43,6 +46,7 @@ export function serializeStaffPlanPreset(row: StaffPresetRow) {
     goalId: row.goalId,
     minWeeklyMiles: row.minWeeklyMiles,
     maxWeeklyMiles: row.maxWeeklyMiles,
+    baseBuildPresetId: row.baseBuildPresetId,
     buildPresetId: row.buildPresetId,
     taperPresetId: row.taperPresetId,
     raceWeekPresetId: row.raceWeekPresetId,
@@ -59,6 +63,10 @@ export function serializeStaffPlanPreset(row: StaffPresetRow) {
     baseLongRunPoolMiles: pools.baseLongRunPoolMiles,
     peakLongRunPoolMiles: pools.peakLongRunPoolMiles,
     taperLongRunPoolMiles: pools.taperLongRunPoolMiles,
+    baseBuildPreset:
+      row.baseBuildPreset != null
+        ? { id: row.baseBuildPreset.id, name: row.baseBuildPreset.name }
+        : null,
     buildPreset:
       build != null ? { id: build.id, name: build.name } : null,
     taperPreset:

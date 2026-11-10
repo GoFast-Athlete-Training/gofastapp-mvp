@@ -29,20 +29,23 @@ export interface PlanGenConfig {
   longRunDefaultDow?: number | null;
 }
 
-export function presetToPlanGenConfig(
-  preset: Pick<
-    training_plan_preset,
-    | "minWeeklyMiles"
-    | "maxWeeklyMiles"
-    | "tempoIdealDow"
-    | "intervalIdealDow"
-    | "longRunDefaultDow"
-  > & {
-    baseLongRunPoolMiles?: number | null;
-    peakLongRunPoolMiles?: number | null;
-    taperLongRunPoolMiles?: number | null;
-  }
-): PlanGenConfig {
+/** Weekly band + DOW live on the preset row. Pool miles are derived, not columns. */
+export type PlanVolumePreset = Pick<
+  training_plan_preset,
+  | "minWeeklyMiles"
+  | "maxWeeklyMiles"
+  | "tempoIdealDow"
+  | "intervalIdealDow"
+  | "longRunDefaultDow"
+  | "slug"
+  | "title"
+> & {
+  baseLongRunPoolMiles?: number | null;
+  peakLongRunPoolMiles?: number | null;
+  taperLongRunPoolMiles?: number | null;
+};
+
+export function presetToPlanGenConfig(preset: PlanVolumePreset): PlanGenConfig {
   return {
     minWeeklyMiles: preset.minWeeklyMiles,
     baseLongRunPoolMiles: preset.baseLongRunPoolMiles ?? null,

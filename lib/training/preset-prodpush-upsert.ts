@@ -4,6 +4,7 @@ import type { TrainingManagePresetForGenerate } from "@/lib/training/fetch-train
 
 export type PresetProdPushBody = {
   plan: Record<string, unknown>;
+  baseBuildPreset?: Record<string, unknown> | null;
   buildPreset?: Record<string, unknown> | null;
   taperPreset?: Record<string, unknown> | null;
   raceWeekPreset?: Record<string, unknown> | null;
@@ -445,9 +446,15 @@ export async function upsertPresetFromProdPush(
       if (raw) await upsertShakeout(tx, raw);
     }
 
+    let baseBuildPresetId: string | null = null;
     let buildPresetId: string | null = null;
     let taperPresetId: string | null = null;
     let raceWeekPresetId: string | null = null;
+
+    const baseBuildRaw = record(body.baseBuildPreset);
+    if (baseBuildRaw && str(baseBuildRaw.id)) {
+      baseBuildPresetId = await upsertBuildPreset(tx, baseBuildRaw);
+    }
 
     const buildRaw = record(body.buildPreset);
     if (buildRaw && str(buildRaw.id)) {
@@ -502,6 +509,7 @@ export async function upsertPresetFromProdPush(
       tempoIdealDow: int(plan.tempoIdealDow, 2),
       intervalIdealDow: int(plan.intervalIdealDow, 4),
       longRunDefaultDow: int(plan.longRunDefaultDow, 6),
+      baseBuildPresetId: baseBuildPresetId ?? str(plan.baseBuildPresetId) ?? null,
       buildPresetId: buildPresetId ?? str(plan.buildPresetId) ?? null,
       taperPresetId: taperPresetId ?? str(plan.taperPresetId) ?? null,
       raceWeekPresetId: raceWeekPresetId ?? str(plan.raceWeekPresetId) ?? null,
