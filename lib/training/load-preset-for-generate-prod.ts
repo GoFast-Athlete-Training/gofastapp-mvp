@@ -62,8 +62,10 @@ export async function loadPresetForGenerateFromProd(
   });
   if (!row) return null;
 
+  type BuildPhaseLoaded = NonNullable<typeof row.buildPreset>;
+
   function phaseBuildFrom(
-    build: typeof row.buildPreset | typeof row.baseBuildPreset,
+    build: BuildPhaseLoaded | null,
   ): TrainingManagePresetForGenerate["build"] {
     if (!build) return null;
     return {
