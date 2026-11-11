@@ -55,6 +55,11 @@ function CompactLinkRow({
   const [url, setUrl] = useState(link.url ?? "");
   const [emoji, setEmoji] = useState(link.emoji ?? "");
   const [linkLogoUrl, setLinkLogoUrl] = useState(link.linkLogoUrl ?? "");
+
+  const isCauseLink = !link.isSection && Boolean(link.athleteCauseId);
+  const logoSrc = (link.linkLogoUrl ?? linkLogoUrl).trim();
+  const isLogoBackedRow =
+    !link.isSection && (isGeneratedRace || isCauseLink || Boolean(logoSrc));
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -85,8 +90,10 @@ function CompactLinkRow({
     const payload: Record<string, unknown> = {
       name: title,
       publicLabel: title,
-      emoji: emoji.trim() || null,
     };
+    if (!isLogoBackedRow) {
+      payload.emoji = emoji.trim() || null;
+    }
     if (!isLegacyRaces) payload.url = url.trim();
     const res = await api.patch(`/athlete/links/items/${link.id}`, payload);
     if (!res.data?.success || !res.data?.tree) throw new Error("fail");
@@ -244,10 +251,52 @@ function CompactLinkRow({
               </button>
             ) : null}
           </div>
-        ) : readOnly ? (
-          <div>
-            <p className="text-sm font-medium text-gray-900">{link.name}</p>
-            <p className="text-[11px] text-gray-400">Toggle in Add → Races</p>
+        ) : isGeneratedRace ? (
+          <div className="flex items-start gap-2">
+            {logoSrc ? (
+              <span className="flex h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-200">
+                <img src={logoSrc} alt="" className="h-full w-full object-contain" />
+              </span>
+            ) : null}
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-900">{link.name}</p>
+              <p className="text-[11px] text-gray-400">Logo matches athletelinks — toggle in Add → Races</p>
+            </div>
+          </div>
+        ) : isLogoBackedRow ? (
+          <div className="space-y-1.5">
+            <div className="flex items-start gap-2">
+              {logoSrc ? (
+                <span className="flex h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-gray-100 ring-1 ring-gray-200">
+                  <img src={logoSrc} alt="" className="h-full w-full object-contain" />
+                </span>
+              ) : null}
+              <input
+                className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                value={buttonTitle}
+                onChange={(e) => {
+                  setButtonTitle(e.target.value);
+                  schedule();
+                }}
+                onBlur={saveOnBlur}
+                placeholder="Button title"
+              />
+            </div>
+            {isCauseLink ? (
+              <p className="text-[11px] text-gray-400">Logo matches athletelinks — toggle in Add → Charities</p>
+            ) : null}
+            {!isLegacyRaces ? (
+              <input
+                className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-800"
+                value={url}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  schedule();
+                }}
+                onBlur={saveOnBlur}
+                placeholder="https://"
+              />
+            ) : null}
           </div>
         ) : (
           <>
