@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { Check, ClipboardCopy, Loader2, Upload, X } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
 import type { DayValidateRunRow } from "@/lib/runmanage/day-validate-llm-packet";
+import {
+  extractRunSnapshotCsv,
+  isRunSnapshotCsv,
+  runSnapshotToDayCorrectionsCsv,
+  RUN_VALIDATE_SNAPSHOT_HEADER,
+  type RunValidateSnapshot,
+} from "@/lib/runmanage/run-validate-snapshot-csv";
 
 type PreviewRow = {
   line: number;
@@ -20,6 +27,9 @@ type Props = {
   onClose: () => void;
   allowedRunIds: string[];
   runsForParse?: DayValidateRunRow[];
+  /** When set, paste of field,value is diffed against this snapshot (single-run check). */
+  runSnapshotBaseline?: RunValidateSnapshot | null;
+  singleRunMode?: boolean;
   onApplied?: () => void;
 };
 
@@ -32,6 +42,8 @@ export function RunManageDayCorrectionsDialog({
   onClose,
   allowedRunIds,
   runsForParse = [],
+  runSnapshotBaseline = null,
+  singleRunMode = false,
   onApplied,
 }: Props) {
   const [mode, setMode] = useState<"paste" | "csv">("paste");
@@ -58,9 +70,26 @@ export function RunManageDayCorrectionsDialog({
   const hasInput = (mode === "csv" ? csvText : pasteText).trim().length > 0;
 
   const resolveCsvText = async (): Promise<string | null> => {
-    if (mode === "csv") return csvText.trim();
-    const trimmed = pasteText.trim();
-    if (!trimmed) return null;
+  const rawInput = (mode === "csv" ? csvText : pasteText).trim();
+    if (!rawInput) return null;
+
+    const snapshotBlock = extractRunSnapshotCsv(rawInput);
+    if (isRunSnapshotCsv(snapshotBlock) && runSnapshotBaseline && allowedRunIds.length === 1) {
+      const { csvText: converted, parseErrors: snapErrors } = runSnapshotToDayCorrectionsCsv(
+        allowedRunIds[0]!,
+        runSnapshotBaseline,
+        snapshotBlock
+      );
+      if (snapErrors.length) setParseErrors(snapErrors);
+      if (!converted) {
+        setError("No changed values in the returned CSV.");
+        return null;
+      }
+      return converted;
+    }
+
+    if (mode === "csv") return rawInput;
+    const trimmed = rawInput;
     const headerLooksCsv = trimmed.split(/\r?\n/)[0]?.toLowerCase().includes("runid");
     if (headerLooksCsv) return trimmed;
     const res = await runmanageApi.post("/api/runmanage/day-corrections/parse", {
@@ -141,9 +170,13 @@ export function RunManageDayCorrectionsDialog({
       >
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Ingest day updates</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {singleRunMode ? "Apply run check" : "Ingest day updates"}
+            </h2>
             <p className="mt-1 text-sm text-gray-600">
-              Paste the LLM reply or a corrections CSV for runs on this day.
+              {singleRunMode
+                ? `Paste the same field,value CSV the model returned (${RUN_VALIDATE_SNAPSHOT_HEADER}). Only changed cells apply.`
+                : "Paste the LLM reply or a corrections CSV for runs on this day."}
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-gray-500 hover:bg-gray-100">
@@ -157,7 +190,7 @@ export function RunManageDayCorrectionsDialog({
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
               rows={8}
-              placeholder={CSV_HINT}
+              placeholder={singleRunMode ? RUN_VALIDATE_SNAPSHOT_HEADER : CSV_HINT}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-xs"
             />
           ) : (
@@ -165,7 +198,7 @@ export function RunManageDayCorrectionsDialog({
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
               rows={8}
-              placeholder={CSV_HINT}
+              placeholder={singleRunMode ? RUN_VALIDATE_SNAPSHOT_HEADER : CSV_HINT}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-xs"
             />
           )}

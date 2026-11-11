@@ -8,7 +8,9 @@ import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAff
 import type { RunInstanceWizardContext, RunInstanceWizardValues } from "@/components/runmanage/runInstanceWizard/shared";
 import type { RunClubPublicSources } from "@/components/runmanage/runInstanceWizard/RunClubPublicSourcesCard";
 import RunManageClubSourceLinks from "@/components/runmanage/RunManageClubSourceLinks";
+import RunManageClubMetaOnRun, { type RunClubMetaOnRun } from "@/components/runmanage/RunManageClubMetaOnRun";
 import RunManageRunCheckBar from "@/components/runmanage/RunManageRunCheckBar";
+import type { RunClubMetaForValidate } from "@/lib/runmanage/run-validate-llm-packet";
 import type { RunDashboardInstanceToolbar } from "@/components/runmanage/run-dashboard-instance-toolbar";
 
 export type { RunDashboardInstanceToolbar };
@@ -20,6 +22,9 @@ type Props = {
   weekdayMismatch: boolean;
   cityLabel: string;
   publicSources?: RunClubPublicSources | null;
+  clubMetaOnRun?: RunClubMetaOnRun | null;
+  checkClubMeta?: RunClubMetaForValidate | null;
+  seriesSourceText?: string | null;
   publicDescriptionContext?: {
     cityRunType?: string | null;
     clubName?: string | null;
@@ -44,6 +49,9 @@ export default function RunManageStaffRunDashboard({
   weekdayMismatch,
   cityLabel,
   publicSources,
+  clubMetaOnRun,
+  checkClubMeta,
+  seriesSourceText,
   publicDescriptionContext,
   associateDraft,
   onAssociateChange,
@@ -71,10 +79,13 @@ export default function RunManageStaffRunDashboard({
           cityRunId={cityRunId}
           cityLabel={cityLabel}
           values={values}
-          clubName={context.clubName}
+          clubMeta={checkClubMeta}
+          seriesSourceText={seriesSourceText}
           onRunRefreshed={onRunRefreshed}
         />
       ) : null}
+
+      {clubMetaOnRun ? <RunManageClubMetaOnRun club={clubMetaOnRun} /> : null}
 
       {publicSources ? <RunManageClubSourceLinks runClub={publicSources} /> : null}
 

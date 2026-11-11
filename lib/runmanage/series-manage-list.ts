@@ -73,3 +73,38 @@ export async function listRunSeriesForManage(opts: {
   mapped.sort(compareSeriesByWeekdayTime);
   return mapped;
 }
+
+/** Load all series for one club — no region/city scope bar required. */
+export async function listRunSeriesForClub(runClubId: string): Promise<SeriesManageRow[]> {
+  const id = runClubId.trim();
+  if (!id) return [];
+
+  const rows = await prisma.run_series.findMany({
+    where: { runClubId: id },
+    include: {
+      runClub: { select: { name: true } },
+      _count: { select: { city_runs: true } },
+    },
+  });
+
+  const mapped: SeriesManageRow[] = rows.map((s) => ({
+    id: s.id,
+    slug: s.slug,
+    name: s.name,
+    description: s.description,
+    dayOfWeek: s.dayOfWeek,
+    startTimeHour: s.startTimeHour,
+    startTimeMinute: s.startTimeMinute,
+    startTimePeriod: s.startTimePeriod,
+    meetUpPoint: s.meetUpPoint,
+    meetUpCity: s.meetUpCity,
+    meetUpState: s.meetUpState,
+    citySlug: s.citySlug,
+    runClubId: s.runClubId,
+    clubName: s.runClub?.name ?? null,
+    runCount: s._count.city_runs,
+  }));
+
+  mapped.sort(compareSeriesByWeekdayTime);
+  return mapped;
+}

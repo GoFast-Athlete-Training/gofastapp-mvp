@@ -121,6 +121,8 @@ export async function GET(
               websiteUrl: true,
               instagramUrl: true,
               stravaUrl: true,
+              runUrl: true,
+              allRunsDescription: true,
             },
           },
           club_association: {
@@ -133,6 +135,7 @@ export async function GET(
               name: true,
               dayOfWeek: true,
               seriesPhotoUrl: true,
+              seriesRunRawText: true,
             },
           },
           runStore: {

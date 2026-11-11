@@ -13,6 +13,7 @@ export default function RunManageSeriesList() {
   const searchParams = useSearchParams();
   const regionFilter = searchParams.get("region")?.trim() ?? "";
   const cityFilter = searchParams.get("city")?.trim() ?? "";
+  const clubFilter = searchParams.get("clubId")?.trim() ?? "";
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +22,8 @@ export default function RunManageSeriesList() {
   const [editRow, setEditRow] = useState<SeriesManageRow | null>(null);
 
   const load = useCallback(async () => {
-    if (!regionFilter || !cityFilter) {
+    const clubOnly = Boolean(clubFilter && !regionFilter && !cityFilter);
+    if (!clubOnly && (!regionFilter || !cityFilter)) {
       setRows([]);
       setLoading(false);
       return;
@@ -29,11 +31,14 @@ export default function RunManageSeriesList() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({
-        region: regionFilter,
-        city: cityFilter,
-        view: "manage",
-      });
+      const params = new URLSearchParams({ view: "manage" });
+      if (clubOnly) {
+        params.set("clubId", clubFilter);
+      } else {
+        params.set("region", regionFilter);
+        params.set("city", cityFilter);
+        if (clubFilter) params.set("clubId", clubFilter);
+      }
       const res = await runmanageApi.get(`/api/runmanage/run-series?${params.toString()}`);
       if (!res.data?.success) {
         setError(res.data?.error || "Failed to load series");
@@ -48,24 +53,26 @@ export default function RunManageSeriesList() {
     } finally {
       setLoading(false);
     }
-  }, [regionFilter, cityFilter]);
+  }, [regionFilter, cityFilter, clubFilter]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const editSeriesId = searchParams.get("edit")?.trim() ?? "";
+  const focusSeriesId =
+    searchParams.get("series")?.trim() ?? searchParams.get("edit")?.trim() ?? "";
 
   useEffect(() => {
-    if (!editSeriesId || rows.length === 0) return;
-    const match = rows.find((r) => r.id === editSeriesId);
+    if (!focusSeriesId || rows.length === 0) return;
+    const match = rows.find((r) => r.id === focusSeriesId);
     if (match) {
       setEditRow(match);
       setFormOpen(true);
     }
-  }, [editSeriesId, rows]);
+  }, [focusSeriesId, rows]);
 
-  const filtersReady = Boolean(regionFilter && cityFilter);
+  const clubScoped = Boolean(clubFilter && !regionFilter && !cityFilter);
+  const filtersReady = clubScoped || Boolean(regionFilter && cityFilter);
 
   function formatTime(row: SeriesManageRow): string {
     if (row.startTimeHour == null) return "—";
@@ -106,13 +113,9 @@ export default function RunManageSeriesList() {
         </div>
       ) : null}
 
-      {!regionFilter ? (
+      {!filtersReady ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-8 text-center text-sm text-amber-950">
-          Select a region in the scope bar above.
-        </p>
-      ) : !cityFilter ? (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-8 text-center text-sm text-amber-950">
-          Select a city in the scope bar to manage series.
+          Select a region and city in the scope bar above, or open this page from a run with a club in the URL.
         </p>
       ) : loading ? (
         <div className="flex items-center gap-2 py-16 text-gray-500">

@@ -5,7 +5,7 @@ import {
   buildWeekQueueSeriesList,
 } from "@/lib/runmanage/series-operational-list";
 import { listRegionCityOptions } from "@/lib/runmanage/week-board-filters";
-import { listRunSeriesForManage } from "@/lib/runmanage/series-manage-list";
+import { listRunSeriesForClub, listRunSeriesForManage } from "@/lib/runmanage/series-manage-list";
 import {
   type RunSeriesMetaInput,
   upsertRunSeriesMetaOnly,
@@ -33,6 +33,16 @@ export async function GET(request: NextRequest) {
 
   try {
     if (view === "manage") {
+      if (runClubId && !regionSlug && !citySlug) {
+        const manageSeries = await listRunSeriesForClub(runClubId);
+        return NextResponse.json({
+          success: true,
+          needsFilters: false,
+          clubScoped: true,
+          filterOptions,
+          manageSeries,
+        });
+      }
       if (!regionSlug || !citySlug) {
         return NextResponse.json({
           success: true,

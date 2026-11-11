@@ -78,6 +78,8 @@ export interface RunClub {
   websiteUrl?: string | null;
   instagramUrl?: string | null;
   stravaUrl?: string | null;
+  runUrl?: string | null;
+  allRunsDescription?: string | null;
 }
 
 export interface CityRunData {
@@ -115,6 +117,7 @@ export interface CityRunData {
     name?: string | null;
     dayOfWeek?: string | null;
     seriesPhotoUrl?: string | null;
+    seriesRunRawText?: string | null;
   } | null;
   runClub: RunClub | null;
   runClubId?: string | null;
@@ -991,7 +994,7 @@ export default function RunManageStaffEditor({
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               <Link
-                href={`/runmanage/series?series=${encodeURIComponent(run.runSeriesId)}`}
+                href={`/runmanage/series?clubId=${encodeURIComponent(run.runClub.id)}&series=${encodeURIComponent(run.runSeriesId)}`}
                 className="text-xs font-medium text-violet-700 hover:text-violet-900"
               >
                 View in Run series
@@ -1041,6 +1044,31 @@ export default function RunManageStaffEditor({
               run.citySlug.replace(/-/g, " ")
             }
             publicSources={publicSources}
+            clubMetaOnRun={
+              run.runClub
+                ? {
+                    name: run.runClub.name,
+                    runUrl: run.runClub.runUrl ?? publicSources?.runUrl ?? null,
+                    websiteUrl: run.runClub.websiteUrl ?? null,
+                    instagramUrl: run.runClub.instagramUrl ?? publicSources?.instagramHandle ?? null,
+                    stravaUrl: run.runClub.stravaUrl ?? null,
+                  }
+                : null
+            }
+            checkClubMeta={
+              run.runClub
+                ? {
+                    name: run.runClub.name,
+                    runUrl: run.runClub.runUrl ?? publicSources?.runUrl ?? null,
+                    websiteUrl: run.runClub.websiteUrl ?? null,
+                    instagramUrl: run.runClub.instagramUrl ?? publicSources?.instagramHandle ?? null,
+                    stravaUrl: run.runClub.stravaUrl ?? null,
+                    allRunsDescription:
+                      run.runClub.allRunsDescription ?? publicSources?.allRunsDescription ?? null,
+                  }
+                : null
+            }
+            seriesSourceText={run.runSeries?.seriesRunRawText ?? null}
             publicDescriptionContext={{
               cityRunType: run.cityRunType,
               clubName: run.runClub?.name,

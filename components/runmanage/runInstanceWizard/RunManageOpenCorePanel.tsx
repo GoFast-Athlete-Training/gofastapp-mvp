@@ -1,6 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import GooglePlacesAutocomplete from "@/components/runmanage/GooglePlacesAutocomplete";
+import RunManageRouteAttachPanel from "@/components/runmanage/runInstanceWizard/RunManageRouteAttachPanel";
+import { generateCitySlugFromParts } from "@/lib/utils/parseAddress";
 import { parseGoogleAddressFromComponents } from "@/lib/parse-google-address";
 import { formatDayLabel } from "@/lib/runmanage/format-day-label";
 import {
@@ -68,6 +72,8 @@ export default function RunManageOpenCorePanel({
   const isSeries = context.isSeriesInstance ?? context.variant === "create-series";
   const dayLabel = context.dayOfWeek ? formatDayLabel(context.dayOfWeek) : "Run";
   const isTrack = isTrackRun(values.runType);
+  const [showAttachRoute, setShowAttachRoute] = useState(false);
+  const linkedCatalogRoute = Boolean(values.routeId?.trim());
 
   const handleRunTypeChange = (nextRunType: string) => {
     if (isTrackRun(nextRunType)) {
@@ -314,6 +320,79 @@ export default function RunManageOpenCorePanel({
             />
           </div>
         </div>
+
+        {staffDashboardLayout && !isTrack && !isAthleteHosted ? (
+          <div className="space-y-3 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-3">
+            <p className="text-xs font-semibold text-gray-800">Route on this run</p>
+            {!linkedCatalogRoute ? (
+              <>
+                <label className="block text-sm font-medium text-gray-900">
+                  Strava link
+                  <input
+                    type="url"
+                    value={values.stravaMapUrl}
+                    onChange={(e) => patch({ stravaMapUrl: e.target.value })}
+                    placeholder="https://www.strava.com/routes/…"
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-gray-900">
+                  Route notes / instructions
+                  <textarea
+                    value={values.routeNotes}
+                    onChange={(e) => patch({ routeNotes: e.target.value })}
+                    rows={2}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </label>
+              </>
+            ) : (
+              <p className="text-xs text-gray-600">
+                Strava link and notes on this run are hidden while a catalog route is attached — they live on the
+                library row.
+              </p>
+            )}
+            <div className="border-t border-gray-200 pt-2">
+              <p className="text-xs font-medium text-gray-900">
+                Recurring route?{" "}
+                {linkedCatalogRoute ? (
+                  <span className="font-normal text-gray-700">
+                    Attached: {values.linkedRouteName.trim() || "Catalog route"}
+                  </span>
+                ) : (
+                  <span className="font-normal text-gray-700">Add it to the library.</span>
+                )}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Link
+                  href="/build-a-run/routes/new"
+                  target="_blank"
+                  className="rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-900 hover:bg-orange-100"
+                >
+                  Add
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowAttachRoute((v) => !v)}
+                  className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-800 hover:bg-gray-50"
+                >
+                  {showAttachRoute ? "Hide attach" : "Attach"}
+                </button>
+              </div>
+              {showAttachRoute ? (
+                <div className="mt-2">
+                  <RunManageRouteAttachPanel
+                    values={values}
+                    patch={patch}
+                    cityRunId={context.cityRunId}
+                    citySlug={generateCitySlugFromParts(values.meetUpCity, values.meetUpState) || null}
+                    onError={onErrorChange}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {!isAthleteHosted ? (
           <div>

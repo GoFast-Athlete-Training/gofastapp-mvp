@@ -3,14 +3,19 @@
 import { useCallback, useMemo, useState } from "react";
 import { ClipboardCopy, Upload, X } from "lucide-react";
 import { RunManageDayCorrectionsDialog } from "@/components/runmanage/RunManageDayCorrectionsDialog";
-import { buildRunValidateLlmPacket } from "@/lib/runmanage/run-validate-llm-packet";
+import {
+  buildRunValidateLlmPacket,
+  type RunClubMetaForValidate,
+} from "@/lib/runmanage/run-validate-llm-packet";
+import type { RunValidateSnapshot } from "@/lib/runmanage/run-validate-snapshot-csv";
 import type { RunInstanceWizardValues } from "@/components/runmanage/runInstanceWizard/shared";
 
 type Props = {
   cityRunId: string;
   cityLabel: string;
   values: RunInstanceWizardValues;
-  clubName?: string | null;
+  clubMeta?: RunClubMetaForValidate | null;
+  seriesSourceText?: string | null;
   onRunRefreshed?: () => void;
 };
 
@@ -18,14 +23,15 @@ export default function RunManageRunCheckBar({
   cityRunId,
   cityLabel,
   values,
-  clubName,
+  clubMeta,
+  seriesSourceText,
   onRunRefreshed,
 }: Props) {
   const [llmOpen, setLlmOpen] = useState(false);
   const [correctionsOpen, setCorrectionsOpen] = useState(false);
   const [copiedPacket, setCopiedPacket] = useState(false);
 
-  const { packet, row: runsForParse } = useMemo(
+  const { packet, row: runsForParse, snapshot } = useMemo(
     () =>
       buildRunValidateLlmPacket({
         cityLabel,
@@ -36,16 +42,17 @@ export default function RunManageRunCheckBar({
           startTimeHour: values.startTimeHour ? Number(values.startTimeHour) : null,
           startTimeMinute: values.startTimeMinute ? Number(values.startTimeMinute) : null,
           startTimePeriod: values.startTimePeriod || null,
+          startTimeHourStr: values.startTimeHour,
+          startTimeMinuteStr: values.startTimeMinute,
+          startTimePeriodStr: values.startTimePeriod,
           meetUpPoint: values.meetUpPoint,
-          description: values.description,
-          stravaMapUrl: values.stravaMapUrl,
-          routeNotes: values.routeNotes,
           stravaEventUrl: values.stravaEventUrl,
           webUrl: values.webUrl,
-          runClub: clubName ? { name: clubName } : null,
+          seriesSourceText,
+          clubMeta: clubMeta ?? null,
         },
       }),
-    [cityRunId, cityLabel, values, clubName]
+    [cityRunId, cityLabel, values, clubMeta, seriesSourceText]
   );
 
   const allowedRunIds = cityRunId ? [cityRunId] : [];
@@ -96,6 +103,8 @@ export default function RunManageRunCheckBar({
         onClose={() => setCorrectionsOpen(false)}
         allowedRunIds={allowedRunIds}
         runsForParse={[runsForParse]}
+        runSnapshotBaseline={snapshot}
+        singleRunMode
         onApplied={() => onRunRefreshed?.()}
       />
     </>
