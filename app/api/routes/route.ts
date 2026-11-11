@@ -26,6 +26,37 @@ export async function GET(request: NextRequest) {
       athleteId = auth.athlete.id;
     }
 
+    if (scope === "catalog" || scope === "staff") {
+      if (!q || q.length < 1) {
+        return NextResponse.json(
+          { success: false, error: "Query q is required" },
+          { status: 400 }
+        );
+      }
+      const routes = await prisma.routes.findMany({
+        where: {
+          name: { contains: q, mode: "insensitive" },
+          ...(citySlug ? { citySlug } : {}),
+        },
+        take: 20,
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          stravaUrl: true,
+          distanceMiles: true,
+          stravaMapUrl: true,
+          mapImageUrl: true,
+          routePhotos: true,
+          routeNeighborhood: true,
+          routeDescription: true,
+          runType: true,
+          citySlug: true,
+        },
+      });
+      return NextResponse.json({ success: true, routes });
+    }
+
     if (scope === "mine") {
       if (!athleteId) {
         return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });

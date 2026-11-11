@@ -92,6 +92,7 @@ async function latestPriorRunForSeries(runSeriesId: string, beforeYmd: string) {
       runType: true,
       workoutDescription: true,
       directionsText: true,
+      routeNotes: true,
       routeId: true,
       plannedWorkoutId: true,
       cityRunType: true,

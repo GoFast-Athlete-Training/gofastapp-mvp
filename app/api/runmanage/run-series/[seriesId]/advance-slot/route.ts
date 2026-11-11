@@ -109,6 +109,7 @@ export async function POST(
       runType: true,
       workoutDescription: true,
       directionsText: true,
+      routeNotes: true,
       routeId: true,
       plannedWorkoutId: true,
       cityRunType: true,

@@ -4,17 +4,32 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
-import { CalendarDays, LayoutGrid, PlusCircle } from "lucide-react";
+import { CalendarDays, LayoutGrid, ListChecks, PlusCircle } from "lucide-react";
 import { useRunManageAuth } from "@/components/runmanage/RunManageProviders";
-import { RUN_MANAGE_SERIES_PATH } from "@/lib/runmanage/paths";
+import {
+  RUN_MANAGE_DASHBOARD_PATH,
+  RUN_MANAGE_SERIES_PATH,
+  RUN_MANAGE_THIS_WEEK_PATH,
+} from "@/lib/runmanage/paths";
 import { RunManageScopeBar } from "@/components/runmanage/RunManageScopeBar";
 import { appendScopeToPath, scopeFromSearchParams } from "@/lib/runmanage/scope-query";
 
 const NAV_ITEMS = [
-  { href: "/runmanage/runs", label: "This week", icon: LayoutGrid, match: (p: string | null) => p === "/runmanage/runs" || p === "/runmanage/runs/" },
+  {
+    href: RUN_MANAGE_DASHBOARD_PATH,
+    label: "Dashboard",
+    icon: LayoutGrid,
+    match: (p: string | null) => p === "/runmanage/runs" || p === "/runmanage/runs/",
+  },
+  {
+    href: RUN_MANAGE_THIS_WEEK_PATH,
+    label: "Manage this week's runs",
+    icon: ListChecks,
+    match: (p: string | null) => p === "/runmanage/this-week" || p?.startsWith("/runmanage/this-week/"),
+  },
   {
     href: RUN_MANAGE_SERIES_PATH,
-    label: "Series",
+    label: "Manage series",
     icon: CalendarDays,
     match: (p: string | null) =>
       p === RUN_MANAGE_SERIES_PATH ||
@@ -30,6 +45,19 @@ const NAV_ITEMS = [
   },
 ] as const;
 
+function showScopeBarForPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (pathname === "/runmanage/runs" || pathname === "/runmanage/runs/") return false;
+  if (pathname === "/runmanage/this-week" || pathname.startsWith("/runmanage/this-week/")) return false;
+  if (pathname.startsWith("/runmanage/runs/") && !pathname.startsWith("/runmanage/runs/new")) return false;
+  return (
+    pathname.startsWith("/runmanage/series") ||
+    pathname.startsWith("/runmanage/clubs") ||
+    pathname.startsWith("/runmanage/types") ||
+    pathname.startsWith("/runmanage/all-runs")
+  );
+}
+
 function NavLinks({
   pathname,
   className,
@@ -43,10 +71,11 @@ function NavLinks({
     <nav className={className} aria-label="Run Manage">
       {NAV_ITEMS.map(({ href, label, icon: Icon, match }) => {
         const active = match(pathname);
+        const needsScope = href === RUN_MANAGE_SERIES_PATH || href === RUN_MANAGE_THIS_WEEK_PATH;
         return (
           <Link
             key={href}
-            href={scopeHref(href)}
+            href={needsScope ? scopeHref(href) : href}
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               active
                 ? "bg-sky-50 text-sky-800 border border-sky-200"
@@ -77,11 +106,13 @@ function RunManageShellInner({ children }: { children: ReactNode }) {
     return <div className="min-h-screen bg-gray-50">{children}</div>;
   }
 
+  const scopeBar = showScopeBarForPath(pathname);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="border-b border-gray-200 bg-white shrink-0">
         <div className="flex items-center justify-between gap-4 px-4 py-3">
-          <Link href={scopeHref("/runmanage/runs")} className="text-lg font-semibold text-sky-700">
+          <Link href={RUN_MANAGE_DASHBOARD_PATH} className="text-lg font-semibold text-sky-700">
             Run Manage
           </Link>
           <div className="flex items-center gap-3 text-sm text-gray-600">
@@ -100,7 +131,7 @@ function RunManageShellInner({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <RunManageScopeBar />
+      {scopeBar ? <RunManageScopeBar /> : null}
 
       <div className="flex flex-1 min-h-0">
         <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white p-3">

@@ -21,6 +21,10 @@ const DAYS = [
 
 type ClubOption = { id: string; name: string; city?: string | null };
 
+function clubSearchLabel(c: ClubOption): string {
+  return c.city ? `${c.name} (${c.city})` : c.name;
+}
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -30,8 +34,10 @@ type Props = {
 };
 
 export function RunManageSeriesMetaForm({ open, onClose, onSaved, citySlug, initial }: Props) {
-  const [clubs, setClubs] = useState<ClubOption[]>([]);
-  const [clubsLoading, setClubsLoading] = useState(false);
+  const [clubQuery, setClubQuery] = useState("");
+  const [clubHits, setClubHits] = useState<ClubOption[]>([]);
+  const [clubSearching, setClubSearching] = useState(false);
+  const [selectedClubLabel, setSelectedClubLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,26 +57,37 @@ export function RunManageSeriesMetaForm({ open, onClose, onSaved, citySlug, init
   const [startTimePeriod, setStartTimePeriod] = useState("AM");
 
   useEffect(() => {
-    if (!open) return;
-    void (async () => {
-      setClubsLoading(true);
-      try {
-        const res = await runmanageApi.get("/api/runmanage/run-clubs?all=1");
-        const list = (res.data?.clubs ?? []) as ClubOption[];
-        setClubs(Array.isArray(list) ? list : []);
-      } catch {
-        setClubs([]);
-      } finally {
-        setClubsLoading(false);
-      }
-    })();
-  }, [open]);
+    const q = clubQuery.trim();
+    if (!open || q.length < 2) {
+      setClubHits([]);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      void (async () => {
+        setClubSearching(true);
+        try {
+          const res = await runmanageApi.get(
+            `/api/runmanage/run-clubs/search?${new URLSearchParams({ q }).toString()}`
+          );
+          const list = (res.data?.clubs ?? []) as ClubOption[];
+          setClubHits(Array.isArray(list) ? list : []);
+        } catch {
+          setClubHits([]);
+        } finally {
+          setClubSearching(false);
+        }
+      })();
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [open, clubQuery]);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
     if (initial) {
       setRunClubId(initial.runClubId ?? "");
+      setSelectedClubLabel(initial.clubName ?? "");
+      setClubQuery("");
       setDayOfWeek(initial.dayOfWeek.toUpperCase());
       setName(initial.name ?? "");
       setDescription(initial.description ?? "");
@@ -88,6 +105,8 @@ export function RunManageSeriesMetaForm({ open, onClose, onSaved, citySlug, init
       setMeetUpLng(null);
     } else {
       setRunClubId("");
+      setSelectedClubLabel("");
+      setClubQuery("");
       setDayOfWeek("TUESDAY");
       setName("");
       setDescription("");
@@ -105,12 +124,12 @@ export function RunManageSeriesMetaForm({ open, onClose, onSaved, citySlug, init
   }, [open, initial]);
 
   useEffect(() => {
-    if (!open || initial || !runClubId || !dayOfWeek) return;
-    const club = clubs.find((c) => c.id === runClubId);
-    if (club && !name.trim()) {
-      setName(`${club.name} ${formatDayLabel(dayOfWeek)} Run`);
+    if (!open || initial || !selectedClubLabel || !dayOfWeek || !runClubId) return;
+    if (!name.trim()) {
+      const base = selectedClubLabel.split(" (")[0]?.trim() || selectedClubLabel;
+      setName(`${base} ${formatDayLabel(dayOfWeek)} Run`);
     }
-  }, [open, initial, runClubId, dayOfWeek, clubs, name]);
+  }, [open, initial, runClubId, dayOfWeek, selectedClubLabel, name]);
 
   const handleSubmit = async () => {
     if (!runClubId.trim() || !dayOfWeek) {
@@ -182,23 +201,54 @@ export function RunManageSeriesMetaForm({ open, onClose, onSaved, citySlug, init
         <div className="space-y-4 px-5 py-4">
           {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}
 
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span className="font-medium text-gray-700">Run club</span>
-            <select
-              value={runClubId}
-              onChange={(e) => setRunClubId(e.target.value)}
-              disabled={clubsLoading}
+            <input
+              type="search"
+              value={clubQuery}
+              onChange={(e) => setClubQuery(e.target.value)}
+              placeholder={runClubId && selectedClubLabel ? selectedClubLabel : "Search club name…"}
               className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">Select club…</option>
-              {clubs.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.city ? ` (${c.city})` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+            {clubSearching ? (
+              <p className="mt-1 text-xs text-gray-500">Searching…</p>
+            ) : null}
+            {clubHits.length > 0 ? (
+              <ul className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                {clubHits.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRunClubId(c.id);
+                        setSelectedClubLabel(clubSearchLabel(c));
+                        setClubQuery("");
+                        setClubHits([]);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-sky-50"
+                    >
+                      {clubSearchLabel(c)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {runClubId ? (
+              <p className="mt-1 text-xs text-gray-600">
+                Selected: {selectedClubLabel || runClubId}{" "}
+                <button
+                  type="button"
+                  className="font-medium text-sky-700 underline"
+                  onClick={() => {
+                    setRunClubId("");
+                    setSelectedClubLabel("");
+                  }}
+                >
+                  Change
+                </button>
+              </p>
+            ) : null}
+          </div>
 
           <div>
             <span className="text-sm font-medium text-gray-700">Day</span>

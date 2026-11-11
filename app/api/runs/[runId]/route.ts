@@ -26,7 +26,6 @@ import {
   relationshipPatchFromBody,
 } from '@/lib/city-run-type';
 import { partnerExtrasForWrite } from '@/lib/runmanage/partner-extras';
-import { ensureCityRunRoute } from '@/lib/city-run/ensure-city-run-route';
 import {
   associatedRunClubIdFromBody,
   cityRunClubAssociationSelect,
@@ -1328,15 +1327,6 @@ export async function PUT(
         console.error('[PUT /api/runs/[runId]] Failed updating run club sources:', runClubError?.message || runClubError);
       }
       }
-    }
-
-    try {
-      await ensureCityRunRoute(resolvedId);
-    } catch (routeEnsureError: unknown) {
-      console.error(
-        '[PUT /api/runs/[runId]] ensureCityRunRoute failed:',
-        routeEnsureError instanceof Error ? routeEnsureError.message : routeEnsureError
-      );
     }
 
     const finalRunClubId =

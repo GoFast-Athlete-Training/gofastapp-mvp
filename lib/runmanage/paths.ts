@@ -8,6 +8,7 @@ export {
   RUN_MANAGE_DASHBOARD_PATH,
 } from '@/lib/runmanage/door';
 
+export const RUN_MANAGE_THIS_WEEK_PATH = '/runmanage/this-week';
 export const RUN_MANAGE_SERIES_PATH = '/runmanage/series';
 export const RUN_MANAGE_CLUBS_PATH = '/runmanage/clubs';
 export const RUN_MANAGE_ALL_RUNS_PATH = '/runmanage/all-runs';

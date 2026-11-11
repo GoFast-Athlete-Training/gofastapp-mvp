@@ -50,8 +50,7 @@ export default function RoutesDiscoverPicker({
           return;
         }
         params.set('q', q);
-        const slug = citySlug?.trim();
-        if (slug) params.set('citySlug', slug);
+        params.set('scope', 'catalog');
       } else {
         params.set('scope', 'mine');
         if (search.trim()) params.set('q', search.trim());

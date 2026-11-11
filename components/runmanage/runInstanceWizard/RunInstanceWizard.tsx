@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import RunManageAssociateStep from "@/components/runmanage/runInstanceWizard/RunManageAssociateStep";
 import RunManageRouteAttachPanel from "@/components/runmanage/runInstanceWizard/RunManageRouteAttachPanel";
+import RunManageStaffOptionalRunActions from "@/components/runmanage/runInstanceWizard/RunManageStaffOptionalRunActions";
 import { generateCitySlugFromParts } from "@/lib/utils/parseAddress";
 import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
 import runmanageApi from "@/lib/runmanage/api-client";
@@ -243,8 +244,12 @@ export default function RunInstanceWizard({
     if (!showAssociateStep) {
       steps = steps.filter((s) => s !== "associate");
     }
+  const isStaffEdit = context.variant === "edit" && !isAthleteHosted;
+    if (isStaffEdit) {
+      steps = steps.filter((s) => s !== "route" && s !== "workout");
+    }
     return steps;
-  }, [isSeriesCreate, isAthleteHosted, isCreateScratch, isTrack, isRaceShakeout, stepOrder, showAssociateStep]);
+  }, [isSeriesCreate, isAthleteHosted, isCreateScratch, isTrack, isRaceShakeout, stepOrder, showAssociateStep, context.variant]);
 
   const lastWizardStep = visibleWizardSteps[visibleWizardSteps.length - 1] ?? "workout";
 
@@ -717,17 +722,27 @@ export default function RunInstanceWizard({
           ) : null}
 
           {wizardStep === "core" ? (
-            <RunManageOpenCorePanel
-              values={values}
-              onChange={onChange}
-              patch={patch}
-              context={context}
-              weekdayMismatch={weekdayMismatch}
-              onErrorChange={onErrorChange}
-              associateDraft={associateDraft}
-              titleInPageHeading={titleInPageHeading}
-              publicDescriptionContext={publicDescriptionContext}
-            />
+            <>
+              <RunManageOpenCorePanel
+                values={values}
+                onChange={onChange}
+                patch={patch}
+                context={context}
+                weekdayMismatch={weekdayMismatch}
+                onErrorChange={onErrorChange}
+                associateDraft={associateDraft}
+                titleInPageHeading={titleInPageHeading}
+                publicDescriptionContext={publicDescriptionContext}
+              />
+              {context.variant === "edit" && !isAthleteHosted ? (
+                <RunManageStaffOptionalRunActions
+                  values={values}
+                  patch={patch}
+                  context={context}
+                  onErrorChange={onErrorChange}
+                />
+              ) : null}
+            </>
           ) : null}
 
 
