@@ -102,7 +102,16 @@ export function AthleteLinkTreeEditor() {
       setTitle(next.publicLabel?.trim() || dn);
       setSubtitle(next.publicDescription ?? "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load link page");
+      const ax =
+        err &&
+        typeof err === "object" &&
+        "response" in err &&
+        err.response &&
+        typeof err.response === "object" &&
+        "data" in err.response
+          ? (err.response as { data?: { error?: string } }).data?.error
+          : null;
+      setError(ax || (err instanceof Error ? err.message : "Failed to load link page"));
     } finally {
       setLoading(false);
     }

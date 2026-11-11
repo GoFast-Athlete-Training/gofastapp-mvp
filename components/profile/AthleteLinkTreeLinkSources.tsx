@@ -10,6 +10,10 @@ import {
   linkIdForCityRun,
   linkIdForUrl,
 } from "@/lib/athlete-link-tree/link-tree-race-section";
+import {
+  normalizeAthleteCharityCatalogHits,
+  type AthleteCharityCatalogHit,
+} from "@/lib/athlete-causes/charity-catalog-search";
 import { linkIdForAthleteCause } from "@/lib/athlete-link-tree/link-tree-charity";
 import {
   athletePublicReflectionUrl,
@@ -105,15 +109,7 @@ export function AthleteLinkTreeLinkSources({
   const [hostedRunsLoading, setHostedRunsLoading] = useState(false);
   const [hostedRunsError, setHostedRunsError] = useState<string | null>(null);
   const [charityQ, setCharityQ] = useState("");
-  const [charityHits, setCharityHits] = useState<
-    Array<{
-      charityId: string;
-      charityName: string;
-      charityUrl: string;
-      charityLogo: string | null;
-      athleteCauseId: string | null;
-    }>
-  >([]);
+  const [charityHits, setCharityHits] = useState<AthleteCharityCatalogHit[]>([]);
   const [charityLoading, setCharityLoading] = useState(false);
   const [charityError, setCharityError] = useState<string | null>(null);
   const [myCauses, setMyCauses] = useState<SerializedAthleteCause[]>([]);
@@ -277,12 +273,23 @@ export function AthleteLinkTreeLinkSources({
             throw new Error(res.data?.error || "Failed to search charities");
           }
           if (!cancelled) {
-            setCharityHits(res.data.charities ?? []);
+            setCharityHits(normalizeAthleteCharityCatalogHits(res.data.charities));
           }
         } catch (err) {
           if (!cancelled) {
             setCharityHits([]);
-            setCharityError(err instanceof Error ? err.message : "Search failed");
+            const ax =
+              err &&
+              typeof err === "object" &&
+              "response" in err &&
+              err.response &&
+              typeof err.response === "object" &&
+              "data" in err.response
+                ? (err.response as { data?: { error?: string } }).data?.error
+                : null;
+            setCharityError(
+              ax || (err instanceof Error ? err.message : "Search failed"),
+            );
           }
         } finally {
           if (!cancelled) setCharityLoading(false);
@@ -571,22 +578,18 @@ export function AthleteLinkTreeLinkSources({
     if (existingId) await onRemoveLink(existingId);
   }
 
-  async function toggleCharityOnPage(
-    hit: {
-      charityId: string;
-      charityName: string;
-      charityUrl: string;
-      athleteCauseId: string | null;
-    },
-    checked: boolean,
-  ) {
+  async function toggleCharityOnPage(hit: AthleteCharityCatalogHit, checked: boolean) {
     const existingId = hit.athleteCauseId
       ? linkIdForAthleteCause(sortedLinks, hit.athleteCauseId)
       : null;
     if (checked) {
       if (existingId) return;
       if (!activeSectionId) return;
-      await onAddLink({ charityId: hit.charityId });
+      const payload =
+        hit.raceRegistryId && hit.charityId === hit.raceRegistryId
+          ? { raceRegistryId: hit.raceRegistryId }
+          : { charityId: hit.charityId };
+      await onAddLink(payload);
       return;
     }
     if (existingId) {

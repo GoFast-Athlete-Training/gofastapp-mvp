@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import api from "@/lib/api";
+import {
+  normalizeAthleteCharityCatalogHits,
+  type AthleteCharityCatalogHit,
+} from "@/lib/athlete-causes/charity-catalog-search";
 import { GOFAST_LINKS_PATH } from "@/lib/athlete/community-nav";
 
 type Cause = {
@@ -17,13 +21,7 @@ type Cause = {
   updatedAt: string;
 };
 
-type CharityHit = {
-  charityId: string;
-  charityName: string;
-  charityUrl: string;
-  charityLogo: string | null;
-  athleteCauseId: string | null;
-};
+type CharityHit = AthleteCharityCatalogHit;
 
 export default function AthleteCausesPage() {
   const [causes, setCauses] = useState<Cause[]>([]);
@@ -71,7 +69,7 @@ export default function AthleteCausesPage() {
             `/athlete/links/charities${q ? `?q=${encodeURIComponent(q)}` : ""}`,
           );
           if (!res.data?.success) throw new Error(res.data?.error || "Search failed");
-          if (!cancelled) setHits(res.data.charities ?? []);
+          if (!cancelled) setHits(normalizeAthleteCharityCatalogHits(res.data.charities));
         } catch (e) {
           if (!cancelled) {
             setHits([]);
@@ -92,7 +90,11 @@ export default function AthleteCausesPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await api.post("/athlete/causes", { charityId: hit.charityId });
+      const body =
+        hit.raceRegistryId && hit.charityId === hit.raceRegistryId
+          ? { raceRegistryId: hit.raceRegistryId }
+          : { charityId: hit.charityId };
+      const res = await api.post("/athlete/causes", body);
       if (!res.data?.success) throw new Error(res.data?.error || "Failed to save");
       await load();
     } catch (e) {
