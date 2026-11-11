@@ -14,6 +14,7 @@ import {
 import { EntitySearch } from "@/components/runmanage/RunManageRunAffiliations";
 import { coffeeFoodKindLabel } from "@/lib/brands/coffee-food-kind";
 import CityRunProfileMetaFields from "@/components/cityruns/CityRunProfileMetaFields";
+import RunManageDiscreetBannerField from "@/components/runmanage/RunManageDiscreetBannerField";
 import { resolvePartnerCircleMark } from "@/lib/city-run/run-profile-visual";
 import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
 import type { RunInstanceWizardContext, RunInstanceWizardValues } from "./shared";
@@ -32,6 +33,8 @@ type Props = {
   panelTitle?: string;
   /** Weekly club runs hide registration; shakeouts keep CSV fields. */
   showRegistrationFields?: boolean;
+  /** Staff run dashboard — no Run look panel; discreet banner under description. */
+  staffDashboardLayout?: boolean;
   publicDescriptionContext?: {
     cityRunType?: string | null;
     clubName?: string | null;
@@ -49,6 +52,7 @@ export default function RunManageOpenCorePanel({
   titleInPageHeading = false,
   panelTitle = "Core details",
   showRegistrationFields,
+  staffDashboardLayout = false,
   publicDescriptionContext,
 }: Props) {
   const partnerMark = resolvePartnerCircleMark({
@@ -157,14 +161,22 @@ export default function RunManageOpenCorePanel({
           <RunRegistrationFields values={values} onChange={patch} />
         ) : null}
 
-        <CityRunProfileMetaFields
-          profileEmoji={values.profileEmoji}
-          onProfileEmojiChange={(v) => patch({ profileEmoji: v })}
-          coverPhotoUrl={values.coverPhotoUrl}
-          onCoverPhotoUrlChange={(v) => patch({ coverPhotoUrl: v })}
-          onUploadError={onErrorChange}
-          partnerMark={partnerMark}
-        />
+        {staffDashboardLayout ? (
+          <RunManageDiscreetBannerField
+            coverPhotoUrl={values.coverPhotoUrl}
+            onChange={(url) => patch({ coverPhotoUrl: url })}
+            onError={onErrorChange}
+          />
+        ) : (
+          <CityRunProfileMetaFields
+            profileEmoji={values.profileEmoji}
+            onProfileEmojiChange={(v) => patch({ profileEmoji: v })}
+            coverPhotoUrl={values.coverPhotoUrl}
+            onCoverPhotoUrlChange={(v) => patch({ coverPhotoUrl: v })}
+            onUploadError={onErrorChange}
+            partnerMark={partnerMark}
+          />
+        )}
 
         {!isSeries && !isAthleteHosted ? (
           <div>

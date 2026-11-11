@@ -52,6 +52,7 @@ import {
   draftFromRun,
   type RunAffiliationDraft,
 } from "@/components/runmanage/RunManageRunAffiliations";
+import { resolvePartnerCircleMark } from "@/lib/city-run/run-profile-visual";
 
 export interface Athlete {
   id: string;
@@ -491,6 +492,18 @@ export default function RunManageStaffEditor({
     [linkForm, run?.runClub?.websiteUrl, run?.runClub?.instagramUrl, run?.runClub?.stravaUrl]
   );
 
+  const headerPartnerMark = useMemo(() => {
+    if (!run) return null;
+    return resolvePartnerCircleMark({
+      runBrandPick: associateDraft?.runBrandPick,
+      runClubPick: associateDraft?.runClubPick,
+      runBrandLogoUrl: run.runBrandLogoUrl ?? run.runBrand?.logoUrl ?? null,
+      runBrandName: run.runBrandName ?? run.runBrand?.name ?? null,
+      runClubLogoUrl: run.runClub?.logoUrl ?? null,
+      runClubName: run.runClub?.name ?? null,
+    });
+  }, [run, associateDraft]);
+
   const weekdayMismatch =
     wizardValues?.date.trim() &&
     run?.dayOfWeek &&
@@ -733,7 +746,17 @@ export default function RunManageStaffEditor({
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-1 gap-3">
+              {staffMode === "edit" && headerPartnerMark?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={headerPartnerMark.logoUrl}
+                  alt=""
+                  title={headerPartnerMark.name}
+                  className="mt-1 h-12 w-12 shrink-0 rounded-full border border-gray-200 bg-white object-contain p-1"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
                 {isClubContext ? "Run club runs" : "Run instance"}
               </p>
@@ -774,6 +797,7 @@ export default function RunManageStaffEditor({
                     No workout attached
                   </span>
                 )}
+              </div>
               </div>
             </div>
 

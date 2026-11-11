@@ -6,9 +6,9 @@ import RunManageAssociateStep from "@/components/runmanage/runInstanceWizard/Run
 import RunManageRunDashboardSideColumn from "@/components/runmanage/RunManageRunDashboardSideColumn";
 import type { RunAffiliationDraft } from "@/components/runmanage/RunManageRunAffiliations";
 import type { RunInstanceWizardContext, RunInstanceWizardValues } from "@/components/runmanage/runInstanceWizard/shared";
-import RunClubPublicSourcesCard, {
-  type RunClubPublicSources,
-} from "@/components/runmanage/runInstanceWizard/RunClubPublicSourcesCard";
+import type { RunClubPublicSources } from "@/components/runmanage/runInstanceWizard/RunClubPublicSourcesCard";
+import RunManageClubSourceLinks from "@/components/runmanage/RunManageClubSourceLinks";
+import RunManageRunCheckBar from "@/components/runmanage/RunManageRunCheckBar";
 import type { RunDashboardInstanceToolbar } from "@/components/runmanage/run-dashboard-instance-toolbar";
 
 export type { RunDashboardInstanceToolbar };
@@ -60,26 +60,35 @@ export default function RunManageStaffRunDashboard({
   const patch = (partial: Partial<RunInstanceWizardValues>) => onChange({ ...values, ...partial });
   const showAssociateStep = Boolean(associateDraft && onAssociateChange);
 
+  const cityRunId = context.cityRunId?.trim() ?? "";
+
   return (
     <div className="space-y-4">
       {headerSlot}
+
+      {cityRunId ? (
+        <RunManageRunCheckBar
+          cityRunId={cityRunId}
+          cityLabel={cityLabel}
+          values={values}
+          clubName={context.clubName}
+          onRunRefreshed={onRunRefreshed}
+        />
+      ) : null}
+
+      {publicSources ? <RunManageClubSourceLinks runClub={publicSources} /> : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(280px,340px)_1fr]">
         <RunManageRunDashboardSideColumn
           values={values}
           patch={patch}
           context={context}
-          cityLabel={cityLabel}
           onErrorChange={onErrorChange}
           onRunRefreshed={onRunRefreshed}
           instanceToolbar={instanceToolbar}
         />
 
         <div className="min-w-0 space-y-4">
-          {publicSources ? (
-            <RunClubPublicSourcesCard runClub={publicSources} showInstanceSection={false} />
-          ) : null}
-
           {showAssociateStep && associateDraft && onAssociateChange ? (
             <RunManageAssociateStep
               cityRunType={context.cityRunType}
@@ -102,6 +111,7 @@ export default function RunManageStaffRunDashboard({
             associateDraft={associateDraft ?? null}
             panelTitle="Run details"
             showRegistrationFields={context.cityRunType === "RACE_SHAKEOUT"}
+            staffDashboardLayout
             publicDescriptionContext={publicDescriptionContext}
           />
 
