@@ -93,6 +93,8 @@ export async function GET(request: NextRequest) {
 
     const standaloneOnly = searchParams.get("standalone") === "1";
     const planOnly = searchParams.get("plan") === "1";
+    const workoutTypeParam = searchParams.get("workoutType")?.trim() ?? "";
+    const titleQuery = searchParams.get("q")?.trim() ?? "";
     const matchedOnly = searchParams.get("matched") === "1";
     const completedOnly =
       searchParams.get("completed") === "1" || matchedOnly;
@@ -101,6 +103,11 @@ export async function GET(request: NextRequest) {
     const dateRange =
       dateParam && dateParam.trim() ? utcDayRangeFromYmd(dateParam) : null;
 
+    const workoutTypeFilter =
+      workoutTypeParam && Object.values(WorkoutType).includes(workoutTypeParam as WorkoutType)
+        ? { workoutType: workoutTypeParam as WorkoutType }
+        : {};
+
     const where = {
       athleteId: athlete.id,
       ...(standaloneOnly ? { planId: null } : {}),
@@ -108,6 +115,10 @@ export async function GET(request: NextRequest) {
       ...(completedOnly ? completedStampsWhere() : {}),
       ...(dateRange ? { date: { gte: dateRange.gte, lt: dateRange.lt } } : {}),
       ...sportWorkoutTypeFilter(sportParam),
+      ...workoutTypeFilter,
+      ...(titleQuery
+        ? { title: { contains: titleQuery, mode: "insensitive" as const } }
+        : {}),
     };
 
     const listSelect = {

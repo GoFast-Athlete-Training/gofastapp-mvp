@@ -4,6 +4,7 @@
 
 import {
   tryParsePastedWorkoutText,
+  explicitPaceSecPerMileFromContext,
   type ParsedPasteSegment,
   type ParsedPasteWorkout,
 } from "@/lib/training/parse-pasted-workout";
@@ -26,6 +27,8 @@ export type ShapeStep =
       durationValue: number;
       effortLabel: ShapeEffortLabel;
       title: string;
+      /** When coach paste names M:SS/mile explicitly on this leg. */
+      explicitPaceSecPerMile?: { low: number; high: number };
     }
   | {
       kind: "rest";
@@ -94,12 +97,14 @@ function parsedSegmentToShapeStep(seg: ParsedPasteSegment): ShapeStep | null {
       title: seg.title || "Recovery",
     };
   }
+  const explicit = explicitPaceSecPerMileFromContext(ctx);
   return {
     kind: "effort",
     durationType: seg.durationType,
     durationValue: seg.durationValue,
     effortLabel: label,
     title: seg.title,
+    ...(explicit ? { explicitPaceSecPerMile: explicit } : {}),
   };
 }
 

@@ -200,6 +200,11 @@ function parseExplicitPaceSecPerMile(context: string): { low: number; high: numb
   return { low: single, high: single };
 }
 
+/** Public helper for shape / materialize paths. */
+export function explicitPaceSecPerMileFromContext(context: string): { low: number; high: number } | null {
+  return parseExplicitPaceSecPerMile(context);
+}
+
 export function effortTextToPaceOffsetSecPerMile(text: string): number | null {
   const t = text.toLowerCase();
   if (/\b5\s*k\s*(?:race\s*)?pace\b|\b5k\s*(?:race\s*)?pace\b|\b5\s*k\b|\b5k\b/.test(t)) return 0;
@@ -244,7 +249,123 @@ export function inferRepDistanceMiles(amount: number, unitRaw: string | undefine
   return amount;
 }
 
-/** `20 × (1' @ 10K / 1' steady)` → one repeat with two timed effort legs. */
+/** Parse one timed leg: `3 minutes ON at 7:25/mile`, `1' @ 10K`, etc. */
+function parseTimedCycleLeg(leg: string): ParsedPasteSegment | null {
+  const trimmed = leg.trim();
+  const onOffRe =
+    /(\d+(?:\.\d+)?)\s*(?:'|’|"|″|"|min(?:ute)?s?)\s*(?:(ON|OFF)\s+)?(?:@|at)?\s*([^\s/,]+(?:\s+[^\s/,]+)*|\d{1,2}:\d{2}(?:\s*\/\s*(?:mi(?:le)?s?)?)?)/i;
+  const lm = trimmed.match(onOffRe);
+  if (!lm) return null;
+  const amount = parseFloat(lm[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const onOff = (lm[2] ?? "").toUpperCase();
+  const effort = (lm[3] ?? "").trim();
+  const fullContext = trimmed;
+  const minutes = /'|”|″|"/.test(trimmed) && !/\bmin/i.test(trimmed) ? amount : amount;
+  const explicit = parseExplicitPaceSecPerMile(fullContext);
+  const offset = explicit ? null : effortTextToPaceOffsetSecPerMile(effort);
+  const title =
+    onOff === "OFF"
+      ? "Recovery"
+      : onOff === "ON"
+        ? "Work"
+        : titleForSegment("TIME", effort, offset);
+  return {
+    title,
+    durationType: "TIME",
+    durationValue: minutes,
+    paceOffsetSecPerMile: offset,
+    effortContext: fullContext,
+  };
+}
+
+/** Coach note with labeled sections (warm-up, main set ON/OFF bullets). */
+function tryParseCoachStructuredNote(text: string): ParsedPasteWorkout | null {
+  const hasStructure =
+    /\*\*Main Set\*\*|Main Set:/i.test(text) &&
+    (/\bON\s+at\s+\d{1,2}:\d{2}/i.test(text) || /\bOFF\s+at\s+\d{1,2}:\d{2}/i.test(text));
+  if (!hasStructure) return null;
+
+  const nameMatch =
+    text.match(/\*\*Workout Name:\*\*\s*(.+)/i) ?? text.match(/Workout Name:\s*(.+)/i);
+  const suggestedTitle = nameMatch?.[1]?.trim().replace(/\*\*/g, "") ?? "Workout";
+
+  const repMatch = text.match(/(\d+)\s+repetitions?\s+of/i);
+  const parenMatch = text.match(/(\d+)\s*[x×]\s*\(/i);
+  const repeatCount = repMatch
+    ? parseInt(repMatch[1], 10)
+    : parenMatch
+      ? parseInt(parenMatch[1], 10)
+      : null;
+  if (repeatCount == null || !Number.isFinite(repeatCount) || repeatCount < 1) return null;
+
+  const onLine = text.match(
+    /(\d+(?:\.\d+)?)\s*min(?:ute)?s?\s+ON\s+at\s+(\d{1,2}:\d{2})\s*(?:\/\s*mile)?/i
+  );
+  const offLine = text.match(
+    /(\d+(?:\.\d+)?)\s*min(?:ute)?s?\s+OFF\s+at\s+(\d{1,2}:\d{2})\s*(?:\/\s*mile)?/i
+  );
+  if (!onLine || !offLine) return null;
+
+  const onMin = parseFloat(onLine[1]);
+  const offMin = parseFloat(offLine[1]);
+  if (!Number.isFinite(onMin) || !Number.isFinite(offMin) || onMin <= 0 || offMin <= 0) return null;
+
+  const bookends = scanBookendSegments(text).map((b) => b.segment);
+  const cooldownRaw = text.match(/\*\*Cool-?Down\*\*:?\s*([^\n]+)/i)?.[1] ?? "";
+  if (cooldownRaw && !bookends.some((b) => b.title === "Cooldown")) {
+    const rangeM = cooldownRaw.match(/(\d+(?:\.\d+)?)\s*[–\-—]\s*(\d+(?:\.\d+)?)\s*(?:mi|mile)/i);
+    const singleM = cooldownRaw.match(/(\d+(?:\.\d+)?)\s*(?:mi|mile)/i);
+    let mi: number | null = null;
+    if (rangeM) {
+      mi = (parseFloat(rangeM[1]) + parseFloat(rangeM[2])) / 2;
+    } else if (singleM) {
+      mi = parseFloat(singleM[1]);
+    }
+    if (mi != null && Number.isFinite(mi) && mi > 0) {
+      bookends.push({
+        title: "Cooldown",
+        durationType: "DISTANCE",
+        durationValue: Math.round(mi * 10) / 10,
+        paceOffsetSecPerMile: 90,
+        effortContext: cooldownRaw,
+      });
+    }
+  }
+
+  const cycleSteps: ParsedPasteSegment[] = [
+    {
+      title: "Work",
+      durationType: "TIME",
+      durationValue: onMin,
+      paceOffsetSecPerMile: null,
+      effortContext: `ON at ${onLine[2]}/mile`,
+    },
+    {
+      title: "Recovery",
+      durationType: "TIME",
+      durationValue: offMin,
+      paceOffsetSecPerMile: null,
+      effortContext: `OFF at ${offLine[2]}/mile`,
+    },
+  ];
+
+  const segments: ParsedPasteSegment[] = [...bookends];
+  segments.push({
+    title: /\bfartlek\b/i.test(text) ? "Fartlek" : "Intervals",
+    durationType: "TIME",
+    durationValue: onMin,
+    repeatCount,
+    cycleSteps,
+    paceOffsetSecPerMile: null,
+    effortContext: `${repeatCount}× ON/OFF`,
+  });
+
+  const summary = text.replace(/\s+/g, " ").slice(0, 160);
+  return { segments, suggestedTitle, suggestedDescription: summary };
+}
+
+/** `20 × (1' @ 10K / 1' steady)` or `8x (3 min ON at 7:25, 3 min OFF at 8:25)` */
 function tryParseTimeCycleRepeatBlock(text: string): ParsedPasteWorkout | null {
   const m = text.match(/(\d+)\s*[x×]\s*\(\s*([^)]+)\)/i);
   if (!m) return null;
@@ -252,29 +373,15 @@ function tryParseTimeCycleRepeatBlock(text: string): ParsedPasteWorkout | null {
   const inner = m[2] ?? "";
   if (!Number.isFinite(repeatCount) || repeatCount < 1) return null;
 
-  const legs = inner.split(/\s*\/\s*/).filter(Boolean);
+  const legs = inner.split(/\s*[,/]\s*/).filter(Boolean);
   if (legs.length < 2) return null;
 
-  const legRe =
-    /(\d+(?:\.\d+)?)\s*(?:'|”|″|min(?:ute)?s?|")\s*(?:@|at)?\s*([^\s/]+(?:\s+[^\s/]+)*)/i;
   const cycleSteps: ParsedPasteSegment[] = [];
 
   for (const leg of legs) {
-    const lm = leg.trim().match(legRe);
-    if (!lm) return null;
-    const amount = parseFloat(lm[1]);
-    if (!Number.isFinite(amount) || amount <= 0) return null;
-    const effort = (lm[2] ?? "").trim();
-    const minutes =
-      /'|”|″|"/.test(leg) && !/\bmin/i.test(leg) ? amount : amount;
-    const offset = effortTextToPaceOffsetSecPerMile(effort);
-    cycleSteps.push({
-      title: titleForSegment("TIME", effort, offset),
-      durationType: "TIME",
-      durationValue: minutes,
-      paceOffsetSecPerMile: offset,
-      effortContext: effort,
-    });
+    const parsed = parseTimedCycleLeg(leg);
+    if (!parsed) return null;
+    cycleSteps.push(parsed);
   }
 
   const bookends = scanBookendSegments(text).map((b) => b.segment);
@@ -541,6 +648,9 @@ export function tryParsePastedWorkoutText(
 
   const blockParsed = tryParseCoachBlockWorkout(text);
   if (blockParsed) return blockParsed;
+
+  const structured = tryParseCoachStructuredNote(text);
+  if (structured) return structured;
 
   const timeCycle = tryParseTimeCycleRepeatBlock(text);
   if (timeCycle) return timeCycle;

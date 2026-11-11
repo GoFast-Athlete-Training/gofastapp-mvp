@@ -292,6 +292,12 @@ export function groupSegmentsForDisplay<T extends SegmentLike>(
   return groupSegmentsInDisplayOrder(sorted);
 }
 
+function segmentHasPaceTarget(seg: SegmentLike): boolean {
+  const targets = seg.targets;
+  if (!targets || !Array.isArray(targets)) return false;
+  return targets.some((t) => String(t.type ?? "").toUpperCase() === "PACE");
+}
+
 /** Pair detection for merging repeat work + following recovery (same rules as grouping). */
 export function isPairRecovery(work: SegmentLike, maybeRecovery: SegmentLike): boolean {
   const reps = work.repeatCount != null && work.repeatCount > 1 ? work.repeatCount : 1;
@@ -508,8 +514,14 @@ export function collapseFlatSegmentsForEditor<T extends SegmentLike>(
   for (const g of groups) {
     const reps = effectiveRepeatCount(g);
     if (isMultiStepRepeatGroup(g) && g.cycleSteps && g.cycleSteps.length > 1) {
-      for (const step of g.cycleSteps) {
-        out.push({ ...step, stepOrder: stepOrder++ } as T);
+      const first = {
+        ...g.cycleSteps[0],
+        stepOrder: stepOrder++,
+        ...(reps > 1 ? { repeatCount: reps } : {}),
+      } as T;
+      out.push(first);
+      for (let si = 1; si < g.cycleSteps.length; si++) {
+        out.push({ ...g.cycleSteps[si], stepOrder: stepOrder++ } as T);
       }
       if (g.betweenRepeatsRecovery) {
         out.push({ ...g.betweenRepeatsRecovery, stepOrder: stepOrder++ } as T);
@@ -526,6 +538,11 @@ export function collapseFlatSegmentsForEditor<T extends SegmentLike>(
     work.stepOrder = stepOrder++;
     if (reps > 1) {
       work.repeatCount = reps;
+      if (rec && segmentHasPaceTarget(rec)) {
+        out.push(work as T);
+        out.push({ ...rec, stepOrder: stepOrder++ } as T);
+        continue;
+      }
       if (rec) {
         work.recoveryDurationType = rec.durationType;
         work.recoveryDurationValue = Number(rec.durationValue);
@@ -535,6 +552,10 @@ export function collapseFlatSegmentsForEditor<T extends SegmentLike>(
       if (g.work.recoveryDurationType && g.work.recoveryDurationValue != null) {
         work.recoveryDurationType = g.work.recoveryDurationType;
         work.recoveryDurationValue = g.work.recoveryDurationValue;
+      } else if (rec && segmentHasPaceTarget(rec)) {
+        out.push(work as T);
+        out.push({ ...rec, stepOrder: stepOrder++ } as T);
+        continue;
       } else if (rec) {
         work.recoveryDurationType = rec.durationType;
         work.recoveryDurationValue = Number(rec.durationValue);

@@ -20,11 +20,15 @@ import {
   isSafeInternalBackPath,
   workoutDetailPathWithBackHref,
 } from "@/lib/training/workout-nav-query";
+import WorkoutCreateEntry, {
+  type CreateEntryPath,
+} from "@/components/workouts/WorkoutCreateEntry";
+import type { CatalogueBrowseItem } from "@/components/workouts/workout-create-types";
+import type { WorkoutStep } from "@/lib/training/prescription";
 import {
   collapseFlatSegmentsForEditor,
   formatSegmentDistance,
 } from "@/lib/training/segment-summary";
-import WorkoutShapeConfirmPanel from "@/components/training/WorkoutShapeConfirmPanel";
 import type { WorkoutShape } from "@/lib/training/workout-shape-service";
 import {
   pacedShapeFromConfirmed,
@@ -272,7 +276,7 @@ function apiSegmentsToSlots(segments: ApiSegment[]): {
   return { warmup, mainSegments, cooldown };
 }
 
-function slotOneLine(slot: SlotData): string {
+function slotOneLine(slot: SlotData, paired?: SlotData | null): string {
   const dist =
     slot.durationValue > 0
       ? slot.durationType === "TIME"
@@ -280,10 +284,33 @@ function slotOneLine(slot: SlotData): string {
         : formatSegmentDistance(slot.durationValue)
       : "";
   const reps =
-    slot.repeatCount != null && slot.repeatCount > 1 ? `${slot.repeatCount}× ` : "";
+    slot.repeatCount != null && slot.repeatCount > 1 ? slot.repeatCount : 0;
   const low = slot.paceValueLow != null ? secPerKmToPaceDisplay(slot.paceValueLow) : "";
   const high = slot.paceValueHigh != null ? secPerKmToPaceDisplay(slot.paceValueHigh) : "";
   const pace = low && high ? (low === high ? `${low}/mi` : `${low}-${high}/mi`) : "";
+
+  if (paired && reps > 1 && !(paired.repeatCount != null && paired.repeatCount > 1)) {
+    const onDist =
+      slot.durationValue > 0
+        ? slot.durationType === "TIME"
+          ? `${slot.durationValue} min`
+          : formatSegmentDistance(slot.durationValue)
+        : "";
+    const offDist =
+      paired.durationValue > 0
+        ? paired.durationType === "TIME"
+          ? `${paired.durationValue} min`
+          : formatSegmentDistance(paired.durationValue)
+        : "";
+    const pl = paired.paceValueLow != null ? secPerKmToPaceDisplay(paired.paceValueLow) : "";
+    const ph = paired.paceValueHigh != null ? secPerKmToPaceDisplay(paired.paceValueHigh) : "";
+    const offPace = pl && ph ? (pl === ph ? `@ ${pl}/mi` : `@ ${pl}-${ph}/mi`) : "";
+    const onPart = [onDist, pace].filter(Boolean).join(" ");
+    const offPart = [offDist, offPace].filter(Boolean).join(" ");
+    return `${reps}× (${onPart} / ${offPart})`;
+  }
+
+  const repsLabel = reps > 1 ? `${reps}× ` : "";
   let recovery = "";
   if (slot.recoveryDurationValue != null && slot.recoveryDurationValue > 0) {
     recovery =
@@ -291,7 +318,7 @@ function slotOneLine(slot: SlotData): string {
         ? ` / ${slot.recoveryDurationValue} min easy`
         : ` / ${formatSegmentDistance(slot.recoveryDurationValue)} easy`;
   }
-  const body = [`${reps}${dist}`.trim(), pace].filter(Boolean).join(" — ");
+  const body = [`${repsLabel}${dist}`.trim(), pace].filter(Boolean).join(" — ");
   return `${body || "—"}${recovery}`;
 }
 
@@ -328,17 +355,6 @@ type EditingTarget =
   | { kind: "warmup" }
   | { kind: "cooldown" }
   | { kind: "main"; index: number };
-
-type CatalogueBrowseItem = {
-  id: string;
-  name: string;
-  description: string | null;
-  workoutType: string;
-  workBaseReps: number | null;
-  workBaseRepMeters: number | null;
-  recoveryDistanceMeters: number | null;
-  recoveryDurationSeconds: number | null;
-};
 
 function catalogueCardSubtitle(item: CatalogueBrowseItem): string {
   if (item.workoutType === "Intervals") {
@@ -411,10 +427,7 @@ function CreateWorkoutPageInner() {
   } | null>(null);
   const [applyingPaces, setApplyingPaces] = useState(false);
   const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
-  const [builtWorkouts, setBuiltWorkouts] = useState<
-    Array<{ id: string; title: string; workoutType: string; date: string | null }>
-  >([]);
-  const [builtWorkoutsLoading, setBuiltWorkoutsLoading] = useState(false);
+  const [createEntryPath, setCreateEntryPath] = useState<CreateEntryPath>(null);
   const [aiGeneratePrompt, setAiGeneratePrompt] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
   const [presetTypeFilter, setPresetTypeFilter] = useState<string>("");
@@ -444,16 +457,6 @@ function CreateWorkoutPageInner() {
     const row = catalogueItems.find((i) => i.id === selectedCatalogueId);
     return row?.name?.trim() || row?.workoutType || null;
   }, [catalogueItems, selectedCatalogueId]);
-
-  const catalogueByType = useMemo(() => {
-    const m = new Map<string, CatalogueBrowseItem[]>();
-    for (const row of catalogueItems) {
-      const list = m.get(row.workoutType) ?? [];
-      list.push(row);
-      m.set(row.workoutType, list);
-    }
-    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [catalogueItems]);
 
   useEffect(() => {
     if (!raceDayMode) return;
@@ -577,7 +580,7 @@ function CreateWorkoutPageInner() {
   }, [raceDayMode, racePlanId]);
 
   useEffect(() => {
-    if (raceDayMode || !presetTypeFilter) return;
+    if (raceDayMode || !presetTypeFilter || createEntryPath !== "catalogue") return;
     let cancelled = false;
     (async () => {
       try {
@@ -597,7 +600,7 @@ function CreateWorkoutPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [raceDayMode, presetTypeFilter]);
+  }, [raceDayMode, presetTypeFilter, createEntryPath]);
 
   useEffect(() => {
     if (raceDayMode) return;
@@ -608,32 +611,6 @@ function CreateWorkoutPageInner() {
         if (!cancelled) setAthleteFiveKPace(data.athlete?.fiveKPace?.trim() || null);
       } catch {
         if (!cancelled) setAthleteFiveKPace(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [raceDayMode]);
-
-  useEffect(() => {
-    if (raceDayMode) return;
-    let cancelled = false;
-    setBuiltWorkoutsLoading(true);
-    (async () => {
-      try {
-        const { data } = await api.get<{
-          workouts: Array<{
-            id: string;
-            title: string;
-            workoutType: string;
-            date: string | null;
-          }>;
-        }>("workouts?standalone=1&paged=1&limit=20");
-        if (!cancelled) setBuiltWorkouts(data.workouts ?? []);
-      } catch {
-        if (!cancelled) setBuiltWorkouts([]);
-      } finally {
-        if (!cancelled) setBuiltWorkoutsLoading(false);
       }
     })();
     return () => {
@@ -754,6 +731,43 @@ function CreateWorkoutPageInner() {
     setEditingPaceHighSec("");
     setDeriveError(null);
     setSelectedCatalogueId(null);
+    setCreateEntryPath(null);
+    setPendingShape(null);
+    setPendingShapeMeta(null);
+  };
+
+  const handleCsvSegments = (steps: WorkoutStep[]) => {
+    applyDerivedSegmentsToCreateForm({
+      segments: steps as ApiSegment[],
+      suggestedTitle: "CSV workout",
+      suggestedDescription: "Imported from CSV",
+    });
+    setCreateEntryPath(null);
+  };
+
+  const handleUseBuiltWorkoutOnPlanDay = async (workoutId: string) => {
+    if (!planDayAssignMode || !racePlanId || !raceDateKey) return;
+    try {
+      const { data } = await api.get<{
+        workout?: { title?: string; workoutType?: string; segments?: ApiSegment[] };
+      }>(`workouts/${encodeURIComponent(workoutId)}/segments`);
+      const w = data.workout;
+      const segments = w?.segments ?? [];
+      if (segments.length === 0) {
+        alert("That workout has no segments.");
+        return;
+      }
+      await api.post("training/plan-day/assign", {
+        planId: racePlanId,
+        date: raceDateKey,
+        title: w?.title?.trim() || "Workout",
+        workoutType: w?.workoutType || "Easy",
+        segments,
+      });
+      router.push(builderBackHref);
+    } catch {
+      alert("Could not assign workout to this plan day.");
+    }
   };
 
   const totalDistanceMiFromApiSegments = (segments: ApiSegment[]): number => {
@@ -875,8 +889,71 @@ function CreateWorkoutPageInner() {
       });
       setPendingShape(null);
       setPendingShapeMeta(null);
+      setCreateEntryPath(null);
     } finally {
       setApplyingPaces(false);
+    }
+  };
+
+  const handlePasteBuild = async () => {
+    const text = sourceText.trim();
+    if (!text) {
+      setDeriveError("Paste a workout description first.");
+      return;
+    }
+    setDeriveError(null);
+    setNeedsPaceHint(null);
+    setSelectedCatalogueId(null);
+    setDeriving(true);
+    try {
+      const tabular = tryParseTabularMilePacePaste(text);
+      if (tabular) {
+        const totalMi = tabular.reduce(
+          (a, s) => a + (s.durationType === "DISTANCE" ? s.durationValue : 0),
+          0
+        );
+        const derived = {
+          segments: tabular,
+          suggestedTitle: `${workoutType} — ${totalMi.toFixed(1)} mi`,
+          suggestedDescription: `Pasted splits (${tabular.length} segments).`,
+        };
+        applyDerivedSegmentsToCreateForm(derived);
+        setCreateEntryPath(null);
+        return;
+      }
+
+      const localShape = buildShapeFromPasteText(text, workoutType);
+      if (localShape) {
+        setPendingShape(localShape);
+        setPendingShapeMeta({
+          suggestedTitle: localShape.suggestedTitle,
+          suggestedDescription: localShape.suggestedDescription,
+        });
+        return;
+      }
+
+      setDeriveError(
+        "Could not read the workout shape from that paste. Try the Ask AI path or shorten the note."
+      );
+    } catch (err: unknown) {
+      let display = "Failed to derive workout";
+      if (err && typeof err === "object" && "response" in err) {
+        const res = (err as { response?: { status?: number; data?: unknown } }).response;
+        const status = res?.status;
+        const data = res?.data;
+        const serverMessage =
+          typeof data === "object" && data !== null && "error" in data && typeof (data as { error?: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : typeof data === "string"
+              ? data.slice(0, 200) + (data.length > 200 ? "…" : "")
+              : null;
+        if (status != null || serverMessage) {
+          display = [status != null ? `Status: ${status}` : null, serverMessage || "No details from server"].filter(Boolean).join(" — ");
+        }
+      }
+      setDeriveError(display);
+    } finally {
+      setDeriving(false);
     }
   };
 
@@ -966,6 +1043,7 @@ function CreateWorkoutPageInner() {
         suggestedTitle: data.suggestedTitle,
         suggestedDescription: data.suggestedDescription,
       });
+      setCreateEntryPath(null);
     } catch (err: unknown) {
       let display = "Failed to generate workout";
       if (err && typeof err === "object" && "response" in err) {
@@ -1111,6 +1189,7 @@ function CreateWorkoutPageInner() {
           workoutTypeOverride: item.workoutType,
           catalogueWorkoutId: item.id,
         });
+        setCreateEntryPath(null);
       }
     } catch (err: unknown) {
       let display = "Failed to load preset";
@@ -1298,32 +1377,48 @@ function CreateWorkoutPageInner() {
             {raceDayMode ? "Plan pacing blocks" : "Build a run"}
           </h1>
 
-          {!raceDayMode ? (
-            <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
-              <h2 className="text-sm font-semibold text-gray-900 mb-2">Workouts you&apos;ve built</h2>
-              {builtWorkoutsLoading ? (
-                <p className="text-sm text-gray-500">Loading…</p>
-              ) : builtWorkouts.length === 0 ? (
-                <p className="text-sm text-gray-600">No standalone workouts yet — paste or pick a preset below.</p>
-              ) : (
-                <ul className="space-y-2 list-none pl-0 m-0">
-                  {builtWorkouts.map((w) => (
-                    <li key={w.id}>
-                      <Link
-                        href={workoutDetailPathWithBackHref(w.id, builderBackHref)}
-                        className="text-sm font-medium text-sky-800 hover:text-sky-950 hover:underline"
-                      >
-                        {w.title}
-                      </Link>
-                      <span className="text-xs text-gray-500 ml-2">
-                        {w.workoutType}
-                        {w.date ? ` · ${String(w.date).slice(0, 10)}` : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+          {!raceDayMode && !hasSlots ? (
+            <WorkoutCreateEntry
+              path={createEntryPath}
+              onPathChange={setCreateEntryPath}
+              builderBackHref={builderBackHref}
+              planDayAssignMode={planDayAssignMode}
+              planId={racePlanId}
+              planDateKey={raceDateKey}
+              workoutType={workoutType}
+              onWorkoutTypeChange={setWorkoutType}
+              sourceText={sourceText}
+              onSourceTextChange={setSourceText}
+              aiGeneratePrompt={aiGeneratePrompt}
+              onAiGeneratePromptChange={setAiGeneratePrompt}
+              deriveError={deriveError}
+              deriving={deriving}
+              aiGenerating={aiGenerating}
+              pendingShape={pendingShape}
+              pendingShapeMeta={pendingShapeMeta}
+              onClearPendingShape={() => {
+                setPendingShape(null);
+                setPendingShapeMeta(null);
+              }}
+              onApplyShapeWithPaces={applyShapeWithPaces}
+              applyingPaces={applyingPaces}
+              onPasteBuild={() => void handlePasteBuild()}
+              onAiGenerate={() => void handleAiCoachGenerate()}
+              onCsvSegments={handleCsvSegments}
+              presetTypeFilter={presetTypeFilter}
+              onPresetTypeFilter={(wt) => {
+                setPresetTypeFilter(wt);
+                setCatalogueItems([]);
+              }}
+              catalogueItems={catalogueItems}
+              catalogueBrowseError={catalogueBrowseError}
+              catalogueGeneratingId={catalogueGeneratingId}
+              onCataloguePreset={handleCataloguePreset}
+              catalogueCardSubtitle={catalogueCardSubtitle}
+              onUseBuiltWorkoutOnPlanDay={
+                planDayAssignMode ? handleUseBuiltWorkoutOnPlanDay : undefined
+              }
+            />
           ) : null}
 
           {!raceDayMode && !hasSlots ? (
@@ -1434,114 +1529,6 @@ function CreateWorkoutPageInner() {
           </div>
           ) : null}
 
-          {!raceDayMode ? (
-          <div className="mb-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Paste your workout</h2>
-              <p className="text-sm text-gray-600 mb-3">
-                Paste from a coach, Runna, or ChatGPT. We read the shape first, then you confirm before paces land.
-              </p>
-              <textarea
-                value={sourceText}
-                onChange={(e) => setSourceText(e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                placeholder="e.g. 20 × (1' @ 10K / 1' steady) — 40 min fartlek"
-              />
-              {deriveError ? <p className="text-sm text-red-600 mt-1">{deriveError}</p> : null}
-              {pendingShape ? (
-                <WorkoutShapeConfirmPanel
-                  shape={pendingShape}
-                  onConfirm={applyShapeWithPaces}
-                  onBack={() => {
-                    setPendingShape(null);
-                    setPendingShapeMeta(null);
-                  }}
-                  applying={applyingPaces}
-                />
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleDerive}
-                  disabled={deriving}
-                  className="mt-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
-                >
-                  <FileText className="w-4 h-4" />
-                  {deriving ? "Parsing…" : "Parse workout"}
-                </button>
-              )}
-            </div>
-          ) : null}
-
-          {!raceDayMode ? (
-          <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Presets by type</h2>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {(["Easy", "Tempo", "Intervals", "LongRun"] as const).map((wt) => (
-                <button
-                  key={wt}
-                  type="button"
-                  onClick={() => {
-                    setPresetTypeFilter(wt);
-                    setWorkoutType(wt);
-                    setCatalogueItems([]);
-                  }}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium border ${
-                    presetTypeFilter === wt
-                      ? "border-orange-600 bg-orange-600 text-white"
-                      : "border-gray-300 bg-white text-gray-800"
-                  }`}
-                >
-                  {wt === "LongRun" ? "Long run" : wt}
-                </button>
-              ))}
-            </div>
-            <p className="text-sm text-gray-600 mb-3">
-              Structured prescriptions (reps and recovery match plan materialization). Zones come from your active
-              goal or profile 5K pace.
-            </p>
-            {catalogueBrowseError != null && (
-              <p className="text-sm text-amber-800 mb-2">{catalogueBrowseError}</p>
-            )}
-            {!presetTypeFilter ? (
-              <p className="text-sm text-gray-500">Pick Easy, Tempo, Intervals, or Long run above.</p>
-            ) : catalogueItems.length === 0 && catalogueBrowseError == null ? (
-              <p className="text-sm text-gray-500">Loading presets…</p>
-            ) : (
-              <div className="space-y-6">
-                {catalogueByType.map(([wt, items]) => (
-                  <div key={wt}>
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">{wt}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {items.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          disabled={catalogueGeneratingId != null}
-                          onClick={() => void handleCataloguePreset(item)}
-                          className={`text-left rounded-lg border px-3 py-2 text-sm max-w-[min(100%,280px)] transition-colors ${
-                            catalogueGeneratingId === item.id
-                              ? "border-orange-400 bg-orange-50"
-                              : "border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/40"
-                          } disabled:opacity-50`}
-                        >
-                          <span className="font-semibold text-gray-900 block">{item.name}</span>
-                          <span className="text-xs text-gray-600 block mt-0.5">
-                            {catalogueCardSubtitle(item)}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <p className="mt-4 text-xs text-gray-500">
-              Optional: set template distance below before picking a preset if you want to scale warmup/cooldown
-              mileage (long-run / easy templates).
-            </p>
-          </div>
-          ) : null}
-
           {false && !raceDayMode ? (
           <details className="mb-8 rounded-lg border border-orange-100 bg-orange-50/50 p-4">
             <summary className="text-lg font-semibold text-gray-900 cursor-pointer">
@@ -1632,49 +1619,6 @@ function CreateWorkoutPageInner() {
           </details>
           ) : null}
 
-          {!raceDayMode ? (
-            <div className="mb-8 rounded-lg border border-orange-100 bg-orange-50/40 p-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">AI — build from your training</h2>
-              <p className="text-sm text-gray-600 mb-3">
-                Uses your threshold pace, 5K baseline, and recent runs. Optional: say what you want
-                (e.g. &quot;tempo 8&quot;, &quot;easy 6 after yesterday&apos;s long run&quot;).
-              </p>
-              <div className="mb-3 max-w-xs">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Workout type</label>
-                <select
-                  value={workoutType}
-                  onChange={(e) => setWorkoutType(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-500"
-                >
-                  {WORKOUT_TYPES.filter((t) => t !== "Race").map((t) => (
-                    <option key={t} value={t}>
-                      {t === "LongRun" ? "Long run" : t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                What do you want? (optional)
-              </label>
-              <input
-                type="text"
-                value={aiGeneratePrompt}
-                onChange={(e) => setAiGeneratePrompt(e.target.value)}
-                placeholder="e.g. tempo with 2 mi warmup"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-white mb-2"
-              />
-              {deriveError ? <p className="text-sm text-red-600 mb-2">{deriveError}</p> : null}
-              <button
-                type="button"
-                onClick={() => void handleAiCoachGenerate()}
-                disabled={aiGenerating}
-                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium disabled:opacity-50"
-              >
-                {aiGenerating ? "Generating…" : "Generate workout"}
-              </button>
-            </div>
-          ) : null}
-
           {raceDayMode ? (
           <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Paste pacing blocks</h2>
@@ -1738,10 +1682,19 @@ function CreateWorkoutPageInner() {
 
             {!raceDayMode && hasSlots ? (
               <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50/80 p-4 space-y-4">
-                <p className="text-sm text-gray-700">
-                  These are saved on this run. Saving also sends the workout to Garmin when you are
-                  connected.
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm text-gray-700">
+                    These are saved on this run. Saving also sends the workout to Garmin when you are
+                    connected.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearSegmentsUsePasteInstead}
+                    className="text-sm text-orange-700 hover:underline"
+                  >
+                    Start over
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1989,7 +1942,14 @@ function CreateWorkoutPageInner() {
                     >
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <span className="font-medium text-gray-900">{label}</span>
-                        <span className="text-sm text-gray-600">{slotOneLine(slot)}</span>
+                        <span className="text-sm text-gray-600">
+                          {slotOneLine(
+                            slot,
+                            slot.repeatCount != null && slot.repeatCount > 1
+                              ? mainSegments[index + 1]
+                              : null
+                          )}
+                        </span>
                         <div className="flex gap-2">
                           <button
                             type="button"

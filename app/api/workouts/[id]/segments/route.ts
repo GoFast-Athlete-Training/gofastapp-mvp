@@ -108,6 +108,38 @@ async function loadSegmentsResponseWorkout(id: string, athleteId: string) {
 }
 
 /**
+ * GET /api/workouts/[id]/segments
+ * Prescribed segments for assign / clone flows.
+ */
+export async function GET(request: NextRequest, ctx: Ctx) {
+  try {
+    const auth = await requireAthleteFromBearer(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const { id } = await ctx.params;
+    const workout = await loadSegmentsResponseWorkout(id, auth.athlete.id);
+    if (!workout) {
+      return NextResponse.json({ error: "Workout not found" }, { status: 404 });
+    }
+
+    const segments = "segments" in workout && Array.isArray(workout.segments) ? workout.segments : [];
+    return NextResponse.json({
+      workout: {
+        id: workout.id,
+        title: workout.title,
+        workoutType: workout.workoutType,
+        segments,
+      },
+    });
+  } catch (error: unknown) {
+    console.error("GET /api/workouts/[id]/segments", error);
+    return NextResponse.json({ error: "Failed to load segments" }, { status: 500 });
+  }
+}
+
+/**
  * PUT /api/workouts/[id]/segments
  * Atomically replace all segments (prescribed only; clears lap actuals on new rows).
  * Plan days write to planned_workout_segments (and synced instance when spawned).

@@ -69,6 +69,14 @@ function paceForLabel(
 
 function paceStep(step: ShapeStep, paces: TrainingPaces, fiveK: string | null | undefined): PacedShapeStep {
   if (step.kind === "rest") return { ...step };
+  if (step.kind === "effort" && step.explicitPaceSecPerMile) {
+    const { low, high } = step.explicitPaceSecPerMile;
+    return {
+      ...step,
+      paceValueLow: secondsPerMileToSecondsPerKm(low),
+      paceValueHigh: secondsPerMileToSecondsPerKm(high),
+    };
+  }
   const band = paceForLabel(step.effortLabel, paces, fiveK);
   if (!band) return { ...step };
   return { ...step, paceValueLow: band.low, paceValueHigh: band.high };

@@ -5,6 +5,8 @@ import {
   materializeParsedPasteWorkoutSteps,
   inferRepDistanceMiles,
 } from "./parse-pasted-workout";
+import { parsedPasteToWorkoutSteps } from "./paste-workout-pipeline";
+import { collapseFlatSegmentsForEditor } from "./segment-summary";
 
 const YORKTOWN_NOTE = `Track Crew, please join us dark and early tomorrow for Tempo Thursday at Yorktown. We'll be running 2 x 20 minutes at tempo pace followed by some sharpening intervals (2x400m at 5k pace). If you haven't been out to the track in a few weeks it's a great time to come back and rejoin the pack as we run around the oval waiting for the sun to rise. See you at 0545 for warmups!`;
 
@@ -169,6 +171,48 @@ test("parses bookends with alternating marathon-pace work as long-run pairs", ()
   assert.equal(work.recoveryDurationValue, 1);
   assert.equal(parsed.segments[2]?.title, "Cooldown");
   assert.match(parsed.suggestedTitle, /alternating MP/i);
+});
+
+const MODIFIED_FARTLEK_NOTE = `**Workout Name:** Modified Fartlek – 3 Minutes On / 3 Minutes Off
+
+**Warm-Up:** 2 miles easy
+
+**Main Set:** 8 repetitions of:
+- 3 minutes ON at 7:25/mile
+- 3 minutes OFF at 8:25/mile
+
+**Cool-Down:** 1–2 miles easy`;
+
+test("parses structured ON/OFF fartlek with explicit paces", () => {
+  const parsed = tryParsePastedWorkoutText(MODIFIED_FARTLEK_NOTE, "Intervals");
+  assert.ok(parsed);
+  assert.match(parsed.suggestedTitle, /Modified Fartlek/i);
+  const work = parsed.segments.find((s) => (s.repeatCount ?? 0) === 8);
+  assert.ok(work?.cycleSteps);
+  assert.equal(work.cycleSteps!.length, 2);
+  assert.equal(work.cycleSteps![0]!.durationValue, 3);
+  assert.equal(work.cycleSteps![1]!.durationValue, 3);
+  const steps = parsedPasteToWorkoutSteps(parsed, "6:14");
+  const collapsed = collapseFlatSegmentsForEditor(
+    steps.map((s, i) => ({
+      ...s,
+      id: `s-${i}`,
+      targets: s.targets,
+    }))
+  );
+  const main = collapsed.find((s) => (s.repeatCount ?? 0) === 8);
+  assert.ok(main);
+  const off = collapsed[collapsed.indexOf(main) + 1];
+  assert.ok(off);
+  assert.ok(off.targets?.[0]?.type === "PACE");
+});
+
+test("parses compact 8x (3 min ON at 7:25, 3 min OFF at 8:25)", () => {
+  const note = "8x (3 min ON at 7:25, 3 min OFF at 8:25)";
+  const parsed = tryParsePastedWorkoutText(note, "Intervals");
+  assert.ok(parsed);
+  const work = parsed.segments.find((s) => (s.repeatCount ?? 0) === 8);
+  assert.equal(work?.cycleSteps?.length, 2);
 });
 
 test("parses fartlek time cycle 20 x (1' @ 10K / 1' steady)", () => {
