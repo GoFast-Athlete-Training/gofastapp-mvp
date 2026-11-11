@@ -1154,8 +1154,9 @@ export function AthleteLinkTreeLinkSources({
             </p>
           ) : null}
           <ul className="max-h-64 space-y-1.5 overflow-y-auto">
-            {visibleCatalogHits.map((hit) => {
+            {charityHits.map((hit) => {
               const needsCharitySection = !charitySectionId;
+              const onPage = Boolean(linkIdForCharityPickerHit(sortedLinks, hit, myCauses));
               const disabled = adding || charitySectionBusy;
               return (
                 <li key={hit.charityId}>
@@ -1172,7 +1173,7 @@ export function AthleteLinkTreeLinkSources({
                     <input
                       type="checkbox"
                       className="mt-0.5"
-                      checked={false}
+                      checked={onPage}
                       disabled={disabled}
                       onChange={(e) => void toggleCharityOnPage(hit, e.target.checked)}
                     />

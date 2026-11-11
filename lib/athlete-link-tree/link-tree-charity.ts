@@ -27,7 +27,7 @@ export function linkIdForAthleteCause(
 
 type CauseUrlRow = { id: string; websiteUrl: string };
 
-/** Match catalog picker row to an on-page cause link (by cause id or normalized URL). */
+/** Match catalog picker row to an on-page cause link (athleteCauseId on the link row only). */
 export function linkIdForCharityPickerHit(
   sortedLinks: AthleteLinkTreeLink[],
   hit: { charityUrl: string; athleteCauseId: string | null },
@@ -41,26 +41,6 @@ export function linkIdForCharityPickerHit(
       savedCauses.find((c) => normalizeCauseWebsiteUrl(c.websiteUrl) === targetUrl)?.id ?? null;
   }
 
-  if (causeId) {
-    const byCause = linkIdForAthleteCause(sortedLinks, causeId);
-    if (byCause) return byCause;
-  }
-
-  if (!targetUrl) return null;
-
-  for (const link of sortedLinks) {
-    if (link.isSection) continue;
-    if (link.athleteCauseId) {
-      const cause = savedCauses.find((c) => c.id === link.athleteCauseId);
-      if (cause && normalizeCauseWebsiteUrl(cause.websiteUrl) === targetUrl) {
-        return link.id;
-      }
-    }
-    const linkUrl = link.url?.trim();
-    if (linkUrl && normalizeCauseWebsiteUrl(linkUrl) === targetUrl) {
-      return link.id;
-    }
-  }
-
-  return null;
+  if (!causeId) return null;
+  return linkIdForAthleteCause(sortedLinks, causeId);
 }

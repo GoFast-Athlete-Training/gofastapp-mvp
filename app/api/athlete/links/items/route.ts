@@ -124,6 +124,7 @@ export async function POST(request: NextRequest) {
   let cityRunVisual: ReturnType<typeof inferCityRunLinkVisual> | null = null;
   let charityLinkLogoUrl: string | null = null;
   let charityEmoji: string | null = null;
+  let reparentCauseLinkId: string | null = null;
 
   if (parsedKind === AthleteLinkTreeLinkKind.ATHLETE_RACE) {
     if (!athleteRaceIdInput) {
@@ -172,10 +173,7 @@ export async function POST(request: NextRequest) {
         select: { id: true },
       });
       if (dup) {
-        return NextResponse.json(
-          { success: false, error: "That charity link is already on your link page" },
-          { status: 400 },
-        );
+        reparentCauseLinkId = dup.id;
       }
       athleteCauseId = cause.id;
       name = cause.name;
@@ -242,10 +240,7 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
     if (dup) {
-      return NextResponse.json(
-        { success: false, error: "That cause is already on your link page" },
-        { status: 400 },
-      );
+      reparentCauseLinkId = dup.id;
     }
     athleteCauseId = cause.id;
     name = cause.name;
@@ -266,10 +261,7 @@ export async function POST(request: NextRequest) {
         select: { id: true },
       });
       if (dup) {
-        return NextResponse.json(
-          { success: false, error: "That charity link is already on your link page" },
-          { status: 400 },
-        );
+        reparentCauseLinkId = dup.id;
       }
       athleteCauseId = cause.id;
       name = cause.name;
@@ -313,6 +305,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Section not found on this page" }, { status: 400 });
     }
     parentSectionId = sectionRow.id;
+  }
+
+  if (reparentCauseLinkId) {
+    const logoPatch =
+      charityLinkLogoUrl != null
+        ? { linkLogoUrl: charityLinkLogoUrl, emoji: charityEmoji }
+        : {};
+    await prisma.athlete_link_tree_links.update({
+      where: { id: reparentCauseLinkId, treeId },
+      data: {
+        ...(parentSectionRaw ? { parentSectionId } : {}),
+        ...logoPatch,
+      },
+    });
+    const tree = await reloadAthleteLinkTreeDetail(gate.athlete.id);
+    if (!tree) {
+      return NextResponse.json({ success: false, error: "Link tree not found" }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, linkId: reparentCauseLinkId, tree }, { status: 200 });
   }
 
   let sortOrder: number;

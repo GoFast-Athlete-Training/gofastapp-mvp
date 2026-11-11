@@ -32,6 +32,8 @@ export function buildLinkTreeEditorBlocks(links: AthleteLinkTreeLink[]): LinkTre
 
   const blocks: LinkTreeEditorBlock[] = [];
 
+  const sectionIds = new Set(topLevel.filter((l) => l.isSection).map((l) => l.id));
+
   for (const item of topLevel) {
     if (item.isSection) {
       blocks.push({
@@ -42,6 +44,13 @@ export function buildLinkTreeEditorBlocks(links: AthleteLinkTreeLink[]): LinkTre
     } else {
       blocks.push({ type: "link", link: item });
     }
+  }
+
+  /** Rows with a missing section parent are still in the tree — show them at root so they can be fixed. */
+  for (const link of sorted) {
+    if (link.isSection || !link.parentSectionId) continue;
+    if (sectionIds.has(link.parentSectionId)) continue;
+    blocks.push({ type: "link", link });
   }
 
   return blocks;
