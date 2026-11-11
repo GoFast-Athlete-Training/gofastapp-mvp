@@ -29,6 +29,7 @@ export const registryMirrorSelect = {
   spectatorInfo: true,
   logisticsInfo: true,
   gearDropInstructions: true,
+  timezone: true,
   charityName: true,
   charityUrl: true,
   charityLogo: true,
@@ -71,6 +72,7 @@ export type RegistryMirrorRow = {
   spectatorInfo: string | null;
   logisticsInfo: string | null;
   gearDropInstructions: string | null;
+  timezone: string | null;
   charityName: string | null;
   charityUrl: string | null;
   charityLogo: string | null;
@@ -111,6 +113,7 @@ export function serializeRegistryMirror(row: RegistryMirrorRow) {
     spectatorInfo: row.spectatorInfo,
     logisticsInfo: row.logisticsInfo,
     gearDropInstructions: row.gearDropInstructions,
+    timezone: row.timezone,
     charityName: row.charityName,
     charityUrl: row.charityUrl,
     charityLogo: row.charityLogo,

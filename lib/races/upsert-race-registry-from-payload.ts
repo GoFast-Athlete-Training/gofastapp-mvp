@@ -16,6 +16,10 @@ import {
   calendarDayWritePair,
   normalizeDateKeyInput,
 } from "@/lib/plan-calendar-day";
+import {
+  isValidIanaTimezone,
+  resolveEventTimezoneForWrite,
+} from "@/lib/city-run/normalize-event-timezone";
 
 export type IncomingRace = Record<string, unknown>;
 
@@ -239,6 +243,13 @@ export async function upsertRaceRegistryFromPayload(
       racePayload,
       "gearDropInstructions"
     );
+    let timezone: string | undefined;
+    if ("timezone" in racePayload) {
+      const resolved = resolveEventTimezoneForWrite(
+        readOptionalTrimmedString(racePayload, "timezone"),
+      );
+      timezone = isValidIanaTimezone(resolved) ? resolved : undefined;
+    }
     const courseMapUrlFromPayload = readOptionalTrimmedString(
       racePayload,
       "courseMapUrl"
@@ -365,6 +376,7 @@ export async function upsertRaceRegistryFromPayload(
       ...(gearDropInstructions !== undefined
         ? { gearDropInstructions }
         : {}),
+      ...(timezone !== undefined ? { timezone } : {}),
       ...(courseMapUrlFromPayload !== undefined
         ? { courseMapUrl: courseMapUrlFromPayload }
         : {}),

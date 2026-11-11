@@ -48,6 +48,7 @@ export async function GET(
         spectatorInfo: true,
         logisticsInfo: true,
         gearDropInstructions: true,
+        timezone: true,
         summaryPhrase: true,
         course_segments: {
           orderBy: { order: "asc" },
@@ -106,9 +107,10 @@ export async function GET(
           packetPickupDescription: true,
           spectatorInfo: true,
           logisticsInfo: true,
-          gearDropInstructions: true,
-          summaryPhrase: true,
-          course_segments: {
+        gearDropInstructions: true,
+        timezone: true,
+        summaryPhrase: true,
+        course_segments: {
             orderBy: { order: "asc" },
             select: {
               order: true,

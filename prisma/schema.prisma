@@ -1001,6 +1001,8 @@ model race_registry {
   raceDate                DateTime
   /// Civil race day YYYY-MM-DD — calendar SOT for plans and triggers. `raceDate` is sort anchor only.
   raceDay                 String?
+  /// IANA timezone for race-day wall clocks (expo, hub shakeouts).
+  timezone                String?                   @default("America/New_York")
   registrationCloseDate   DateTime?
   /// Capacity closed before deadline (e.g. sold out); hides external registration CTA.
   registrationSoldOut     Boolean                   @default(false)
