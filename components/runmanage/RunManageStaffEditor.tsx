@@ -18,6 +18,8 @@ import runmanageApi from "@/lib/runmanage/api-client";
 import RunContentPreviewFrame from "@/components/runmanage/RunContentPreviewFrame";
 import RunInstanceRsvpPanel from "@/components/runmanage/RunInstanceRsvpPanel";
 import RunInstanceWizard from "@/components/runmanage/runInstanceWizard/RunInstanceWizard";
+import RunManageStaffRunDashboard from "@/components/runmanage/RunManageStaffRunDashboard";
+import RunManagePublishStrip from "@/components/runmanage/RunManagePublishStrip";
 import type { AutoSaveStatus } from "@/components/runclub/edit/SaveStatusPill";
 import type { RunInstanceWizardValues } from "@/components/runmanage/runInstanceWizard/shared";
 import { normalizeGroupWorkoutSegment } from "@/lib/group-workout-segment-editor";
@@ -809,6 +811,17 @@ export default function RunManageStaffEditor({
             </div>
           </div>
 
+          {staffMode === "edit" && wizardValues ? (
+            <RunManagePublishStrip
+              dateYmd={wizardValues.date}
+              dayOfWeek={run.dayOfWeek ?? run.runDay}
+              startTimeHour={wizardValues.startTimeHour}
+              startTimeMinute={wizardValues.startTimeMinute}
+              startTimePeriod={wizardValues.startTimePeriod}
+              meetUpPoint={wizardValues.meetUpPoint}
+            />
+          ) : null}
+
           <div className="mt-4 flex flex-wrap gap-2">
             <ModeTab active={staffMode === "view"} href={modePath("view")} icon={Eye} label="View" />
             <ModeTab
@@ -976,7 +989,7 @@ export default function RunManageStaffEditor({
         ) : null}
 
         {staffMode === "edit" && wizardValues && (
-          <RunInstanceWizard
+          <RunManageStaffRunDashboard
             values={wizardValues}
             onChange={setWizardValues}
             context={{
@@ -998,23 +1011,15 @@ export default function RunManageStaffEditor({
                 runClubName: run.runClub?.name ?? null,
               },
             }}
-            onSave={() => void handleSaveAndPreview()}
-            saving={saving}
-            error={wizardError}
-            onErrorChange={setWizardError}
-            saveLabel="Save & Preview"
-            initialWizardStep={initialWizardStep ?? "sources"}
+            weekdayMismatch={Boolean(weekdayMismatch)}
+            cityLabel={
+              [run.meetUpCity, run.meetUpState].filter(Boolean).join(", ") ||
+              run.citySlug.replace(/-/g, " ")
+            }
             publicSources={publicSources}
             publicDescriptionContext={{
               cityRunType: run.cityRunType,
               clubName: run.runClub?.name,
-            }}
-            instancePublicReadout={{
-              cityRunId: run.id,
-              slug: run.slug,
-              citySlug: run.citySlug,
-              description: wizardValues.description,
-              seriesPhotoUrl: run.runSeries?.seriesPhotoUrl ?? null,
             }}
             associateDraft={useAssociateTab ? associateDraft ?? undefined : undefined}
             onAssociateChange={useAssociateTab ? setAssociateDraft : undefined}
@@ -1022,6 +1027,9 @@ export default function RunManageStaffEditor({
             associateSaving={associateSaving}
             associateError={associateError}
             associateMessage={associateMessage}
+            error={wizardError}
+            onErrorChange={setWizardError}
+            onRunRefreshed={() => void fetchRun()}
             instanceToolbar={{
               autoSaveStatus,
               published: Boolean(run.published),

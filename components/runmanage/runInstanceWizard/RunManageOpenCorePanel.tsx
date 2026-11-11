@@ -29,6 +29,9 @@ type Props = {
   onErrorChange?: (msg: string | null) => void;
   associateDraft?: RunAffiliationDraft | null;
   titleInPageHeading?: boolean;
+  panelTitle?: string;
+  /** Weekly club runs hide registration; shakeouts keep CSV fields. */
+  showRegistrationFields?: boolean;
   publicDescriptionContext?: {
     cityRunType?: string | null;
     clubName?: string | null;
@@ -44,6 +47,8 @@ export default function RunManageOpenCorePanel({
   onErrorChange,
   associateDraft = null,
   titleInPageHeading = false,
+  panelTitle = "Core details",
+  showRegistrationFields,
   publicDescriptionContext,
 }: Props) {
   const partnerMark = resolvePartnerCircleMark({
@@ -52,6 +57,10 @@ export default function RunManageOpenCorePanel({
     ...context.affiliateLogoFallback,
   });
   const isAthleteHosted = context.variant === "athlete-hosted";
+  const registrationVisible =
+    showRegistrationFields !== undefined
+      ? showRegistrationFields
+      : !isAthleteHosted;
   const isSeries = context.isSeriesInstance ?? context.variant === "create-series";
   const dayLabel = context.dayOfWeek ? formatDayLabel(context.dayOfWeek) : "Run";
   const isTrack = isTrackRun(values.runType);
@@ -79,7 +88,7 @@ export default function RunManageOpenCorePanel({
   return (
     <div className="rounded-lg border border-gray-200 bg-white">
       <div className="border-b border-gray-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-gray-900">Core details</h3>
+        <h3 className="text-sm font-semibold text-gray-900">{panelTitle}</h3>
         <p className="mt-1 text-xs text-gray-600">
           {isSeries && context.variant === "create-series"
             ? "Confirm date and start time match the club post you just checked. Save here — route and workout are optional after."
@@ -144,7 +153,7 @@ export default function RunManageOpenCorePanel({
           </div>
         )}
 
-        {!isAthleteHosted ? (
+        {registrationVisible ? (
           <RunRegistrationFields values={values} onChange={patch} />
         ) : null}
 
