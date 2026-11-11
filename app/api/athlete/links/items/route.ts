@@ -180,8 +180,11 @@ export async function POST(request: NextRequest) {
       athleteCauseId = cause.id;
       name = cause.name;
       url = cause.websiteUrl;
-      charityLinkLogoUrl = cause.logoUrl?.trim() || null;
-      charityEmoji = "❤️";
+      charityLinkLogoUrl =
+        cause.logoUrl?.trim() ||
+        (typeof body.linkLogoUrl === "string" ? body.linkLogoUrl.trim() : "") ||
+        null;
+      charityEmoji = charityLinkLogoUrl ? null : "❤️";
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to save charity";
       return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -247,8 +250,11 @@ export async function POST(request: NextRequest) {
     athleteCauseId = cause.id;
     name = cause.name;
     url = cause.websiteUrl;
-    charityLinkLogoUrl = cause.logoUrl?.trim() || null;
-    charityEmoji = "❤️";
+    charityLinkLogoUrl =
+      cause.logoUrl?.trim() ||
+      (typeof body.linkLogoUrl === "string" ? body.linkLogoUrl.trim() : "") ||
+      null;
+    charityEmoji = charityLinkLogoUrl ? null : "❤️";
   } else if (raceRegistryIdInput && !isSection) {
     try {
       const { row: cause } = await upsertAthleteCauseFromRaceRegistry({
@@ -268,8 +274,11 @@ export async function POST(request: NextRequest) {
       athleteCauseId = cause.id;
       name = cause.name;
       url = cause.websiteUrl;
-      charityLinkLogoUrl = cause.logoUrl?.trim() || null;
-      charityEmoji = "❤️";
+      charityLinkLogoUrl =
+        cause.logoUrl?.trim() ||
+        (typeof body.linkLogoUrl === "string" ? body.linkLogoUrl.trim() : "") ||
+        null;
+      charityEmoji = charityLinkLogoUrl ? null : "❤️";
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to save cause";
       return NextResponse.json({ success: false, error: message }, { status: 400 });

@@ -18,7 +18,10 @@ import {
   CHARITY_LINK_SECTION_DEFAULT,
   findCharityLinkSectionId,
 } from "@/lib/athlete-link-tree/charity-link-section";
-import { linkIdForAthleteCause } from "@/lib/athlete-link-tree/link-tree-charity";
+import {
+  linkIdForAthleteCause,
+  linkIdForCharityPickerHit,
+} from "@/lib/athlete-link-tree/link-tree-charity";
 import {
   athletePublicReflectionUrl,
   athletePublicStoryUrl,
@@ -60,7 +63,7 @@ type SerializedAthleteCause = {
   id: string;
   name: string;
   websiteUrl: string;
-  logoUrl: string | null;
+  logoUrl?: string | null;
   note: string | null;
   raceRegistryId: string | null;
 };
@@ -423,6 +426,37 @@ export function AthleteLinkTreeLinkSources({
 
   const charitySectionId = findCharityLinkSectionId(sections);
 
+  const reloadCharityPicker = useCallback(async () => {
+    try {
+      const q = charityQ.trim();
+      const [causesRes, charitiesRes] = await Promise.all([
+        api.get("/athlete/causes"),
+        api.get(`/athlete/links/charities${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+      ]);
+      if (causesRes.data?.success) {
+        setMyCauses((causesRes.data.causes as SerializedAthleteCause[]) ?? []);
+      }
+      if (charitiesRes.data?.success) {
+        setCharityHits(normalizeAthleteCharityCatalogHits(charitiesRes.data.charities));
+      }
+    } catch {
+      /* keep prior picker state */
+    }
+  }, [charityQ]);
+
+  useEffect(() => {
+    if (source !== "charities") return;
+    void reloadCharityPicker();
+  }, [source, sortedLinks, reloadCharityPicker]);
+
+  const visibleCatalogHits = useMemo(
+    () =>
+      charityHits.filter(
+        (hit) => !linkIdForCharityPickerHit(sortedLinks, hit, myCauses),
+      ),
+    [charityHits, sortedLinks, myCauses],
+  );
+
   async function ensureCharitySectionId(): Promise<string | null> {
     const existing = findCharityLinkSectionId(sections);
     if (existing) return existing;
@@ -636,16 +670,19 @@ export function AthleteLinkTreeLinkSources({
         athleteCauseId: cause.id,
         parentSectionId: sectionId,
         sectionId,
+        ...(cause.logoUrl?.trim() ? { linkLogoUrl: cause.logoUrl.trim() } : {}),
       });
+      await reloadCharityPicker();
       return;
     }
-    if (existingId) await onRemoveLink(existingId);
+    if (existingId) {
+      await onRemoveLink(existingId);
+      await reloadCharityPicker();
+    }
   }
 
   async function toggleCharityOnPage(hit: AthleteCharityCatalogHit, checked: boolean) {
-    const existingId = hit.athleteCauseId
-      ? linkIdForAthleteCause(sortedLinks, hit.athleteCauseId)
-      : null;
+    const existingId = linkIdForCharityPickerHit(sortedLinks, hit, myCauses);
     if (checked) {
       if (existingId) return;
       const sectionId = charitySectionId ?? (await ensureCharitySectionId());
@@ -658,11 +695,14 @@ export function AthleteLinkTreeLinkSources({
         ...linkBody,
         parentSectionId: sectionId,
         sectionId,
+        ...(hit.charityLogo?.trim() ? { linkLogoUrl: hit.charityLogo.trim() } : {}),
       });
+      await reloadCharityPicker();
       return;
     }
     if (existingId) {
       await onRemoveLink(existingId);
+      await reloadCharityPicker();
     }
   }
 
@@ -1075,6 +1115,11 @@ export function AthleteLinkTreeLinkSources({
                       />
                       <span className="min-w-0 flex-1">
                         <span className="font-medium text-gray-900">{c.name}</span>
+                        {onPage ? (
+                          <span className="mt-0.5 block text-xs font-medium text-emerald-700">
+                            On your page
+                          </span>
+                        ) : null}
                         <span className="mt-0.5 block truncate text-xs text-gray-500">{c.websiteUrl}</span>
                       </span>
                     </label>
@@ -1094,23 +1139,22 @@ export function AthleteLinkTreeLinkSources({
           </label>
           {charityLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
           {charityError ? <p className="text-xs text-red-700">{charityError}</p> : null}
-          {!charityLoading && !charityError && charityHits.length === 0 ? (
+          {!charityLoading && !charityError && visibleCatalogHits.length === 0 ? (
             <p className="text-xs text-gray-500">
-              {charityQ.trim()
-                ? "No charities in the GoFast catalog matched that name."
-                : "No charities in the catalog yet with an https website URL."}
+              {charityHits.length > 0
+                ? "Matching charities are already on your page — see “Your causes” above to remove."
+                : charityQ.trim()
+                  ? "No charities in the GoFast catalog matched that name."
+                  : "No charities in the catalog yet with an https website URL."}
             </p>
           ) : null}
-          {!charityQ.trim() && charityHits.length > 0 ? (
+          {!charityQ.trim() && visibleCatalogHits.length > 0 ? (
             <p className="text-xs text-gray-500">
               GoFast charity catalog — filter by name, then check to add under your heading.
             </p>
           ) : null}
           <ul className="max-h-64 space-y-1.5 overflow-y-auto">
-            {charityHits.map((hit) => {
-              const onPage = Boolean(
-                hit.athleteCauseId && linkIdForAthleteCause(sortedLinks, hit.athleteCauseId),
-              );
+            {visibleCatalogHits.map((hit) => {
               const needsCharitySection = !charitySectionId;
               const disabled = adding || charitySectionBusy;
               return (
@@ -1128,11 +1172,18 @@ export function AthleteLinkTreeLinkSources({
                     <input
                       type="checkbox"
                       className="mt-0.5"
-                      checked={onPage}
+                      checked={false}
                       disabled={disabled}
                       onChange={(e) => void toggleCharityOnPage(hit, e.target.checked)}
                     />
                     <span className="min-w-0 flex-1">
+                      {hit.charityLogo?.trim() ? (
+                        <img
+                          src={hit.charityLogo.trim()}
+                          alt=""
+                          className="mb-1 h-8 w-8 rounded object-contain"
+                        />
+                      ) : null}
                       <span className="font-medium text-gray-900">{hit.charityName}</span>
                       <span className="mt-0.5 block truncate text-xs text-gray-500">{hit.charityUrl}</span>
                     </span>
