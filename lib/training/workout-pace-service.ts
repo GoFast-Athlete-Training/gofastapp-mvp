@@ -7,6 +7,7 @@ import {
   parsePaceToSecondsPerMile,
   paceTargetFromSecondsPerMile,
   secondsPerMileToSecondsPerKm,
+  secondsPerMileToStoredPaceSecKm,
   type TrainingPaces,
 } from "@/lib/workout-generator/pace-calculator";
 import type {
@@ -73,8 +74,8 @@ function paceStep(step: ShapeStep, paces: TrainingPaces, fiveK: string | null | 
     const { low, high } = step.explicitPaceSecPerMile;
     return {
       ...step,
-      paceValueLow: secondsPerMileToSecondsPerKm(low),
-      paceValueHigh: secondsPerMileToSecondsPerKm(high),
+      paceValueLow: secondsPerMileToStoredPaceSecKm(low),
+      paceValueHigh: secondsPerMileToStoredPaceSecKm(high),
     };
   }
   const band = paceForLabel(step.effortLabel, paces, fiveK);

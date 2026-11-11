@@ -7,6 +7,8 @@ import {
 } from "./parse-pasted-workout";
 import { parsedPasteToWorkoutSteps } from "./paste-workout-pipeline";
 import { collapseFlatSegmentsForEditor } from "./segment-summary";
+import { formatStoredPaceAsMinPerMile } from "@/lib/workout-generator/pace-calculator";
+import { apiSegmentsToSlots } from "./create-workout-slot-map";
 
 const YORKTOWN_NOTE = `Track Crew, please join us dark and early tomorrow for Tempo Thursday at Yorktown. We'll be running 2 x 20 minutes at tempo pace followed by some sharpening intervals (2x400m at 5k pace). If you haven't been out to the track in a few weeks it's a great time to come back and rejoin the pack as we run around the oval waiting for the sun to rise. See you at 0545 for warmups!`;
 
@@ -205,6 +207,19 @@ test("parses structured ON/OFF fartlek with explicit paces", () => {
   const off = collapsed[collapsed.indexOf(main) + 1];
   assert.ok(off);
   assert.ok(off.targets?.[0]?.type === "PACE");
+});
+
+test("explicit fartlek paces round-trip to 7:25 and 8:25 in create slots", () => {
+  const parsed = tryParsePastedWorkoutText(MODIFIED_FARTLEK_NOTE, "Intervals");
+  assert.ok(parsed);
+  const steps = parsedPasteToWorkoutSteps(parsed, "6:14");
+  const { mainSegments } = apiSegmentsToSlots(steps);
+  const legs = mainSegments[0]?.intervalBlock?.legs;
+  assert.ok(legs);
+  const onPace = formatStoredPaceAsMinPerMile(legs[0]!.paceValueLow!, 2);
+  const offPace = formatStoredPaceAsMinPerMile(legs[1]!.paceValueLow!, 2);
+  assert.equal(onPace, "7:25");
+  assert.equal(offPace, "8:25");
 });
 
 test("parses compact 8x (3 min ON at 7:25, 3 min OFF at 8:25)", () => {

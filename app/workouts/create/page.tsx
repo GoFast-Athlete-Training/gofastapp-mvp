@@ -26,9 +26,17 @@ import WorkoutCreateEntry, {
 import type { CatalogueBrowseItem } from "@/components/workouts/workout-create-types";
 import type { WorkoutStep } from "@/lib/training/prescription";
 import {
-  collapseFlatSegmentsForEditor,
   formatSegmentDistance,
+  formatSegmentDuration,
 } from "@/lib/training/segment-summary";
+import {
+  apiSegmentsToSlots,
+  intervalBlockHeaderLabel,
+  materializeMainSlotRows,
+  slotHasPositiveDuration,
+  type SlotData,
+} from "@/lib/training/create-workout-slot-map";
+export type { SlotData };
 import type { WorkoutShape } from "@/lib/training/workout-shape-service";
 import {
   pacedShapeFromConfirmed,
@@ -65,29 +73,8 @@ function applyGoalRaceMpPacesToMainSlots(
 /** Stored PACE targets are sec/km, encoding v2 (same as workout detail / Garmin). */
 const PACE_SLOT_ENC = 2 as const;
 
-export interface SlotData {
-  durationType: "DISTANCE" | "TIME";
-  /** Miles when DISTANCE, minutes when TIME. */
-  durationValue: number;
-  /** Prescription step title from catalogue (e.g. Work) — preserved on save. */
-  segmentTitle?: string;
-  /** PACE API valueLow (sec/km, v2) — faster bound; same as detail editor “Pace low”. */
-  paceValueLow?: number;
-  /** PACE API valueHigh (sec/km, v2) — slower bound; “Pace high”. */
-  paceValueHigh?: number;
-  hrMin?: number;
-  hrMax?: number;
-  repeatCount?: number;
-  recoveryDurationType?: string | null;
-  recoveryDurationValue?: number | null;
-}
-
 function emptySlot(): SlotData {
   return { durationType: "DISTANCE", durationValue: 0 };
-}
-
-function slotHasPositiveDuration(slot: SlotData | null | undefined): boolean {
-  return (slot?.durationValue ?? 0) > 0;
 }
 
 type ApiSegment = {
@@ -183,97 +170,12 @@ function hrBandFromTarget(t: { type?: string; valueLow?: number; valueHigh?: num
   return { min: Math.min(lo, hi), max: Math.max(lo, hi) };
 }
 
-/** e.g. "20 mile long run", "10mi tempo" → miles */
-function extractMilesFromTitle(title: string): number | undefined {
-  const m = title.match(/([\d.]+)\s*(?:mi|mile|miles)\b/i);
-  if (!m) return undefined;
-  const v = parseFloat(m[1]);
-  return Number.isFinite(v) && v > 0 ? v : undefined;
-}
-
-/** Map AI-derived segments into warmup, ordered main segments, and cooldown (no merging). */
-function apiSegmentsToSlots(segments: ApiSegment[]): {
-  warmup: SlotData | null;
-  mainSegments: SlotData[];
-  cooldown: SlotData | null;
-} {
-  const collapsed = collapseFlatSegmentsForEditor(
-    segments.map((s, i) => ({
-      ...s,
-      stepOrder: s.stepOrder ?? i + 1,
-      title: s.title ?? "",
-      durationType: s.durationType ?? "DISTANCE",
-      durationValue: s.durationValue,
-      targets: s.targets,
-      repeatCount: s.repeatCount ?? null,
-      recoveryDurationType: s.recoveryDurationType ?? null,
-      recoveryDurationValue: s.recoveryDurationValue ?? null,
-    }))
-  ) as ApiSegment[];
-
-  let warmup: SlotData | null = null;
-  const mainSegments: SlotData[] = [];
-  let cooldown: SlotData | null = null;
-
-  for (const seg of collapsed) {
-    const title = (seg.title ?? "").toLowerCase();
-    const durationType =
-      String(seg.durationType ?? "DISTANCE").toUpperCase() === "TIME" ? "TIME" : "DISTANCE";
-    let durationValue = 0;
-    if (durationType === "TIME") {
-      durationValue =
-        typeof seg.durationValue === "number" && seg.durationValue > 0 ? seg.durationValue : 0;
-    } else {
-      durationValue =
-        typeof seg.durationValue === "number" && seg.durationValue > 0 ? seg.durationValue : 0;
-      if (durationValue === 0) {
-        const fromTitle = extractMilesFromTitle(seg.title ?? "");
-        if (fromTitle != null) durationValue = fromTitle;
-      }
-    }
-    let paceValueLow: number | undefined;
-    let paceValueHigh: number | undefined;
-    for (const raw of seg.targets ?? []) {
-      const band = paceBandSecKmFromTarget(raw);
-      if (band.low != null) {
-        paceValueLow = band.low;
-        paceValueHigh = band.high ?? band.low;
-        break;
-      }
-    }
-    let hrMin: number | undefined;
-    let hrMax: number | undefined;
-    for (const raw of seg.targets ?? []) {
-      const hr = hrBandFromTarget(raw);
-      if (hr.min != null && hr.max != null) {
-        hrMin = hr.min;
-        hrMax = hr.max;
-        break;
-      }
-    }
-    const slot: SlotData = {
-      durationType,
-      durationValue,
-      segmentTitle: seg.title?.trim() || undefined,
-      paceValueLow,
-      paceValueHigh,
-      hrMin,
-      hrMax,
-      repeatCount: seg.repeatCount ?? undefined,
-      recoveryDurationType: seg.recoveryDurationType ?? undefined,
-      recoveryDurationValue: seg.recoveryDurationValue ?? undefined,
-    };
-
-    if (/warmup|warm.up|warm up/.test(title)) {
-      warmup = { ...slot, segmentTitle: slot.segmentTitle ?? "Warmup" };
-    } else if (/cooldown|cool.down|cool down/.test(title)) {
-      cooldown = { ...slot, segmentTitle: slot.segmentTitle ?? "Cooldown" };
-    } else {
-      mainSegments.push(slot);
-    }
-  }
-
-  return { warmup, mainSegments, cooldown };
+function slotLegPaceLine(leg: SlotData): string | null {
+  const low = leg.paceValueLow != null ? secPerKmToPaceDisplay(leg.paceValueLow) : "";
+  const high = leg.paceValueHigh != null ? secPerKmToPaceDisplay(leg.paceValueHigh) : "";
+  if (!low && !high) return null;
+  if (low && high && low !== high) return `${low}–${high}/mi`;
+  return `${low || high}/mi`;
 }
 
 function slotOneLine(slot: SlotData, paired?: SlotData | null): string {
@@ -1267,7 +1169,22 @@ function CreateWorkoutPageInner() {
         mainOrdinal++;
         const defaultMainTitle =
           mainsWithDuration.length === 1 ? "Work" : `Segment ${mainOrdinal}`;
-        pushSlotSegment(slot, defaultMainTitle);
+        const rows = materializeMainSlotRows(slot, defaultMainTitle);
+        for (const row of rows) {
+          const rowSlot: SlotData = {
+            durationType: row.durationType === "TIME" ? "TIME" : "DISTANCE",
+            durationValue: row.durationValue,
+            segmentTitle: row.title,
+            paceValueLow: row.paceValueLow,
+            paceValueHigh: row.paceValueHigh,
+            hrMin: row.hrMin,
+            hrMax: row.hrMax,
+            repeatCount: row.repeatCount,
+            recoveryDurationType: row.recoveryDurationType,
+            recoveryDurationValue: row.recoveryDurationValue,
+          };
+          pushSlotSegment(rowSlot, row.title);
+        }
       }
       if (cooldown) pushSlotSegment(cooldown, "Cooldown");
 
@@ -1934,6 +1851,53 @@ function CreateWorkoutPageInner() {
                     mainSegments.length === 1 ? "Main work" : `Segment ${index + 1}`;
                   const isEditing =
                     editingTarget?.kind === "main" && editingTarget.index === index;
+                  const block = slot.intervalBlock;
+
+                  if (block) {
+                    return (
+                      <div
+                        key={`main-${index}`}
+                        className="border border-gray-200 rounded-lg mb-4 overflow-hidden bg-white"
+                      >
+                        <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide bg-orange-500 text-white">
+                          {intervalBlockHeaderLabel(slot)}
+                        </div>
+                        <div className="p-4">
+                          <p className="text-sm font-medium text-gray-900 mb-2">
+                            {slot.segmentTitle && slot.segmentTitle !== intervalBlockHeaderLabel(slot)
+                              ? slot.segmentTitle
+                              : "Intervals"}
+                          </p>
+                          <ul className="space-y-1.5 list-none pl-0 m-0">
+                            {block.legs.map((leg, legIdx) => {
+                              const paceLine = slotLegPaceLine(leg);
+                              return (
+                                <li
+                                  key={legIdx}
+                                  className="text-sm text-gray-800 flex flex-wrap items-baseline gap-x-2"
+                                >
+                                  <span className="font-medium text-gray-900">
+                                    {leg.segmentTitle?.trim() ||
+                                      (legIdx === 0 ? "Work" : "Recovery")}
+                                  </span>
+                                  <span className="tabular-nums text-gray-600">
+                                    {formatSegmentDuration({
+                                      durationType: leg.durationType,
+                                      durationValue: leg.durationValue,
+                                      stepOrder: legIdx + 1,
+                                    })}
+                                  </span>
+                                  {paceLine ? (
+                                    <span className="tabular-nums text-gray-500">@ {paceLine}</span>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div
@@ -1942,14 +1906,7 @@ function CreateWorkoutPageInner() {
                     >
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <span className="font-medium text-gray-900">{label}</span>
-                        <span className="text-sm text-gray-600">
-                          {slotOneLine(
-                            slot,
-                            slot.repeatCount != null && slot.repeatCount > 1
-                              ? mainSegments[index + 1]
-                              : null
-                          )}
-                        </span>
+                        <span className="text-sm text-gray-600">{slotOneLine(slot, null)}</span>
                         <div className="flex gap-2">
                           <button
                             type="button"

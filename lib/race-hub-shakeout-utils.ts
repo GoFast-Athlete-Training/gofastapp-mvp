@@ -85,6 +85,10 @@ export function serializePublicShakeout(
     runClub: hub.runClub,
     registrationRequired: hub.registrationRequired,
     registrationUrl: hub.registrationUrl,
+    organizerName: hub.organizerName,
+    shakeoutClubName: hub.shakeoutClubName,
+    timezone: hub.timezone,
+    startsAt: hub.startsAt,
   };
 }
 

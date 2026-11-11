@@ -27,6 +27,14 @@ export function secondsPerMileToSecondsPerKm(secPerMile: number): number {
 }
 
 /**
+ * Store coach-authored explicit paces with one decimal sec/km so M:SS/mile round-trips (e.g. 7:25).
+ * Zone-derived paces still use integer {@link secondsPerMileToSecondsPerKm}.
+ */
+export function secondsPerMileToStoredPaceSecKm(secPerMile: number): number {
+  return Math.round((secPerMile / KM_PER_MILE) * 10) / 10;
+}
+
+/**
  * Convert stored PACE band numbers to seconds per mile for UI and evaluation.
  * @param encodingVersion v1 legacy blob uses inflated values; v2 is true sec/km.
  */

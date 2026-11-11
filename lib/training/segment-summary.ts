@@ -292,7 +292,7 @@ export function groupSegmentsForDisplay<T extends SegmentLike>(
   return groupSegmentsInDisplayOrder(sorted);
 }
 
-function segmentHasPaceTarget(seg: SegmentLike): boolean {
+export function segmentHasPaceTarget(seg: SegmentLike): boolean {
   const targets = seg.targets;
   if (!targets || !Array.isArray(targets)) return false;
   return targets.some((t) => String(t.type ?? "").toUpperCase() === "PACE");
