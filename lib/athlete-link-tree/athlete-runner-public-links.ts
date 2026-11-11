@@ -57,7 +57,7 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
   {
     id: "charities",
     title: "Charity",
-    hint: "Search race charity snaps from the registry — add under a section heading",
+    hint: "GoFast charity catalog — pick a section (not Top), then check a charity",
   },
   { id: "routes", title: "Route", hint: "Pick a saved Strava route" },
   { id: "custom", title: "Custom link", hint: "Any URL" },

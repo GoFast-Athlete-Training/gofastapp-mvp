@@ -257,6 +257,13 @@ export function AthleteLinkTreeLinkSources({
     };
   }, [source]);
 
+  /** Charity/race links need a section — if only one exists, pre-select it when Placement is Top. */
+  useEffect(() => {
+    if (!source || source === "landing" || source === "runs") return;
+    if (activeSectionId || sections.length !== 1) return;
+    onActiveSectionIdChange(sections[0]!.id);
+  }, [source, sections, activeSectionId, onActiveSectionIdChange]);
+
   useEffect(() => {
     if (source !== "charities") return;
     const q = charityQ.trim();
@@ -1042,10 +1049,20 @@ export function AthleteLinkTreeLinkSources({
               const onPage = Boolean(
                 hit.athleteCauseId && linkIdForAthleteCause(sortedLinks, hit.athleteCauseId),
               );
-              const disabled = adding || !activeSectionId;
+              const needsSection = !activeSectionId;
+              const disabled = adding || needsSection;
               return (
                 <li key={hit.charityId}>
-                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-2 py-2 text-sm hover:bg-gray-50">
+                  <label
+                    className={`flex items-start gap-2 rounded-lg border border-gray-200 px-2 py-2 text-sm ${
+                      disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-gray-50"
+                    }`}
+                    title={
+                      needsSection
+                        ? "Choose a section in Placement (not Top), or click a heading on the right"
+                        : undefined
+                    }
+                  >
                     <input
                       type="checkbox"
                       className="mt-0.5"
