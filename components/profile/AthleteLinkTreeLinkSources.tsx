@@ -14,6 +14,10 @@ import {
   normalizeAthleteCharityCatalogHits,
   type AthleteCharityCatalogHit,
 } from "@/lib/athlete-causes/charity-catalog-search";
+import {
+  CHARITY_LINK_SECTION_DEFAULT,
+  findCharityLinkSectionId,
+} from "@/lib/athlete-link-tree/charity-link-section";
 import { linkIdForAthleteCause } from "@/lib/athlete-link-tree/link-tree-charity";
 import {
   athletePublicReflectionUrl,
@@ -80,6 +84,7 @@ type Props = {
   onActiveSectionIdChange: (id: string | null) => void;
   onAddLink: (payload: Record<string, unknown>) => Promise<void>;
   onRemoveLink: (linkId: string) => Promise<void>;
+  onAddSection: (name: string) => Promise<string | null>;
 };
 
 export function AthleteLinkTreeLinkSources({
@@ -91,7 +96,9 @@ export function AthleteLinkTreeLinkSources({
   onActiveSectionIdChange,
   onAddLink,
   onRemoveLink,
+  onAddSection,
 }: Props) {
+  const [charitySectionBusy, setCharitySectionBusy] = useState(false);
   const [source, setSource] = useState<AthleteLinkSourceCardId | null>(null);
   const [customTitle, setCustomTitle] = useState("");
   const [customUrl, setCustomUrl] = useState("https://");
@@ -257,12 +264,13 @@ export function AthleteLinkTreeLinkSources({
     };
   }, [source]);
 
-  /** Charity/race links need a section — if only one exists, pre-select it when Placement is Top. */
   useEffect(() => {
-    if (!source || source === "landing" || source === "runs") return;
-    if (activeSectionId || sections.length !== 1) return;
-    onActiveSectionIdChange(sections[0]!.id);
-  }, [source, sections, activeSectionId, onActiveSectionIdChange]);
+    if (source !== "charities") return;
+    const charitySectionId = findCharityLinkSectionId(sections);
+    if (charitySectionId) {
+      onActiveSectionIdChange(charitySectionId);
+    }
+  }, [source, sections, onActiveSectionIdChange]);
 
   useEffect(() => {
     if (source !== "charities") return;
@@ -412,6 +420,50 @@ export function AthleteLinkTreeLinkSources({
       cancelled = true;
     };
   }, [source]);
+
+  const charitySectionId = findCharityLinkSectionId(sections);
+
+  async function ensureCharitySectionId(): Promise<string | null> {
+    const existing = findCharityLinkSectionId(sections);
+    if (existing) return existing;
+    setCharitySectionBusy(true);
+    try {
+      const id = await onAddSection(CHARITY_LINK_SECTION_DEFAULT);
+      if (id) onActiveSectionIdChange(id);
+      return id;
+    } finally {
+      setCharitySectionBusy(false);
+    }
+  }
+
+  function charitySectionBanner() {
+    if (charitySectionId) {
+      const label =
+        sections.find((s) => s.id === charitySectionId)?.label ?? CHARITY_LINK_SECTION_DEFAULT;
+      return (
+        <p className="text-xs text-gray-600 rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5">
+          Charity buttons appear under the <strong className="font-semibold text-gray-900">{label}</strong>{" "}
+          heading on your page (not under Races).
+        </p>
+      );
+    }
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-amber-900 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+          Add a <strong>{CHARITY_LINK_SECTION_DEFAULT}</strong> section heading first — charity links never
+          belong at Top or under Races.
+        </p>
+        <button
+          type="button"
+          disabled={charitySectionBusy || adding}
+          onClick={() => void ensureCharitySectionId()}
+          className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+        >
+          {charitySectionBusy ? "Adding section…" : `Add “${CHARITY_LINK_SECTION_DEFAULT}” section`}
+        </button>
+      </div>
+    );
+  }
 
   function sectionRequiredBanner() {
     if (sections.length === 0) {
@@ -578,8 +630,13 @@ export function AthleteLinkTreeLinkSources({
     const existingId = linkIdForAthleteCause(sortedLinks, cause.id);
     if (checked) {
       if (existingId) return;
-      if (!activeSectionId) return;
-      await onAddLink({ athleteCauseId: cause.id });
+      const sectionId = charitySectionId ?? (await ensureCharitySectionId());
+      if (!sectionId) return;
+      await onAddLink({
+        athleteCauseId: cause.id,
+        parentSectionId: sectionId,
+        sectionId,
+      });
       return;
     }
     if (existingId) await onRemoveLink(existingId);
@@ -591,12 +648,17 @@ export function AthleteLinkTreeLinkSources({
       : null;
     if (checked) {
       if (existingId) return;
-      if (!activeSectionId) return;
-      const payload =
+      const sectionId = charitySectionId ?? (await ensureCharitySectionId());
+      if (!sectionId) return;
+      const linkBody =
         hit.raceRegistryId && hit.charityId === hit.raceRegistryId
           ? { raceRegistryId: hit.raceRegistryId }
           : { charityId: hit.charityId };
-      await onAddLink(payload);
+      await onAddLink({
+        ...linkBody,
+        parentSectionId: sectionId,
+        sectionId,
+      });
       return;
     }
     if (existingId) {
@@ -982,7 +1044,7 @@ export function AthleteLinkTreeLinkSources({
 
       {source === "charities" ? (
         <div className="space-y-2">
-          {sectionRequiredBanner()}
+          {charitySectionBanner()}
           <p className="text-xs text-gray-500">
             Save causes on the{" "}
             <a href="/causes" className="font-medium text-sky-700 hover:underline">
@@ -1000,7 +1062,7 @@ export function AthleteLinkTreeLinkSources({
             <ul className="max-h-40 space-y-1.5 overflow-y-auto">
               {myCauses.map((c) => {
                 const onPage = Boolean(linkIdForAthleteCause(sortedLinks, c.id));
-                const disabled = adding || !activeSectionId;
+                const disabled = adding || charitySectionBusy;
                 return (
                   <li key={c.id}>
                     <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 px-2 py-2 text-sm hover:bg-gray-50">
@@ -1049,8 +1111,8 @@ export function AthleteLinkTreeLinkSources({
               const onPage = Boolean(
                 hit.athleteCauseId && linkIdForAthleteCause(sortedLinks, hit.athleteCauseId),
               );
-              const needsSection = !activeSectionId;
-              const disabled = adding || needsSection;
+              const needsCharitySection = !charitySectionId;
+              const disabled = adding || charitySectionBusy;
               return (
                 <li key={hit.charityId}>
                   <label
@@ -1058,8 +1120,8 @@ export function AthleteLinkTreeLinkSources({
                       disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-gray-50"
                     }`}
                     title={
-                      needsSection
-                        ? "Choose a section in Placement (not Top), or click a heading on the right"
+                      needsCharitySection
+                        ? `Add the “${CHARITY_LINK_SECTION_DEFAULT}” section first (button above)`
                         : undefined
                     }
                   >

@@ -138,7 +138,7 @@ export function AthleteLinkTreeEditor() {
     setTitle(res.data.tree.publicLabel?.trim() || trimmedTitle);
   });
 
-  async function addLinkRaw(payload: Record<string, unknown>) {
+  async function addLinkRaw(payload: Record<string, unknown>): Promise<string | null> {
     setAdding(true);
     setError(null);
     try {
@@ -147,15 +147,22 @@ export function AthleteLinkTreeEditor() {
         throw new Error(res.data?.error || "Failed to add");
       }
       setTree(res.data.tree);
+      return typeof res.data.linkId === "string" ? res.data.linkId : null;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add");
+      return null;
     } finally {
       setAdding(false);
     }
   }
 
-  function addLinkWithPlacement(base: Record<string, unknown>) {
-    return addLinkRaw(linkInsertPayload(sortedLinks, activeSectionId, base));
+  function addLinkWithPlacement(base: Record<string, unknown>): Promise<void> {
+    const explicitSection =
+      typeof base.parentSectionId === "string" && base.parentSectionId.trim()
+        ? base.parentSectionId.trim()
+        : null;
+    const placementSection = explicitSection ?? activeSectionId;
+    return addLinkRaw(linkInsertPayload(sortedLinks, placementSection, base)).then(() => undefined);
   }
 
   async function removeLink(linkId: string) {
@@ -188,11 +195,11 @@ export function AthleteLinkTreeEditor() {
     }
   }
 
-  async function addSection(name: string) {
+  async function addSection(name: string): Promise<string | null> {
     setAddingSection(true);
     setError(null);
     try {
-      await addLinkRaw({ name, isSection: true });
+      return await addLinkRaw({ name, isSection: true });
     } finally {
       setAddingSection(false);
     }
@@ -361,6 +368,7 @@ export function AthleteLinkTreeEditor() {
                   onActiveSectionIdChange={setActiveSectionId}
                   onAddLink={addLinkWithPlacement}
                   onRemoveLink={removeLink}
+                  onAddSection={addSection}
                 />
               ) : null}
             </div>

@@ -19,7 +19,7 @@ type Props = {
   onMove: (id: string, dir: -1 | 1) => void;
   onUpdated: (tree: AthleteLinkTreeDetail) => void;
   onRowSaveStatus: (status: SaveStatus) => void;
-  onAddSection: (name: string) => Promise<void>;
+  onAddSection: (name: string) => Promise<unknown>;
   addingSection: boolean;
 };
 

@@ -1,3 +1,4 @@
+import { CHARITY_LINK_SECTION_DEFAULT } from "@/lib/athlete-link-tree/charity-link-section";
 import { runnerPublicLandingUrl } from "@/lib/gofast-with-me/runner-public-url";
 
 /** Absolute public URL on the runner host for this athlete's landing or subpage. */
@@ -57,7 +58,7 @@ export const ATHLETE_LINK_SOURCE_CARDS: Array<{
   {
     id: "charities",
     title: "Charity",
-    hint: "GoFast charity catalog — pick a section (not Top), then check a charity",
+    hint: `Catalog charities — adds under “${CHARITY_LINK_SECTION_DEFAULT}” (created automatically if needed)`,
   },
   { id: "routes", title: "Route", hint: "Pick a saved Strava route" },
   { id: "custom", title: "Custom link", hint: "Any URL" },
