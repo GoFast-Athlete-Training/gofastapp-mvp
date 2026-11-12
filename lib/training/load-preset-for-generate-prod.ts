@@ -161,6 +161,7 @@ export async function loadPresetForGenerateFromProd(
   return applyPresetOwnedPhase(loaded, {
     entryLongRunMiles: row.entryLongRunMiles,
     peakLongRunMiles: row.peakLongRunMiles,
+    baseStartLongRunMiles: row.baseStartLongRunMiles,
     baseEndLongRunMiles: row.baseEndLongRunMiles,
     baseEndWeeklyMiles: row.baseEndWeeklyMiles,
     baseWeeklyMinMiles: row.baseWeeklyMinMiles,

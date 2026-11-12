@@ -541,6 +541,7 @@ export async function upsertPresetFromProdPush(
       raceWeekPresetId: raceWeekPresetId ?? str(plan.raceWeekPresetId) ?? null,
       entryLongRunMiles: num(plan.entryLongRunMiles) ?? null,
       peakLongRunMiles: num(plan.peakLongRunMiles) ?? null,
+      baseStartLongRunMiles: num(plan.baseStartLongRunMiles) ?? null,
       baseEndLongRunMiles: num(plan.baseEndLongRunMiles) ?? null,
       baseEndWeeklyMiles:
         num(plan.baseEndWeeklyMiles) != null ? int(plan.baseEndWeeklyMiles, 0) : null,

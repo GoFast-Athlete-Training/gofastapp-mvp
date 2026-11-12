@@ -2352,6 +2352,8 @@ model training_plan_preset {
   /// Miles for generate. Empty falls back to the linked build, taper, or race-week row.
   entryLongRunMiles    Float?
   peakLongRunMiles     Float?
+  /// Long run at the start of the base phase (rough guide).
+  baseStartLongRunMiles Float?
   baseEndLongRunMiles  Float?
   baseEndWeeklyMiles   Int?
   longRunCutback       Float?
@@ -2388,8 +2390,9 @@ model training_plan_preset {
 
 /// Four run-type slots shared by every phase. No phase column and no miles.
 model phase_preset {
-  id   String @id @default(cuid())
-  name String
+  id          String  @id @default(cuid())
+  name        String
+  description String?
 
   longRunConfigId   String?
   intervalsConfigId String?

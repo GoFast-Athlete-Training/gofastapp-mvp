@@ -50,7 +50,8 @@ test("phase miles set the base band and taper caps and leave race-week days alon
   const loaded = applyPresetOwnedPhase(loadedPreset(), {
     entryLongRunMiles: 12,
     peakLongRunMiles: 20,
-    baseEndLongRunMiles: null,
+    baseStartLongRunMiles: 8,
+    baseEndLongRunMiles: 12,
     baseEndWeeklyMiles: null,
     baseWeeklyMinMiles: 30,
     baseWeeklyMaxMiles: 40,
@@ -68,6 +69,8 @@ test("phase miles set the base band and taper caps and leave race-week days alon
   assert.equal(loaded.build?.startLongRunMiles, 12);
   assert.equal(loaded.build?.peakLongRunMiles, 20);
   assert.equal(loaded.build?.longRunCutback, 0.2);
+  assert.equal(loaded.baseBuild?.startLongRunMiles, 8);
+  assert.equal(loaded.baseBuild?.peakLongRunMiles, 12);
   assert.equal(loaded.baseBuild?.weeklyMinMiles, 30);
   assert.equal(loaded.baseBuild?.peakWeeklyMiles, 40);
   assert.equal(loaded.taper?.weeks.find((week) => week.weekIndex === 1)?.totalMilesCap, 40);

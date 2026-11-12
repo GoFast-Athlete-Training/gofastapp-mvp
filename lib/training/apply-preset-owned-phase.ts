@@ -21,6 +21,7 @@ export type OwnedPhasePreset = {
 export type OwnedPresetMiles = {
   entryLongRunMiles: number | null;
   peakLongRunMiles: number | null;
+  baseStartLongRunMiles: number | null;
   baseEndLongRunMiles: number | null;
   baseEndWeeklyMiles: number | null;
   baseWeeklyMinMiles: number | null;
@@ -152,10 +153,15 @@ export function applyPresetOwnedPhase(
   }
 
   const baseMax = owned.baseWeeklyMaxMiles ?? owned.baseEndWeeklyMiles;
-  const hasBaseMiles = baseMax != null || owned.baseWeeklyMinMiles != null || owned.baseEndLongRunMiles != null;
+  const hasBaseMiles =
+    baseMax != null ||
+    owned.baseWeeklyMinMiles != null ||
+    owned.baseStartLongRunMiles != null ||
+    owned.baseEndLongRunMiles != null;
   if (hasBaseMiles || owned.baseBuildPhase) {
     loaded.baseBuild = loaded.baseBuild ?? emptyBuild();
-    if (owned.baseEndLongRunMiles != null) loaded.baseBuild.startLongRunMiles = owned.baseEndLongRunMiles;
+    if (owned.baseStartLongRunMiles != null) loaded.baseBuild.startLongRunMiles = owned.baseStartLongRunMiles;
+    if (owned.baseEndLongRunMiles != null) loaded.baseBuild.peakLongRunMiles = owned.baseEndLongRunMiles;
     if (baseMax != null) loaded.baseBuild.peakWeeklyMiles = baseMax;
     if (owned.baseWeeklyMinMiles != null) loaded.baseBuild.weeklyMinMiles = owned.baseWeeklyMinMiles;
     if (owned.baseBuildPhase) applyConfigs(loaded.baseBuild, owned.baseBuildPhase);

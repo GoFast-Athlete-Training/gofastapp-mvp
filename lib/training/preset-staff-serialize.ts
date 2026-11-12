@@ -57,6 +57,7 @@ export function serializeStaffPlanPreset(row: StaffPresetRow) {
     raceWeekPresetId: row.raceWeekPresetId,
     entryLongRunMiles: row.entryLongRunMiles,
     peakLongRunMiles: row.peakLongRunMiles,
+    baseStartLongRunMiles: row.baseStartLongRunMiles,
     baseEndLongRunMiles: row.baseEndLongRunMiles,
     baseEndWeeklyMiles: row.baseEndWeeklyMiles,
     baseWeeklyMinMiles: row.baseWeeklyMinMiles,
