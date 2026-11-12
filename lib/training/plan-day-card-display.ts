@@ -30,13 +30,6 @@ export function workoutCardPrimaryName(w: PlanDayCard): string {
   return typeLabelForCard(w.workoutType);
 }
 
-export function weekTotalMilesDisplay(days: PlanDayCard[]): string {
-  const m = days.reduce((s, d) => s + (d.estimatedDistanceInMeters ?? 0), 0) / MI_PER_M;
-  if (!Number.isFinite(m) || m <= 0) return "—";
-  const rounded = Math.round(m * 10) / 10;
-  return `${rounded} mi`;
-}
-
 export function formatWeekCardMiles(estimatedDistanceInMeters: number | null | undefined): string {
   if (estimatedDistanceInMeters == null || !Number.isFinite(estimatedDistanceInMeters)) {
     return "";

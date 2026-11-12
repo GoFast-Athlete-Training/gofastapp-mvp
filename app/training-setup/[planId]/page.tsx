@@ -1283,6 +1283,12 @@ export default function TrainingSetupPlanPage({
                 onPrevWeek={goPrevWeek}
                 onNextWeek={goNextWeek}
                 onSelectDay={openPlanDay}
+                weeklyMileageTarget={
+                  plan.weeklyMileageTarget != null &&
+                  Number.isFinite(Number(plan.weeklyMileageTarget))
+                    ? Math.round(Number(plan.weeklyMileageTarget))
+                    : null
+                }
                 selectedDayDetail={
                   focusPlanDay ? (
                     <div className="rounded-xl border border-orange-200 bg-white p-4 sm:p-5">

@@ -11,6 +11,7 @@ import {
   workoutTypeLeftBorderClass,
 } from "@/lib/training/plan-day-card-display";
 import type { PlanDayCard } from "@/lib/training/fetch-plan-week-client";
+import { WeekMileageBar } from "@/components/training/WeekMileageBar";
 
 type Props = {
   weeks: PublicPlanWeek[];
@@ -71,9 +72,9 @@ export default function PublicPlanWeekViewer({
           <h2 className="text-lg font-semibold text-gray-900">
             Week {week.weekNumber} of {totalWeeks}
           </h2>
-          <p className="mt-1 text-sm text-gray-600">
-            {week.totalMiles > 0 ? `${week.totalMiles} mi planned this week` : "Weekly mileage TBD"}
-          </p>
+          {week.totalMiles > 0 ? null : (
+            <p className="mt-1 text-sm text-gray-600">Weekly mileage TBD</p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -98,6 +99,10 @@ export default function PublicPlanWeekViewer({
           </button>
         </div>
       </div>
+
+      {week.days.length > 0 ? (
+        <WeekMileageBar days={week.days.map(toPlanDayCard)} />
+      ) : null}
 
       <ul className="space-y-2">
         {week.days.map((d) => {

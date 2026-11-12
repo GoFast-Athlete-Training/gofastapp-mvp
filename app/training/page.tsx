@@ -1020,12 +1020,6 @@ export default function TrainingHubPage() {
                     Week {weekNumber} of {effectiveTotalWeeks}
                     {calendarRangeLabel ? ` · ${calendarRangeLabel}` : ""}
                   </p>
-                  {weekPlannedMiles != null ? (
-                    <p className="mt-1 text-xs text-gray-600 tabular-nums">
-                      Total miles this week:{" "}
-                      <span className="font-semibold text-gray-900">{weekPlannedMiles} mi</span>
-                    </p>
-                  ) : null}
                   {raceReadiness?.projectedFinish ? (
                     <p className="mt-1 text-xs text-gray-600">
                       Predicted:{" "}
@@ -1148,6 +1142,7 @@ export default function TrainingHubPage() {
                 showCalendarRangeLabel={false}
                 onOpenDayDetails={openDayDetails}
                 onOpenDayReplace={openDayReplace}
+                weeklyMileageTarget={savedWeeklyTarget}
                 headerActions={
                   <TrainingHubWeekGear
                     planId={planDetail.id}

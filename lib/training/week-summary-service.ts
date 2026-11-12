@@ -1,6 +1,6 @@
 import type { PlanDayCard } from "@/lib/training/fetch-plan-week-client";
 import { formatPlanDateDisplay } from "@/lib/training/plan-utils";
-import { formatWeekCardMiles, weekTotalMilesDisplay } from "@/lib/training/plan-day-card-display";
+import { formatWeekCardMiles } from "@/lib/training/plan-day-card-display";
 
 export type WeekSummary = {
   headline: string;
@@ -104,9 +104,6 @@ export function buildWeekSummary(params: {
   const headline = `Week ${weekNumber} of ${totalWeeks} · ${theme}`;
   const chips: string[] = [];
 
-  if (days.length > 0) {
-    chips.push(`${weekTotalMilesDisplay(days)} planned`);
-  }
   if (longRuns.length > 0) {
     const lr = longRuns[0]!;
     chips.push(

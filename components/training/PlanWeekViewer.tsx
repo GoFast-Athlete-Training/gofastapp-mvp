@@ -16,6 +16,7 @@ import {
   sessionStatusLabel,
 } from "@/lib/training/session-status";
 import WeekWorkoutWidget from "@/components/training/WeekWorkoutWidget";
+import { WeekMileageBar } from "@/components/training/WeekMileageBar";
 
 type Props = {
   weekNumber: number;
@@ -43,6 +44,8 @@ type Props = {
   onOpenDayDetails?: (day: PlanDayCard) => void;
   /** Opens day screen focused on replace / paste panel. */
   onOpenDayReplace?: (day: PlanDayCard) => void;
+  /** Saved weekly target. The bar notes it only when it differs from the scheduled sum. */
+  weeklyMileageTarget?: number | null;
 };
 
 export default function PlanWeekViewer({
@@ -64,6 +67,7 @@ export default function PlanWeekViewer({
   headerActions,
   onOpenDayDetails,
   onOpenDayReplace,
+  weeklyMileageTarget,
 }: Props) {
   const atFirstWeek = weekNumber <= 1;
   const atLastWeek = weekNumber >= totalWeeks;
@@ -133,6 +137,10 @@ export default function PlanWeekViewer({
           </button>
         </div>
       </div>
+
+      {days.length > 0 ? (
+        <WeekMileageBar days={days} weeklyMileageTarget={weeklyMileageTarget} />
+      ) : null}
 
       {loading && days.length === 0 ? (
         <p className="text-sm text-gray-500">Loading this week&apos;s sessions…</p>

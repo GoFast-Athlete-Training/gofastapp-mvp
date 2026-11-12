@@ -24,6 +24,7 @@ import RaceCompleteModal, {
   isRaceCongratsDismissed,
 } from '@/components/athlete/RaceCompleteModal';
 import { PaceContextCard } from '@/components/athlete/PaceContextCard';
+import { WeekMileageBar } from '@/components/training/WeekMileageBar';
 import { SignupRaceDayBeforeBanner } from '@/components/races/RaceDayBanner';
 import { RaceDayGoalBanner } from '@/components/races/RaceDayGoalBanner';
 import { RacePrepForkActions } from '@/components/races/RacePrepForkActions';
@@ -1880,14 +1881,13 @@ export default function AthleteHomePage() {
                     : ''}
                 </p>
                 {weekPlanProgress.plannedMetersTotal > 0 ? (
-                  <p className="mt-1 tabular-nums text-gray-700">
-                    Volume: ~
-                    {(weekPlanProgress.actualMetersMatched / 1609.34).toFixed(1)} mi actual vs ~
-                    {(weekPlanProgress.plannedMetersTotal / 1609.34).toFixed(1)} mi planned
-                    {weekPlanProgress.weeklyMileageCompletionPct != null
-                      ? ` (${weekPlanProgress.weeklyMileageCompletionPct.toFixed(0)}% of planned)`
-                      : ''}
-                  </p>
+                  <div className="mt-3">
+                    <WeekMileageBar
+                      variant="progress"
+                      actualMiles={weekPlanProgress.actualMetersMatched / 1609.34}
+                      plannedMiles={weekPlanProgress.plannedMetersTotal / 1609.34}
+                    />
+                  </div>
                 ) : null}
                 {weekPlanProgress.longRunCompletionRatio != null ? (
                   <p className="mt-1 text-gray-700">

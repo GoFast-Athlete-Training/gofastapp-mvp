@@ -1,5 +1,9 @@
 "use client";
 
+import { WeekMileageBar } from "@/components/training/WeekMileageBar";
+
+const MI_PER_M = 1609.34;
+
 export function PerformanceWeekSummary({
   weekPerformance,
   planName,
@@ -39,13 +43,13 @@ export function PerformanceWeekSummary({
         {wp.sessionsSkipped > 0 ? ` · ${wp.sessionsSkipped} skipped` : ""}
       </p>
       {wp.plannedMetersTotal > 0 ? (
-        <p className="mt-1 tabular-nums text-sm text-gray-700">
-          Volume: ~{(wp.actualMetersMatched / 1609.34).toFixed(1)} mi actual vs ~
-          {(wp.plannedMetersTotal / 1609.34).toFixed(1)} mi planned
-          {wp.weeklyMileageCompletionPct != null
-            ? ` (${wp.weeklyMileageCompletionPct.toFixed(0)}% of planned)`
-            : ""}
-        </p>
+        <div className="mt-3">
+          <WeekMileageBar
+            variant="progress"
+            actualMiles={wp.actualMetersMatched / MI_PER_M}
+            plannedMiles={wp.plannedMetersTotal / MI_PER_M}
+          />
+        </div>
       ) : null}
       {wp.longRunCompletionRatio != null ? (
         <p className="mt-1 text-sm text-gray-700">
