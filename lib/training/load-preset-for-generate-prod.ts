@@ -108,6 +108,7 @@ export async function loadPresetForGenerateFromProd(
     title: row.title,
     minWeeklyMiles: row.minWeeklyMiles,
     maxWeeklyMiles: row.maxWeeklyMiles,
+    peakWeeklyVolumeMiles: row.peakWeeklyVolumeMiles,
     publicDescription: row.publicDescription,
     targetDistanceLabel: row.targetDistanceLabel,
     tempoIdealDow: row.tempoIdealDow,

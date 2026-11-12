@@ -62,6 +62,7 @@ export function serializeStaffPlanPreset(row: StaffPresetRow) {
     baseEndWeeklyMiles: row.baseEndWeeklyMiles,
     baseWeeklyMinMiles: row.baseWeeklyMinMiles,
     baseWeeklyMaxMiles: row.baseWeeklyMaxMiles,
+    peakWeeklyVolumeMiles: row.peakWeeklyVolumeMiles,
     longRunCutback: row.longRunCutback,
     taperWeek1TotalMiles: row.taperWeek1TotalMiles,
     taperWeek1LongRunMiles: row.taperWeek1LongRunMiles,

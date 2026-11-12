@@ -555,6 +555,8 @@ export async function upsertPresetFromProdPush(
         num(plan.baseWeeklyMinMiles) != null ? int(plan.baseWeeklyMinMiles, 0) : null,
       baseWeeklyMaxMiles:
         num(plan.baseWeeklyMaxMiles) != null ? int(plan.baseWeeklyMaxMiles, 0) : null,
+      peakWeeklyVolumeMiles:
+        num(plan.peakWeeklyVolumeMiles) != null ? int(plan.peakWeeklyVolumeMiles, 0) : null,
       raceWeekMiles: num(plan.raceWeekMiles) ?? null,
       raceWeekDayMiles:
         plan.raceWeekDayMiles == null

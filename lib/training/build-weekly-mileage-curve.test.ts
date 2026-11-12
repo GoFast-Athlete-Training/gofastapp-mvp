@@ -19,25 +19,26 @@ test("build weeks stay at athlete weekly goal", () => {
   assert.equal(map.get(5), 42);
 });
 
-test("hold weeks stay flat before the 8-week ramp", () => {
+test("hold weeks stay at the athlete and the peak block ramps to peak volume", () => {
   const map = buildWeeklyMileageTargetsByWeek({
     totalWeeks: 18,
     taperStartWeekNumber: 17,
     peakWeekNumber: 16,
-    athleteStartMiles: 48,
-    presetMinMiles: 45,
-    presetPeakMiles: 48,
+    athleteStartMiles: 42,
+    presetMinMiles: 40,
+    presetPeakMiles: 55,
     taperWeeks: null,
     raceWeek: null,
     holdWeekNumbers: [1, 2, 3, 4, 5, 6, 7, 8],
-    holdWeeklyMiles: 48,
+    holdWeeklyMiles: 42,
     rampStartWeekNumber: 9,
   });
 
-  assert.equal(map.get(1), 48);
-  assert.equal(map.get(8), 48);
-  assert.equal(map.get(12), 48);
-  assert.equal(map.get(16), 48);
+  assert.equal(map.get(1), 42);
+  assert.equal(map.get(8), 42);
+  const rampMid = map.get(12);
+  assert.ok(rampMid != null && rampMid > 42 && rampMid < 55);
+  assert.equal(map.get(16), 55);
 });
 
 test("taper weeks use preset caps when set (no generic taper target)", () => {

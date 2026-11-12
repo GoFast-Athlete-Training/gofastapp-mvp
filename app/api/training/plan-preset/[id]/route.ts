@@ -167,7 +167,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const value = optionalMiles(key);
     if (value !== undefined) data[key] = value;
   }
-  for (const key of ["baseEndWeeklyMiles", "baseWeeklyMinMiles", "baseWeeklyMaxMiles"] as const) {
+  for (const key of ["baseEndWeeklyMiles", "baseWeeklyMinMiles", "baseWeeklyMaxMiles", "peakWeeklyVolumeMiles"] as const) {
     const value = optionalMiles(key);
     if (value !== undefined) data[key] = value == null ? null : Math.round(value);
   }

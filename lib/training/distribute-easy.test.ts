@@ -94,7 +94,7 @@ test("insufficient easy capacity leaves week under target instead of breaking ca
   }
 });
 
-test("does not fill easy days when quality days already meet athlete weekly target", () => {
+test("a 42-mile week fills toward 42 and not the band high end", () => {
   const schedule = [
     week(1, [
       { dow: 2, workoutType: "Tempo", miles: 7, catalogueWorkoutId: null, planCycleIndex: null },
@@ -108,9 +108,29 @@ test("does not fill easy days when quality days already meet athlete weekly targ
   const easy = out[0]!.days.find((d) => d.workoutType === "Easy")!;
   const weekTotal = out[0]!.days.reduce((s, d) => s + d.miles, 0);
 
-  assert.ok(weekTotal < 50, `should not pad toward preset peak, got ${weekTotal}`);
-  assert.ok(easy.miles <= baseCfg.standardMiles + 0.1);
+  assert.ok(weekTotal <= 42.05, `filled past the week target to ${weekTotal}`);
+  assert.ok(weekTotal < 50, `padded toward the band high end, got ${weekTotal}`);
+  assert.ok(easy.miles <= baseCfg.maxMiles);
   assert.ok(weekTotal >= 30);
+});
+
+test("peak-week target above the band fills toward peak volume", () => {
+  const schedule = [
+    week(1, [
+      { dow: 2, workoutType: "Tempo", miles: 7, catalogueWorkoutId: null, planCycleIndex: null },
+      { dow: 4, workoutType: "Intervals", miles: 5, catalogueWorkoutId: null, planCycleIndex: null },
+      { dow: 6, workoutType: "LongRun", miles: 16, catalogueWorkoutId: null, planCycleIndex: null },
+      { dow: 1, workoutType: "Easy", miles: 0, catalogueWorkoutId: null, planCycleIndex: null },
+      { dow: 3, workoutType: "Easy", miles: 0, catalogueWorkoutId: null, planCycleIndex: null },
+      { dow: 5, workoutType: "Easy", miles: 0, catalogueWorkoutId: null, planCycleIndex: null },
+    ]),
+  ];
+
+  const out = runDistribute(schedule, 55, { maxWeeklyMiles: 55 });
+  const weekTotal = out[0]!.days.reduce((s, d) => s + d.miles, 0);
+
+  assert.ok(weekTotal > 50, `peak week stayed inside the band at ${weekTotal}`);
+  assert.ok(weekTotal <= 55.05, `filled past peak volume to ${weekTotal}`);
 });
 
 test("deload-style week does not refill easy days toward weekly target", () => {

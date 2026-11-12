@@ -2364,6 +2364,8 @@ model training_plan_preset {
   /// Rough weekly guide for the base phase. Not a floor for a low athlete.
   baseWeeklyMinMiles Int?
   baseWeeklyMaxMiles Int?
+  /// Build-to-peak override. The peak block ramps here even when this is above the self-select band. Empty keeps that block at the athlete's miles.
+  peakWeeklyVolumeMiles Int?
   /// Race-week total. Not spread across days.
   raceWeekMiles Float?
   /// [{ offsetFromRace, prescribedMiles }]

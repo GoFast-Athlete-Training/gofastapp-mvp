@@ -7,11 +7,7 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, n));
-}
-
-/** Build-week targets follow the athlete weekly goal; taper/race use phase caps when set. */
+/** Hold weeks stay at the athlete. Peak-block weeks ramp to preset peak volume. Taper and race use phase caps. */
 export function buildWeeklyMileageTargetsByWeek(params: {
   totalWeeks: number;
   taperStartWeekNumber: number;
@@ -31,10 +27,8 @@ export function buildWeeklyMileageTargetsByWeek(params: {
   const out = new Map<number, number>();
   const taperStart = Math.max(1, Math.floor(params.taperStartWeekNumber));
   const peakWeek = Math.max(1, Math.floor(params.peakWeekNumber));
-  const start = round2(
-    Math.min(params.presetPeakMiles, Math.max(0, params.athleteStartMiles)),
-  );
-  const peak = start;
+  const peak = round2(Math.max(0, params.presetPeakMiles));
+  const start = round2(Math.min(peak, Math.max(0, params.athleteStartMiles)));
   const holdWeeks = new Set(params.holdWeekNumbers ?? []);
   const holdMiles = round2(params.holdWeeklyMiles ?? start);
   const rampStart = params.rampStartWeekNumber ?? 1;

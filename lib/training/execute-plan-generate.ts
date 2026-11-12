@@ -58,7 +58,6 @@ import {
   positionsFromPhaseRotation,
 } from "@/lib/training/apply-phase-preset-generate";
 import { presetTaperHasVolumeCaps } from "@/lib/training/phase-week-pins";
-import { weeklyVolumePeakFromPreset } from "@/lib/training/preset-core";
 import { splitBuildRampToPeak, splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
 import { stampPhaseOnPlanSchedule } from "@/lib/training/plan-week-phase-key";
 import {
@@ -221,7 +220,7 @@ export async function executePlanGenerate(params: {
     catalogueRowsFull.map((r) => [r.id, r])
   );
 
-  /** Athlete preference (persisted on the plan). Preset max caps generation only. */
+  /** Athlete preference inside the self-select band. Peak volume is the peak-block ramp, not this number. */
   const requestedWeeklyMileageTarget = Math.max(
     params.minWeeklyMiles,
     Math.min(100, params.weeklyMileageTarget)
@@ -232,20 +231,25 @@ export async function executePlanGenerate(params: {
     phaseBuild?.peakWeeklyMiles ??
     planConfig.maxWeeklyMiles ??
     null;
-  const presetPeakMiles = weeklyVolumePeakFromPreset({
-    minWeeklyMiles: Math.max(1, bandMin),
-    maxWeeklyMiles: bandMax,
-  });
+  const peakVolumeRaw = phasePreset?.peakWeeklyVolumeMiles;
+  const peakVolumeMiles =
+    peakVolumeRaw != null && Number.isFinite(peakVolumeRaw) && peakVolumeRaw > 0
+      ? Math.round(peakVolumeRaw)
+      : null;
 
   let weeklyMileageTarget = requestedWeeklyMileageTarget;
   if (bandMax != null && Number.isFinite(bandMax) && bandMax > 0) {
     weeklyMileageTarget = Math.min(weeklyMileageTarget, bandMax);
+  }
+  if (peakVolumeMiles != null && weeklyMileageTarget > peakVolumeMiles) {
+    weeklyMileageTarget = peakVolumeMiles;
   }
   weeklyMileageTarget = Math.max(
     params.minWeeklyMiles,
     Math.min(100, weeklyMileageTarget),
   );
   const athleteWeeklyVolumeGoal = weeklyMileageTarget;
+  const rampPeakMiles = peakVolumeMiles ?? athleteWeeklyVolumeGoal;
 
   const preferredDays =
     plan.preferredDays?.length > 0
@@ -383,12 +387,9 @@ export async function executePlanGenerate(params: {
         athlete: athleteStart,
         entryLongRunMiles: phaseBuild.startLongRunMiles,
         peakLongRunMiles: phaseBuild.peakLongRunMiles,
-        entryWeeklyMiles:
-          phaseBaseBuild?.peakWeeklyMiles != null
-            ? Math.min(phaseBaseBuild.peakWeeklyMiles, athleteWeeklyVolumeGoal)
-            : null,
+        entryWeeklyMiles: athleteWeeklyVolumeGoal,
         baseWeeklyMinMiles: phaseBaseBuild?.weeklyMinMiles ?? null,
-        peakWeeklyMiles: athleteWeeklyVolumeGoal,
+        peakWeeklyMiles: rampPeakMiles,
         longRunCutback: null,
       })
     : null;
@@ -548,7 +549,7 @@ export async function executePlanGenerate(params: {
         peakWeekNumber: placement.peakWeekNumber ?? placement.taperStartWeekNumber - 1,
         athleteStartMiles: weeklyMileageTarget,
         presetMinMiles: Math.max(minWeeklyFromPreset, bandMin),
-        presetPeakMiles: athleteWeeklyVolumeGoal,
+        presetPeakMiles: rampPeakMiles,
         taperWeeks: phasePreset?.taper?.weeks,
         raceWeek: phasePreset?.raceWeek?.slots ?? null,
         taperWeekNumbers,
@@ -563,8 +564,7 @@ export async function executePlanGenerate(params: {
     planSchedule: schedule,
     weeklyMileageTarget,
     minWeeklyMiles: Math.max(minWeeklyFromPreset, params.minWeeklyMiles),
-    maxWeeklyMiles:
-      bandMax != null && Number.isFinite(Number(bandMax)) ? Number(bandMax) : undefined,
+    maxWeeklyMiles: peakVolumeMiles ?? undefined,
     raceDistanceMiles,
     easyRunConfig: easyRunResolved,
     catalogueRowsById,

@@ -17,6 +17,8 @@ export type TrainingManagePresetForGenerate = {
   title: string;
   minWeeklyMiles: number;
   maxWeeklyMiles: number | null;
+  /** Build-to-peak override. Null means the peak block stays at the athlete's miles. */
+  peakWeeklyVolumeMiles?: number | null;
   publicDescription: string | null;
   targetDistanceLabel: string | null;
   tempoIdealDow: number;
