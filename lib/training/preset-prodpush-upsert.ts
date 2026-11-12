@@ -391,6 +391,7 @@ async function upsertPhasePresetRow(tx: Tx, raw: Record<string, unknown>): Promi
   const rotations = await upsertPhaseRotations(tx, raw);
   const data = {
     name,
+    ...("description" in raw ? { description: str(raw.description) ?? null } : {}),
     longRunConfigId: rotations.longRunConfigId ?? str(raw.longRunConfigId) ?? null,
     intervalsConfigId: rotations.intervalsConfigId ?? str(raw.intervalsConfigId) ?? null,
     tempoConfigId: rotations.tempoConfigId ?? str(raw.tempoConfigId) ?? null,

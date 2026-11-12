@@ -12,6 +12,8 @@ function configId(body: Record<string, unknown>, key: string): string | null {
 function phaseData(body: Record<string, unknown>) {
   return {
     name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : "Phase",
+    description:
+      typeof body.description === "string" && body.description.trim() ? body.description.trim() : null,
     longRunConfigId: configId(body, "longRunConfigId"),
     easyConfigId: configId(body, "easyConfigId"),
     tempoConfigId: configId(body, "tempoConfigId"),
