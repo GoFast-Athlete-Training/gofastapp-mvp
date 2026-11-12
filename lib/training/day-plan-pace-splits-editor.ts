@@ -325,7 +325,14 @@ export function formatDayPaceEditorTotalMiles(
     repeatCount?: number | null;
   }>
 ): string | null {
-  const { miles } = structuredSegmentTotals(segments);
+  const { miles } = structuredSegmentTotals(
+    segments.map((s, i) => ({
+      stepOrder: s.stepOrder ?? i + 1,
+      durationType: s.durationType,
+      durationValue: s.durationValue,
+      repeatCount: s.repeatCount,
+    }))
+  );
   if (!Number.isFinite(miles) || miles <= 0) return null;
   const rounded = Math.round(miles * 10) / 10;
   if (Math.abs(rounded - Math.round(rounded)) < 1e-9) {
