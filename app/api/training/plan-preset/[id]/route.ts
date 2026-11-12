@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { parseRaceWeekDayMiles } from "@/lib/training/apply-preset-owned-phase";
 import { normalizeSlug } from "@/lib/training/plan-entity-slugs";
 import {
   serializeStaffPlanPreset,
@@ -142,6 +144,61 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
       data.taperPresetId = taper.id;
     }
+  }
+
+  function optionalMiles(key: string): number | null | undefined {
+    if (!(key in body)) return undefined;
+    if (body[key] === null || body[key] === "") return null;
+    if (typeof body[key] === "number" && Number.isFinite(body[key])) return body[key];
+    return undefined;
+  }
+
+  for (const key of [
+    "entryLongRunMiles",
+    "peakLongRunMiles",
+    "baseEndLongRunMiles",
+    "longRunCutback",
+    "taperWeek1TotalMiles",
+    "taperWeek1LongRunMiles",
+    "taperWeek2TotalMiles",
+    "taperWeek2LongRunMiles",
+  ] as const) {
+    const value = optionalMiles(key);
+    if (value !== undefined) data[key] = value;
+  }
+  const baseEndWeekly = optionalMiles("baseEndWeeklyMiles");
+  if (baseEndWeekly !== undefined) {
+    data.baseEndWeeklyMiles = baseEndWeekly == null ? null : Math.round(baseEndWeekly);
+  }
+  if ("raceWeekDayMiles" in body) {
+    if (body.raceWeekDayMiles == null) {
+      data.raceWeekDayMiles = Prisma.DbNull;
+    } else {
+      const parsed = parseRaceWeekDayMiles(body.raceWeekDayMiles);
+      data.raceWeekDayMiles = parsed ?? [];
+    }
+  }
+
+  for (const key of [
+    "baseBuildPhasePresetId",
+    "buildToPeakPhasePresetId",
+    "taperPhasePresetId",
+    "raceWeekPhasePresetId",
+  ] as const) {
+    if (!(key in body)) continue;
+    const raw = body[key];
+    if (raw === null || raw === "") {
+      data[key] = null;
+      continue;
+    }
+    if (typeof raw !== "string" || !raw.trim()) {
+      return NextResponse.json({ success: false, error: "Phase preset id is invalid" }, { status: 400 });
+    }
+    const phase = await prisma.phase_preset.findUnique({ where: { id: raw.trim() } });
+    if (!phase) {
+      return NextResponse.json({ success: false, error: "Phase preset not found" }, { status: 404 });
+    }
+    data[key] = phase.id;
   }
 
   if ("raceWeekPresetId" in body) {

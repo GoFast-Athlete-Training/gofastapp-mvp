@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { applyPresetOwnedPhase, type OwnedPhasePreset } from "@/lib/training/apply-preset-owned-phase";
 import { phaseWeekRowsFromLegacyTaper } from "@/lib/training/phase-week-pins";
 import { parseRaceWeekSlots } from "@/lib/training/race-week-slots";
 import { parseTaperWeekSlots } from "@/lib/training/taper-week-slots";
@@ -51,6 +52,15 @@ export async function loadPresetForGenerateFromProd(
     },
   } as const;
 
+  const phaseInclude = {
+    include: {
+      longRunConfig: rotationInclude,
+      easyConfig: rotationInclude,
+      tempoConfig: rotationInclude,
+      intervalsConfig: rotationInclude,
+    },
+  } as const;
+
   const row = await prisma.training_plan_preset.findUnique({
     where: { id: presetId },
     include: {
@@ -58,6 +68,8 @@ export async function loadPresetForGenerateFromProd(
       buildPreset: buildInclude,
       taperPreset: true,
       raceWeekPreset: true,
+      baseBuildPhasePreset: phaseInclude,
+      buildToPeakPhasePreset: phaseInclude,
     },
   });
   if (!row) return null;
@@ -121,5 +133,43 @@ export async function loadPresetForGenerateFromProd(
       : null,
   };
 
-  return loaded;
+  function ownedPhase(
+    phase: {
+      longRunConfigId: string | null;
+      easyConfigId: string | null;
+      tempoConfigId: string | null;
+      intervalsConfigId: string | null;
+      longRunConfig: Parameters<typeof mapRotation>[0];
+      easyConfig: Parameters<typeof mapRotation>[0];
+      tempoConfig: Parameters<typeof mapRotation>[0];
+      intervalsConfig: Parameters<typeof mapRotation>[0];
+    } | null,
+  ): OwnedPhasePreset | null {
+    if (!phase) return null;
+    return {
+      longRunConfigId: phase.longRunConfigId,
+      easyConfigId: phase.easyConfigId,
+      tempoConfigId: phase.tempoConfigId,
+      intervalsConfigId: phase.intervalsConfigId,
+      longRunConfig: mapRotation(phase.longRunConfig),
+      easyConfig: mapRotation(phase.easyConfig),
+      tempoConfig: mapRotation(phase.tempoConfig),
+      intervalsConfig: mapRotation(phase.intervalsConfig),
+    };
+  }
+
+  return applyPresetOwnedPhase(loaded, {
+    entryLongRunMiles: row.entryLongRunMiles,
+    peakLongRunMiles: row.peakLongRunMiles,
+    baseEndLongRunMiles: row.baseEndLongRunMiles,
+    baseEndWeeklyMiles: row.baseEndWeeklyMiles,
+    longRunCutback: row.longRunCutback,
+    taperWeek1TotalMiles: row.taperWeek1TotalMiles,
+    taperWeek1LongRunMiles: row.taperWeek1LongRunMiles,
+    taperWeek2TotalMiles: row.taperWeek2TotalMiles,
+    taperWeek2LongRunMiles: row.taperWeek2LongRunMiles,
+    raceWeekDayMiles: row.raceWeekDayMiles,
+    baseBuildPhase: ownedPhase(row.baseBuildPhasePreset),
+    buildToPeakPhase: ownedPhase(row.buildToPeakPhasePreset),
+  });
 }

@@ -8,6 +8,7 @@ export type PresetProdPushBody = {
   buildPreset?: Record<string, unknown> | null;
   taperPreset?: Record<string, unknown> | null;
   raceWeekPreset?: Record<string, unknown> | null;
+  phasePresets?: Record<string, unknown>[];
   shakeoutRunConfigs?: Record<string, unknown>[];
   workoutCatalogues?: Record<string, unknown>[];
   phaseGenerate?: TrainingManagePresetForGenerate | null;
@@ -384,6 +385,25 @@ async function upsertTaperPreset(tx: Tx, raw: Record<string, unknown>): Promise<
   return id;
 }
 
+async function upsertPhasePresetRow(tx: Tx, raw: Record<string, unknown>): Promise<string> {
+  const id = str(raw.id)!;
+  const name = str(raw.name) ?? "Phase";
+  const rotations = await upsertPhaseRotations(tx, raw);
+  const data = {
+    name,
+    longRunConfigId: rotations.longRunConfigId ?? str(raw.longRunConfigId) ?? null,
+    intervalsConfigId: rotations.intervalsConfigId ?? str(raw.intervalsConfigId) ?? null,
+    tempoConfigId: rotations.tempoConfigId ?? str(raw.tempoConfigId) ?? null,
+    easyConfigId: rotations.easyConfigId ?? str(raw.easyConfigId) ?? null,
+  };
+  await tx.phase_preset.upsert({
+    where: { id },
+    create: { id, ...data },
+    update: data,
+  });
+  return id;
+}
+
 async function upsertRaceWeekPreset(tx: Tx, raw: Record<string, unknown>): Promise<string> {
   const id = str(raw.id)!;
   const title = str(raw.title) ?? "Race week";
@@ -471,6 +491,11 @@ export async function upsertPresetFromProdPush(
       raceWeekPresetId = await upsertRaceWeekPreset(tx, raceRaw);
     }
 
+    for (const phase of body.phasePresets ?? []) {
+      const phaseRaw = record(phase);
+      if (phaseRaw && str(phaseRaw.id)) await upsertPhasePresetRow(tx, phaseRaw);
+    }
+
     let slug = slugIn;
     const existing = await tx.training_plan_preset.findUnique({
       where: { id },
@@ -514,6 +539,24 @@ export async function upsertPresetFromProdPush(
       buildPresetId: buildPresetId ?? str(plan.buildPresetId) ?? null,
       taperPresetId: taperPresetId ?? str(plan.taperPresetId) ?? null,
       raceWeekPresetId: raceWeekPresetId ?? str(plan.raceWeekPresetId) ?? null,
+      entryLongRunMiles: num(plan.entryLongRunMiles) ?? null,
+      peakLongRunMiles: num(plan.peakLongRunMiles) ?? null,
+      baseEndLongRunMiles: num(plan.baseEndLongRunMiles) ?? null,
+      baseEndWeeklyMiles:
+        num(plan.baseEndWeeklyMiles) != null ? int(plan.baseEndWeeklyMiles, 0) : null,
+      longRunCutback: num(plan.longRunCutback) ?? null,
+      taperWeek1TotalMiles: num(plan.taperWeek1TotalMiles) ?? null,
+      taperWeek1LongRunMiles: num(plan.taperWeek1LongRunMiles) ?? null,
+      taperWeek2TotalMiles: num(plan.taperWeek2TotalMiles) ?? null,
+      taperWeek2LongRunMiles: num(plan.taperWeek2LongRunMiles) ?? null,
+      raceWeekDayMiles:
+        plan.raceWeekDayMiles == null
+          ? Prisma.DbNull
+          : (plan.raceWeekDayMiles as Prisma.InputJsonValue),
+      baseBuildPhasePresetId: str(plan.baseBuildPhasePresetId) ?? null,
+      buildToPeakPhasePresetId: str(plan.buildToPeakPhasePresetId) ?? null,
+      taperPhasePresetId: str(plan.taperPhasePresetId) ?? null,
+      raceWeekPhasePresetId: str(plan.raceWeekPhasePresetId) ?? null,
       lastSyncedByStaffId: body.lastSyncedByStaffId?.trim() || null,
     };
 
