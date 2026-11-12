@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma, WorkoutType } from "@prisma/client";
+import { Prisma, type WorkoutType } from "@prisma/client";
 import type { TrainingManagePresetForGenerate } from "@/lib/training/fetch-training-manage-preset-for-generate";
 
 export type PresetProdPushBody = {
