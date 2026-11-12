@@ -6,6 +6,11 @@
 import { LONG_RUN_BLOCK_WEEKS } from "@/lib/training/long-run-block-weeks";
 
 import { prisma } from "@/lib/prisma";
+import { dateKeyFromDate } from "@/lib/calendar-date";
+import {
+  calendarDayWritePair,
+  scheduleAnchorDayKey,
+} from "@/lib/plan-calendar-day";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
 import { Prisma } from "@prisma/client";
 import { metersToMiles } from "@/lib/pace-utils";
@@ -134,7 +139,26 @@ export async function executePlanGenerate(params: {
 
   const planConfig = blueprintToPlanGenConfig(blueprint);
 
-  const weekCountEarly = calendarTrainingWeekCount(plan.startDate, race.raceDate);
+  const preferredDays =
+    plan.preferredDays?.length > 0
+      ? plan.preferredDays
+      : prefs?.preferredDays?.length
+        ? prefs.preferredDays
+        : [1, 2, 3, 4, 5, 6];
+
+  const requestedStartDay = dateKeyFromDate(plan.startDate);
+  const raceDayKey = dateKeyFromDate(race.raceDate);
+  const scheduleStartDay = scheduleAnchorDayKey(
+    requestedStartDay,
+    preferredDays,
+    raceDayKey
+  );
+  const scheduleStartDate =
+    scheduleStartDay === requestedStartDay
+      ? plan.startDate
+      : calendarDayWritePair(scheduleStartDay).anchor;
+
+  const weekCountEarly = calendarTrainingWeekCount(scheduleStartDate, race.raceDate);
   const phaseSplit = splitPlanWeekPhases(weekCountEarly);
   const needsBuildPhase = phaseSplit.buildWeekNumbers.length > 0;
 
@@ -250,13 +274,6 @@ export async function executePlanGenerate(params: {
   const athleteWeeklyVolumeGoal = weeklyMileageTarget;
   const rampPeakMiles = peakVolumeMiles ?? athleteWeeklyVolumeGoal;
 
-  const preferredDays =
-    plan.preferredDays?.length > 0
-      ? plan.preferredDays
-      : prefs?.preferredDays?.length
-        ? prefs.preferredDays
-        : [1, 2, 3, 4, 5, 6];
-
   const weekCount = weekCountEarly;
   const taperWeekNumbers = phaseSplit.taperWeekNumbers;
   const raceMeters = await resolveGoalRaceMetersForGenerate({
@@ -287,7 +304,7 @@ export async function executePlanGenerate(params: {
     (phasePreset?.raceWeek?.slots?.length ?? 0) > 0;
 
   const placement = assignWorkoutDays({
-    planStartDate: plan.startDate,
+    planStartDate: scheduleStartDate,
     raceDate: race.raceDate,
     raceName: race.name,
     raceDistanceMiles,
@@ -324,7 +341,7 @@ export async function executePlanGenerate(params: {
   });
 
   imprintPlanRaceCalendarOnSchedule({
-    planStart: plan.startDate,
+    planStart: scheduleStartDate,
     totalWeeks: weekCount,
     schedule,
     calendar,
@@ -585,7 +602,7 @@ export async function executePlanGenerate(params: {
 
   if (phasePreset?.taper?.slots?.length) {
     applyTaperWeekSlotsFromPreset({
-      planStart: plan.startDate,
+      planStart: scheduleStartDate,
       raceDate: race.raceDate,
       schedule,
       slots: phasePreset.taper.slots,
@@ -594,7 +611,7 @@ export async function executePlanGenerate(params: {
 
   if (phasePreset?.raceWeek?.slots?.length) {
     applyRaceWeekSlotsFromPreset({
-      planStart: plan.startDate,
+      planStart: scheduleStartDate,
       raceDate: race.raceDate,
       schedule,
       slots: phasePreset.raceWeek.slots,
@@ -655,6 +672,9 @@ export async function executePlanGenerate(params: {
         ? { peakLongRunPoolMiles }
         : {}),
       totalWeeks: weekCount,
+      ...(scheduleStartDay !== requestedStartDay
+        ? { startDate: scheduleStartDate, startDay: scheduleStartDay }
+        : {}),
       ...(mergedGoalTime ? { goalRaceTime: mergedGoalTime } : {}),
       ...(imprintPace ? { goalRacePace: imprintPace } : {}),
       updatedAt: new Date(),

@@ -143,6 +143,31 @@ export function dateKeyForDayInWeek(
   throw new Error(`Could not place day ${ourDow} in calendar week`);
 }
 
+/**
+ * If no preferred training day falls on or after plan start inside that
+ * Mon–Sun week, week 1 would have no workouts. Anchor the schedule on the
+ * following Monday. An empty preferred-day list means days are not chosen
+ * yet, so the start stays put. Do not move the start onto or past race day.
+ */
+export function scheduleAnchorDayKey(
+  planStartDay: string,
+  preferredDays: number[],
+  raceDay?: string | null
+): string {
+  const days = [
+    ...new Set(preferredDays.filter((d) => Number.isFinite(d) && d >= 1 && d <= 7)),
+  ];
+  if (days.length === 0) return planStartDay;
+  const hasTrainableDay = days.some((dow) => {
+    const key = dateKeyForDayInWeek(planStartDay, 1, dow);
+    return key >= planStartDay;
+  });
+  if (hasTrainableDay) return planStartDay;
+  const nextMonday = addCalendarDays(mondayKeyOfWeekContaining(planStartDay), 7);
+  if (raceDay && nextMonday >= raceDay) return planStartDay;
+  return nextMonday;
+}
+
 export function raceCalendarBeforeProductToday(raceDay: string): boolean {
   return raceDay < productTodayKey();
 }

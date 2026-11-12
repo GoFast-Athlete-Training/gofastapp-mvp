@@ -14,6 +14,11 @@ import {
 } from "@/lib/training/plan-phases";
 import { cataloguePhaseFallbackForWeek, localTodayKey } from "@/lib/training/plan-utils";
 import {
+  normalizeDateKeyInput,
+  ourDowFromDateKey,
+  scheduleAnchorDayKey,
+} from "@/lib/plan-calendar-day";
+import {
   effectiveTrainingWeekCount,
   formatCalendarWeekRangeLabel,
   formatPlanDateDisplay,
@@ -150,6 +155,17 @@ const DAY_OPTIONS: { value: number; label: string }[] = [
 const LONG_RUN_DAY_OPTIONS: { value: number; label: string }[] = [
   { value: 6, label: "Saturday" },
   { value: 7, label: "Sunday" },
+];
+
+const FULL_DAY_NAMES = [
+  "",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
 ];
 
 function dayLabelsFromValues(values: number[]): string {
@@ -504,6 +520,19 @@ export default function TrainingSetupPlanPage({
     () => preferredDaysLocal.filter((d) => d >= 1 && d <= 7).length,
     [preferredDaysLocal]
   );
+
+  const emptyFirstWeekNote = useMemo(() => {
+    if (!plan?.startDate || preferredCount === 0) return null;
+    const startDay = normalizeDateKeyInput(plan.startDate);
+    if (!startDay) return null;
+    const raceDay = plan.race_registry?.raceDate
+      ? normalizeDateKeyInput(plan.race_registry.raceDate)
+      : null;
+    const anchor = scheduleAnchorDayKey(startDay, preferredDaysLocal, raceDay);
+    if (anchor === startDay) return null;
+    const weekday = FULL_DAY_NAMES[ourDowFromDateKey(startDay)] ?? "That day";
+    return `${weekday} isn't a training day, so week 1 starts Monday, ${formatPlanDateDisplay(anchor)}.`;
+  }, [plan?.startDate, plan?.race_registry?.raceDate, preferredCount, preferredDaysLocal]);
 
   const { min: presetMinWeeklyMiles, max: presetMaxWeeklyMiles } = useMemo(
     () => presetWeeklyMilesBand(plan?.training_plan_preset),
@@ -1049,7 +1078,7 @@ export default function TrainingSetupPlanPage({
                 setRegenerationSuccess(false);
                 setShowPreferencesEditor(true);
               }}
-              className="mb-4 w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-700 sm:hidden"
+              className="mb-4 w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-700"
             >
               Change preferences
             </button>
@@ -1679,6 +1708,15 @@ export default function TrainingSetupPlanPage({
                 })}
               </div>
             </div>
+
+            {emptyFirstWeekNote ? (
+              <p
+                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
+                role="status"
+              >
+                {emptyFirstWeekNote}
+              </p>
+            ) : null}
 
             <button
               type="button"

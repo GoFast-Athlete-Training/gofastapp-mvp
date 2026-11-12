@@ -25,7 +25,6 @@ import { effectiveTrainingWeekCount, totalWeeksFromDates } from "@/lib/training/
 import { resolvePlanTerminalRaceDisplay } from "@/lib/training/plan-race-snapshots";
 import { appendSlugSuffix, slugifyPlanSlug } from "@/lib/training/public-plan-slug";
 import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
-import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
 import { upsertRaceMembershipFromSignup } from "@/lib/race-container-membership";
 import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
 import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
@@ -637,8 +636,7 @@ export async function adoptPublishedPlanBySlug(
         preferredIntervalDow: sourcePlan.preferredIntervalDow,
         presetId: sourcePlan.presetId,
         athletePresetId: sourcePlan.athletePresetId,
-        planSchedule: sourcePlan.planSchedule as Prisma.InputJsonValue,
-        totalWeeks: sourcePlan.totalWeeks ?? totalWeeks,
+        totalWeeks,
         updatedAt: now,
       },
     });
@@ -684,31 +682,6 @@ export async function adoptPublishedPlanBySlug(
     athleteId: input.athleteId,
     athleteRaceId: result.athleteRaceId,
   });
-
-  const { catalogPresetSummaryForApi } = await import(
-    "@/lib/training/hydrate-catalog-preset-from-training-manage"
-  );
-  if (sourcePlan.presetId) {
-    const preset = await catalogPresetSummaryForApi(sourcePlan.presetId);
-    const weeklyMileageTarget = prefs?.weeklyMileageTarget ?? 45;
-    await executePlanGenerate({
-      athleteId: input.athleteId,
-      athleteFiveKPace: fiveKPace,
-      athleteWeeklyMileage: weeklyResolved,
-      plan: {
-        id: result.plan.id,
-        presetId: sourcePlan.presetId,
-        startDate: result.plan.startDate,
-        preferredDays: result.plan.preferredDays ?? [],
-        preferredLongRunDow: result.plan.preferredLongRunDow ?? null,
-        preferredTempoDow: result.plan.preferredTempoDow ?? null,
-        preferredIntervalDow: result.plan.preferredIntervalDow ?? null,
-        weeklyMileageTarget: result.plan.weeklyMileageTarget,
-      },
-      weeklyMileageTarget,
-      minWeeklyMiles: preset?.minWeeklyMiles ?? 40,
-    });
-  }
 
   return {
     trainingPlanId: result.plan.id,

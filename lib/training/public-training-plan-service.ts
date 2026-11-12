@@ -15,7 +15,6 @@ import { dateKeyFromDate } from "@/lib/calendar-date";
 import { prisma } from "@/lib/prisma";
 import { metersToMiles } from "@/lib/pace-utils";
 import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
-import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
 import {
   calendarDayWritePair,
   resolveRaceDayKey,
@@ -30,7 +29,6 @@ import {
   type PublicPlanCustomWorkoutSnapshot,
   type PublicPlanPreviewSnapshot,
 } from "@/lib/training/public-training-plan-snapshots";
-import { catalogPresetSummaryForApi } from "@/lib/training/hydrate-catalog-preset-from-training-manage";
 
 export type {
   PublicPlanPreviewSnapshot,
@@ -609,27 +607,6 @@ export async function adoptPublicTrainingPlan(
   await snapPrimaryRaceToPlanTerminal({
     athleteId: input.athleteId,
     athleteRaceId: result.plan.athleteRaceId!,
-  });
-
-  const catalogPreset = await catalogPresetSummaryForApi(publicPlan.sourcePresetId);
-
-  const weeklyMileageTarget = prefs?.weeklyMileageTarget ?? 45;
-  await executePlanGenerate({
-    athleteId: input.athleteId,
-    athleteFiveKPace: fiveKPace,
-    athleteWeeklyMileage: weeklyResolved,
-    plan: {
-      id: result.plan.id,
-      presetId: publicPlan.sourcePresetId,
-      startDate: result.plan.startDate,
-      preferredDays: result.plan.preferredDays ?? [],
-      preferredLongRunDow: result.plan.preferredLongRunDow ?? null,
-        preferredTempoDow: result.plan.preferredTempoDow ?? null,
-        preferredIntervalDow: result.plan.preferredIntervalDow ?? null,
-        weeklyMileageTarget: result.plan.weeklyMileageTarget,
-    },
-    weeklyMileageTarget,
-    minWeeklyMiles: catalogPreset?.minWeeklyMiles ?? 40,
   });
 
   return {

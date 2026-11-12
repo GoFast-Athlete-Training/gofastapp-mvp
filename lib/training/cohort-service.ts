@@ -22,7 +22,6 @@ import {
   resolveGoalRacePace,
 } from "@/lib/training/goal-pace-calculator";
 import { metersToMiles } from "@/lib/pace-utils";
-import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
 
 export type PublicCohortPayload = {
   id: string;
@@ -498,25 +497,6 @@ export async function joinTrainingCohort(
   await snapPrimaryRaceToPlanTerminal({
     athleteId,
     athleteRaceId: result.plan.athleteRaceId!,
-  });
-
-  const weeklyMileageTarget = prefs?.weeklyMileageTarget ?? 45;
-  await executePlanGenerate({
-    athleteId,
-    athleteFiveKPace: athlete.fiveKPace,
-    athleteWeeklyMileage: athlete.weeklyMileage,
-    plan: {
-      id: result.plan.id,
-      presetId: cohort.presetId,
-      startDate: result.plan.startDate,
-      preferredDays: result.plan.preferredDays ?? [],
-      preferredLongRunDow: result.plan.preferredLongRunDow ?? null,
-      preferredTempoDow: result.plan.preferredTempoDow ?? null,
-      preferredIntervalDow: result.plan.preferredIntervalDow ?? null,
-      weeklyMileageTarget: result.plan.weeklyMileageTarget,
-    },
-    weeklyMileageTarget,
-    minWeeklyMiles: 40,
   });
 
   return {

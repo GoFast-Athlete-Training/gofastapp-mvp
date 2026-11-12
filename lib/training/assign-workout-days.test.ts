@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { dateKeyToUtcNoonDate } from "@/lib/calendar-date";
+import { scheduleAnchorDayKey } from "@/lib/plan-calendar-day";
 import { assignWorkoutDays } from "@/lib/training/assign-workout-days";
 import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
 import { ymdFromDate } from "@/lib/training/plan-utils";
@@ -37,6 +39,35 @@ test("mid-week week 1 skips missed tempo instead of cramming both tempo/interval
       [5, "Easy"],
       [6, "LongRun"],
     ]
+  );
+});
+
+test("Sunday start with Monday–Saturday days does not leave week 1 empty", () => {
+  const requestedStart = "2026-11-15";
+  const raceDay = "2027-04-18";
+  const preferredDays = [1, 2, 3, 4, 5, 6];
+  const anchor = scheduleAnchorDayKey(requestedStart, preferredDays, raceDay);
+  assert.equal(anchor, "2026-11-16");
+
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    planStartDate: dateKeyToUtcNoonDate(anchor),
+    raceDate: dateKeyToUtcNoonDate(raceDay),
+    preferredDays,
+    preferredLongRunDow: 6,
+    totalWeeks: 22,
+  });
+
+  const week1 = schedule[0];
+  assert.equal(week1?.weekNumber, 1);
+  assert.ok(week1 && week1.days.length > 0, "week 1 should contain the first workouts");
+  assert.ok(
+    week1.days.some((d) => d.dow >= 1 && d.dow <= 6),
+    "week 1 should place weekday workouts"
+  );
+  assert.equal(
+    schedule.some((w) => w.weekNumber === 1 && w.days.length === 0),
+    false
   );
 });
 
