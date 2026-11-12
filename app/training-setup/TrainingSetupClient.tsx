@@ -911,12 +911,9 @@ export default function TrainingSetupClient() {
       returningFromInjury,
     });
 
-    const paceEmpty = paceMin.trim() === "" && paceSec.trim() === "";
-    const fiveKPaceOut = paceEmpty
-      ? null
-      : buildFiveKPaceFromParts(paceMin.trim(), paceSec.trim());
-    if (!paceEmpty && fiveKPaceOut == null) {
-      setFormError("Enter a valid 5K pace (minutes and seconds 0–59).");
+    const fiveKPaceOut = buildFiveKPaceFromParts(paceMin.trim(), paceSec.trim());
+    if (fiveKPaceOut == null) {
+      setFormError("Enter your current 5K pace (minutes and seconds 0–59).");
       return;
     }
 
@@ -1027,11 +1024,11 @@ export default function TrainingSetupClient() {
     setFormError(null);
     try {
       const token = await getToken();
-      const { plan } = await fetchTrainingPlanDetail(active.id, token);
+      const { plan, athleteFiveKPace } = await fetchTrainingPlanDetail(active.id, token);
       const detail = plan as {
         presetId?: string | null;
         athletePresetId?: string | null;
-        weeklyMileageTarget?: number | null;
+        currentWeeklyMileage?: number | null;
         currentFiveKPace?: string | null;
         training_plan_preset?: { title?: string } | null;
       };
@@ -1056,13 +1053,14 @@ export default function TrainingSetupClient() {
         return;
       }
       if (
-        detail.weeklyMileageTarget != null &&
-        Number.isFinite(Number(detail.weeklyMileageTarget))
+        detail.currentWeeklyMileage != null &&
+        Number.isFinite(Number(detail.currentWeeklyMileage))
       ) {
-        setBaselineWeeklyMileage(String(Math.round(Number(detail.weeklyMileageTarget))));
+        setBaselineWeeklyMileage(String(Math.round(Number(detail.currentWeeklyMileage))));
       }
-      if (detail.currentFiveKPace?.trim()) {
-        const parts = parseFiveKPaceToParts(detail.currentFiveKPace);
+      const fiveKToCopy = detail.currentFiveKPace?.trim() || athleteFiveKPace?.trim() || "";
+      if (fiveKToCopy) {
+        const parts = parseFiveKPaceToParts(fiveKToCopy);
         setPaceMin(parts.min);
         setPaceSec(parts.sec);
       }
@@ -1122,7 +1120,8 @@ export default function TrainingSetupClient() {
       setSelectedPreset(p);
       setSelectedAthletePresetId(null);
       setFormError(null);
-      void createPlan({ presetOverride: p });
+      setCreateFeedback(null);
+      setCreateFeedbackMessage(null);
     }
 
     const baselinePresetTitle =
@@ -1562,7 +1561,9 @@ export default function TrainingSetupClient() {
                                             setSelectedAthletePresetId(ap.id);
                                             setSelectedPreset(null);
                                             if (!planNameTouched) setPlanName(ap.title);
-                                            void createPlan({ athletePresetOverride: ap.id });
+                                            setFormError(null);
+                                            setCreateFeedback(null);
+                                            setCreateFeedbackMessage(null);
                                           }}
                                           className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
                                         >
@@ -1744,7 +1745,7 @@ export default function TrainingSetupClient() {
                   <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-xs font-medium text-gray-700">
-                        What&apos;s your current 5K pace?
+                        What&apos;s your current 5K pace? (required)
                       </label>
                       <div className="flex flex-wrap items-center gap-2">
                         <input

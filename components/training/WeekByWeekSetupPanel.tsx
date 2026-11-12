@@ -117,7 +117,7 @@ export function WeekByWeekSetupPanel({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-700">
-            Current 5K pace (for workout zones)
+            Current 5K pace (required for workout zones)
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <input

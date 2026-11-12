@@ -110,6 +110,7 @@ type PlanDetail = {
   weeklyMileageTarget?: number | null;
   peakLongRunPoolMiles?: number | null;
   currentWeeklyMileage?: number | null;
+  currentFiveKPace?: string | null;
   _count?: { planned_workouts: number };
   athlete_race?: {
     id: string;
@@ -162,6 +163,24 @@ function longRunDayLabel(dow: number | null | undefined): string {
   return LONG_RUN_DAY_OPTIONS.find((d) => d.value === dow)?.label ?? "Saturday";
 }
 
+function parseFiveKPaceToParts(pace: string | null | undefined): { min: string; sec: string } {
+  const t = (pace ?? "").trim();
+  const m = /^(\d+):(\d{1,2})$/.exec(t);
+  if (m) {
+    const secNum = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+    return { min: m[1], sec: String(secNum).padStart(2, "0") };
+  }
+  return { min: "", sec: "" };
+}
+
+function buildFiveKPaceFromParts(minStr: string, secStr: string): string | null {
+  const min = Number(minStr);
+  const sec = Number(secStr);
+  if (!Number.isFinite(min) || !Number.isFinite(sec)) return null;
+  if (min < 2 || min > 30 || sec < 0 || sec > 59) return null;
+  return `${Math.round(min)}:${String(Math.round(sec)).padStart(2, "0")}`;
+}
+
 
 function parsePlanWeekOverviewRows(planSchedule: unknown): PlanWeekRow[] {
   if (!Array.isArray(planSchedule)) return [];
@@ -209,8 +228,10 @@ export default function TrainingSetupPlanPage({
   const [weeklyMilesTarget, setWeeklyMilesTarget] = useState("");
   const [currentWeeklyMiles, setCurrentWeeklyMiles] = useState("");
   const [longRunMiles, setLongRunMiles] = useState("");
-  const [returningFromInjury, setReturningFromInjury] = useState(false);
   const [longRunCapabilityMiles, setLongRunCapabilityMiles] = useState<number | null>(null);
+  const [athleteFiveKPace, setAthleteFiveKPace] = useState<string | null>(null);
+  const [paceMin, setPaceMin] = useState("");
+  const [paceSec, setPaceSec] = useState("");
   const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
   const [preferredTempoDowLocal, setPreferredTempoDowLocal] = useState<number | null>(null);
   const [preferredIntervalDowLocal, setPreferredIntervalDowLocal] = useState<number | null>(
@@ -248,11 +269,12 @@ export default function TrainingSetupPlanPage({
     setError(null);
     try {
       const token = await getToken();
-      const { plan, weeklyMileageTargetPreference, raceReadiness } =
+      const { plan, weeklyMileageTargetPreference, raceReadiness, athleteFiveKPace: profileFiveK } =
         await fetchTrainingPlanDetail(planId, token);
       const detail = plan as PlanDetail;
       setPlan(detail);
       setAthleteWeeklyTargetPreference(weeklyMileageTargetPreference);
+      setAthleteFiveKPace(profileFiveK);
       setLongRunCapabilityMiles(
         (raceReadiness as RaceReadinessSummary | null)?.longRunCapabilityMiles ?? null,
       );
@@ -359,7 +381,16 @@ export default function TrainingSetupPlanPage({
         ? String(longRunCapabilityMiles)
         : "",
     );
-    setReturningFromInjury(false);
+    const existingFiveK =
+      plan.currentFiveKPace?.trim() || athleteFiveKPace?.trim() || "";
+    if (existingFiveK) {
+      const parts = parseFiveKPaceToParts(existingFiveK);
+      setPaceMin(parts.min);
+      setPaceSec(parts.sec);
+    } else {
+      setPaceMin("");
+      setPaceSec("");
+    }
   }, [
     plan?.id,
     plan?.preferredDays,
@@ -368,6 +399,8 @@ export default function TrainingSetupPlanPage({
     plan?.preferredIntervalDow,
     plan?.weeklyMileageTarget,
     plan?.currentWeeklyMileage,
+    plan?.currentFiveKPace,
+    athleteFiveKPace,
     longRunCapabilityMiles,
     plan?.training_plan_preset?.minWeeklyMiles,
     (plan?.training_plan_preset as { maxWeeklyMiles?: number | null } | null)
@@ -682,6 +715,15 @@ export default function TrainingSetupPlanPage({
   }
 
   async function saveFoundationStart(token: string): Promise<boolean> {
+    const fiveKOut =
+      buildFiveKPaceFromParts(paceMin.trim(), paceSec.trim()) ||
+      plan?.currentFiveKPace?.trim() ||
+      athleteFiveKPace?.trim() ||
+      null;
+    if (!fiveKOut) {
+      setError("Enter your current 5K pace (minutes and seconds 0–59).");
+      return false;
+    }
     const rawWeekly = currentWeeklyMiles.trim();
     if (rawWeekly !== "") {
       const weeklyMi = Number(rawWeekly);
@@ -701,15 +743,19 @@ export default function TrainingSetupPlanPage({
     const start = foundationMilesToSave({
       weeklyMiles: currentWeeklyMiles,
       longRunMiles,
-      returningFromInjury,
+      returningFromInjury: false,
     });
+    const planBody: Record<string, unknown> = { currentFiveKPace: fiveKOut };
+    if (!hasSchedule) {
+      planBody.currentWeeklyMileage = start.weeklyMiles;
+    }
     const planRes = await fetch(`/api/training-plan/${planId}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         ...athleteBearerFetchHeaders(token),
       },
-      body: JSON.stringify({ currentWeeklyMileage: start.weeklyMiles }),
+      body: JSON.stringify(planBody),
     });
     if (!planRes.ok) {
       const data = (await planRes.json().catch(() => ({}))) as { error?: string };
@@ -725,6 +771,7 @@ export default function TrainingSetupPlanPage({
           ...athleteBearerFetchHeaders(token),
         },
         body: JSON.stringify({
+          fiveKPace: fiveKOut,
           weeklyMileage: start.weeklyMiles,
           longRunCapabilityMiles: start.longRunMiles,
         }),
@@ -1329,13 +1376,46 @@ export default function TrainingSetupPlanPage({
               />
             ) : null}
 
+            {!(plan.currentFiveKPace?.trim() || athleteFiveKPace?.trim()) ? (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <label className="mb-1 block text-xs font-medium text-gray-700">
+                  What&apos;s your current 5K pace? (required)
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="number"
+                    min={2}
+                    max={30}
+                    placeholder="min"
+                    className="w-24 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    value={paceMin}
+                    onChange={(e) => setPaceMin(e.target.value)}
+                  />
+                  <span className="text-gray-500">:</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    placeholder="sec"
+                    className="w-24 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    value={paceSec}
+                    onChange={(e) => setPaceSec(e.target.value)}
+                  />
+                  <span className="text-sm text-gray-600">min / mile</span>
+                </div>
+                <p className="mt-1.5 text-xs text-gray-600">
+                  Needed for workout paces. We&apos;ll save this to your profile.
+                </p>
+              </div>
+            ) : null}
+
             <FoundationStartFields
               weeklyMiles={currentWeeklyMiles}
               onWeeklyMiles={setCurrentWeeklyMiles}
               longRunMiles={longRunMiles}
               onLongRunMiles={setLongRunMiles}
-              returningFromInjury={returningFromInjury}
-              onReturningFromInjury={setReturningFromInjury}
+              showInjuryCheckbox={false}
+              weeklyCaption="Starting mileage from plan setup. Edit if your baseline changed — injury reduction is not applied again here."
             />
 
             <div>

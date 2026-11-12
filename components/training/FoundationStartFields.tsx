@@ -26,17 +26,26 @@ export function FoundationStartFields({
   onWeeklyMiles,
   longRunMiles,
   onLongRunMiles,
-  returningFromInjury,
+  returningFromInjury = false,
   onReturningFromInjury,
+  showInjuryCheckbox = true,
+  weeklyCaption,
 }: {
   weeklyMiles: string;
   onWeeklyMiles: (value: string) => void;
   longRunMiles: string;
   onLongRunMiles: (value: string) => void;
-  returningFromInjury: boolean;
-  onReturningFromInjury: (value: boolean) => void;
+  returningFromInjury?: boolean;
+  onReturningFromInjury?: (value: boolean) => void;
+  showInjuryCheckbox?: boolean;
+  weeklyCaption?: string;
 }) {
-  const start = foundationMilesToSave({ weeklyMiles, longRunMiles, returningFromInjury });
+  const injury = showInjuryCheckbox ? returningFromInjury : false;
+  const start = foundationMilesToSave({
+    weeklyMiles,
+    longRunMiles,
+    returningFromInjury: injury,
+  });
   const preview = start.missingData
     ? "No current weekly miles or longest run yet. The peak block will start from the preset entry."
     : `Starting point: ${start.weeklyMiles ?? "—"} mi/week and a ${start.longRunMiles ?? "—"} mi long run.${
@@ -62,7 +71,7 @@ export function FoundationStartFields({
           onChange={(e) => onWeeklyMiles(e.target.value)}
         />
         <p className="mt-1.5 text-xs text-gray-600">
-          This is your baseline today. Target weekly mileage comes later.
+          {weeklyCaption ?? "This is your baseline today. Target weekly mileage comes later."}
         </p>
       </div>
       <div>
@@ -78,15 +87,17 @@ export function FoundationStartFields({
           onChange={(e) => onLongRunMiles(e.target.value)}
         />
       </div>
-      <label className="flex items-start gap-2 text-sm text-gray-800">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={returningFromInjury}
-          onChange={(e) => onReturningFromInjury(e.target.checked)}
-        />
-        <span>I&apos;m coming back from a break or injury</span>
-      </label>
+      {showInjuryCheckbox && onReturningFromInjury ? (
+        <label className="flex items-start gap-2 text-sm text-gray-800">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={returningFromInjury}
+            onChange={(e) => onReturningFromInjury(e.target.checked)}
+          />
+          <span>I&apos;m coming back from a break or injury</span>
+        </label>
+      ) : null}
       <p className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800">{preview}</p>
     </div>
   );
