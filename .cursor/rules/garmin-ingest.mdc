@@ -16,11 +16,13 @@
 
 Product surfaces (Home, Train, All activities, finish push) must **never** select, filter, or gate completion on `garminDetailActivityId`. Use **stamps** (`actualDistanceMeters`, `actualDurationSeconds`, etc.) and `workoutId`.
 
-## Ingest flow (target)
+## Ingest flow (canonical)
 
 ```text
-ingest raw → always spawn workoutId → stamp actuals → tryMatchWorkoutToTrainingPlan (plannedWorkoutId)
+ingest raw → seedSpawnedWorkoutFromActivity (workoutId) → tryMatchActivityToTrainingWorkout (stamp plan onto that id) → FIT bolt + pace stamp
 ```
+
+Do not defer seed when a planned workout exists on the same day (`activityHasPlausiblePlannedWorkoutNearby` is deprecated on ingest).
 
 Sidecar `garmin-activity-detail-ingest` completes the same `athlete_activities` row and spawns laps onto `workoutId` via `workout_segments` / `workout_segment_laps`.
 

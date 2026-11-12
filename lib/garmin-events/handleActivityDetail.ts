@@ -15,7 +15,6 @@ import { tryMatchActivityToCityRun } from "../cta-triggers/try-match-activity-to
 import { tryMatchActivityToTrainingWorkout } from "../training/match-activity-to-workout";
 import { tryMatchActivityToBikeWorkout } from "../training/match-activity-to-bike-workout";
 import { seedSpawnedWorkoutFromActivity } from "../training/seed-spawned-workout-from-activity";
-import { activityHasPlausiblePlannedWorkoutNearby } from "../training/plausible-planned-workout-nearby";
 import { extractActivityRouteFromDetail } from "../training/activity-route-from-detail";
 import { isGenericGarminActivityName } from "./generic-activity-names";
 
@@ -237,17 +236,8 @@ async function runPostIngestActivityMatching(params: {
       return;
     }
 
-    const matchResult = await tryMatchActivityToTrainingWorkout(params.activityId);
-    const ingestRow = await prisma.athlete_activities.findUnique({
-      where: { id: params.activityId },
-      select: { ingestionStatus: true },
-    });
-    if (!matchResult.matched && ingestRow?.ingestionStatus === "UNMATCHED") {
-      const deferGhost = await activityHasPlausiblePlannedWorkoutNearby(params.activityId);
-      if (!deferGhost) {
-        await seedSpawnedWorkoutFromActivity(params.activityId);
-      }
-    }
+    await seedSpawnedWorkoutFromActivity(params.activityId);
+    await tryMatchActivityToTrainingWorkout(params.activityId);
   } catch (matchErr) {
     console.warn("runPostIngestActivityMatching:", matchErr);
   }

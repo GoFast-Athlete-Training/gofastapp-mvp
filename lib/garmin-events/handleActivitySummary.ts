@@ -12,6 +12,7 @@ import { tryMatchActivityToCityRun } from '../cta-triggers/try-match-activity-to
 import { tryMatchActivityToBikeWorkout } from '../training/match-activity-to-bike-workout';
 import { isCyclingActivityType } from '../training/activity-type-sets';
 import { surfaceFinishedRunningActivity } from '../training/finish-workout-surfacing-push';
+import { seedSpawnedWorkoutFromActivity } from '../training/seed-spawned-workout-from-activity';
 
 import { isGenericGarminActivityName } from './generic-activity-names';
 
@@ -135,6 +136,7 @@ export async function handleActivitySummary(
         if (isCyclingActivityType(activity.activityType)) {
           await tryMatchActivityToBikeWorkout(created.id);
         } else {
+          await seedSpawnedWorkoutFromActivity(created.id);
           matchResult = await tryMatchActivityToTrainingWorkout(created.id);
         }
         await tryMatchActivityToCityRun(created.id).catch((cityRunErr) => {

@@ -411,7 +411,7 @@ export async function clearWorkoutDerivedActuals(workoutId: string): Promise<voi
   });
 }
 
-async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<void> {
+export async function syncActivityDetailToLinkedWorkout(activityId: string): Promise<void> {
   const activity = await prisma.athlete_activities.findUnique({
     where: { id: activityId },
     select: { id: true, detailData: true, fitLapData: true },
