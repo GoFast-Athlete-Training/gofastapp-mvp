@@ -45,6 +45,7 @@ import {
   sessionStatusBadgeClass,
   sessionStatusLabel,
 } from '@/lib/training/session-status';
+import { isWeeklyRecapSummary } from '@/lib/training/weekly-pace-service';
 import {
   fetchTrainingPlanDetail,
   fetchPlanWeekSchedule,
@@ -2001,39 +2002,63 @@ export default function AthleteHomePage() {
             ) : null}
 
             {paceNotifications.length > 0 && paceNotifications[0]?.summaryMessage ? (
-              <div
-                className={`mb-4 rounded-lg border px-3 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm ${
-                  paceNotifications[0].adjustmentSecPerMile > 0
-                    ? 'border-emerald-200 bg-emerald-50/90'
-                    : 'border-gray-200 bg-white'
-                }`}
-              >
-                <p className="text-gray-800 min-w-0">
-                  <span className="font-medium">
-                    {paceNotifications[0].adjustmentSecPerMile > 0
-                      ? '5K pace updated · '
-                      : 'Training note · '}
-                  </span>
-                  <span className="text-gray-700">{paceNotifications[0].summaryMessage}</span>
-                </p>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const athleteId = LocalStorageAPI.getAthleteId();
-                    const top = paceNotifications[0];
-                    if (!athleteId || !top) return;
-                    try {
-                      await api.patch(`/athlete/${athleteId}/pace-notifications`, { logId: top.id });
-                      setPaceNotifications((prev) => prev.filter((n) => n.id !== top.id));
-                    } catch (e) {
-                      console.error('dismiss pace notification', e);
-                    }
-                  }}
-                  className="shrink-0 text-xs font-semibold text-orange-600 hover:text-orange-700"
-                >
-                  Dismiss
-                </button>
-              </div>
+              (() => {
+                const top = paceNotifications[0]!;
+                const weeklyRecap = isWeeklyRecapSummary(top.summaryMessage);
+                return (
+                  <div
+                    className={`mb-4 rounded-lg border px-3 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm ${
+                      top.adjustmentSecPerMile > 0
+                        ? 'border-emerald-200 bg-emerald-50/90'
+                        : weeklyRecap
+                          ? 'border-violet-200 bg-violet-50/90'
+                          : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <p className="text-gray-800 min-w-0">
+                      <span className="font-medium">
+                        {top.adjustmentSecPerMile > 0
+                          ? '5K pace updated · '
+                          : weeklyRecap
+                            ? 'Your week in review · '
+                            : 'Training note · '}
+                      </span>
+                      <span className="text-gray-700">{top.summaryMessage}</span>
+                    </p>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      {weeklyRecap ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            router.push('/performance?weeklyReview=1');
+                          }}
+                          className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                        >
+                          Review &amp; confirm 5K
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const athleteId = LocalStorageAPI.getAthleteId();
+                          if (!athleteId || !top) return;
+                          try {
+                            await api.patch(`/athlete/${athleteId}/pace-notifications`, {
+                              logId: top.id,
+                            });
+                            setPaceNotifications((prev) => prev.filter((n) => n.id !== top.id));
+                          } catch (e) {
+                            console.error('dismiss pace notification', e);
+                          }
+                        }}
+                        className="text-xs font-semibold text-gray-600 hover:text-gray-800"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()
             ) : null}
 
             {!garminConnected && (

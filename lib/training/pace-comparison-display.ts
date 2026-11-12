@@ -108,6 +108,20 @@ export function computeBandPaceDelta(
   return null;
 }
 
+/** Compact signed delta for split rows — positive = faster than plan band. */
+export function formatSignedBandDeltaSec(
+  actualSecPerMile: number | null | undefined,
+  low: number | null | undefined,
+  high: number | null | undefined
+): string {
+  if (paceRangeBounds(low, high) == null) return "—";
+  const delta = computeBandPaceDelta(actualSecPerMile, low, high);
+  if (delta == null) return "—";
+  if (delta === 0) return "0";
+  if (delta > 0) return `+${delta}s`;
+  return `${delta}s`;
+}
+
 /** When only a single target pace exists (no range). */
 export function singleTargetPaceDeltaMessage(
   paceDeltaSecPerMile: number | null | undefined

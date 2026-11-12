@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Activity, LayoutDashboard, MapPin, PenLine, Trophy, Users } from "lucide-react";
+import { Activity, BarChart3, LayoutDashboard, MapPin, PenLine, Trophy, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import AthleteMobileNav from "@/components/athlete/AthleteMobileNav";
 import {
@@ -55,6 +55,11 @@ function activityHubMatch(p: string | null, backParam: string | null): boolean {
   );
 }
 
+function performanceHubMatch(p: string | null, _backParam: string | null): boolean {
+  if (!p) return false;
+  return p === "/performance" || p.startsWith("/performance/");
+}
+
 function gorunMatch(p: string | null, backParam: string | null): boolean {
   if (!p) return false;
   if (isRunScopedWorkoutPath(p, backParam)) return true;
@@ -92,6 +97,12 @@ const primaryNavItems: NavItem[] = [
     match: (path) =>
       !!path &&
       (path === "/races" || path.startsWith("/races/") || path.startsWith("/myrace/")),
+  },
+  {
+    label: "Performance",
+    href: "/performance",
+    icon: BarChart3,
+    match: performanceHubMatch,
   },
   {
     label: "Activity",

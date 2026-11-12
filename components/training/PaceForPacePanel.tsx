@@ -7,9 +7,7 @@ import type {
 } from "@/lib/training/workout-performance-analysis";
 import {
   formatPaceTargetRangeDisplay,
-  paceRangeDeltaMessage,
-  paceRangeBounds,
-  paceVsTargetLabel,
+  formatSignedBandDeltaSec,
 } from "@/lib/training/pace-comparison-display";
 import { humanizeSegmentTitle } from "@/lib/training/segment-summary";
 
@@ -20,32 +18,28 @@ function formatSecPerMile(sec: number | null | undefined): string | null {
   return `${m}:${String(s).padStart(2, "0")}/mi`;
 }
 
-function lapPaceLabel(lap: PhaseAwareLapRow): string {
-  const bandMessage = paceRangeDeltaMessage(
-    lap.paceSecPerMile,
-    lap.targetPaceSecPerMile,
-    lap.targetPaceSecPerMileHigh
-  );
-  if (bandMessage) return bandMessage;
-  if (lap.vsPlanPaceLabel && lap.vsPlanPaceLabel !== "—") return lap.vsPlanPaceLabel;
-  return "—";
+function hasPrescription(lap: PhaseAwareLapRow): boolean {
+  return lap.targetPaceSecPerMile != null && Number.isFinite(lap.targetPaceSecPerMile);
 }
 
-function splitsLaps(analysis: WorkoutPerformanceAnalysis | null): PhaseAwareLapRow[] {
+function scoredWorkLaps(analysis: WorkoutPerformanceAnalysis | null): PhaseAwareLapRow[] {
   if (!analysis) return [];
-  return analysis.phaseAwareLaps;
+  return analysis.phaseAwareLaps.filter(
+    (lap) => lap.phase === "work" && hasPrescription(lap)
+  );
+}
+
+function otherLaps(analysis: WorkoutPerformanceAnalysis | null): PhaseAwareLapRow[] {
+  if (!analysis) return [];
+  return analysis.phaseAwareLaps.filter(
+    (lap) => lap.phase !== "work" || !hasPrescription(lap)
+  );
 }
 
 function hasLapPaceDeltas(analysis: WorkoutPerformanceAnalysis | null): boolean {
   if (!analysis) return false;
   if ((analysis.activityDerivedLaps?.length ?? 0) > 0) return true;
-  const laps = analysis.phaseAwareLaps;
-  return laps.some(
-    (lap) =>
-      lap.paceSecPerMile != null ||
-      (lap.paceDeltaSecPerMile != null && Number.isFinite(lap.paceDeltaSecPerMile)) ||
-      (lap.vsPlanPaceLabel !== "—" && lap.phase === "work")
-  );
+  return scoredWorkLaps(analysis).some((lap) => lap.paceSecPerMile != null);
 }
 
 function isGenericWorkTitle(title: string | null | undefined): boolean {
@@ -75,60 +69,73 @@ function splitRowTitle(
   return humanizeSegmentTitle(lap.segmentTitle, workoutType);
 }
 
-function paceBarWidthPercent(
-  actualSecPerMile: number,
-  low: number | null | undefined,
-  high: number | null | undefined
-): number {
-  const b = paceRangeBounds(low, high);
-  if (!b) return 24;
-  const label = paceVsTargetLabel(actualSecPerMile, low, high);
-  if (label === "in_range") return 100;
-  if (label === "slower") {
-    return Math.min(96, Math.max(14, Math.round((b.hi / actualSecPerMile) * 100)));
-  }
-  if (label === "faster") return 96;
-  return 24;
-}
-
-function SplitBar({
+function WorkSplitRow({
   lap,
   rowTitle,
 }: {
   lap: PhaseAwareLapRow;
   rowTitle: string;
 }) {
-  const pace = formatSecPerMile(lap.paceSecPerMile);
-  const prescribed =
-    lap.targetPaceSecPerMile != null
-      ? formatPaceTargetRangeDisplay(lap.targetPaceSecPerMile, lap.targetPaceSecPerMileHigh)
-      : "OPEN";
-  const label = lapPaceLabel(lap);
-  const barWidth =
-    lap.paceSecPerMile != null
-      ? `${paceBarWidthPercent(
-          lap.paceSecPerMile,
-          lap.targetPaceSecPerMile,
-          lap.targetPaceSecPerMileHigh
-        )}%`
-      : "24%";
+  const plan =
+    formatPaceTargetRangeDisplay(lap.targetPaceSecPerMile, lap.targetPaceSecPerMileHigh) ??
+    "OPEN";
+  const actual = formatSecPerMile(lap.paceSecPerMile) ?? "—";
+  const delta = formatSignedBandDeltaSec(
+    lap.paceSecPerMile,
+    lap.targetPaceSecPerMile,
+    lap.targetPaceSecPerMileHigh
+  );
 
   return (
     <li className="rounded-xl border border-violet-200 bg-white px-4 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
         <span className="font-semibold text-gray-900">{rowTitle}</span>
-        <span className="tabular-nums text-gray-800">{pace ?? "—"}</span>
       </div>
-      <div className="mt-2 h-2 rounded-full bg-violet-100">
-        <div
-          className="h-2 rounded-full bg-violet-600 transition-all"
-          style={{ width: barWidth }}
-        />
+      <motionGrid plan={plan} actual={actual} delta={delta} />
+    </li>
+  );
+}
+
+function motionGrid({ plan, actual, delta }: { plan: string; actual: string; delta: string }) {
+  const deltaClass =
+    delta.startsWith("+") && delta !== "+0s"
+      ? "text-emerald-800"
+      : delta.startsWith("-")
+        ? "text-amber-900"
+        : "text-gray-700";
+
+  return (
+    <dl className="mt-2 grid grid-cols-3 gap-2 text-xs sm:text-sm">
+      <div>
+        <dt className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Plan</dt>
+        <dd className="mt-0.5 tabular-nums font-medium text-gray-800">{plan}</dd>
       </div>
-      <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-gray-600">
-        <span>Prescribed: {prescribed ?? "OPEN"}</span>
-        <span className="font-medium text-violet-900">{label}</span>
+      <div>
+        <dt className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Actual</dt>
+        <dd className="mt-0.5 tabular-nums font-medium text-gray-900">{actual}</dd>
       </div>
+      <div>
+        <dt className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Δ</dt>
+        <dd className={`mt-0.5 tabular-nums font-semibold ${deltaClass}`}>{delta}</dd>
+      </div>
+    </dl>
+  );
+}
+
+function OtherLapLine({ lap }: { lap: PhaseAwareLapRow }) {
+  const title =
+    lap.phase === "recovery"
+      ? "Recovery"
+      : lap.phase === "warmup"
+        ? "Warm-up"
+        : lap.phase === "cooldown"
+          ? "Cool-down"
+          : lap.segmentTitle?.trim() || "Other";
+  const actual = formatSecPerMile(lap.paceSecPerMile) ?? "—";
+  return (
+    <li className="flex justify-between gap-3 text-xs text-gray-600 tabular-nums">
+      <span>{title}</span>
+      <span>{actual}</span>
     </li>
   );
 }
@@ -167,10 +174,11 @@ export default function PaceForPacePanel({
   performanceAnalysis,
   workoutType,
 }: Props) {
-  const available = hasLapPaceDeltas(performanceAnalysis);
-  const laps = splitsLaps(performanceAnalysis);
+  const workLaps = scoredWorkLaps(performanceAnalysis);
+  const other = otherLaps(performanceAnalysis);
   const garminLaps = performanceAnalysis?.activityDerivedLaps ?? [];
-  const showGarminLaps = garminLaps.length > 0 && laps.length === 0;
+  const showGarminLaps = garminLaps.length > 0 && workLaps.length === 0;
+  const available = hasLapPaceDeltas(performanceAnalysis);
 
   if (!garminDetailActivityId) {
     return (
@@ -182,14 +190,14 @@ export default function PaceForPacePanel({
 
   return (
     <div className="rounded-2xl border-2 border-violet-300 bg-violet-50/60 p-5">
-      <p className="text-xs font-bold uppercase tracking-widest text-violet-900">Your splits</p>
+      <p className="text-xs font-bold uppercase tracking-widest text-violet-900">Work rep splits</p>
 
       {available ? (
         <>
           <p className="mt-2 text-sm text-violet-950">
             {showGarminLaps
               ? "Laps from your Garmin activity file."
-              : "Prescribed vs actual pace for each lap."}
+              : "Prescribed vs actual pace on work reps only (recovery and warm-up not scored)."}
           </p>
           <ul className="mt-4 space-y-3">
             {showGarminLaps
@@ -198,14 +206,10 @@ export default function PaceForPacePanel({
                 ))
               : (() => {
                   let workOrdinal = 0;
-                  return laps.map((lap) => {
-                    const workIndex = lap.phase === "work" ? workOrdinal++ : workOrdinal;
-                    const title =
-                      lap.phase === "work"
-                        ? splitRowTitle(lap, workoutType, workIndex)
-                        : splitRowTitle(lap, workoutType, 0);
+                  return workLaps.map((lap) => {
+                    const title = splitRowTitle(lap, workoutType, workOrdinal++);
                     return (
-                      <SplitBar
+                      <WorkSplitRow
                         key={`${lap.segmentId}-${lap.lapIndex}`}
                         lap={lap}
                         rowTitle={title}
@@ -214,6 +218,18 @@ export default function PaceForPacePanel({
                   });
                 })()}
           </ul>
+          {!showGarminLaps && other.length > 0 ? (
+            <div className="mt-4 border-t border-violet-200/80 pt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-800/80">
+                {other.length} other lap{other.length === 1 ? "" : "s"} (not scored)
+              </p>
+              <ul className="mt-2 space-y-1">
+                {other.map((lap) => (
+                  <OtherLapLine key={`other-${lap.segmentId}-${lap.lapIndex}`} lap={lap} />
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </>
       ) : (
         <p className="mt-3 text-sm text-violet-900/90">

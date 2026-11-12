@@ -182,6 +182,17 @@ const HARDCODED_TEMPLATES: Record<NotificationTemplateKey, TemplateDefinition> =
       return `${name} is a week in the books. Pick your next race and start the next block.`;
     },
   },
+  'performance.weekRecap': {
+    title: () => 'Your week in review',
+    body: ({ body, weekNumber }) => {
+      if (typeof body === 'string' && body.trim()) return body.trim();
+      const wk =
+        typeof weekNumber === 'number' && Number.isFinite(weekNumber)
+          ? `Week ${weekNumber}`
+          : 'This week';
+      return `${wk} is wrapped — open Performance to confirm your 5K pace for next week's training.`;
+    },
+  },
 };
 
 function renderHardcoded(

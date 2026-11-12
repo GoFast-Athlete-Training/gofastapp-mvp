@@ -13,7 +13,8 @@ export type NotificationTemplateKey =
   | 'race.dayBefore'
   | 'race.raceDay'
   | 'race.prCongrats'
-  | 'race.nextPlanReady';
+  | 'race.nextPlanReady'
+  | 'performance.weekRecap';
 
 export type AppNotificationObjectType =
   | 'workout'
@@ -23,7 +24,8 @@ export type AppNotificationObjectType =
   | 'run_crew_announcement'
   | 'athlete_activity'
   | 'sponsor_commitment'
-  | 'athlete_race';
+  | 'athlete_race'
+  | 'training_plan';
 
 export type TemplateFacts = Record<string, unknown>;
 
@@ -83,6 +85,8 @@ export function templateKeyToMobileType(templateKey: NotificationTemplateKey): s
       return 'race_pr_congrats';
     case 'race.nextPlanReady':
       return 'race_next_plan_ready';
+    case 'performance.weekRecap':
+      return 'performance_week_recap';
     default:
       return templateKey;
   }

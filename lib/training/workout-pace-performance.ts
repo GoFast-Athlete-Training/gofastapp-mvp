@@ -15,9 +15,40 @@ import {
   type TempoGoalThresholdInterpretation,
 } from "@/lib/training/goal-threshold-from-mp";
 import { computeMatchedWorkoutPaceCredits } from "@/lib/training/apply-activity-to-workout";
+import { computeBandPaceDelta } from "@/lib/training/pace-comparison-display";
 
 const MAX_FIVE_K_SUGGESTION_ADJUST_SEC = 10;
 const MIN_FIVE_K_FLOOR_RATIO = 0.9;
+
+export type WorkRepLapForBeat = {
+  phase: string;
+  paceSecPerMile: number | null;
+  targetPaceSecPerMile: number | null;
+  targetPaceSecPerMileHigh: number | null;
+};
+
+/** Median positive beat vs prescribed work-rep bands (for 5K suggestion when row paceDelta is null). */
+export function deriveWorkRepBeatSecPerMile(
+  laps: WorkRepLapForBeat[] | null | undefined
+): number | null {
+  if (!laps?.length) return null;
+  const positives: number[] = [];
+  for (const lap of laps) {
+    if (lap.phase !== "work") continue;
+    if (lap.targetPaceSecPerMile == null) continue;
+    const delta = computeBandPaceDelta(
+      lap.paceSecPerMile,
+      lap.targetPaceSecPerMile,
+      lap.targetPaceSecPerMileHigh
+    );
+    if (delta != null && delta > 0) positives.push(delta);
+  }
+  if (positives.length === 0) return null;
+  positives.sort((a, b) => a - b);
+  const mid = Math.floor(positives.length / 2);
+  if (positives.length % 2 === 1) return positives[mid]!;
+  return Math.round((positives[mid - 1]! + positives[mid]!) / 2);
+}
 
 export type FiveKPaceSuggestion = {
   eligible: boolean;
@@ -138,6 +169,7 @@ export async function loadWorkoutPerformanceSignals(params: {
     creditedThresholdPaceSecPerMile: number | null;
     goalRacePaceSecPerMile?: number | null;
     intervalsCatalogueOffsetSecPerMile?: number | null;
+    workRepBeatSecPerMile?: number | null;
   };
 }): Promise<WorkoutPerformanceSignals> {
   const athlete = await prisma.athlete.findUnique({
@@ -159,12 +191,18 @@ export async function loadWorkoutPerformanceSignals(params: {
     currentFiveKSecPerMile = null;
   }
 
+  const effectivePaceDelta =
+    params.workout.paceDeltaSecPerMile != null &&
+    Number.isFinite(params.workout.paceDeltaSecPerMile)
+      ? params.workout.paceDeltaSecPerMile
+      : params.workout.workRepBeatSecPerMile ?? null;
+
   const fiveKSuggestion =
     params.workout.workoutType === "Intervals" || params.workout.workoutType === "Race"
       ? computeFiveKPaceSuggestion({
           workoutType: params.workout.workoutType,
           paceSecPerMile: params.workout.paceSecPerMile,
-          paceDeltaSecPerMile: params.workout.paceDeltaSecPerMile,
+          paceDeltaSecPerMile: effectivePaceDelta,
           currentFiveKSecPerMile,
           intervalsCatalogueOffsetSecPerMile:
             params.workout.intervalsCatalogueOffsetSecPerMile ?? null,

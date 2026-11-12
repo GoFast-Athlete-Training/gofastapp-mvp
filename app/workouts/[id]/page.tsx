@@ -90,7 +90,9 @@ import {
 } from "@/lib/training/workout-performance-analysis";
 import {
   TempoGoalBenchmarkPanel,
+  WorkoutFiveKConfirmPanel,
 } from "@/components/training/WorkoutGoalPacePanel";
+import type { WorkoutPerformanceSignals } from "@/lib/training/workout-pace-performance";
 import { CompletedWorkoutResults } from "@/components/training/CompletedWorkoutResults";
 import type { TempoPrescriptionGoalBenchmark } from "@/lib/training/goal-threshold-from-mp";
 
@@ -937,6 +939,8 @@ export default function WorkoutDetailPage() {
   const [garminToast, setGarminToast] = useState<string | null>(null);
   const [showMatchPanel, setShowMatchPanel] = useState(false);
   const [deletingRecordedRun, setDeletingRecordedRun] = useState(false);
+  const [performanceSignals, setPerformanceSignals] =
+    useState<WorkoutPerformanceSignals | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [savingEdits, setSavingEdits] = useState(false);
@@ -1647,11 +1651,14 @@ export default function WorkoutDetailPage() {
     try {
       const response = await api.get<{
         workout: Workout;
+        performanceSignals?: WorkoutPerformanceSignals;
       }>(`/training/workout/${workoutId}`);
       const w = response.data?.workout;
       if (w) {
         setWorkout(w);
+        setPerformanceSignals(response.data?.performanceSignals ?? null);
       } else {
+        setPerformanceSignals(null);
         setPushStatus({
           success: false,
           message: "Workout not found",
@@ -2218,6 +2225,11 @@ export default function WorkoutDetailPage() {
 
         {isLogged && (workout.garminDetailActivityId || workout.garmin_detail_activity) ? (
           <>
+            <WorkoutFiveKConfirmPanel
+              workoutId={workoutId}
+              performanceSignals={performanceSignals}
+              onConfirmed={() => void fetchWorkout()}
+            />
             <CompletedWorkoutResults
               workout={workout}
               performanceAnalysis={displayAnalysis}

@@ -12,7 +12,10 @@ import { metersToMiles } from "@/lib/pace-utils";
 import type { Prisma, WorkoutType } from "@prisma/client";
 import { segmentSnapshotDocumentFromApiSegments, goalBenchmarkFromSegmentSnapshot } from "@/lib/training/workout-segment-snapshot";
 import { buildTempoPrescriptionGoalBenchmark } from "@/lib/training/goal-threshold-from-mp";
-import { loadWorkoutPerformanceSignals } from "@/lib/training/workout-pace-performance";
+import {
+  deriveWorkRepBeatSecPerMile,
+  loadWorkoutPerformanceSignals,
+} from "@/lib/training/workout-pace-performance";
 import { isStructuredPlanWeek } from "@/lib/training/plan-schedule-schema";
 import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
 import { parseAthletePaceAdjuster } from "@/lib/training/athlete-pace-adjuster";
@@ -281,6 +284,10 @@ export async function GET(request: NextRequest, context: Ctx) {
         goalDistance: linkedRace?.goalDistance ?? null,
       }).goalPaceSecPerMile;
 
+      const workRepBeatSecPerMile = deriveWorkRepBeatSecPerMile(
+        performanceAnalysis.phaseAwareLaps
+      );
+
       const performanceSignals = await loadWorkoutPerformanceSignals({
         athleteId: scopedAthleteId,
         workout: {
@@ -292,6 +299,7 @@ export async function GET(request: NextRequest, context: Ctx) {
           goalRacePaceSecPerMile,
           intervalsCatalogueOffsetSecPerMile:
             plannedDetail.workout_catalogue?.workBasePaceOffsetSecPerMile ?? null,
+          workRepBeatSecPerMile,
         },
       });
 
@@ -446,20 +454,6 @@ export async function GET(request: NextRequest, context: Ctx) {
           })
         : null);
 
-    const performanceSignals = await loadWorkoutPerformanceSignals({
-      athleteId: auth.athlete.id,
-      workout: {
-        workoutType: workout.workoutType,
-        paceSecPerMile: workout.actualAvgPaceSecPerMile,
-        paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
-        creditedFiveKPaceSecPerMile: workout.creditedFiveKPaceSecPerMile,
-        creditedThresholdPaceSecPerMile: workout.creditedThresholdPaceSecPerMile,
-        goalRacePaceSecPerMile,
-        intervalsCatalogueOffsetSecPerMile:
-          workout.workout_catalogue?.workBasePaceOffsetSecPerMile ?? null,
-      },
-    });
-
     const performanceAnalysis = computeWorkoutPerformanceAnalysis({
       workoutType: workout.workoutType,
       planId: workout.planId,
@@ -492,6 +486,25 @@ export async function GET(request: NextRequest, context: Ctx) {
           ? s.segment_laps.filter((lap) => lap.activityId === workout.garminDetailActivityId)
           : s.segment_laps,
       })),
+    });
+
+    const workRepBeatSecPerMile = deriveWorkRepBeatSecPerMile(
+      performanceAnalysis.phaseAwareLaps
+    );
+
+    const performanceSignals = await loadWorkoutPerformanceSignals({
+      athleteId: auth.athlete.id,
+      workout: {
+        workoutType: workout.workoutType,
+        paceSecPerMile: workout.actualAvgPaceSecPerMile,
+        paceDeltaSecPerMile: workout.paceDeltaSecPerMile,
+        creditedFiveKPaceSecPerMile: workout.creditedFiveKPaceSecPerMile,
+        creditedThresholdPaceSecPerMile: workout.creditedThresholdPaceSecPerMile,
+        goalRacePaceSecPerMile,
+        intervalsCatalogueOffsetSecPerMile:
+          workout.workout_catalogue?.workBasePaceOffsetSecPerMile ?? null,
+        workRepBeatSecPerMile,
+      },
     });
 
     return NextResponse.json({

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { confirmWhereYouStand } from "@/lib/training/where-you-stand";
+import { markWeeklyRecapSeen } from "@/lib/training/weekly-pace-service";
 
 type Body = {
   planId?: string | null;
@@ -36,6 +37,14 @@ export async function POST(request: NextRequest) {
       longRunCapabilityPaceSecPerMile: body.longRunCapabilityPaceSecPerMile ?? null,
       sourceWorkoutId: body.sourceWorkoutId ?? null,
     });
+
+    if (result.ok && body.planId && body.weekNumber != null) {
+      await markWeeklyRecapSeen({
+        athleteId: auth.athlete.id,
+        planId: body.planId,
+        weekNumber: body.weekNumber,
+      });
+    }
 
     return NextResponse.json({ ok: result.ok, result });
   } catch (e: unknown) {

@@ -8,6 +8,9 @@ import { addDaysUtc, utcDateOnly } from "@/lib/training/plan-utils";
 import { dateForDayInWeek } from "@/lib/training/schedule-parser";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { loadWeekPerformanceSnapshot } from "@/lib/training/week-performance-metrics";
+import { loadWhereYouStandSnapshot } from "@/lib/training/where-you-stand";
+import { metersToMiles } from "@/lib/pace-utils";
+import { sendAppNotification } from "@/lib/app-notifications/send";
 
 function secondsPerMileToPaceString(sec: number): string {
   const minutes = Math.floor(sec / 60);
@@ -43,7 +46,28 @@ export type WeeklySummaryResult =
   | { ok: true; planId: string; weekNumber: number }
   | { ok: false; error: string };
 
-const WEEKLY_RECAP_PREFIX = "Weekly recap —";
+export const WEEKLY_RECAP_PREFIX = "Weekly recap —";
+
+export function isWeeklyRecapSummary(message: string | null | undefined): boolean {
+  return Boolean(message?.startsWith(WEEKLY_RECAP_PREFIX));
+}
+
+export async function markWeeklyRecapSeen(params: {
+  athleteId: string;
+  planId: string;
+  weekNumber: number;
+}): Promise<void> {
+  await prisma.pace_adjustment_log.updateMany({
+    where: {
+      athleteId: params.athleteId,
+      planId: params.planId,
+      weekNumber: params.weekNumber,
+      summaryMessage: { startsWith: WEEKLY_RECAP_PREFIX },
+      seenAt: null,
+    },
+    data: { seenAt: new Date() },
+  });
+}
 
 /**
  * End-of-week wrap-up: one pace_adjustment_log row with adjustment 0 and a human summary only.
@@ -83,7 +107,10 @@ export async function generateWeeklySummary(params: {
     select: {
       startDate: true,
       totalWeeks: true,
-      race_registry: { select: { raceDate: true } },
+      goalRaceTime: true,
+      race_registry: {
+        select: { raceDate: true, distanceMeters: true, name: true },
+      },
     },
   });
   if (!plan) {
@@ -113,7 +140,28 @@ export async function generateWeeklySummary(params: {
       ? ` Tempo/interval pace vs target: ${metrics.structuredPaceAvgDeltaSecPerMile > 0 ? "+" : ""}${metrics.structuredPaceAvgDeltaSecPerMile} sec/mi.`
       : "";
 
-  const summaryMessage = `${WEEKLY_RECAP_PREFIX} Week ${weekNumber}: ${metrics.sessionsCompleted} of ${metrics.sessionsPlanned} sessions complete, ~${miLogged} mi${metrics.longRunCompleted ? ", long run done" : ""}.${structuredPaceLine} Your current 5K pace is ${paceDisplay}.`;
+  const raceMiles =
+    plan.race_registry?.distanceMeters != null
+      ? metersToMiles(Number(plan.race_registry.distanceMeters))
+      : null;
+
+  const stand = await loadWhereYouStandSnapshot({
+    athleteId,
+    planId,
+    planStartDate: plan.startDate,
+    weekNumber,
+    storedTotalWeeks: plan.totalWeeks,
+    raceDate: plan.race_registry?.raceDate ?? null,
+    raceDistanceMiles: raceMiles,
+    raceName: plan.race_registry?.name ?? null,
+    goalRaceTime: plan.goalRaceTime?.trim() ?? null,
+  });
+
+  const fiveKFollowUp = stand.fiveK.proposedPace
+    ? ` Suggested 5K: ${stand.fiveK.proposedPace}/mi — confirm for next week's workouts.`
+    : ` Still right at ${paceDisplay} for next week? Confirm in Performance.`;
+
+  const summaryMessage = `${WEEKLY_RECAP_PREFIX} Week ${weekNumber}: ${metrics.sessionsCompleted} of ${metrics.sessionsPlanned} sessions complete, ~${miLogged} mi${metrics.longRunCompleted ? ", long run done" : ""}.${structuredPaceLine} Your current 5K pace is ${paceDisplay}.${fiveKFollowUp}`;
 
   await prisma.pace_adjustment_log.create({
     data: {
@@ -129,6 +177,30 @@ export async function generateWeeklySummary(params: {
       summaryMessage,
     },
   });
+
+  const pushBody = `${metrics.sessionsCompleted} of ${metrics.sessionsPlanned} sessions · ~${miLogged} mi. 5K ${paceDisplay} — does it look right to build next week's training?`;
+  try {
+    await sendAppNotification({
+      athleteId,
+      templateKey: "performance.weekRecap",
+      objectType: "training_plan",
+      objectId: planId,
+      deeplink: `/performance?weeklyReview=1&week=${weekNumber}`,
+      facts: {
+        weekNumber,
+        fiveKPace: paceDisplay,
+        body: pushBody,
+      },
+      payload: {
+        type: "performance_week_recap",
+        screen: "performance",
+        planId,
+        weekNumber,
+      },
+    });
+  } catch (err) {
+    console.error("weekly_recap push:", err);
+  }
 
   return { ok: true, planId, weekNumber };
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
@@ -30,6 +31,9 @@ type PerformanceSummaryResponse = {
 
 export default function PerformancePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const weeklyReview = searchParams.get("weeklyReview") === "1";
+  const whereYouStandRef = useRef<HTMLDivElement | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +52,14 @@ export default function PerformancePage() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!weeklyReview || loading) return;
+    const t = window.setTimeout(() => {
+      whereYouStandRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 200);
+    return () => window.clearTimeout(t);
+  }, [weeklyReview, loading, summary]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -70,6 +82,12 @@ export default function PerformancePage() {
             Your current training week, plan sessions, and fitness anchors — confirm or edit
             your numbers.
           </p>
+          {weeklyReview ? (
+            <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-sm text-emerald-950">
+              Confirm your paces so we build next week&apos;s training correctly — especially your
+              5K anchor.
+            </p>
+          ) : null}
         </div>
 
         {loading && !authReady ? (
@@ -121,12 +139,14 @@ export default function PerformancePage() {
             ) : null}
 
             {!summary?.inRaceCloseOut && summary?.whereYouStand ? (
-              <WhereYouStandPanel
-                stand={summary.whereYouStand}
-                planId={summary.planId}
-                weekNumber={summary.weekNumber}
-                onConfirmed={() => void load()}
-              />
+              <div ref={whereYouStandRef}>
+                <WhereYouStandPanel
+                  stand={summary.whereYouStand}
+                  planId={summary.planId}
+                  weekNumber={summary.weekNumber}
+                  onConfirmed={() => void load()}
+                />
+              </div>
             ) : null}
 
             <Link

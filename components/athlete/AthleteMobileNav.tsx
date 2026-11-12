@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Activity, LayoutDashboard, MapPin, PenLine, Trophy, Users, X } from 'lucide-react';
+import { Activity, BarChart3, LayoutDashboard, MapPin, PenLine, Trophy, Users, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
   BUILD_CONTENT_LABEL,
@@ -62,6 +62,11 @@ function racesMatch(p: string | null): boolean {
   );
 }
 
+function performanceHubMatch(p: string | null, _backParam: string | null): boolean {
+  if (!p) return false;
+  return p === '/performance' || p.startsWith('/performance/');
+}
+
 function activityHubMatch(p: string | null, backParam: string | null): boolean {
   if (!p) return false;
   if (p === '/workouts/create' || p.startsWith('/workouts/create/')) return false;
@@ -82,6 +87,13 @@ const primaryTabs: NavItem[] = [
 ];
 
 const moreItems: NavItem[] = [
+  {
+    id: 'performance',
+    label: 'Performance',
+    href: '/performance',
+    icon: BarChart3,
+    match: performanceHubMatch,
+  },
   {
     id: 'build-content',
     label: BUILD_CONTENT_LABEL,
