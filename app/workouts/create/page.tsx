@@ -1524,10 +1524,10 @@ function CreateWorkoutPageInner() {
                       Set goal →
                     </Link>
                     <Link
-                      href="/athlete-edit-profile"
+                      href="/profile/training"
                       className="inline-flex items-center justify-center px-4 py-2 rounded-lg border-2 border-orange-200 text-orange-800 text-sm font-semibold hover:bg-orange-50 transition-colors"
                     >
-                      Set 5K baseline (profile) →
+                      Set 5K pace
                     </Link>
                   </div>
                 </div>

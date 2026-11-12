@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import api from "@/lib/api";
 import { LocalStorageAPI } from "@/lib/localstorage";
+import { normalizePace } from "@/utils/formatPace";
 
 type AthleteRow = {
   firstName: string;
@@ -29,13 +30,10 @@ function parseFiveKPaceToParts(raw: string | null | undefined): {
   minutes: string;
   seconds: string;
 } {
-  const t = (raw ?? "").trim().split("/")[0].trim();
-  if (!t) return { minutes: "", seconds: "" };
-  const parts = t.split(":");
-  if (parts.length === 2) {
-    return { minutes: parts[0].trim(), seconds: parts[1].trim() };
-  }
-  return { minutes: "", seconds: "" };
+  const normalized = normalizePace(raw);
+  if (!normalized) return { minutes: "", seconds: "" };
+  const [minutes, seconds] = normalized.split(":");
+  return { minutes: minutes ?? "", seconds: seconds ?? "" };
 }
 
 export default function ProfileTrainingPage() {
@@ -86,9 +84,7 @@ export default function ProfileTrainingPage() {
 
   const assembledFiveKPace = useMemo(() => {
     if (!fiveKPaceMinutes.trim() || !fiveKPaceSeconds.trim()) return "";
-    const m = fiveKPaceMinutes.padStart(2, "0");
-    const s = fiveKPaceSeconds.padStart(2, "0");
-    return `${m}:${s}`;
+    return normalizePace(`${fiveKPaceMinutes}:${fiveKPaceSeconds}`) ?? "";
   }, [fiveKPaceMinutes, fiveKPaceSeconds]);
 
   async function handleSave(e: React.FormEvent) {
@@ -103,7 +99,7 @@ export default function ProfileTrainingPage() {
     if (pm && ps) {
       const mm = parseInt(pm, 10);
       const ss = parseInt(ps, 10);
-      if (Number.isNaN(mm) || Number.isNaN(ss) || mm < 0 || mm > 180 || ss < 0 || ss >= 60) {
+      if (Number.isNaN(mm) || Number.isNaN(ss) || mm < 0 || mm > 99 || ss < 0 || ss >= 60) {
         setError("Use valid minutes and seconds (seconds under 60).");
         return;
       }
@@ -166,13 +162,14 @@ export default function ProfileTrainingPage() {
               </label>
               <input
                 id="profile-fivek-min"
-                type="number"
-                min={0}
-                max={180}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="7"
                 value={fiveKPaceMinutes}
                 onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "");
-                  if (val === "" || (parseInt(val, 10) >= 0 && parseInt(val, 10) <= 180)) {
+                  const val = e.target.value.replace(/\D/g, "").slice(0, 2);
+                  if (val === "" || (parseInt(val, 10) >= 0 && parseInt(val, 10) <= 99)) {
                     setFiveKPaceMinutes(val);
                   }
                 }}
@@ -186,12 +183,13 @@ export default function ProfileTrainingPage() {
               </label>
               <input
                 id="profile-fivek-sec"
-                type="number"
-                min={0}
-                max={59}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="34"
                 value={fiveKPaceSeconds}
                 onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "");
+                  const val = e.target.value.replace(/\D/g, "").slice(0, 2);
                   if (val === "" || (parseInt(val, 10) >= 0 && parseInt(val, 10) <= 59)) {
                     setFiveKPaceSeconds(val);
                   }
@@ -207,7 +205,9 @@ export default function ProfileTrainingPage() {
               <span className="font-mono font-semibold">{assembledFiveKPace}</span> /mile
             </div>
           ) : (
-            <p className="mt-2 text-xs text-gray-500">Optional. Use minutes and seconds (e.g. 7 and 30).</p>
+            <p className="mt-2 text-xs text-gray-500">
+              Minutes and seconds per mile, like 7:34. Not a 5K finish time. Seconds can be 00.
+            </p>
           )}
         </div>
         <div>

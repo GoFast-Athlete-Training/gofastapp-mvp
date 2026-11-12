@@ -12,6 +12,7 @@ import PersonalCommunityCard from '@/components/profile/PersonalCommunityCard';
 
 import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
 import { CONTENT_BUILDER_LABEL, CONTENT_BUILDER_PATH } from '@/lib/athlete/community-nav';
+import { formatFiveKPacePerMile } from '@/utils/formatPace';
 
 type PublicGoalPayload = {
   trainingSummary: {
@@ -210,7 +211,10 @@ export default function ProfilePage() {
           </p>
           {fiveKPace?.trim() ? (
             <p className="text-sm text-gray-500 mt-2">
-              5K pace: <span className="font-semibold text-gray-800">{fiveKPace.trim()}</span>
+              5K pace:{" "}
+              <span className="font-semibold text-gray-800">
+                {formatFiveKPacePerMile(fiveKPace) ?? fiveKPace.trim()}
+              </span>
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2 mt-4">

@@ -159,7 +159,9 @@ export function InlineGoalForm({
             <label className="block text-xs text-gray-500 mb-1">Hours</label>
             <input
               ref={hoursRef}
-              type="number"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
               min={0}
               max={23}
               value={h}
@@ -184,7 +186,9 @@ export function InlineGoalForm({
             <label className="block text-xs text-gray-500 mb-1">Minutes</label>
             <input
               ref={minutesRef}
-              type="number"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
               min={0}
               max={59}
               value={m}
@@ -212,7 +216,9 @@ export function InlineGoalForm({
             <label className="block text-xs text-gray-500 mb-1">Seconds</label>
             <input
               ref={secondsRef}
-              type="number"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
               min={0}
               max={59}
               value={s}
@@ -238,7 +244,9 @@ export function InlineGoalForm({
             <label className="block text-xs text-gray-500 mb-1">Hours (optional)</label>
             <input
               ref={hoursRef}
-              type="number"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
               min={0}
               max={23}
               value={h}
@@ -263,7 +271,9 @@ export function InlineGoalForm({
             <label className="block text-xs text-gray-500 mb-1">Minutes</label>
             <input
               ref={minutesRef}
-              type="number"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
               min={0}
               max={59}
               value={m}
@@ -291,7 +301,9 @@ export function InlineGoalForm({
             <label className="block text-xs text-gray-500 mb-1">Seconds</label>
             <input
               ref={secondsRef}
-              type="number"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
               min={0}
               max={59}
               value={s}

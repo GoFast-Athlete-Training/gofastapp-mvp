@@ -1335,8 +1335,11 @@ export default function TrainingSetupPlanPage({
 
               {!loadingWeek && weekDays.length === 0 && (
                 <p className="mb-4 text-sm text-gray-500">
-                  Loading workouts for this week… If nothing appears, set your 5K pace on
-                  your profile so we can build segments.
+                  Loading workouts for this week… If nothing appears,{" "}
+                  <Link href="/profile/training" className="font-semibold text-orange-700 hover:underline">
+                    set your 5K pace
+                  </Link>{" "}
+                  (minutes per mile, like 7:34) so we can build segments.
                 </p>
               )}
             </>
@@ -1481,32 +1484,35 @@ export default function TrainingSetupPlanPage({
             {!athleteFiveKPace?.trim() ? (
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <label className="mb-1 block text-xs font-medium text-gray-700">
-                  What&apos;s your current 5K pace? (required)
+                  Current 5K pace (required)
                 </label>
                 <div className="flex flex-wrap items-center gap-2">
                   <input
-                    type="number"
-                    min={2}
-                    max={30}
-                    placeholder="min"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="7"
+                    aria-label="Pace minutes"
                     className="w-24 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                     value={paceMin}
-                    onChange={(e) => setPaceMin(e.target.value)}
+                    onChange={(e) => setPaceMin(e.target.value.replace(/\D/g, "").slice(0, 2))}
                   />
                   <span className="text-gray-500">:</span>
                   <input
-                    type="number"
-                    min={0}
-                    max={59}
-                    placeholder="sec"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="34"
+                    aria-label="Pace seconds"
                     className="w-24 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                     value={paceSec}
-                    onChange={(e) => setPaceSec(e.target.value)}
+                    onChange={(e) => setPaceSec(e.target.value.replace(/\D/g, "").slice(0, 2))}
                   />
                   <span className="text-sm text-gray-600">min / mile</span>
                 </div>
                 <p className="mt-1.5 text-xs text-gray-600">
-                  Needed for workout paces. We&apos;ll save this to your profile.
+                  Example: 7:34 /mile — how fast you run a mile now, not your 5K finish time.
+                  We&apos;ll save this to your profile.
                 </p>
               </div>
             ) : null}

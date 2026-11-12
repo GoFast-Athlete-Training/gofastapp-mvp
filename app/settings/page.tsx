@@ -324,10 +324,10 @@ export default function SettingsPage() {
               and for plan snapshots.
             </p>
             <Link
-              href="/athlete-edit-profile"
+              href="/profile/training"
               className="inline-block bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
             >
-              Set baseline in profile
+              Set 5K pace
             </Link>
           </div>
 

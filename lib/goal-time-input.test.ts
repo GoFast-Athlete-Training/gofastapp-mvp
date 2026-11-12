@@ -20,6 +20,32 @@ test("validateAndAssembleGoalTime accepts H:MM:SS for marathon", () => {
   }
 });
 
+test("validateAndAssembleGoalTime drops a zero hours part on a 5K", () => {
+  const result = validateAndAssembleGoalTime(
+    { distanceLabel: "5K", distanceMeters: 5000 },
+    "00",
+    "22",
+    "30"
+  );
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.goalTime, "22:30");
+  }
+});
+
+test("validateAndAssembleGoalTime keeps even seconds on a 5K", () => {
+  const result = validateAndAssembleGoalTime(
+    { distanceLabel: "5K", distanceMeters: 5000 },
+    "",
+    "25",
+    "00"
+  );
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.goalTime, "25:00");
+  }
+});
+
 test("validateAndAssembleGoalTime accepts MM:SS for 5K", () => {
   const result = validateAndAssembleGoalTime(
     { distanceLabel: "5K", distanceMeters: 5000 },

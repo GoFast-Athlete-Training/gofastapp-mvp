@@ -120,14 +120,14 @@ export function validateAndAssembleGoalTime(
       message: "Invalid time. Minutes and seconds must be under 60.",
     };
   }
-  if (h.trim() && h !== "0") {
-    const hh = parseInt(h, 10);
-    if (Number.isNaN(hh) || hh < 0) {
+  const hoursNum = parseInt(h, 10);
+  if (h.trim() && hoursNum !== 0) {
+    if (Number.isNaN(hoursNum) || hoursNum < 0) {
       return { ok: false, message: "Invalid hours." };
     }
     return {
       ok: true,
-      goalTime: `${h.padStart(2, "0")}:${m.padStart(2, "0")}:${s.padStart(2, "0")}`,
+      goalTime: `${String(hoursNum).padStart(2, "0")}:${m.padStart(2, "0")}:${s.padStart(2, "0")}`,
     };
   }
   return {

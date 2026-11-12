@@ -44,10 +44,9 @@ export default function PerformanceSnapshot({
           </p>
           {!fiveKPace && (
             <p className="text-xs text-gray-500 mt-2">
-              <a href="/athlete-edit-profile" className="text-orange-600 font-medium hover:underline">
-                Edit profile
-              </a>{" "}
-              to set current 5K pace (training baseline).
+              <Link href="/profile/training" className="text-orange-600 font-medium hover:underline">
+                Set 5K pace
+              </Link>
             </p>
           )}
         </div>

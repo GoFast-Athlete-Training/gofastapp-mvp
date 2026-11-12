@@ -9,6 +9,7 @@ import { LocalStorageAPI } from '@/lib/localstorage';
 import { rememberAthleteChrome } from '@/lib/athlete-chrome-cache';
 import AthleteAppShell from '@/components/athlete/AthleteAppShell';
 import { athletePublicLandingUrl } from '@/lib/gofast-with-me/athlete-community-routes';
+import { normalizePace } from '@/utils/formatPace';
 
 const TAB_IDS = ['profile-info', 'about-you', 'goal-perf'] as const;
 type ProfileTab = (typeof TAB_IDS)[number];
@@ -287,21 +288,33 @@ function AthleteEditProfileInner() {
       setError('Athlete ID not found.');
       return;
     }
+    const paceRaw = formData.fiveKPace.trim();
+    const fiveKPace = paceRaw ? normalizePace(paceRaw) : null;
+    if (paceRaw && !fiveKPace) {
+      setError('Enter 5K pace as minutes and seconds, like 7:34.');
+      return;
+    }
     beginSave();
     setLoading(true);
     try {
-      await api.put(`/athlete/${athleteId}/profile`, {
-        birthday: formData.birthday || null,
-        gender: formData.gender || null,
-        primarySport: formData.primarySport.trim() || null,
-        fiveKPace: formData.fiveKPace.trim() || null,
+      const payload: Record<string, unknown> = {
+        fiveKPace,
         weeklyMileage: (() => {
           const t = formData.weeklyMileage.trim();
           if (!t) return null;
           const n = Number(t);
           return Number.isFinite(n) ? n : null;
         })(),
-      });
+      };
+      if (formData.birthday.trim()) payload.birthday = formData.birthday;
+      if (formData.gender === 'male' || formData.gender === 'female') {
+        payload.gender = formData.gender;
+      }
+      if (formData.primarySport.trim()) payload.primarySport = formData.primarySport.trim();
+      await api.put(`/athlete/${athleteId}/profile`, payload);
+      if (fiveKPace) {
+        setFormData((prev) => ({ ...prev, fiveKPace }));
+      }
       setSuccess('Goal & Performance — saved.');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string; error?: string } } };
@@ -646,7 +659,9 @@ function AthleteEditProfileInner() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Birthday</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Birthday <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
                 <input
                   type="date"
                   value={formData.birthday}
@@ -657,7 +672,9 @@ function AthleteEditProfileInner() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Gender <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
                 <div className="flex flex-wrap gap-4">
                   <label className="flex items-center">
                     <input
@@ -709,8 +726,13 @@ function AthleteEditProfileInner() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Current 5K pace</label>
+                <p className="mb-1 text-xs text-gray-500">
+                  Minutes and seconds per mile, like 7:34. Not a finish time.
+                </p>
                 <input
                   type="text"
+                  inputMode="text"
+                  placeholder="7:34"
                   value={formData.fiveKPace}
                   onChange={(e) => handleInputChange('fiveKPace', e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"

@@ -265,14 +265,14 @@ function validateAndAssembleGoalTime(
       message: "Invalid time. Minutes and seconds must be under 60.",
     };
   }
-  if (h.trim() && h !== "0") {
-    const hh = parseInt(h, 10);
-    if (Number.isNaN(hh) || hh < 0) {
+  const hoursNum = parseInt(h, 10);
+  if (h.trim() && hoursNum !== 0) {
+    if (Number.isNaN(hoursNum) || hoursNum < 0) {
       return { ok: false, message: "Invalid hours." };
     }
     return {
       ok: true,
-      goalTime: `${h.padStart(2, "0")}:${m.padStart(2, "0")}:${s.padStart(2, "0")}`,
+      goalTime: `${String(hoursNum).padStart(2, "0")}:${m.padStart(2, "0")}:${s.padStart(2, "0")}`,
     };
   }
   return {
@@ -1159,7 +1159,9 @@ export default function GoalSetter({
                     <label className="block text-xs text-gray-500 mb-1">Hours</label>
                     <input
                       ref={hoursRef}
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
                       min={0}
                       max={23}
                       value={goalHours}
@@ -1193,7 +1195,9 @@ export default function GoalSetter({
                     <label className="block text-xs text-gray-500 mb-1">Minutes</label>
                     <input
                       ref={minutesRef}
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
                       min={0}
                       max={59}
                       value={goalMinutes}
@@ -1230,7 +1234,9 @@ export default function GoalSetter({
                     <label className="block text-xs text-gray-500 mb-1">Seconds</label>
                     <input
                       ref={secondsRef}
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
                       min={0}
                       max={59}
                       value={goalSeconds}
@@ -1266,7 +1272,9 @@ export default function GoalSetter({
                       </label>
                       <input
                         ref={shortHoursRef}
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
                         min={0}
                         max={23}
                         value={goalHours}
@@ -1300,7 +1308,9 @@ export default function GoalSetter({
                       <label className="block text-xs text-gray-500 mb-1">Minutes</label>
                       <input
                         ref={shortMinutesRef}
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
                         min={0}
                         max={59}
                         value={goalMinutes}
@@ -1341,7 +1351,9 @@ export default function GoalSetter({
                       <label className="block text-xs text-gray-500 mb-1">Seconds</label>
                       <input
                         ref={shortSecondsRef}
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
                         min={0}
                         max={59}
                         value={goalSeconds}

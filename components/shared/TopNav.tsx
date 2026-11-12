@@ -189,9 +189,9 @@ export default function TopNav({ showBack = false, backUrl, backLabel = 'Back' }
 
             {/* Profile Picture Button - Links to Edit Profile */}
             <Link
-              href="/athlete-edit-profile"
+              href="/profile/training"
               className="flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-gray-600 hover:text-gray-900 rounded-lg font-medium hover:bg-gray-100 transition"
-              title="Edit Profile"
+              title="Training & pace"
             >
               {photoSrc ? (
                 <img

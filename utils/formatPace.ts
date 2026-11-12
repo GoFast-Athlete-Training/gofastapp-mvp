@@ -96,18 +96,30 @@ export function validatePaceFormat(pace: string | null | undefined): boolean {
  */
 export function normalizePace(pace: string | null | undefined): string | null {
   if (!pace) return null;
-  
-  // Remove whitespace
-  pace = pace.trim();
-  
-  // If already in MM:SS format, validate and return
-  if (validatePaceFormat(pace)) {
-    // Ensure it's properly formatted (e.g., "8:0" -> "8:00")
-    const [minutes, seconds] = pace.split(':');
-    return `${minutes}:${seconds.padStart(2, '0')}`;
+
+  // Minutes and seconds only. "7:34:00" and "7:34/mi" both become "7:34".
+  const clock = pace.trim().split("/")[0]?.trim() ?? "";
+  if (!clock) return null;
+
+  const parts = clock.split(":");
+  if (parts.length >= 2) {
+    const minutes = parseInt(parts[0], 10);
+    const seconds = parseInt(parts[1], 10);
+    if (
+      Number.isFinite(minutes) &&
+      Number.isFinite(seconds) &&
+      minutes >= 0 &&
+      minutes <= 99 &&
+      seconds >= 0 &&
+      seconds <= 59
+    ) {
+      return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    }
+    return null;
   }
-  
-  // Try to parse other formats
+
+  pace = clock;
+
   // Handle "8.5" (8 minutes 30 seconds) -> "8:30"
   if (pace.includes('.')) {
     const [mins, dec] = pace.split('.');
@@ -143,6 +155,15 @@ export function paceToSeconds(pace: string | null | undefined): number | null {
   
   const [minutes, seconds] = normalized.split(':').map(Number);
   return minutes * 60 + seconds;
+}
+
+/**
+ * Saved 5K pace for display: "7:34/mi".
+ */
+export function formatFiveKPacePerMile(pace: string | null | undefined): string | null {
+  const normalized = normalizePace(pace);
+  if (!normalized) return null;
+  return `${normalized}/mi`;
 }
 
 /**

@@ -121,26 +121,31 @@ export function WeekByWeekSetupPanel({
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <input
-              type="number"
-              min={2}
-              max={30}
-              placeholder="min"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="7"
+              aria-label="Pace minutes"
               className="w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
               value={paceMin}
-              onChange={(e) => onPaceMinChange(e.target.value)}
+              onChange={(e) => onPaceMinChange(e.target.value.replace(/\D/g, "").slice(0, 2))}
             />
             <span className="text-gray-500">:</span>
             <input
-              type="number"
-              min={0}
-              max={59}
-              placeholder="sec"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="34"
+              aria-label="Pace seconds"
               className="w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
               value={paceSec}
-              onChange={(e) => onPaceSecChange(e.target.value)}
+              onChange={(e) => onPaceSecChange(e.target.value.replace(/\D/g, "").slice(0, 2))}
             />
             <span className="text-sm text-gray-600">min / mile</span>
           </div>
+          <p className="mt-1.5 text-xs text-gray-600">
+            Example: 7:34 /mile — how fast you run a mile now, not your 5K finish time.
+          </p>
         </div>
       </div>
 

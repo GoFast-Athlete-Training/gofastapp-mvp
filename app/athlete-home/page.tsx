@@ -1616,9 +1616,18 @@ export default function AthleteHomePage() {
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-gray-500 text-xs">Current 5K</dt>
+                        <dt className="text-gray-500 text-xs">Current 5K pace</dt>
                         <dd className="font-semibold text-gray-900 tabular-nums">
-                          {fiveKPaceStr ?? '—'}
+                          {current5kSecPerMile != null ? (
+                            formatSecPerMile(current5kSecPerMile)
+                          ) : (
+                            <Link
+                              href="/profile/training"
+                              className="text-orange-700 hover:underline"
+                            >
+                              Set 5K pace
+                            </Link>
+                          )}
                         </dd>
                       </div>
                       <div>

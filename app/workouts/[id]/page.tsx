@@ -470,8 +470,11 @@ function CataloguePrescriptionCard({
         <div className="border border-amber-200 bg-amber-50 rounded-lg p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Coach prescription</h2>
           <p className="text-sm text-amber-900">
-            Set your current 5K pace on your profile (and ensure your plan has a baseline) to see
-            coaching notes and target paces for this workout.
+            Set your current 5K pace (minutes per mile, like 7:34) on your{" "}
+            <Link href="/profile/training" className="font-semibold underline">
+              profile
+            </Link>{" "}
+            to see coaching notes and target paces for this workout.
           </p>
         </div>
       );
