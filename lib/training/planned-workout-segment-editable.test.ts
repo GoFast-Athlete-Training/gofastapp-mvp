@@ -11,6 +11,20 @@ test("defaultWorkPaceBandSecPerMile seeds easy band from 5K anchor", () => {
   assert.deepEqual(defaultWorkPaceBandSecPerMile(386, "Tempo"), { low: 401, high: 401 });
 });
 
+test("seedWorkBlockPaceIfMissing skips recovery without stored PACE", () => {
+  const editable = segmentToEditablePlanned({
+    id: "r1",
+    stepOrder: 2,
+    title: "Recovery",
+    durationType: "DISTANCE",
+    durationValue: 0.062,
+    targets: [],
+  });
+  const seeded = seedWorkBlockPaceIfMissing(editable, "Recovery", "Interval", 382);
+  assert.equal(seeded.paceLowMin, "");
+  assert.equal(seeded.paceHighMin, "");
+});
+
 test("seedWorkBlockPaceIfMissing fills tempo work block without stored PACE", () => {
   const editable = segmentToEditablePlanned({
     id: "s1",

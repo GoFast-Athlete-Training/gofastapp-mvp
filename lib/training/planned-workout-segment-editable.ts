@@ -5,6 +5,7 @@ import {
 } from "@/lib/workout-generator/pace-calculator";
 import { parseSplitPaceToSecPerMile, secPerMileToSplitStrings } from "@/lib/workout/pace-mi-split";
 import { inferSegmentKind } from "@/lib/group-workout-segment-editor";
+import { isRecoveryTitle } from "@/lib/training/segment-summary";
 
 export type PlannedWorkoutSegment = {
   id: string;
@@ -158,6 +159,7 @@ export function seedWorkBlockPaceIfMissing(
   workoutType: string,
   fiveKSecPerMile: number | null
 ): EditablePlannedSegment {
+  if (isRecoveryTitle(segmentTitle)) return editable;
   if (inferSegmentKind(segmentTitle) !== "work") return editable;
   if (editable.paceLowMin.trim() || editable.paceLowSec.trim()) return editable;
   if (fiveKSecPerMile == null || !Number.isFinite(fiveKSecPerMile)) return editable;
@@ -222,8 +224,10 @@ export function editablePlannedSegmentsToApiPayload(segments: EditablePlannedSeg
     }
 
     const kind = inferSegmentKind(title);
+    const recovery = isRecoveryTitle(title);
     let targets: unknown = null;
-    if (kind === "work") {
+    const allowPaceTargets = kind === "work" || recovery;
+    if (allowPaceTargets) {
       const lowSecMi = parseSplitPaceToSecPerMile(
         s.paceLowMin,
         s.paceLowSec,

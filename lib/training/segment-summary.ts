@@ -18,7 +18,7 @@ export const SEGMENT_METERS_PER_MILE = 1609.34;
 
 /** Standard track rep lengths — only these display as meters (not ~3 mi MP blocks). */
 export const STANDARD_TRACK_REP_METERS = [
-  200, 400, 600, 800, 1000, 1200, 1500, 1600, 2000, 3000, 5000,
+  100, 200, 400, 600, 800, 1000, 1200, 1500, 1600, 2000, 3000, 5000,
 ] as const;
 
 function isWholeNumber(value: number): boolean {
@@ -43,6 +43,11 @@ function isStandardTrackRepMeters(meters: number): boolean {
   if (!Number.isFinite(meters) || meters <= 0) return false;
   for (const target of STANDARD_TRACK_REP_METERS) {
     const relErr = Math.abs(meters - target) / target;
+    if (relErr <= 0.005) return true;
+  }
+  const grid = Math.round(meters / 50) * 50;
+  if (grid > 0) {
+    const relErr = Math.abs(meters - grid) / grid;
     if (relErr <= 0.005) return true;
   }
   return false;
@@ -252,7 +257,7 @@ export function effectiveRepeatCount(group: SegmentDisplayGroup): number {
   return 1;
 }
 
-function tryCollapseAlternatingWorkRecovery<T extends SegmentLike>(
+export function tryCollapseAlternatingWorkRecovery<T extends SegmentLike>(
   segmentsInOrder: T[],
   start: number
 ): { workCount: number; recovery?: T; nextIndex: number } | null {
