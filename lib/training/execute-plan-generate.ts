@@ -384,7 +384,12 @@ export async function executePlanGenerate(params: {
         entryLongRunMiles: phaseBuild.startLongRunMiles,
         peakLongRunMiles: phaseBuild.peakLongRunMiles,
         entryWeeklyMiles: phaseBaseBuild?.peakWeeklyMiles ?? null,
-        peakWeeklyMiles: phaseBuild.peakWeeklyMiles ?? presetPeakMiles,
+        peakWeeklyMiles:
+          phasePreset?.maxWeeklyMiles != null &&
+          Number.isFinite(phasePreset.maxWeeklyMiles) &&
+          phasePreset.maxWeeklyMiles > 0
+            ? phasePreset.maxWeeklyMiles
+            : (phaseBuild.peakWeeklyMiles ?? presetPeakMiles),
         longRunCutback: phaseBuild.longRunCutback ?? null,
       })
     : null;
