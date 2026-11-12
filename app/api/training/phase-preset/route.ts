@@ -28,7 +28,16 @@ export async function GET(request: NextRequest) {
 
   const rows = await prisma.phase_preset.findMany({
     orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true, updatedAt: true },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      longRunConfigId: true,
+      easyConfigId: true,
+      tempoConfigId: true,
+      intervalsConfigId: true,
+      updatedAt: true,
+    },
   });
   return NextResponse.json({ success: true, phasePresets: rows });
 }
@@ -40,11 +49,19 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const id = typeof body.id === "string" && body.id.trim() ? body.id.trim() : null;
+  const data = phaseData(body);
   if (!id) {
-    return NextResponse.json({ success: false, error: "id is required" }, { status: 400 });
+    try {
+      const row = await prisma.phase_preset.create({ data });
+      return NextResponse.json({ success: true, phasePreset: row });
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Could not create phase preset." },
+        { status: 400 },
+      );
+    }
   }
 
-  const data = phaseData(body);
   try {
     const row = await prisma.phase_preset.upsert({
       where: { id },

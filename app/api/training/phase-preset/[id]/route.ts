@@ -50,3 +50,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ success: false, error: "Phase preset not found" }, { status: 404 });
   }
 }
+
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const authError = await assertStaffBearerAuth(request);
+  if (authError) return authError;
+  const { id } = await params;
+  try {
+    await prisma.phase_preset.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ success: false, error: "Phase preset not found" }, { status: 404 });
+  }
+}
