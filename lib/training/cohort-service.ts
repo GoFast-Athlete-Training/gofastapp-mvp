@@ -392,7 +392,6 @@ export async function joinTrainingCohort(
     where: { athleteId },
   });
   const preferredDays = prefs?.preferredDays?.length ? prefs.preferredDays : [];
-  const fiveKPace = athlete.fiveKPace ?? null;
   const weeklyResolved = athlete.weeklyMileage ?? null;
 
   const planName = `${race.name} — group training`;
@@ -470,7 +469,6 @@ export async function joinTrainingCohort(
         totalWeeks,
         currentWeeklyMileage: weeklyResolved,
         weeklyMileageTarget: null,
-        currentFiveKPace: fiveKPace,
         goalRaceTime: gt,
         ...(imprintedGoalPace ? { goalRacePace: imprintedGoalPace } : {}),
         lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
@@ -515,7 +513,6 @@ export async function joinTrainingCohort(
       preferredLongRunDow: result.plan.preferredLongRunDow ?? null,
       preferredTempoDow: result.plan.preferredTempoDow ?? null,
       preferredIntervalDow: result.plan.preferredIntervalDow ?? null,
-      currentFiveKPace: result.plan.currentFiveKPace,
       weeklyMileageTarget: result.plan.weeklyMileageTarget,
     },
     weeklyMileageTarget,

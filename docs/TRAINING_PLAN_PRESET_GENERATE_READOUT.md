@@ -41,7 +41,7 @@ build_preset
 - **Taper** (`taper_preset`): `week1*` / `week2*` totals and long-run miles, `weekPins`, `slots`.
 - **Race week** (`race_week_preset`): `slots`.
 - **Prodpush** (`lib/training/preset-prodpush-upsert.ts`): upserts kept preset scalars and phase rows; ignores dropped JSON/pool fields in the payload.
-- **Plan row**: stores `presetId`, athlete baseline (`currentWeeklyMileage`, `weeklyMileageTarget`, `currentFiveKPace`), goal race (`athleteRaceId` → `athlete_races`), preferred days, and after generate the schedule JSON and snapshots. Generate does not re-copy the whole preset onto the plan.
+- **Plan row**: stores `presetId`, athlete baseline (`currentWeeklyMileage`, `weeklyMileageTarget`), goal race (`athleteRaceId` → `athlete_races`), preferred days, and after generate the schedule JSON and snapshots. 5K pace lives on `Athlete.fiveKPace`. Generate does not re-copy the whole preset onto the plan.
 
 ## How plan generate reads it
 

@@ -234,7 +234,7 @@ async function rematerializeFutureDaysInWeek(params: {
     const nativeSteps = buildScheduleNativeWorkoutSteps({
       workoutType: d.workoutType,
       miles: d.estimatedDistanceInMeters / 1609.34,
-      fiveKPace: params.plan.currentFiveKPace,
+      fiveKPace: params.plan.athleteFiveKPace,
     });
     if (nativeSteps.length > 0) {
       try {
@@ -334,7 +334,7 @@ async function commitWorkoutIngest(params: {
   const nativeSteps = buildScheduleNativeWorkoutSteps({
     workoutType: workout.workoutType,
     miles: workout.miles,
-    fiveKPace: params.plan.currentFiveKPace,
+    fiveKPace: params.plan.athleteFiveKPace,
   });
   if (nativeSteps.length > 0) {
     const days = expandWeekSchedule({

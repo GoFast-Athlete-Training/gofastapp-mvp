@@ -146,7 +146,6 @@ export async function planGeneratePostHandler(
         preferredLongRunDow: plan.preferredLongRunDow ?? null,
         preferredTempoDow: plan.preferredTempoDow ?? null,
         preferredIntervalDow: plan.preferredIntervalDow ?? null,
-        currentFiveKPace: plan.currentFiveKPace,
         weeklyMileageTarget: plan.weeklyMileageTarget,
       },
       weeklyMileageTarget,

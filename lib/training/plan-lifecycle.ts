@@ -255,7 +255,7 @@ export async function ensureRetiredActivePlansForPastRaces(
   return archivedIds;
 }
 
-/** Copy Athlete.fiveKPace onto the single ACTIVE training plan (if any). */
+/** Rebuild today + future planned workouts from Athlete.fiveKPace. */
 export async function syncAthleteFiveKPaceToActivePlan(athleteId: string): Promise<void> {
   const athlete = await prisma.athlete.findUnique({
     where: { id: athleteId },
@@ -264,6 +264,7 @@ export async function syncAthleteFiveKPaceToActivePlan(athleteId: string): Promi
   if (!athlete) return;
 
   const pace = athlete.fiveKPace?.trim() || null;
+  if (!pace) return;
 
   const active = await prisma.training_plans.findFirst({
     where: { athleteId, lifecycleStatus: TrainingPlanLifecycle.ACTIVE },
@@ -271,24 +272,14 @@ export async function syncAthleteFiveKPaceToActivePlan(athleteId: string): Promi
   });
   if (!active) return;
 
-  await prisma.training_plans.update({
-    where: { id: active.id },
-    data: {
-      currentFiveKPace: pace,
-      updatedAt: new Date(),
-    },
-  });
-
-  if (pace) {
-    try {
-      await rematerializeFuturePlannedWorkoutsForPlan({
-        athleteId,
-        planId: active.id,
-        fromDateKey: productTodayKey(),
-        refreshFromAthleteFiveK: true,
-      });
-    } catch (err) {
-      console.error("rematerializeFuturePlannedWorkoutsForPlan after 5K sync:", err);
-    }
+  try {
+    await rematerializeFuturePlannedWorkoutsForPlan({
+      athleteId,
+      planId: active.id,
+      fromDateKey: productTodayKey(),
+      refreshFromAthleteFiveK: true,
+    });
+  } catch (err) {
+    console.error("rematerializeFuturePlannedWorkoutsForPlan after 5K sync:", err);
   }
 }

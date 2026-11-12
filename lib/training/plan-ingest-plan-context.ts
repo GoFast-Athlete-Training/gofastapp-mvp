@@ -23,7 +23,7 @@ export type AthletePlanContext = {
   totalWeeks: number;
   planSchedule: unknown;
   taperStartWeekNumber: number | null;
-  currentFiveKPace: string | null;
+  athleteFiveKPace: string | null;
   name: string;
   raceCtx: ReturnType<typeof planRaceScheduleContextFromPlan>;
 };
@@ -32,35 +32,40 @@ export async function loadAthletePlanContext(
   planId: string,
   athleteId: string
 ): Promise<AthletePlanContext | null> {
-  const plan = await prisma.training_plans.findFirst({
-    where: { id: planId, athleteId },
-    select: {
-      id: true,
-      athleteId: true,
-      startDate: true,
-      totalWeeks: true,
-      planSchedule: true,
-      taperStartWeekNumber: true,
-      currentFiveKPace: true,
-      name: true,
-      athlete_race: {
-        select: {
-          raceDate: true,
-          name: true,
-          distanceMeters: true,
-          distanceLabel: true,
+  const [plan, athlete] = await Promise.all([
+    prisma.training_plans.findFirst({
+      where: { id: planId, athleteId },
+      select: {
+        id: true,
+        athleteId: true,
+        startDate: true,
+        totalWeeks: true,
+        planSchedule: true,
+        taperStartWeekNumber: true,
+        name: true,
+        athlete_race: {
+          select: {
+            raceDate: true,
+            name: true,
+            distanceMeters: true,
+            distanceLabel: true,
+          },
+        },
+        race_registry: {
+          select: {
+            raceDate: true,
+            name: true,
+            distanceMeters: true,
+            distanceLabel: true,
+          },
         },
       },
-      race_registry: {
-        select: {
-          raceDate: true,
-          name: true,
-          distanceMeters: true,
-          distanceLabel: true,
-        },
-      },
-    },
-  });
+    }),
+    prisma.athlete.findUnique({
+      where: { id: athleteId },
+      select: { fiveKPace: true },
+    }),
+  ]);
   if (!plan) return null;
 
   return {
@@ -70,7 +75,7 @@ export async function loadAthletePlanContext(
     totalWeeks: plan.totalWeeks,
     planSchedule: plan.planSchedule,
     taperStartWeekNumber: plan.taperStartWeekNumber,
-    currentFiveKPace: plan.currentFiveKPace,
+    athleteFiveKPace: athlete?.fiveKPace?.trim() || null,
     name: plan.name,
     raceCtx: planRaceScheduleContextFromPlan(plan),
   };

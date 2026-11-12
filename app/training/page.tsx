@@ -55,7 +55,6 @@ type PlanDetailHub = {
   planSchedule: unknown;
   weeklyMileageTarget?: number | null;
   peakLongRunPoolMiles?: number | null;
-  currentFiveKPace?: string | null;
   _count?: { planned_workouts: number };
   raceId?: string | null;
   race_registry: {
@@ -193,10 +192,9 @@ export default function TrainingHubPage() {
   }, [planDetail?.race_registry?.raceDate]);
 
   const paceDisplay = useMemo(() => {
-    if (!planDetail) return null;
-    const p = athleteFiveKPace?.trim() || planDetail.currentFiveKPace?.trim();
+    const p = athleteFiveKPace?.trim();
     return p || null;
-  }, [planDetail, athleteFiveKPace]);
+  }, [athleteFiveKPace]);
 
   const goalPaceDisplay = useMemo(() => {
     if (goalRacePaceResolved?.goalPaceDisplay?.trim()) {

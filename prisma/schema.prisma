@@ -2958,8 +2958,6 @@ model training_plans {
   weeklyMileageTarget  Int?
   /// Plan-level override for peak long-run pool (sum of 4 peak-block Saturdays); falls back to blueprint at generate.
   peakLongRunPoolMiles Float?
-  /// Snapshot of current 5K pace for plan-scoped hydration/comparison
-  currentFiveKPace     String?
   /// Goal race finish time, e.g. "2:59:00" (marathon). Drives mpSimulation workouts.
   goalRaceTime         String?
   /// Imprinted goal pace per mile, e.g. "6:52" — derived from goalRaceTime + race distance.

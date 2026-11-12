@@ -15,7 +15,6 @@ const activityInclude = {
         select: {
           id: true,
           name: true,
-          currentFiveKPace: true,
           athleteRaceId: true,
           lifecycleStatus: true,
         },

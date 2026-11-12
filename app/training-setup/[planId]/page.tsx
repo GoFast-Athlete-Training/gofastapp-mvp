@@ -110,7 +110,6 @@ type PlanDetail = {
   weeklyMileageTarget?: number | null;
   peakLongRunPoolMiles?: number | null;
   currentWeeklyMileage?: number | null;
-  currentFiveKPace?: string | null;
   _count?: { planned_workouts: number };
   athlete_race?: {
     id: string;
@@ -381,8 +380,7 @@ export default function TrainingSetupPlanPage({
         ? String(longRunCapabilityMiles)
         : "",
     );
-    const existingFiveK =
-      athleteFiveKPace?.trim() || plan.currentFiveKPace?.trim() || "";
+    const existingFiveK = athleteFiveKPace?.trim() || "";
     if (existingFiveK) {
       const parts = parseFiveKPaceToParts(existingFiveK);
       setPaceMin(parts.min);
@@ -399,7 +397,6 @@ export default function TrainingSetupPlanPage({
     plan?.preferredIntervalDow,
     plan?.weeklyMileageTarget,
     plan?.currentWeeklyMileage,
-    plan?.currentFiveKPace,
     athleteFiveKPace,
     longRunCapabilityMiles,
     plan?.training_plan_preset?.minWeeklyMiles,
@@ -718,7 +715,6 @@ export default function TrainingSetupPlanPage({
     const fiveKOut =
       buildFiveKPaceFromParts(paceMin.trim(), paceSec.trim()) ||
       athleteFiveKPace?.trim() ||
-      plan?.currentFiveKPace?.trim() ||
       null;
     if (!fiveKOut) {
       setError("Enter your current 5K pace (minutes and seconds 0–59).");
@@ -745,22 +741,20 @@ export default function TrainingSetupPlanPage({
       longRunMiles,
       returningFromInjury: false,
     });
-    const planBody: Record<string, unknown> = { currentFiveKPace: fiveKOut };
     if (!hasSchedule) {
-      planBody.currentWeeklyMileage = start.weeklyMiles;
-    }
-    const planRes = await fetch(`/api/training-plan/${planId}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...athleteBearerFetchHeaders(token),
-      },
-      body: JSON.stringify(planBody),
-    });
-    if (!planRes.ok) {
-      const data = (await planRes.json().catch(() => ({}))) as { error?: string };
-      setError(data.error || "Could not save your starting mileage");
-      return false;
+      const planRes = await fetch(`/api/training-plan/${planId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...athleteBearerFetchHeaders(token),
+        },
+        body: JSON.stringify({ currentWeeklyMileage: start.weeklyMiles }),
+      });
+      if (!planRes.ok) {
+        const data = (await planRes.json().catch(() => ({}))) as { error?: string };
+        setError(data.error || "Could not save your starting mileage");
+        return false;
+      }
     }
     const athleteId = LocalStorageAPI.getAthleteId();
     if (athleteId) {
@@ -1449,7 +1443,7 @@ export default function TrainingSetupPlanPage({
               />
             ) : null}
 
-            {!(plan.currentFiveKPace?.trim() || athleteFiveKPace?.trim()) ? (
+            {!athleteFiveKPace?.trim() ? (
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <label className="mb-1 block text-xs font-medium text-gray-700">
                   What&apos;s your current 5K pace? (required)

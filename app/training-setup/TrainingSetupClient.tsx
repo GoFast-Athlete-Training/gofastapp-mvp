@@ -1029,7 +1029,6 @@ export default function TrainingSetupClient() {
         presetId?: string | null;
         athletePresetId?: string | null;
         currentWeeklyMileage?: number | null;
-        currentFiveKPace?: string | null;
         training_plan_preset?: { title?: string } | null;
       };
       if (detail.athletePresetId) {
@@ -1058,7 +1057,7 @@ export default function TrainingSetupClient() {
       ) {
         setBaselineWeeklyMileage(String(Math.round(Number(detail.currentWeeklyMileage))));
       }
-      const fiveKToCopy = athleteFiveKPace?.trim() || detail.currentFiveKPace?.trim() || "";
+      const fiveKToCopy = athleteFiveKPace?.trim() || "";
       if (fiveKToCopy) {
         const parts = parseFiveKPaceToParts(fiveKToCopy);
         setPaceMin(parts.min);

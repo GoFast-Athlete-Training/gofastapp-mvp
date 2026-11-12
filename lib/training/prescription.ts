@@ -7,7 +7,6 @@
 import type { workout_catalogue, WorkoutType } from "@prisma/client";
 import {
   getTrainingPaces,
-  parsePaceToSecondsPerMile,
   paceTargetFromSecondsPerMile,
   type PaceZone,
   type TrainingPaces,
@@ -47,19 +46,6 @@ export type WorkoutStep = {
   recoveryDurationType?: string | null;
   recoveryDurationValue?: number | null;
 };
-
-/** Parses plan snapshot string (e.g. "7:30") to anchor sec/mile for zone math. */
-export function anchorSecondsPerMileFromPlanPace(
-  currentFiveKPace: string | null
-): number {
-  const raw = currentFiveKPace?.trim();
-  if (!raw) {
-    throw new Error(
-      "training_plans.currentFiveKPace is required; set it from Athlete.fiveKPace when generating or updating the plan."
-    );
-  }
-  return parsePaceToSecondsPerMile(raw);
-}
 
 function round(n: number, d: number): number {
   const f = 10 ** d;

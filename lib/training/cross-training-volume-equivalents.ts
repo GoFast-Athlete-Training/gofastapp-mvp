@@ -1,6 +1,6 @@
 /**
  * Conservative run-mile equivalents for cross-training volume (readiness copy only).
- * Does not affect `currentFiveKPace` or Garmin prescription.
+ * Does not affect Athlete.fiveKPace or Garmin prescription.
  */
 
 /** Per mile ridden (road / trainer), mapped to a small run-mile credit for aerobic load. */

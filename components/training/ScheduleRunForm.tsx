@@ -86,7 +86,6 @@ export default function ScheduleRunForm({
           date?: string | null;
           estimatedDistanceInMeters?: number | null;
           profileFiveKPace?: string | null;
-          training_plans?: { currentFiveKPace?: string | null } | null;
         };
       }>(`/training/workout/${initialWorkoutId}`);
       const w = data?.workout;
@@ -110,10 +109,7 @@ export default function ScheduleRunForm({
           setRunDate(d.toISOString().slice(0, 10));
         }
       }
-      const pace =
-        w.profileFiveKPace?.trim() ||
-        w.training_plans?.currentFiveKPace?.trim() ||
-        null;
+      const pace = w.profileFiveKPace?.trim() || null;
       setFiveKPace(pace);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } } };

@@ -240,7 +240,7 @@ export async function previewPlanIngest(params: {
     const parsed = tryParsePastedWorkoutText(text, workoutTypeHint);
     let parseSource: "deterministic" | "openai" = "deterministic";
     let segments = parsed
-      ? parsedPasteToAiGenerateResponse(parsed, plan.currentFiveKPace).segments
+      ? parsedPasteToAiGenerateResponse(parsed, plan.athleteFiveKPace).segments
       : [];
 
     let workoutType: WorkoutType = workoutTypeHint;
@@ -261,7 +261,7 @@ export async function previewPlanIngest(params: {
         paceNote: text,
         workoutType: workoutTypeHint,
         miles: 0,
-        fiveKPace: plan.currentFiveKPace,
+        fiveKPace: plan.athleteFiveKPace,
       });
       if (fromPaceNote?.length) {
         segments = fromPaceNote;
@@ -288,7 +288,7 @@ export async function previewPlanIngest(params: {
         buildScheduleNativeWorkoutSteps({
           workoutType: day.workoutType,
           miles: day.miles,
-          fiveKPace: plan.currentFiveKPace,
+          fiveKPace: plan.athleteFiveKPace,
         }) ?? [];
       parseSource = segments.length > 0 ? "deterministic" : parseSource;
     }
@@ -297,7 +297,7 @@ export async function previewPlanIngest(params: {
       segments = buildScheduleNativeWorkoutSteps({
         workoutType,
         miles,
-        fiveKPace: plan.currentFiveKPace,
+        fiveKPace: plan.athleteFiveKPace,
       });
     }
 
@@ -407,7 +407,7 @@ export async function previewPlanIngest(params: {
             week: incomingWeek,
             planStartDate: plan.startDate,
             weekNumber,
-            fiveKPace: plan.currentFiveKPace,
+            fiveKPace: plan.athleteFiveKPace,
           })
         : {};
 
@@ -515,7 +515,7 @@ export async function previewPlanIngest(params: {
           week: w,
           planStartDate: planCtx.startDate,
           weekNumber: wn,
-          fiveKPace: planCtx.currentFiveKPace,
+          fiveKPace: planCtx.athleteFiveKPace,
         });
         Object.assign(daySegmentsByDateKey, weekSegs);
       }

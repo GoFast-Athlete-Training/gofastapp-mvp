@@ -356,7 +356,6 @@ export async function POST(request: NextRequest) {
           currentWeeklyMileage: weeklyResolved,
           /// Set on the preferences screen after plan creation — not the wizard baseline.
           weeklyMileageTarget: null,
-          currentFiveKPace: fiveKPaceResolved,
           goalRaceTime: gt,
           ...(imprintedGoalPace ? { goalRacePace: imprintedGoalPace } : {}),
           lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
@@ -491,7 +490,6 @@ export async function GET(request: NextRequest) {
         planSchedule: true,
         weeklyMileageTarget: true,
         lifecycleStatus: true,
-        currentFiveKPace: true,
         createdAt: true,
         updatedAt: true,
         race_registry: { select: { name: true, raceDate: true, raceDay: true } },

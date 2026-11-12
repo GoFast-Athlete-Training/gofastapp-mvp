@@ -199,7 +199,6 @@ interface Workout {
     id: string;
     name: string;
     totalWeeks: number;
-    currentFiveKPace?: string | null;
     lifecycleStatus?: string;
   } | null;
   slug?: string | null;
@@ -1309,12 +1308,9 @@ export default function WorkoutDetailPage() {
     quickOrderDirty || quickOverridesDirty || conversationalPaceDirty || titleDirty;
 
   const profileFiveKPaceDisplay = useMemo(() => {
-    const paceStr =
-      workout?.profileFiveKPace?.trim() ||
-      workout?.training_plans?.currentFiveKPace?.trim() ||
-      null;
+    const paceStr = workout?.profileFiveKPace?.trim() || null;
     return paceStr;
-  }, [workout?.profileFiveKPace, workout?.training_plans?.currentFiveKPace]);
+  }, [workout?.profileFiveKPace]);
 
   const fiveKAnchorSec = useMemo(() => {
     if (!profileFiveKPaceDisplay) return null;
@@ -3513,10 +3509,7 @@ export default function WorkoutDetailPage() {
           <CataloguePrescriptionCard
             catalogue={workout.workout_catalogue}
             prescriptionNarrative={workout.prescriptionNarrative}
-            fiveKPaceSnapshot={
-              workout.profileFiveKPace?.trim() ||
-              workout.training_plans?.currentFiveKPace
-            }
+            fiveKPaceSnapshot={workout.profileFiveKPace?.trim() || null}
             estimatedDistanceInMeters={workout.estimatedDistanceInMeters ?? null}
             targetPaceSecPerMile={workout.targetPaceSecPerMile}
             targetPaceSecPerMileHigh={workout.targetPaceSecPerMileHigh}

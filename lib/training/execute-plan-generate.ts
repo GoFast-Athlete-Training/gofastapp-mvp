@@ -79,7 +79,6 @@ export async function executePlanGenerate(params: {
     preferredLongRunDow: number | null;
     preferredTempoDow?: number | null;
     preferredIntervalDow?: number | null;
-    currentFiveKPace: string | null;
     weeklyMileageTarget: number | null;
   };
   weeklyMileageTarget: number;
@@ -602,10 +601,7 @@ export async function executePlanGenerate(params: {
     });
   }
 
-  const syncedFiveKPace =
-    params.athleteFiveKPace?.trim() ||
-    plan.currentFiveKPace?.trim() ||
-    null;
+  const athleteFiveKPace = params.athleteFiveKPace?.trim() || null;
 
   const needsFiveKAnchor = schedule.some((w) =>
     w.days.some(
@@ -615,9 +611,9 @@ export async function executePlanGenerate(params: {
         d.workoutType === "Race"
     )
   );
-  if (needsFiveKAnchor && !syncedFiveKPace) {
+  if (needsFiveKAnchor && !athleteFiveKPace) {
     throw new Error(
-      "Set 5K pace on your athlete profile before generating a plan (syncs to the plan for workout zones)."
+      "Set 5K pace on your athlete profile before generating a plan."
     );
   }
 
@@ -659,7 +655,6 @@ export async function executePlanGenerate(params: {
         ? { peakLongRunPoolMiles }
         : {}),
       totalWeeks: weekCount,
-      ...(syncedFiveKPace != null ? { currentFiveKPace: syncedFiveKPace } : {}),
       ...(mergedGoalTime ? { goalRaceTime: mergedGoalTime } : {}),
       ...(imprintPace ? { goalRacePace: imprintPace } : {}),
       updatedAt: new Date(),

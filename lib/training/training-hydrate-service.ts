@@ -298,10 +298,7 @@ export async function loadTrainingHydrateSnapshot(
   });
   const goalPaceSecPerMile = resolvedGoalPace.goalPaceSecPerMile;
 
-  const current5k =
-    athlete?.fiveKPace?.trim() ||
-    plan.currentFiveKPace?.trim() ||
-    null;
+  const current5k = athlete?.fiveKPace?.trim() || null;
   const current5kSecPerMile = parsePaceStringToSecPerMile(current5k);
   const goalPace5KSecPerMile = linkedGoal?.goalPace5K ?? null;
 

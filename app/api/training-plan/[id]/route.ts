@@ -303,7 +303,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       return NextResponse.json({ plan: planRow, restored: true });
     }
 
-    const patchKeys = Object.keys(body);
+    const patchKeys = Object.keys(body).filter((k) => k !== "currentFiveKPace");
     if (patchKeys.length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
@@ -311,7 +311,6 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       const invalid = patchKeys.filter(
         (k) =>
           k !== "lifecycleStatus" &&
-          k !== "currentFiveKPace" &&
           k !== "name" &&
           !REGENERATE_PATCH_KEYS.has(k)
       );
@@ -319,7 +318,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         return NextResponse.json(
           {
             error:
-              "After the training schedule is generated, only lifecycleStatus, currentFiveKPace, athleteRaceId, weeklyMileageTarget, peakLongRunPoolMiles, and training-day preferences can be updated",
+              "After the training schedule is generated, only lifecycleStatus, athleteRaceId, weeklyMileageTarget, peakLongRunPoolMiles, and training-day preferences can be updated",
           },
           { status: 400 }
         );
@@ -510,12 +509,6 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           return NextResponse.json({ error: chk.error }, { status: 400 });
         }
       }
-    }
-
-    if (typeof body.currentFiveKPace === "string") {
-      data.currentFiveKPace = body.currentFiveKPace.trim() || null;
-    } else if (body.currentFiveKPace === null) {
-      data.currentFiveKPace = null;
     }
 
     if (body.lifecycleStatus === TrainingPlanLifecycle.ACTIVE) {
