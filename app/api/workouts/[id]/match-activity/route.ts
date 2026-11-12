@@ -364,20 +364,10 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         athleteId: auth.athlete.id,
       });
 
-      if (!reassignResult.success) {
-        return NextResponse.json(
-          {
-            error: `Activity is already linked to "${reassignResult.conflict.workoutTitle}"`,
-            conflict: reassignResult.conflict,
-          },
-          { status: 409 }
-        );
-      }
-
       return NextResponse.json({
         success: true,
         workoutId: reassignResult.workoutId,
-        reassignedFrom: reassignResult.reassignedFrom ?? null,
+        reassignedFrom: null,
       });
     }
 
