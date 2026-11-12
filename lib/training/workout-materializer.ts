@@ -185,8 +185,10 @@ async function buildPrescriptionSteps(params: {
     paceAdjusterThresholdSecPerMile: number | null;
     paceAdjusterIntervalSecPerMile: number | null;
   } | null;
+  presetPaceNudgeSecPerMile?: number | null;
 }): Promise<{ steps: WorkoutStep[]; goalRacePaceSecPerMile: number | null }> {
   const { scheduled, plan, race, athlete } = params;
+  const presetPaceNudgeSecPerMile = params.presetPaceNudgeSecPerMile ?? 0;
   if (!plan) {
     throw new MaterializeWorkoutError("Plan not found");
   }
@@ -272,6 +274,7 @@ async function buildPrescriptionSteps(params: {
       distanceLabel: race?.distanceLabel ?? null,
     },
     planCycleIndex: scheduled.planCycleIndex ?? null,
+    presetPaceNudgeSecPerMile,
   });
 
   return {
@@ -342,6 +345,14 @@ export async function materializeWorkoutForPlanDay(params: {
   if (!plan) {
     throw new MaterializeWorkoutError("Plan not found");
   }
+
+  const presetNudgeRow = plan.presetId
+    ? await prisma.training_plan_preset.findUnique({
+        where: { id: plan.presetId },
+        select: { paceNudgeSecPerMile: true },
+      })
+    : null;
+  const presetPaceNudgeSecPerMile = presetNudgeRow?.paceNudgeSecPerMile ?? 0;
 
   const raceCtx = planRaceScheduleContextFromPlan(plan);
 
@@ -435,6 +446,7 @@ export async function materializeWorkoutForPlanDay(params: {
     plan,
     race,
     athlete: athleteRow,
+    presetPaceNudgeSecPerMile,
   });
   assertPrescriptionSteps(steps, scheduled, dateKey);
 

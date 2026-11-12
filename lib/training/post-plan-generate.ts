@@ -126,6 +126,8 @@ export async function planGeneratePostHandler(
       athleteId: athlete.id,
       athleteFiveKPace: athlete.fiveKPace,
       athleteWeeklyMileage: athlete.weeklyMileage,
+      athleteLongRunMiles: athlete.longRunCapabilityMiles,
+      athleteAvgWeeklyMiles: athlete.avgWeeklyMilesSnapshot,
       plan: {
         id: plan.id,
         presetId: plan.presetId,

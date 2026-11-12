@@ -88,6 +88,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (typeof body.maxWeeklyMiles === "number" && Number.isFinite(body.maxWeeklyMiles)) {
     data.maxWeeklyMiles = Math.max(1, Math.round(body.maxWeeklyMiles));
   }
+  if (typeof body.paceNudgeSecPerMile === "number" && Number.isFinite(body.paceNudgeSecPerMile)) {
+    data.paceNudgeSecPerMile = Math.max(-180, Math.min(180, Math.round(body.paceNudgeSecPerMile)));
+  }
   if (typeof body.coachIntent === "string") data.coachIntent = body.coachIntent.trim();
   if (body.coachIntent === null) data.coachIntent = null;
   if ("personaId" in body) {

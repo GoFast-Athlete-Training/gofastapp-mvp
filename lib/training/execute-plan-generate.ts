@@ -61,11 +61,17 @@ import { presetTaperHasVolumeCaps } from "@/lib/training/phase-week-pins";
 import { weeklyVolumePeakFromPreset } from "@/lib/training/preset-core";
 import { splitBuildRampToPeak, splitPlanWeekPhases } from "@/lib/training/plan-week-phase-split";
 import { stampPhaseOnPlanSchedule } from "@/lib/training/plan-week-phase-key";
+import {
+  planFoundationBuild,
+  resolveAthleteStart,
+} from "@/lib/training/foundation-progression";
 
 export async function executePlanGenerate(params: {
   athleteId: string;
   athleteFiveKPace: string | null;
   athleteWeeklyMileage: number | null;
+  athleteLongRunMiles?: number | null;
+  athleteAvgWeeklyMiles?: number | null;
   plan: {
     id: string;
     presetId?: string | null;
@@ -364,6 +370,25 @@ export async function executePlanGenerate(params: {
     fitnessPhase: blueprint.fitnessPhase,
   });
 
+  const athleteStart = resolveAthleteStart({
+    currentWeeklyMileage: planRow.currentWeeklyMileage,
+    athleteWeeklyMileage: params.athleteWeeklyMileage,
+    avgWeeklyMilesSnapshot: params.athleteAvgWeeklyMiles,
+    longRunCapabilityMiles: params.athleteLongRunMiles,
+  });
+  const foundationPlan = phaseBuild
+    ? planFoundationBuild({
+        holdWeekNumbers: buildRampSplit.holdWeekNumbers,
+        rampWeekNumbers: buildRampSplit.rampWeekNumbers,
+        athlete: athleteStart,
+        entryLongRunMiles: phaseBuild.startLongRunMiles,
+        peakLongRunMiles: phaseBuild.peakLongRunMiles,
+        entryWeeklyMiles: phaseBaseBuild?.peakWeeklyMiles ?? null,
+        peakWeeklyMiles: phaseBuild.peakWeeklyMiles ?? presetPeakMiles,
+        longRunCutback: phaseBuild.longRunCutback ?? null,
+      })
+    : null;
+
   if (phaseBuild) {
     if (needsBuildPhase && buildRampSplit.holdWeekNumbers.length > 0) {
       const baseLongRun = positionsFromPhaseRotation(phaseBaseBuild?.longRunConfig ?? null);
@@ -402,6 +427,7 @@ export async function executePlanGenerate(params: {
         holdWeekNumbers: buildRampSplit.holdWeekNumbers,
         holdLongRunMiles,
         rampStartWeekNumber: buildRampSplit.rampStartWeekNumber,
+        longRunMilesByWeek: foundationPlan?.longRunByWeek ?? null,
       });
     }
     ensureTaperLongRunDays({
@@ -480,6 +506,17 @@ export async function executePlanGenerate(params: {
       intervals: intervalsPositions.length,
       tempo: tempoPositions.length,
     },
+    foundation: foundationPlan
+      ? {
+          missingData: foundationPlan.missingData,
+          derived: foundationPlan.derived,
+          unrealistic: foundationPlan.unrealistic,
+          entryLongRunMiles: foundationPlan.entryLongRunMiles,
+          entryWeeklyMiles: foundationPlan.entryWeeklyMiles,
+          peakLongRunMiles: foundationPlan.peakLongRunMiles,
+          peakWeeklyMiles: foundationPlan.peakWeeklyMiles,
+        }
+      : null,
   };
 
   const minWeeklyFromPreset = Number(vol.minWeeklyMiles);
@@ -517,6 +554,7 @@ export async function executePlanGenerate(params: {
         holdWeekNumbers: buildRampSplit.holdWeekNumbers,
         holdWeeklyMiles,
         rampStartWeekNumber: buildRampSplit.rampStartWeekNumber,
+        weeklyMilesByWeek: foundationPlan?.weeklyByWeek ?? null,
       })
     : null;
 

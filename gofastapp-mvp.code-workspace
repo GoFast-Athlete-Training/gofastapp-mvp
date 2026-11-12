@@ -10,7 +10,13 @@
 			"path": "../trainingmvp"
 		},
 		{
-			"path": "../gofastfrontend-mvp1"
+			"path": "../gf-racemanage"
+		},
+		{
+			"path": "../gofast-contentpublic"
+		},
+		{
+			"path": "../GoFastcontent"
 		}
 	],
 	"settings": {}

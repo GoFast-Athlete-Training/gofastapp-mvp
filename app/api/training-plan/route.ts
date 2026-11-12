@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       startDate: startRaw,
       name,
       currentWeeklyMileage,
+      longRunCapabilityMiles: bodyLongRunCapabilityMiles,
       preferredDays: bodyPreferredDays,
       fiveKPace: bodyFiveK,
       current5KPace: bodyLegacy5k,
@@ -388,12 +389,25 @@ export async function POST(request: NextRequest) {
       athleteRaceId: terminalAthleteRace.id,
     });
 
+    let longRunResolved: number | null | undefined;
+    if (
+      bodyLongRunCapabilityMiles !== undefined &&
+      bodyLongRunCapabilityMiles !== null &&
+      bodyLongRunCapabilityMiles !== ""
+    ) {
+      const n = Number(bodyLongRunCapabilityMiles);
+      if (Number.isFinite(n) && n > 0) longRunResolved = Math.round(n * 10) / 10;
+    } else if (bodyLongRunCapabilityMiles === null || bodyLongRunCapabilityMiles === "") {
+      longRunResolved = null;
+    }
+
     if (syncAthleteBaseline === true || syncAthleteBaseline === "true") {
       await prisma.athlete.update({
         where: { id: athlete.id },
         data: {
           fiveKPace: fiveKPaceResolved,
           weeklyMileage: weeklyResolved,
+          ...(longRunResolved !== undefined ? { longRunCapabilityMiles: longRunResolved } : {}),
         },
       });
     }

@@ -25,6 +25,8 @@ export function buildWeeklyMileageTargetsByWeek(params: {
   holdWeekNumbers?: number[];
   holdWeeklyMiles?: number | null;
   rampStartWeekNumber?: number | null;
+  /** Athlete-aware build weeks. Skips the preset-min clamp for those weeks. */
+  weeklyMilesByWeek?: Map<number, number> | null;
 }): Map<number, number> {
   const out = new Map<number, number>();
   const taperStart = Math.max(1, Math.floor(params.taperStartWeekNumber));
@@ -38,6 +40,11 @@ export function buildWeeklyMileageTargetsByWeek(params: {
   const rampStart = params.rampStartWeekNumber ?? 1;
 
   for (let w = 1; w < taperStart; w++) {
+    const prescribed = params.weeklyMilesByWeek?.get(w);
+    if (prescribed != null && Number.isFinite(prescribed)) {
+      out.set(w, round2(prescribed));
+      continue;
+    }
     if (holdWeeks.has(w)) {
       out.set(w, holdMiles);
       continue;

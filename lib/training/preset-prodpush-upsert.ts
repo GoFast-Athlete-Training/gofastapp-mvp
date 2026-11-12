@@ -506,6 +506,7 @@ export async function upsertPresetFromProdPush(
         null,
       minWeeklyMiles: int(plan.minWeeklyMiles, 40),
       maxWeeklyMiles: num(plan.maxWeeklyMiles) ?? null,
+      paceNudgeSecPerMile: int(plan.paceNudgeSecPerMile, 0),
       tempoIdealDow: int(plan.tempoIdealDow, 2),
       intervalIdealDow: int(plan.intervalIdealDow, 4),
       longRunDefaultDow: int(plan.longRunDefaultDow, 6),

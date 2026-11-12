@@ -240,12 +240,14 @@ function buildPaceCtx(params: {
   racePaceSecondsPerMile: number | null;
   workoutType: WorkoutType | string;
   paceAdjuster?: AthletePaceAdjuster | null;
+  presetNudgeSecPerMile?: number | null;
 }): PaceResolutionContext {
   return buildPaceResolutionContext({
     anchorSecondsPerMile: params.anchorSecondsPerMile,
     racePaceSecondsPerMile: params.racePaceSecondsPerMile,
     workoutType: params.workoutType,
     paceAdjuster: params.paceAdjuster,
+    presetNudgeSecPerMile: params.presetNudgeSecPerMile,
   });
 }
 
@@ -485,6 +487,8 @@ export function prescribe(params: {
   easyWorkPaceOffsetOverrideSecPerMile?: number | null;
   /** Athlete per-type pace adjuster — added after catalogue offset at materialization. */
   paceAdjuster?: AthletePaceAdjuster | null;
+  /** Catalog preset nudge, added after the catalogue offset. Default 0. */
+  presetPaceNudgeSecPerMile?: number | null;
 }): WorkoutStep[] {
   const {
     entry,
@@ -494,6 +498,7 @@ export function prescribe(params: {
     planCycleIndex = null,
     easyWorkPaceOffsetOverrideSecPerMile = null,
     paceAdjuster = null,
+    presetPaceNudgeSecPerMile = 0,
   } = params;
   const totalMiles = scheduleMiles;
   const type = entry.workoutType as WorkoutType;
@@ -502,6 +507,7 @@ export function prescribe(params: {
     racePaceSecondsPerMile,
     workoutType: type,
     paceAdjuster,
+    presetNudgeSecPerMile: presetPaceNudgeSecPerMile,
   });
 
   if (type === "Easy") {

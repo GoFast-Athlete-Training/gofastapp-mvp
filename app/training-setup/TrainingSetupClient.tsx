@@ -23,6 +23,10 @@ import {
 import { metersToMiles } from "@/lib/pace-utils";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
 import { AthletePresetBuilder } from "@/components/training/AthletePresetBuilder";
+import {
+  FoundationStartFields,
+  foundationMilesToSave,
+} from "@/components/training/FoundationStartFields";
 import { InlineGoalForm, type InlineGoalRow } from "@/components/races/InlineGoalForm";
 import {
   AthleteRaceDistanceField,
@@ -349,6 +353,8 @@ export default function TrainingSetupClient() {
   const [paceMin, setPaceMin] = useState("");
   const [paceSec, setPaceSec] = useState("");
   const [baselineWeeklyMileage, setBaselineWeeklyMileage] = useState("");
+  const [baselineLongRun, setBaselineLongRun] = useState("");
+  const [returningFromInjury, setReturningFromInjury] = useState(false);
   const [planName, setPlanName] = useState("");
   const [planNameTouched, setPlanNameTouched] = useState(false);
   const [athleteFirstName, setAthleteFirstName] = useState<string | null>(null);
@@ -661,6 +667,7 @@ export default function TrainingSetupClient() {
           firstName?: string | null;
           fiveKPace?: string | null;
           weeklyMileage?: number | null;
+          longRunCapabilityMiles?: number | null;
         };
       }>(`/athlete/${id}`)
       .then((res) => {
@@ -679,6 +686,13 @@ export default function TrainingSetupClient() {
           if (prev.trim() !== "") return prev;
           if (a.weeklyMileage != null && Number.isFinite(Number(a.weeklyMileage))) {
             return String(a.weeklyMileage);
+          }
+          return "";
+        });
+        setBaselineLongRun((prev) => {
+          if (prev.trim() !== "") return prev;
+          if (a.longRunCapabilityMiles != null && Number.isFinite(Number(a.longRunCapabilityMiles))) {
+            return String(a.longRunCapabilityMiles);
           }
           return "";
         });
@@ -883,6 +897,19 @@ export default function TrainingSetupClient() {
         return;
       }
     }
+    const rawLong = baselineLongRun.trim();
+    if (rawLong !== "") {
+      const longMi = Number(rawLong);
+      if (!Number.isFinite(longMi) || longMi <= 0) {
+        setFormError("Enter your longest recent run as a positive number, or leave it blank.");
+        return;
+      }
+    }
+    const foundationStart = foundationMilesToSave({
+      weeklyMiles: baselineWeeklyMileage,
+      longRunMiles: baselineLongRun,
+      returningFromInjury,
+    });
 
     const paceEmpty = paceMin.trim() === "" && paceSec.trim() === "";
     const fiveKPaceOut = paceEmpty
@@ -912,10 +939,8 @@ export default function TrainingSetupClient() {
           name: trimmedPlanName,
           startDate,
           fiveKPace: fiveKPaceOut,
-          currentWeeklyMileage:
-            baselineWeeklyMileage.trim() === ""
-              ? null
-              : Number(baselineWeeklyMileage),
+          currentWeeklyMileage: foundationStart.weeklyMiles,
+          longRunCapabilityMiles: foundationStart.longRunMiles,
           syncAthleteBaseline: true,
           ...(weekByWeekLoad
             ? { weekByWeekLoad: true }
@@ -1072,32 +1097,6 @@ export default function TrainingSetupClient() {
         city: rr.city,
         state: rr.state,
       });
-
-    const weeklyN = baselineWeeklyMileage.trim() === "" ? NaN : Number(baselineWeeklyMileage);
-    const baseLongRunPoolMilesPreset = selectedPreset?.baseLongRunPoolMiles;
-    const rampBanner =
-      selectedPreset != null &&
-      Number.isFinite(weeklyN) &&
-      weeklyN > 0 &&
-      Number.isFinite(baseLongRunPoolMilesPreset) ? (
-        weeklyN < (baseLongRunPoolMilesPreset as number) * 0.75 ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            <p className="font-medium text-amber-950">We&apos;ll build you up</p>
-            <p className="mt-1 text-amber-900/90">
-              Your plan starts with a gradual increase in volume to get you to your full training
-              load without overloading.
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
-            <p className="font-medium text-emerald-900">You&apos;re ready for this plan</p>
-            <p className="mt-1 text-emerald-900/90">
-              Your current mileage puts you right in range. Your plan starts at full training
-              volume from week one.
-            </p>
-          </div>
-        )
-      ) : null;
 
     const hasBlueprintSelected =
       selectedPreset != null || selectedAthletePresetId != null;
@@ -1770,26 +1769,16 @@ export default function TrainingSetupClient() {
                         <span className="text-sm text-gray-600">min / mile</span>
                       </div>
                     </div>
-                    <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs font-medium text-gray-700">
-                        How many miles per week are you running right now?
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        className="w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                        value={baselineWeeklyMileage}
-                        onChange={(e) => setBaselineWeeklyMileage(e.target.value)}
-                      />
-                      <p className="mt-1.5 text-xs text-gray-600">
-                        This is your baseline today — not your goal. You&apos;ll set target weekly
-                        mileage on the next step.
-                      </p>
-                    </div>
                   </div>
 
-                  {rampBanner}
+                  <FoundationStartFields
+                    weeklyMiles={baselineWeeklyMileage}
+                    onWeeklyMiles={setBaselineWeeklyMileage}
+                    longRunMiles={baselineLongRun}
+                    onLongRunMiles={setBaselineLongRun}
+                    returningFromInjury={returningFromInjury}
+                    onReturningFromInjury={setReturningFromInjury}
+                  />
 
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-800">

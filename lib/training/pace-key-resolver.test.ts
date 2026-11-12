@@ -21,6 +21,34 @@ test("resolveCataloguePaceSecPerMile adds catalogue offset and type adjuster", (
   );
 });
 
+test("preset pace nudge of 0 leaves catalogue pace unchanged", () => {
+  const ctx = buildPaceResolutionContext({
+    anchorSecondsPerMile: ANCHOR_SEC,
+    racePaceSecondsPerMile: null,
+    workoutType: "Easy",
+    paceAdjuster: { easy: -10, longRun: 0, threshold: 0, interval: 0 },
+    presetNudgeSecPerMile: 0,
+  });
+  assert.equal(
+    resolveCataloguePaceSecPerMile({ legacyOffsetSecPerMile: 90, ctx }),
+    ANCHOR_SEC + 90 - 10,
+  );
+});
+
+test("preset pace nudge is added after the catalogue offset", () => {
+  const ctx = buildPaceResolutionContext({
+    anchorSecondsPerMile: ANCHOR_SEC,
+    racePaceSecondsPerMile: null,
+    workoutType: "Easy",
+    paceAdjuster: { easy: -10, longRun: 0, threshold: 0, interval: 0 },
+    presetNudgeSecPerMile: -10,
+  });
+  assert.equal(
+    resolveCataloguePaceSecPerMile({ legacyOffsetSecPerMile: 90, ctx }),
+    ANCHOR_SEC + 90 - 10 - 10,
+  );
+});
+
 test("resolveCataloguePaceSecPerMile uses zero adjuster when type not in profile defaults", () => {
   const ctx = buildPaceResolutionContext({
     anchorSecondsPerMile: ANCHOR_SEC,

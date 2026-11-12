@@ -46,6 +46,7 @@ export function serializeStaffPlanPreset(row: StaffPresetRow) {
     goalId: row.goalId,
     minWeeklyMiles: row.minWeeklyMiles,
     maxWeeklyMiles: row.maxWeeklyMiles,
+    paceNudgeSecPerMile: row.paceNudgeSecPerMile,
     baseBuildPresetId: row.baseBuildPresetId,
     buildPresetId: row.buildPresetId,
     taperPresetId: row.taperPresetId,

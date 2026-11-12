@@ -35,6 +35,8 @@ export function applyBuildPhaseLongRunMiles(input: {
   holdWeekNumbers?: number[];
   holdLongRunMiles?: number | null;
   rampStartWeekNumber?: number | null;
+  /** When set, these miles replace the internal ramp for that week. */
+  longRunMilesByWeek?: Map<number, number> | null;
 }): void {
   const start = input.startLongRunMiles ?? 8;
   const peak = Math.max(start, input.peakLongRunMiles ?? 20);
@@ -48,9 +50,12 @@ export function applyBuildPhaseLongRunMiles(input: {
   for (const week of input.planSchedule) {
     if (week.weekNumber >= input.taperStartWeekNumber) continue;
     const w = week.weekNumber;
+    const prescribed = input.longRunMilesByWeek?.get(w);
     let lrMi: number;
     const isPeakWeek = w === peakWeek;
-    if (holdWeeks.has(w)) {
+    if (prescribed != null && Number.isFinite(prescribed)) {
+      lrMi = round1(prescribed);
+    } else if (holdWeeks.has(w)) {
       lrMi = round1(holdLong);
       if (cutback > 0 && w % 4 === 0) {
         lrMi = round1(lrMi * (1 - cutback));

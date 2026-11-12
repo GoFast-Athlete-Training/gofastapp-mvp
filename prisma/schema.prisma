@@ -2328,6 +2328,8 @@ model training_plan_preset {
 
   minWeeklyMiles     Int    @default(40)
   maxWeeklyMiles     Int?
+  /// Added after the catalogue pace offset. Negative is faster. 0 leaves MVP paces unchanged.
+  paceNudgeSecPerMile Int @default(0)
   tempoIdealDow      Int    @default(2)
   intervalIdealDow   Int    @default(4)
   longRunDefaultDow  Int    @default(6)

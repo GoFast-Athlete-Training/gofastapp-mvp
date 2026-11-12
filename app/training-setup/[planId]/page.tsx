@@ -24,6 +24,12 @@ import {
   type PlanDayCard,
 } from "@/lib/training/fetch-plan-week-client";
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
+import { LocalStorageAPI } from "@/lib/localstorage";
+import {
+  FoundationStartFields,
+  foundationMilesToSave,
+} from "@/components/training/FoundationStartFields";
+import type { RaceReadinessSummary } from "@/lib/training/fetch-plan-week-client";
 import { validatePreferredTempoInterval } from "@/lib/training/preferred-tempo-interval";
 import { isStructuredPlanWeek, type PlanDaySchedule } from "@/lib/training/plan-schedule-schema";
 import { buildWeekSummary } from "@/lib/training/week-summary-service";
@@ -201,6 +207,10 @@ export default function TrainingSetupPlanPage({
   const [selectedDayKey, setSelectedDayKey] = useState("");
   const [preferredDaysLocal, setPreferredDaysLocal] = useState<number[]>([]);
   const [weeklyMilesTarget, setWeeklyMilesTarget] = useState("");
+  const [currentWeeklyMiles, setCurrentWeeklyMiles] = useState("");
+  const [longRunMiles, setLongRunMiles] = useState("");
+  const [returningFromInjury, setReturningFromInjury] = useState(false);
+  const [longRunCapabilityMiles, setLongRunCapabilityMiles] = useState<number | null>(null);
   const [preferredLongRunDowLocal, setPreferredLongRunDowLocal] = useState(6);
   const [preferredTempoDowLocal, setPreferredTempoDowLocal] = useState<number | null>(null);
   const [preferredIntervalDowLocal, setPreferredIntervalDowLocal] = useState<number | null>(
@@ -238,13 +248,14 @@ export default function TrainingSetupPlanPage({
     setError(null);
     try {
       const token = await getToken();
-      const { plan, weeklyMileageTargetPreference } = await fetchTrainingPlanDetail(
-        planId,
-        token
-      );
+      const { plan, weeklyMileageTargetPreference, raceReadiness } =
+        await fetchTrainingPlanDetail(planId, token);
       const detail = plan as PlanDetail;
       setPlan(detail);
       setAthleteWeeklyTargetPreference(weeklyMileageTargetPreference);
+      setLongRunCapabilityMiles(
+        (raceReadiness as RaceReadinessSummary | null)?.longRunCapabilityMiles ?? null,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
       if (!opts?.quiet) {
@@ -339,6 +350,16 @@ export default function TrainingSetupPlanPage({
     }
     setPreferredTempoDowLocal(plan.preferredTempoDow ?? null);
     setPreferredIntervalDowLocal(plan.preferredIntervalDow ?? null);
+    const current = plan.currentWeeklyMileage;
+    setCurrentWeeklyMiles(
+      current != null && Number.isFinite(Number(current)) ? String(current) : "",
+    );
+    setLongRunMiles(
+      longRunCapabilityMiles != null && Number.isFinite(longRunCapabilityMiles)
+        ? String(longRunCapabilityMiles)
+        : "",
+    );
+    setReturningFromInjury(false);
   }, [
     plan?.id,
     plan?.preferredDays,
@@ -346,6 +367,8 @@ export default function TrainingSetupPlanPage({
     plan?.preferredTempoDow,
     plan?.preferredIntervalDow,
     plan?.weeklyMileageTarget,
+    plan?.currentWeeklyMileage,
+    longRunCapabilityMiles,
     plan?.training_plan_preset?.minWeeklyMiles,
     (plan?.training_plan_preset as { maxWeeklyMiles?: number | null } | null)
       ?.maxWeeklyMiles,
@@ -658,6 +681,63 @@ export default function TrainingSetupPlanPage({
     return `Enter your weekly target within this plan’s band (${band}).`;
   }
 
+  async function saveFoundationStart(token: string): Promise<boolean> {
+    const rawWeekly = currentWeeklyMiles.trim();
+    if (rawWeekly !== "") {
+      const weeklyMi = Number(rawWeekly);
+      if (!Number.isFinite(weeklyMi) || weeklyMi <= 0) {
+        setError("Enter your current weekly miles as a positive number, or leave it blank.");
+        return false;
+      }
+    }
+    const rawLong = longRunMiles.trim();
+    if (rawLong !== "") {
+      const longMi = Number(rawLong);
+      if (!Number.isFinite(longMi) || longMi <= 0) {
+        setError("Enter your longest recent run as a positive number, or leave it blank.");
+        return false;
+      }
+    }
+    const start = foundationMilesToSave({
+      weeklyMiles: currentWeeklyMiles,
+      longRunMiles,
+      returningFromInjury,
+    });
+    const planRes = await fetch(`/api/training-plan/${planId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...athleteBearerFetchHeaders(token),
+      },
+      body: JSON.stringify({ currentWeeklyMileage: start.weeklyMiles }),
+    });
+    if (!planRes.ok) {
+      const data = (await planRes.json().catch(() => ({}))) as { error?: string };
+      setError(data.error || "Could not save your starting mileage");
+      return false;
+    }
+    const athleteId = LocalStorageAPI.getAthleteId();
+    if (athleteId) {
+      const profileRes = await fetch(`/api/athlete/${athleteId}/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...athleteBearerFetchHeaders(token),
+        },
+        body: JSON.stringify({
+          weeklyMileage: start.weeklyMiles,
+          longRunCapabilityMiles: start.longRunMiles,
+        }),
+      });
+      if (!profileRes.ok) {
+        const data = (await profileRes.json().catch(() => ({}))) as { error?: string };
+        setError(data.error || "Could not save your longest run");
+        return false;
+      }
+    }
+    return true;
+  }
+
   async function savePlanPreferences(token: string, targetMiles: number) {
     const normalized = preferredDaysLocal.filter((d) => d >= 1 && d <= 7);
     if (normalized.length === 0) {
@@ -725,6 +805,8 @@ export default function TrainingSetupPlanPage({
         setError(weeklyTargetBandErrorMessage());
         return;
       }
+      const foundationSaved = await saveFoundationStart(token);
+      if (!foundationSaved) return;
       const saved = await savePlanPreferences(token, targetMiles);
       if (!saved) return;
       const generated = await generatePlanSchedule(token, targetMiles);
@@ -747,6 +829,8 @@ export default function TrainingSetupPlanPage({
         setError(weeklyTargetBandErrorMessage());
         return;
       }
+      const foundationSaved = await saveFoundationStart(token);
+      if (!foundationSaved) return;
       const saved = await savePlanPreferences(token, targetMiles);
       if (!saved) return;
       const generated = await generatePlanSchedule(token, targetMiles);
@@ -1244,6 +1328,15 @@ export default function TrainingSetupPlanPage({
                 }}
               />
             ) : null}
+
+            <FoundationStartFields
+              weeklyMiles={currentWeeklyMiles}
+              onWeeklyMiles={setCurrentWeeklyMiles}
+              longRunMiles={longRunMiles}
+              onLongRunMiles={setLongRunMiles}
+              returningFromInjury={returningFromInjury}
+              onReturningFromInjury={setReturningFromInjury}
+            />
 
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-800">

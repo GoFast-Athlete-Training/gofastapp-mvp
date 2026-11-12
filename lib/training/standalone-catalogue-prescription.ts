@@ -66,6 +66,7 @@ export function prescribeCatalogueEntry(params: {
   athlete: PrescriptionAthleteContext;
   goal: PrescriptionGoalContext | null;
   planCycleIndex?: number | null;
+  presetPaceNudgeSecPerMile?: number | null;
 }): { steps: WorkoutStep[]; goalRacePaceSecPerMile: number | null } {
   const anchors = resolvePrescriptionAnchors(params.athlete, params.goal);
   if ("needsFiveKPace" in anchors) {
@@ -83,6 +84,7 @@ export function prescribeCatalogueEntry(params: {
       planCycleIndex: params.planCycleIndex ?? null,
       easyWorkPaceOffsetOverrideSecPerMile: null,
       paceAdjuster,
+      presetPaceNudgeSecPerMile: params.presetPaceNudgeSecPerMile ?? 0,
     }),
     goalRacePaceSecPerMile: anchors.goalRacePaceSecPerMile,
   };

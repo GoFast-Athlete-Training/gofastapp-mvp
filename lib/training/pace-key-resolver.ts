@@ -11,6 +11,8 @@ export type PaceResolutionContext = {
   racePaceSecPerMile: number | null;
   /** Sec/mi nudge for the scheduled workout type (Easy / LongRun / Tempo / Intervals). */
   typeAdjusterSecPerMile: number;
+  /** Preset-wide sec/mi added after the catalogue offset. Negative is faster. Default 0. */
+  presetNudgeSecPerMile: number;
   workoutType?: WorkoutType | string;
 };
 
@@ -30,7 +32,7 @@ function resolveAnchorSecPerMile(
 }
 
 /**
- * Resolve catalogue segment pace: anchor + catalogue offset + per-type athlete adjuster.
+ * Resolve catalogue segment pace: anchor + catalogue offset + preset nudge + per-type athlete adjuster.
  */
 export function resolveCataloguePaceSecPerMile(params: {
   paceKey?: string | null;
@@ -40,15 +42,19 @@ export function resolveCataloguePaceSecPerMile(params: {
 }): number | null {
   const { legacyOffsetSecPerMile, mpAnchorSecPerMile, ctx } = params;
   const adj = ctx.typeAdjusterSecPerMile;
+  const presetNudge =
+    ctx.presetNudgeSecPerMile != null && Number.isFinite(ctx.presetNudgeSecPerMile)
+      ? ctx.presetNudgeSecPerMile
+      : 0;
   const base =
     mpAnchorSecPerMile != null
       ? mpAnchorSecPerMile
       : ctx.fitnessAnchorSecPerMile;
   if (legacyOffsetSecPerMile != null && Number.isFinite(legacyOffsetSecPerMile)) {
-    return Math.max(1, base + legacyOffsetSecPerMile + adj);
+    return Math.max(1, base + legacyOffsetSecPerMile + presetNudge + adj);
   }
   if (mpAnchorSecPerMile != null) {
-    return Math.max(1, mpAnchorSecPerMile + adj);
+    return Math.max(1, mpAnchorSecPerMile + presetNudge + adj);
   }
   return null;
 }
@@ -58,12 +64,16 @@ export function buildPaceResolutionContext(params: {
   racePaceSecondsPerMile: number | null;
   workoutType: WorkoutType | string;
   paceAdjuster?: AthletePaceAdjuster | null;
+  presetNudgeSecPerMile?: number | null;
 }): PaceResolutionContext {
   const adjuster = params.paceAdjuster ?? DEFAULT_ATHLETE_PACE_ADJUSTER;
+  const presetNudge = params.presetNudgeSecPerMile;
   return {
     fitnessAnchorSecPerMile: params.anchorSecondsPerMile,
     racePaceSecPerMile: params.racePaceSecondsPerMile,
     typeAdjusterSecPerMile: adjusterForWorkoutType(params.workoutType, adjuster),
+    presetNudgeSecPerMile:
+      presetNudge != null && Number.isFinite(presetNudge) ? Math.round(presetNudge) : 0,
     workoutType: params.workoutType,
   };
 }

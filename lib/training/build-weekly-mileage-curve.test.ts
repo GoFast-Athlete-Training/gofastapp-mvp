@@ -60,3 +60,29 @@ test("taper weeks use preset caps when set (no generic taper target)", () => {
   assert.equal(map.get(11), 40);
   assert.equal(map.get(12), 30);
 });
+
+test("foundation weekly map does not replace taper or race week", () => {
+  const map = buildWeeklyMileageTargetsByWeek({
+    totalWeeks: 13,
+    taperStartWeekNumber: 11,
+    peakWeekNumber: 10,
+    athleteStartMiles: 22,
+    presetMinMiles: 45,
+    presetPeakMiles: 55,
+    taperWeeks: [
+      { weekIndex: 1, totalMilesCap: 40, longRunCapMiles: 12, pins: [] },
+      { weekIndex: 2, totalMilesCap: 30, longRunCapMiles: 8, pins: [] },
+    ],
+    raceWeek: [{ weekIndex: 1, totalMilesCap: 18, longRunCapMiles: 6, pins: [] }],
+    taperWeekNumbers: [11, 12],
+    weeklyMilesByWeek: new Map([
+      [1, 22],
+      [10, 55],
+    ]),
+  });
+  assert.equal(map.get(1), 22);
+  assert.equal(map.get(10), 55);
+  assert.equal(map.get(11), 40);
+  assert.equal(map.get(12), 30);
+  assert.equal(map.get(13), 18);
+});
