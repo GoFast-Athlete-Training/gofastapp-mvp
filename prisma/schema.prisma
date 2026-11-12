@@ -2359,6 +2359,11 @@ model training_plan_preset {
   taperWeek1LongRunMiles Float?
   taperWeek2TotalMiles   Float?
   taperWeek2LongRunMiles Float?
+  /// Rough weekly guide for the base phase. Not a floor for a low athlete.
+  baseWeeklyMinMiles Int?
+  baseWeeklyMaxMiles Int?
+  /// Race-week total. Not spread across days.
+  raceWeekMiles Float?
   /// [{ offsetFromRace, prescribedMiles }]
   raceWeekDayMiles Json?
 

@@ -30,6 +30,7 @@ export type TrainingManagePresetForGenerate = {
     peakLongRunMiles: number | null;
     peakWeeklyMiles: number | null;
     longRunCutback: number | null;
+    weeklyMinMiles?: number | null;
     longRunConfigId?: string | null;
     easyConfigId?: string | null;
     tempoConfigId?: string | null;
@@ -44,6 +45,7 @@ export type TrainingManagePresetForGenerate = {
     peakLongRunMiles: number | null;
     peakWeeklyMiles: number | null;
     longRunCutback: number | null;
+    weeklyMinMiles?: number | null;
     longRunConfigId?: string | null;
     easyConfigId?: string | null;
     tempoConfigId?: string | null;
@@ -62,6 +64,8 @@ export type TrainingManagePresetForGenerate = {
     title: string;
     slots: RaceWeekSlotForGenerate[];
   } | null;
+  /** Stored race-week total. Not spread across days in this pass. */
+  raceWeekMiles?: number | null;
 };
 
 export type RaceWeekSlotForGenerate = {

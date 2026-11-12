@@ -384,13 +384,14 @@ export async function executePlanGenerate(params: {
         entryLongRunMiles: phaseBuild.startLongRunMiles,
         peakLongRunMiles: phaseBuild.peakLongRunMiles,
         entryWeeklyMiles: phaseBaseBuild?.peakWeeklyMiles ?? null,
+        baseWeeklyMinMiles: phaseBaseBuild?.weeklyMinMiles ?? null,
         peakWeeklyMiles:
           phasePreset?.maxWeeklyMiles != null &&
           Number.isFinite(phasePreset.maxWeeklyMiles) &&
           phasePreset.maxWeeklyMiles > 0
             ? phasePreset.maxWeeklyMiles
             : (phaseBuild.peakWeeklyMiles ?? presetPeakMiles),
-        longRunCutback: phaseBuild.longRunCutback ?? null,
+        longRunCutback: null,
       })
     : null;
 
@@ -427,7 +428,7 @@ export async function executePlanGenerate(params: {
           placement.taperStartWeekNumber - 1,
         startLongRunMiles: phaseBuild.startLongRunMiles,
         peakLongRunMiles: phaseBuild.peakLongRunMiles,
-        longRunCutback: phaseBuild.longRunCutback ?? null,
+        longRunCutback: null,
         longRunPositions,
         holdWeekNumbers: buildRampSplit.holdWeekNumbers,
         holdLongRunMiles,

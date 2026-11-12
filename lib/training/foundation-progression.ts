@@ -170,6 +170,8 @@ export function planFoundationBuild(params: {
   peakLongRunMiles: number | null;
   /** Base-build peak weekly when that phase is linked; otherwise derived. */
   entryWeeklyMiles: number | null;
+  /** Base-build weekly floor. Used only when the athlete has no weekly number. */
+  baseWeeklyMinMiles?: number | null;
   peakWeeklyMiles: number | null;
   longRunCutback: number | null;
 }): FoundationBuildPlan {
@@ -181,10 +183,11 @@ export function planFoundationBuild(params: {
     round1(peakWeeklyRaw * (entryLong / peakLong));
   const peakWeekly = Math.max(entryWeekly, peakWeeklyRaw);
   const cutback = effectiveCutback(params.longRunCutback);
+  const baseMin = positive(params.baseWeeklyMinMiles);
 
   const missingData = params.athlete.missingData;
   let startLong = params.athlete.longRunMiles ?? entryLong;
-  let startWeekly = params.athlete.weeklyMiles ?? entryWeekly;
+  let startWeekly = params.athlete.weeklyMiles ?? baseMin ?? entryWeekly;
   startLong = Math.min(startLong, peakLong);
   startWeekly = Math.min(startWeekly, peakWeekly);
 
@@ -206,7 +209,8 @@ export function planFoundationBuild(params: {
 
   const arrivalLong = holdLong.length > 0 ? holdLong[holdLong.length - 1]! : startLong;
   const arrivalWeekly = holdWeekly.length > 0 ? holdWeekly[holdWeekly.length - 1]! : startWeekly;
-  const rampLong = peakBlockSeries(ramp.length, arrivalLong, peakLong, cutback);
+  const rampLongStart = Math.min(peakLong, Math.max(arrivalLong, entryLong));
+  const rampLong = peakBlockSeries(ramp.length, rampLongStart, peakLong, cutback);
   const rampWeekly = peakBlockSeries(ramp.length, arrivalWeekly, peakWeekly, cutback);
 
   const longRunByWeek = new Map<number, number>();

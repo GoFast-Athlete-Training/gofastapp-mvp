@@ -145,3 +145,64 @@ test("phase handoff: last base week meets build-to-peak entry", () => {
   assert.equal(plan.longRunByWeek.get(5)! >= plan.entryLongRunMiles * 0.7, true);
   assert.equal(plan.longRunByWeek.get(12), plan.peakLongRunMiles);
 });
+
+test("base band does not lift a low athlete to the base floor", () => {
+  const athlete = resolveAthleteStart({
+    currentWeeklyMileage: 22,
+    longRunCapabilityMiles: 8,
+  });
+  const plan = planFoundationBuild({
+    holdWeekNumbers: [1, 2, 3, 4],
+    rampWeekNumbers: [5, 6, 7, 8, 9, 10, 11, 12],
+    athlete,
+    entryLongRunMiles: 12,
+    peakLongRunMiles: 20,
+    entryWeeklyMiles: 40,
+    baseWeeklyMinMiles: 30,
+    peakWeeklyMiles: 55,
+    longRunCutback: null,
+  });
+  assert.ok(plan.weeklyByWeek.get(1)! < 30);
+  assert.equal(plan.weeklyByWeek.get(4), 40);
+  assert.equal(plan.longRunByWeek.get(4), 12);
+  assert.equal(plan.longRunByWeek.get(12), 20);
+});
+
+test("missing weekly uses the base band as the guide", () => {
+  const athlete = resolveAthleteStart({});
+  const plan = planFoundationBuild({
+    holdWeekNumbers: [1, 2],
+    rampWeekNumbers: [3, 4, 5, 6, 7, 8, 9, 10],
+    athlete,
+    entryLongRunMiles: 12,
+    peakLongRunMiles: 20,
+    entryWeeklyMiles: 40,
+    baseWeeklyMinMiles: 30,
+    peakWeeklyMiles: 55,
+    longRunCutback: null,
+  });
+  assert.ok(plan.weeklyByWeek.get(1)! > 30);
+  assert.ok(plan.weeklyByWeek.get(1)! < 40);
+  assert.equal(plan.weeklyByWeek.get(2), 40);
+  assert.equal(plan.longRunByWeek.get(10), 20);
+});
+
+test("peak block starts at the starting long run when the athlete is below it", () => {
+  const athlete = resolveAthleteStart({
+    currentWeeklyMileage: 25,
+    longRunCapabilityMiles: 8,
+  });
+  const plan = planFoundationBuild({
+    holdWeekNumbers: [],
+    rampWeekNumbers: [1, 2, 3, 4, 5, 6, 7, 8],
+    athlete,
+    entryLongRunMiles: 12,
+    peakLongRunMiles: 20,
+    entryWeeklyMiles: 40,
+    peakWeeklyMiles: 55,
+    longRunCutback: null,
+  });
+  const fromStart = peakBlockSeries(8, 12, 20, 0.2);
+  assert.equal(plan.longRunByWeek.get(1), fromStart[0]);
+  assert.equal(plan.longRunByWeek.get(8), 20);
+});

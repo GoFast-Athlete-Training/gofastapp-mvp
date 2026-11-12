@@ -549,6 +549,11 @@ export async function upsertPresetFromProdPush(
       taperWeek1LongRunMiles: num(plan.taperWeek1LongRunMiles) ?? null,
       taperWeek2TotalMiles: num(plan.taperWeek2TotalMiles) ?? null,
       taperWeek2LongRunMiles: num(plan.taperWeek2LongRunMiles) ?? null,
+      baseWeeklyMinMiles:
+        num(plan.baseWeeklyMinMiles) != null ? int(plan.baseWeeklyMinMiles, 0) : null,
+      baseWeeklyMaxMiles:
+        num(plan.baseWeeklyMaxMiles) != null ? int(plan.baseWeeklyMaxMiles, 0) : null,
+      raceWeekMiles: num(plan.raceWeekMiles) ?? null,
       raceWeekDayMiles:
         plan.raceWeekDayMiles == null
           ? Prisma.DbNull

@@ -23,12 +23,15 @@ export type OwnedPresetMiles = {
   peakLongRunMiles: number | null;
   baseEndLongRunMiles: number | null;
   baseEndWeeklyMiles: number | null;
+  baseWeeklyMinMiles: number | null;
+  baseWeeklyMaxMiles: number | null;
   longRunCutback: number | null;
   taperWeek1TotalMiles: number | null;
   taperWeek1LongRunMiles: number | null;
   taperWeek2TotalMiles: number | null;
   taperWeek2LongRunMiles: number | null;
   raceWeekDayMiles: unknown;
+  raceWeekMiles: number | null;
   baseBuildPhase: OwnedPhasePreset | null;
   buildToPeakPhase: OwnedPhasePreset | null;
 };
@@ -39,6 +42,7 @@ function emptyBuild(): PhaseBuild {
     peakLongRunMiles: null,
     peakWeeklyMiles: null,
     longRunCutback: null,
+    weeklyMinMiles: null,
     longRunConfigId: null,
     easyConfigId: null,
     tempoConfigId: null,
@@ -139,27 +143,26 @@ export function applyPresetOwnedPhase(
   loaded: TrainingManagePresetForGenerate,
   owned: OwnedPresetMiles,
 ): TrainingManagePresetForGenerate {
-  const hasBuildMiles =
-    owned.entryLongRunMiles != null ||
-    owned.peakLongRunMiles != null ||
-    owned.longRunCutback != null;
+  const hasBuildMiles = owned.entryLongRunMiles != null || owned.peakLongRunMiles != null;
   if (hasBuildMiles || owned.buildToPeakPhase) {
     loaded.build = loaded.build ?? emptyBuild();
     if (owned.entryLongRunMiles != null) loaded.build.startLongRunMiles = owned.entryLongRunMiles;
     if (owned.peakLongRunMiles != null) loaded.build.peakLongRunMiles = owned.peakLongRunMiles;
-    if (owned.longRunCutback != null) loaded.build.longRunCutback = owned.longRunCutback;
     if (owned.buildToPeakPhase) applyConfigs(loaded.build, owned.buildToPeakPhase);
   }
 
-  const hasBaseMiles = owned.baseEndLongRunMiles != null || owned.baseEndWeeklyMiles != null;
+  const baseMax = owned.baseWeeklyMaxMiles ?? owned.baseEndWeeklyMiles;
+  const hasBaseMiles = baseMax != null || owned.baseWeeklyMinMiles != null || owned.baseEndLongRunMiles != null;
   if (hasBaseMiles || owned.baseBuildPhase) {
     loaded.baseBuild = loaded.baseBuild ?? emptyBuild();
     if (owned.baseEndLongRunMiles != null) loaded.baseBuild.startLongRunMiles = owned.baseEndLongRunMiles;
-    if (owned.baseEndWeeklyMiles != null) loaded.baseBuild.peakWeeklyMiles = owned.baseEndWeeklyMiles;
+    if (baseMax != null) loaded.baseBuild.peakWeeklyMiles = baseMax;
+    if (owned.baseWeeklyMinMiles != null) loaded.baseBuild.weeklyMinMiles = owned.baseWeeklyMinMiles;
     if (owned.baseBuildPhase) applyConfigs(loaded.baseBuild, owned.baseBuildPhase);
   }
 
   overlayTaperWeeks(loaded, owned);
   overlayRaceWeekMiles(loaded, owned.raceWeekDayMiles);
+  loaded.raceWeekMiles = owned.raceWeekMiles;
   return loaded;
 }

@@ -158,6 +158,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     "peakLongRunMiles",
     "baseEndLongRunMiles",
     "longRunCutback",
+    "raceWeekMiles",
     "taperWeek1TotalMiles",
     "taperWeek1LongRunMiles",
     "taperWeek2TotalMiles",
@@ -166,9 +167,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const value = optionalMiles(key);
     if (value !== undefined) data[key] = value;
   }
-  const baseEndWeekly = optionalMiles("baseEndWeeklyMiles");
-  if (baseEndWeekly !== undefined) {
-    data.baseEndWeeklyMiles = baseEndWeekly == null ? null : Math.round(baseEndWeekly);
+  for (const key of ["baseEndWeeklyMiles", "baseWeeklyMinMiles", "baseWeeklyMaxMiles"] as const) {
+    const value = optionalMiles(key);
+    if (value !== undefined) data[key] = value == null ? null : Math.round(value);
   }
   if ("raceWeekDayMiles" in body) {
     if (body.raceWeekDayMiles == null) {
