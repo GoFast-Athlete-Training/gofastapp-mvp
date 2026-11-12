@@ -223,6 +223,13 @@ export default function ProfilePage() {
             </button>
             <button
               type="button"
+              onClick={() => router.push('/profile/training')}
+              className="border border-orange-300 bg-orange-50 text-orange-900 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-orange-100"
+            >
+              Training preferences
+            </button>
+            <button
+              type="button"
               onClick={() => router.push('/athlete-edit-profile?tab=about-you')}
               className="border border-gray-200 text-gray-800 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-50"
             >

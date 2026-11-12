@@ -970,3 +970,39 @@ test("easy run with mile laps uses mile on-target headline not segment reps", ()
   assert.equal(analysis.executionVerdict?.verdict, "partial");
   assert.ok(!analysis.scorecard.workEffort?.summary?.includes("reps on target"));
 });
+
+test("400 repeat jogs stay open when two recoveries sit between reps", () => {
+  const rows = buildPhaseAwareLapRows({
+    segments: [
+      {
+        id: "work",
+        title: "400m",
+        stepOrder: 1,
+        targets: [{ type: "PACE", valueLow: 223, valueHigh: 242 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        durationValue: 400 / 1609.34,
+        repeatCount: 8,
+        segment_laps: [
+          { lapIndex: 0, avgPaceSecPerMile: 340, distanceMiles: 0.25 },
+          { lapIndex: 1, avgPaceSecPerMile: 620, distanceMiles: 0.05 },
+          { lapIndex: 2, avgPaceSecPerMile: 640, distanceMiles: 0.06 },
+          { lapIndex: 3, avgPaceSecPerMile: 350, distanceMiles: 0.25 },
+        ],
+      },
+    ],
+    workoutTargetLow: 360,
+    workoutTargetHigh: 389,
+  });
+
+  assert.deepEqual(
+    rows.map((row) => row.phase),
+    ["work", "recovery", "recovery", "work"]
+  );
+  assert.equal(rows[1]!.targetPaceSecPerMile, null);
+  assert.equal(rows[2]!.targetPaceSecPerMile, null);
+  assert.ok(rows[0]!.targetPaceSecPerMile != null);
+  assert.ok(rows[3]!.targetPaceSecPerMile != null);
+});

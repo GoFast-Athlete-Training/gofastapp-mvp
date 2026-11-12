@@ -194,7 +194,7 @@ export default function TrainingHubPage() {
 
   const paceDisplay = useMemo(() => {
     if (!planDetail) return null;
-    const p = planDetail.currentFiveKPace?.trim() || athleteFiveKPace?.trim();
+    const p = athleteFiveKPace?.trim() || planDetail.currentFiveKPace?.trim();
     return p || null;
   }, [planDetail, athleteFiveKPace]);
 

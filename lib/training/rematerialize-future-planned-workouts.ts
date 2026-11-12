@@ -14,6 +14,8 @@ export async function rematerializeFuturePlannedWorkoutsForPlan(params: {
   planId: string;
   /** Only rematerialize on/after this calendar day (default: tomorrow UTC). */
   fromDateKey?: string;
+  /** Rebuild existing segments from Athlete.fiveKPace (5K profile save). */
+  refreshFromAthleteFiveK?: boolean;
 }): Promise<{ rematerialized: number; skipped: number; errors: string[] }> {
   const fromKey =
     params.fromDateKey?.trim() ||
@@ -42,6 +44,7 @@ export async function rematerializeFuturePlannedWorkoutsForPlan(params: {
         planId: params.planId,
         athleteId: params.athleteId,
         dateParam: dateKey,
+        refreshFromAthleteFiveK: params.refreshFromAthleteFiveK === true,
       });
       if (result.status === "materialized") rematerialized++;
       else skipped++;

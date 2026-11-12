@@ -238,7 +238,6 @@ export async function executePlanGenerate(params: {
   });
 
   let weeklyMileageTarget = requestedWeeklyMileageTarget;
-  weeklyMileageTarget = Math.max(bandMin, weeklyMileageTarget);
   if (bandMax != null && Number.isFinite(bandMax) && bandMax > 0) {
     weeklyMileageTarget = Math.min(weeklyMileageTarget, bandMax);
   }
@@ -246,6 +245,7 @@ export async function executePlanGenerate(params: {
     params.minWeeklyMiles,
     Math.min(100, weeklyMileageTarget),
   );
+  const athleteWeeklyVolumeGoal = weeklyMileageTarget;
 
   const preferredDays =
     plan.preferredDays?.length > 0
@@ -383,14 +383,12 @@ export async function executePlanGenerate(params: {
         athlete: athleteStart,
         entryLongRunMiles: phaseBuild.startLongRunMiles,
         peakLongRunMiles: phaseBuild.peakLongRunMiles,
-        entryWeeklyMiles: phaseBaseBuild?.peakWeeklyMiles ?? null,
+        entryWeeklyMiles:
+          phaseBaseBuild?.peakWeeklyMiles != null
+            ? Math.min(phaseBaseBuild.peakWeeklyMiles, athleteWeeklyVolumeGoal)
+            : null,
         baseWeeklyMinMiles: phaseBaseBuild?.weeklyMinMiles ?? null,
-        peakWeeklyMiles:
-          phasePreset?.maxWeeklyMiles != null &&
-          Number.isFinite(phasePreset.maxWeeklyMiles) &&
-          phasePreset.maxWeeklyMiles > 0
-            ? phasePreset.maxWeeklyMiles
-            : (phaseBuild.peakWeeklyMiles ?? presetPeakMiles),
+        peakWeeklyMiles: athleteWeeklyVolumeGoal,
         longRunCutback: null,
       })
     : null;
@@ -541,10 +539,7 @@ export async function executePlanGenerate(params: {
   const usePresetWeeklyMileageCurve =
     phaseBuild != null || presetTaperHasVolumeCaps(phasePreset?.taper?.weeks);
 
-  const holdWeeklyMiles =
-    phaseBaseBuild?.peakWeeklyMiles != null
-      ? Math.max(Math.max(minWeeklyFromPreset, bandMin), phaseBaseBuild.peakWeeklyMiles)
-      : Math.max(minWeeklyFromPreset, bandMin, weeklyMileageTarget);
+  const holdWeeklyMiles = weeklyMileageTarget;
 
   const weeklyMileageByWeek = usePresetWeeklyMileageCurve
     ? buildWeeklyMileageTargetsByWeek({
@@ -553,7 +548,7 @@ export async function executePlanGenerate(params: {
         peakWeekNumber: placement.peakWeekNumber ?? placement.taperStartWeekNumber - 1,
         athleteStartMiles: weeklyMileageTarget,
         presetMinMiles: Math.max(minWeeklyFromPreset, bandMin),
-        presetPeakMiles,
+        presetPeakMiles: athleteWeeklyVolumeGoal,
         taperWeeks: phasePreset?.taper?.weeks,
         raceWeek: phasePreset?.raceWeek?.slots ?? null,
         taperWeekNumbers,

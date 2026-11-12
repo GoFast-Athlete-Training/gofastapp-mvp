@@ -453,6 +453,57 @@ test("mile repeats: modular W/R until five work miles, all laps assigned", () =>
   );
 });
 
+test("fragmented 400 FIT file: near-400m laps are the work reps, jogs stay off them", () => {
+  const miles = [
+    0.14, 0.25, 0.05, 0.25, 0.04, 0.25, 0.06, 0.25, 0.06, 0.25, 0.01, 0.06, 0.06,
+    0.25, 0.02, 0.25, 0.06, 0.25, 0.06, 0.25, 0.06, 0.22, 1.0, 0.28, 0.22,
+  ];
+  const segments = [
+    {
+      id: "w",
+      stepOrder: 1,
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "work",
+      stepOrder: 2,
+      title: "400m",
+      durationType: "DISTANCE",
+      durationValue: M400,
+      repeatCount: 8,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+      recoveryDurationType: "DISTANCE",
+      recoveryDurationValue: 0.06,
+    },
+    {
+      id: "c",
+      stepOrder: 3,
+      title: "Cooldown",
+      durationType: "DISTANCE",
+      durationValue: 1,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+  ];
+  const derived = miles.map((distanceMiles, lapIndex) =>
+    lap(lapIndex, distanceMiles < 0.2 ? 600 : 340, distanceMiles)
+  );
+  const result = assignLapsForTest(derived, segments, "Intervals");
+  assert.ok(result);
+  const workLaps = result.bySegment.get("work")!;
+  const workNear = workLaps.filter((l) => (l.distanceMiles ?? 0) >= M400 * 0.75);
+  assert.equal(workNear.length, 8);
+  assert.ok(workLaps.every((l) => (l.distanceMiles ?? 0) >= M400 * 0.75 || (l.distanceMiles ?? 1) < 0.15));
+  assert.equal(result.bySegment.get("w")![0]!.lapIndex, 0);
+});
+
 test("unassignable laps return null", () => {
   const segments = [
     {

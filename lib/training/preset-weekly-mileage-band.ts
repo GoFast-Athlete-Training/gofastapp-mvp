@@ -21,22 +21,23 @@ export function presetWeeklyMilesBand(
   return { min, max };
 }
 
+/** Preset max is a ceiling only — do not lift below the preset min. */
 export function clampWeeklyMilesToPresetBand(
   miles: number,
   band: { min: number; max: number | null }
 ): number {
   let n = Math.round(miles);
-  if (n < band.min) n = band.min;
   if (band.max != null && n > band.max) n = band.max;
   return n;
 }
 
+/** Athlete weekly target may be below the preset guide band; only max is enforced. */
 export function weeklyMileageTargetWithinPresetBand(
   miles: number,
   band: { min: number; max: number | null }
 ): boolean {
   const n = Math.round(miles);
-  if (n < band.min) return false;
+  if (n < 1 || n > 100) return false;
   if (band.max != null && n > band.max) return false;
   return true;
 }

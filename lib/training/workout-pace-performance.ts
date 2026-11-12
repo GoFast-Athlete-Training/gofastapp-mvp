@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { productTodayKey } from "@/lib/plan-calendar-day";
 import { parsePaceToSecondsPerMile } from "@/lib/workout-generator/pace-calculator";
 import { syncAthleteFiveKPaceToActivePlan } from "@/lib/training/plan-lifecycle";
 import { rematerializeFuturePlannedWorkoutsForPlan } from "@/lib/training/rematerialize-future-planned-workouts";
@@ -303,6 +304,8 @@ export async function confirmAthleteFiveKPaceFromWorkout(params: {
       await rematerializeFuturePlannedWorkoutsForPlan({
         athleteId: params.athleteId,
         planId,
+        fromDateKey: productTodayKey(),
+        refreshFromAthleteFiveK: true,
       });
     } catch (err) {
       console.error("rematerialize after confirm 5K:", err);

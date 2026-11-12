@@ -2,22 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildWeeklyMileageTargetsByWeek } from "@/lib/training/build-weekly-mileage-curve";
 
-test("build weeks climb from athlete 48 to preset peak 55 by peak week", () => {
+test("build weeks stay at athlete weekly goal", () => {
   const map = buildWeeklyMileageTargetsByWeek({
     totalWeeks: 12,
     taperStartWeekNumber: 11,
     peakWeekNumber: 10,
-    athleteStartMiles: 48,
+    athleteStartMiles: 42,
     presetMinMiles: 45,
-    presetPeakMiles: 55,
+    presetPeakMiles: 42,
     taperWeeks: null,
     raceWeek: null,
   });
 
-  assert.equal(map.get(1), 48);
-  assert.equal(map.get(10), 55);
-  const w5 = map.get(5);
-  assert.ok(w5 != null && w5 > 48 && w5 < 55);
+  assert.equal(map.get(1), 42);
+  assert.equal(map.get(10), 42);
+  assert.equal(map.get(5), 42);
 });
 
 test("hold weeks stay flat before the 8-week ramp", () => {
@@ -27,19 +26,18 @@ test("hold weeks stay flat before the 8-week ramp", () => {
     peakWeekNumber: 16,
     athleteStartMiles: 48,
     presetMinMiles: 45,
-    presetPeakMiles: 60,
+    presetPeakMiles: 48,
     taperWeeks: null,
     raceWeek: null,
     holdWeekNumbers: [1, 2, 3, 4, 5, 6, 7, 8],
-    holdWeeklyMiles: 50,
+    holdWeeklyMiles: 48,
     rampStartWeekNumber: 9,
   });
 
-  assert.equal(map.get(1), 50);
-  assert.equal(map.get(8), 50);
-  const rampMid = map.get(12);
-  assert.ok(rampMid != null && rampMid > 50 && rampMid < 60);
-  assert.equal(map.get(16), 60);
+  assert.equal(map.get(1), 48);
+  assert.equal(map.get(8), 48);
+  assert.equal(map.get(12), 48);
+  assert.equal(map.get(16), 48);
 });
 
 test("taper weeks use preset caps when set (no generic taper target)", () => {

@@ -73,11 +73,22 @@ export async function planGeneratePostHandler(
     let weeklyMileageTarget =
       typeof rawTarget === "number" && Number.isFinite(rawTarget)
         ? Math.round(rawTarget)
-        : plan.weeklyMileageTarget ?? prefs?.weeklyMileageTarget ?? 45;
+        : plan.weeklyMileageTarget ??
+          prefs?.weeklyMileageTarget ??
+          (plan.currentWeeklyMileage != null && Number.isFinite(Number(plan.currentWeeklyMileage))
+            ? Math.round(Number(plan.currentWeeklyMileage))
+            : null);
+
+    if (weeklyMileageTarget == null || !Number.isFinite(weeklyMileageTarget)) {
+      return NextResponse.json(
+        { error: "weeklyMileageTarget is required to generate a schedule." },
+        { status: 400 },
+      );
+    }
 
     weeklyMileageTarget = Math.max(
       minWeeklyMiles,
-      Math.min(100, weeklyMileageTarget)
+      Math.min(100, weeklyMileageTarget),
     );
 
     if (plan.presetId) {
@@ -91,7 +102,6 @@ export async function planGeneratePostHandler(
       if (presetBand) {
         const bandMin = Math.max(1, presetBand.minWeeklyMiles);
         minWeeklyMiles = Math.max(minWeeklyMiles, bandMin);
-        weeklyMileageTarget = Math.max(bandMin, weeklyMileageTarget);
         if (
           presetBand.maxWeeklyMiles != null &&
           Number.isFinite(presetBand.maxWeeklyMiles)

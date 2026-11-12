@@ -425,14 +425,8 @@ export default function TrainingPlanDayPreviewPage() {
           setWorkout(raceDayPayload);
           const rawRecord = rawW as Record<string, unknown>;
           const profilePace = rawRecord.profileFiveKPace;
-          const planFiveK = (rawRecord.training_plans as { currentFiveKPace?: string } | null)
-            ?.currentFiveKPace;
           setWorkoutProfileFiveKPace(
-            (typeof profilePace === "string" && profilePace.trim()
-              ? profilePace.trim()
-              : typeof planFiveK === "string" && planFiveK.trim()
-                ? planFiveK.trim()
-                : null) ?? null
+            typeof profilePace === "string" && profilePace.trim() ? profilePace.trim() : null
           );
           const mid = rawRecord.garminDetailActivityId;
           setMatchedActivityId(typeof mid === "string" && mid.trim() ? mid.trim() : null);
@@ -580,7 +574,7 @@ export default function TrainingPlanDayPreviewPage() {
       )
     : dateKey ?? "";
   const isLogged = garminDetailActivityId != null;
-  const profileFiveKPace = workoutProfileFiveKPace?.trim() || athleteFiveKPace?.trim() || null;
+  const profileFiveKPace = athleteFiveKPace?.trim() || workoutProfileFiveKPace?.trim() || null;
   const canShowPaceSplits =
     !isLogged && workoutId != null && workout != null && workout.segments.length > 0 && !isRaceDay;
   const canMatchWorkout =

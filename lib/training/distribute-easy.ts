@@ -90,7 +90,7 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
       weekTargetOverride != null && Number.isFinite(weekTargetOverride)
         ? weekTargetOverride
         : input.weeklyMileageTarget;
-    let weeklyCap = Math.max(input.minWeeklyMiles, Math.min(100, baseTarget));
+    let weeklyCap = Math.min(100, Math.max(0, baseTarget));
     if (input.maxWeeklyMiles != null && Number.isFinite(input.maxWeeklyMiles)) {
       weeklyCap = Math.min(weeklyCap, Number(input.maxWeeklyMiles));
     }
@@ -174,11 +174,21 @@ export function distributeEasyMiles(input: DistributeEasyInput): void {
       if (!hit) break;
     }
 
+    const nonEasyMiles = round2(
+      week.days
+        .filter((d) => d.workoutType !== "Easy")
+        .reduce((s, d) => s + d.miles, 0)
+    );
+
     const deloadWeek = isDeloadStyleWeek({
       weekTotalMiles: weekSum(),
       previousWeekTotalMiles,
     });
-    const shouldFillTowardTarget = beforeTaper && !deloadWeek && !inTaperVolume;
+    const shouldFillTowardTarget =
+      beforeTaper &&
+      !deloadWeek &&
+      !inTaperVolume &&
+      nonEasyMiles < fillTarget - 0.05;
 
     if (shouldFillTowardTarget) {
       const increment = 0.25;

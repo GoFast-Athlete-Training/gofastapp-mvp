@@ -100,6 +100,9 @@ interface WorkoutSegmentLap {
   avgHeartRate: number | null;
   distanceMiles: number | null;
   durationSeconds?: number | null;
+  prescribedPaceMinSecPerMile?: number | null;
+  prescribedPaceMaxSecPerMile?: number | null;
+  paceDeltaSecPerMile?: number | null;
 }
 
 interface WorkoutSegment {
@@ -995,6 +998,8 @@ export default function WorkoutDetailPage() {
         actualPaceSecPerMile: s.actualPaceSecPerMile ?? null,
         actualDurationSeconds: s.actualDurationSeconds ?? null,
         actualDistanceMiles: s.actualDistanceMiles ?? null,
+        durationValue: s.durationValue,
+        repeatCount: s.repeatCount ?? null,
         segment_laps: s.segment_laps,
       })),
     });
@@ -1305,11 +1310,11 @@ export default function WorkoutDetailPage() {
 
   const profileFiveKPaceDisplay = useMemo(() => {
     const paceStr =
-      workout?.training_plans?.currentFiveKPace?.trim() ||
       workout?.profileFiveKPace?.trim() ||
+      workout?.training_plans?.currentFiveKPace?.trim() ||
       null;
     return paceStr;
-  }, [workout?.training_plans?.currentFiveKPace, workout?.profileFiveKPace]);
+  }, [workout?.profileFiveKPace, workout?.training_plans?.currentFiveKPace]);
 
   const fiveKAnchorSec = useMemo(() => {
     if (!profileFiveKPaceDisplay) return null;
@@ -3508,7 +3513,10 @@ export default function WorkoutDetailPage() {
           <CataloguePrescriptionCard
             catalogue={workout.workout_catalogue}
             prescriptionNarrative={workout.prescriptionNarrative}
-            fiveKPaceSnapshot={workout.training_plans?.currentFiveKPace}
+            fiveKPaceSnapshot={
+              workout.profileFiveKPace?.trim() ||
+              workout.training_plans?.currentFiveKPace
+            }
             estimatedDistanceInMeters={workout.estimatedDistanceInMeters ?? null}
             targetPaceSecPerMile={workout.targetPaceSecPerMile}
             targetPaceSecPerMileHigh={workout.targetPaceSecPerMileHigh}

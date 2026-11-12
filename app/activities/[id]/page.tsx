@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Activity, Flag } from "lucide-react";
-import TopNav from "@/components/shared/TopNav";
-import AthleteSidebar from "@/components/athlete/AthleteSidebar";
+import AthleteAppShell from "@/components/athlete/AthleteAppShell";
+import PaceForPacePanel from "@/components/training/PaceForPacePanel";
+import type { WorkoutPerformanceAnalysis } from "@/lib/training/workout-performance-analysis";
 import ActivityRouteMap from "@/components/activities/ActivityRouteMap";
 import ActivityAddStuffPanel from "@/components/activities/ActivityAddStuffPanel";
 import MarkActivityAsRaceSheet from "@/components/races/MarkActivityAsRaceSheet";
@@ -71,7 +72,10 @@ export default function ActivityDetailPage() {
   const [hubPost, setHubPost] = useState<ActivityPostOwnerPayload | null>(null);
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [matchedPlanRaceId, setMatchedPlanRaceId] = useState<string | null>(null);
+  const [isPlanRaceWorkout, setIsPlanRaceWorkout] = useState(false);
+  const [matchedWorkoutType, setMatchedWorkoutType] = useState<string | null>(null);
+  const [performanceAnalysis, setPerformanceAnalysis] =
+    useState<WorkoutPerformanceAnalysis | null>(null);
   const [stampingResults, setStampingResults] = useState(false);
   const [resultsStamped, setResultsStamped] = useState(false);
 
@@ -92,7 +96,9 @@ export default function ActivityDetailPage() {
         activity?: ActivityPayload;
         derivedLaps?: DerivedLapPayload[];
         hasDetail?: boolean;
+        performanceAnalysis?: WorkoutPerformanceAnalysis | null;
         matchedWorkout?: {
+          workoutType?: string | null;
           training_plans?: {
             athleteRaceId?: string | null;
             lifecycleStatus?: string | null;
@@ -105,13 +111,16 @@ export default function ActivityDetailPage() {
         setActivity(null);
         setDerivedLaps([]);
         setHasDetail(false);
+        setPerformanceAnalysis(null);
+        setIsPlanRaceWorkout(false);
         return;
       }
       setActivity(json.activity ?? null);
       setDerivedLaps(json.derivedLaps ?? []);
       setHasDetail(json.hasDetail ?? false);
-      const planRaceId = json.matchedWorkout?.training_plans?.athleteRaceId?.trim() || null;
-      setMatchedPlanRaceId(planRaceId);
+      setPerformanceAnalysis(json.performanceAnalysis ?? null);
+      setMatchedWorkoutType(json.matchedWorkout?.workoutType ?? null);
+      setIsPlanRaceWorkout(json.matchedWorkout?.workoutType === "Race");
       setResultsStamped(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load activity");
@@ -229,12 +238,14 @@ export default function ActivityDetailPage() {
     activity?.activityType?.replace(/_/g, " ") ||
     "Activity";
 
+  const scoredHeadline = performanceAnalysis?.executionHeadline?.trim() || null;
+  const showScoredSplits =
+    activity?.ingestionStatus === "MATCHED" &&
+    (performanceAnalysis?.phaseAwareLaps.length ?? 0) > 0;
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <TopNav />
-      <div className="flex flex-1 overflow-hidden min-w-0">
-        <AthleteSidebar />
-        <main className="flex-1 overflow-y-auto min-w-0 pb-24 lg:pb-0">
+    <>
+    <AthleteAppShell>
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
             <Link
               href="/activities"
@@ -364,50 +375,65 @@ export default function ActivityDetailPage() {
                   />
                 ) : null}
 
-                <div className="mb-8">
-                  <h2 className="text-base font-semibold text-gray-900 mb-3">Laps</h2>
-                  {hasDetail && derivedLaps.length > 0 ? (
-                    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-                      <div className="grid grid-cols-5 gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2 text-[11px] font-semibold uppercase text-gray-500">
-                        <span>Lap</span>
-                        <span>Time</span>
-                        <span>Dist</span>
-                        <span className="col-span-2">Pace</span>
-                      </div>
-                      {derivedLaps.map((lap) => (
-                        <div
-                          key={lap.lapIndex}
-                          className="grid grid-cols-5 gap-2 border-b border-gray-100 px-4 py-2 text-sm last:border-b-0"
-                        >
-                          <span className="font-medium text-gray-900">{lap.lapIndex}</span>
-                          <span className="tabular-nums text-gray-700">
-                            {lap.durationSeconds > 0
-                              ? `${Math.floor(lap.durationSeconds / 60)}:${String(
-                                  Math.round(lap.durationSeconds % 60)
-                                ).padStart(2, "0")}`
-                              : "—"}
-                          </span>
-                          <span className="tabular-nums text-gray-700">
-                            {lap.distanceMiles != null ? `${lap.distanceMiles.toFixed(2)} mi` : "—"}
-                          </span>
-                          <span className="col-span-2 tabular-nums text-gray-700">
-                            {lap.avgPaceSecPerMile != null && isRun
-                              ? formatSecPerMile(lap.avgPaceSecPerMile)
-                              : "—"}
-                          </span>
+                <div className="mb-8 space-y-3">
+                  {showScoredSplits ? (
+                    <>
+                      {scoredHeadline ? (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                          <p className="text-xs font-bold uppercase tracking-widest text-emerald-800">
+                            How&apos;d you do?
+                          </p>
+                          <p className="mt-2 text-base font-semibold text-gray-900">{scoredHeadline}</p>
                         </div>
-                      ))}
-                    </div>
+                      ) : null}
+                      <PaceForPacePanel
+                        garminDetailActivityId={activity.id}
+                        performanceAnalysis={performanceAnalysis}
+                        workoutType={matchedWorkoutType}
+                      />
+                    </>
                   ) : (
-                    <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-4 text-sm text-gray-600">
-                      {hasDetail
-                        ? "No lap data in this activity."
-                        : "Waiting on Garmin detail sync for lap breakdown…"}
-                    </div>
+                    <>
+                      <h2 className="text-base font-semibold text-gray-900">Laps</h2>
+                      {hasDetail && derivedLaps.length > 0 ? (
+                        <ul className="space-y-2">
+                          {derivedLaps.map((lap) => (
+                            <li
+                              key={lap.lapIndex}
+                              className="rounded-xl border border-gray-200 bg-white px-4 py-3"
+                            >
+                              <div className="flex items-baseline justify-between gap-3 text-sm">
+                                <span className="font-semibold text-gray-900">Lap {lap.lapIndex}</span>
+                                <span className="tabular-nums text-gray-800">
+                                  {lap.avgPaceSecPerMile != null && isRun
+                                    ? formatSecPerMile(lap.avgPaceSecPerMile)
+                                    : "—"}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs tabular-nums text-gray-600">
+                                {lap.durationSeconds > 0
+                                  ? `${Math.floor(lap.durationSeconds / 60)}:${String(
+                                      Math.round(lap.durationSeconds % 60)
+                                    ).padStart(2, "0")}`
+                                  : "—"}
+                                {" · "}
+                                {lap.distanceMiles != null ? `${lap.distanceMiles.toFixed(2)} mi` : "—"}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-4 text-sm text-gray-600">
+                          {hasDetail
+                            ? "No lap data in this activity."
+                            : "Waiting on Garmin detail sync for lap breakdown…"}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
-                {activity.ingestionStatus === "MATCHED" && matchedPlanRaceId ? (
+                {activity.ingestionStatus === "MATCHED" && isPlanRaceWorkout ? (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-5 mb-6">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
@@ -482,8 +508,7 @@ export default function ActivityDetailPage() {
               </>
             )}
           </div>
-        </main>
-      </div>
+    </AthleteAppShell>
 
       <MarkActivityAsRaceSheet
         open={markRaceOpen}
@@ -492,6 +517,6 @@ export default function ActivityDetailPage() {
         durationSeconds={activity?.duration ?? null}
         activityLabel={activityLabel}
       />
-    </div>
+    </>
   );
 }

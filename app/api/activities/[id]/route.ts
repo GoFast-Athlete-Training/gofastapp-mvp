@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { projectActivityDetailResponse } from "@/lib/training/activity-detail-projection";
+import { loadWorkoutForAnalysis } from "@/lib/training/load-workout-analysis";
 import { canAccessGfwmHostContent } from "@/lib/gfwm-member-access";
 import { prisma } from "@/lib/prisma";
 
@@ -69,6 +70,14 @@ export async function GET(
       startTime: activityRow.startTime,
     });
 
+    const loadedAnalysis =
+      isOwner && garmin_detail_workout
+        ? await loadWorkoutForAnalysis({
+            workoutId: garmin_detail_workout.id,
+            athleteId: auth.athlete.id,
+          })
+        : null;
+
     return NextResponse.json({
       activity: {
         ...projected.activity,
@@ -79,6 +88,7 @@ export async function GET(
       },
       derivedLaps: projected.derivedLaps,
       hasDetail: projected.hasDetail,
+      performanceAnalysis: loadedAnalysis?.performanceAnalysis ?? null,
       matchedWorkout: garmin_detail_workout
         ? {
             ...garmin_detail_workout,

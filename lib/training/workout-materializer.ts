@@ -290,11 +290,32 @@ function resultFromPlannedId(
   return { plannedWorkoutId, workoutId: plannedWorkoutId, status };
 }
 
+const USER_OWNED_SEGMENT_SOURCES = new Set([
+  "segments_put",
+  "race_day_builder",
+  "garmin_push",
+  "standalone_workout_post",
+  "group_workout_create",
+  "club_planned_workout",
+  "run_planned_workout",
+]);
+
+function segmentSnapshotSource(snapshot: unknown): string | null {
+  if (!snapshot || typeof snapshot !== "object") return null;
+  const source = (snapshot as { source?: unknown }).source;
+  return typeof source === "string" ? source : null;
+}
+
 export async function materializeWorkoutForPlanDay(params: {
   planId: string;
   athleteId: string;
   /** `YYYY-MM-DD` (UTC) or full ISO datetime */
   dateParam: string;
+  /**
+   * Rebuild catalogue/schedule segments from Athlete.fiveKPace.
+   * Leaves athlete-authored snapshots (ingest, race-day builder, manual segment edits) in place.
+   */
+  refreshFromAthleteFiveK?: boolean;
 }): Promise<MaterializeWorkoutForPlanDayResult> {
   const { planId, athleteId, dateParam } = params;
   const anchor = parseDateParam(dateParam.trim());
@@ -425,13 +446,20 @@ export async function materializeWorkoutForPlanDay(params: {
       catalogueWorkoutId: true,
       estimatedDistanceInMeters: true,
       workoutPushed: true,
+      segmentSnapshotJson: true,
       _count: { select: { segments: true } },
     },
   });
 
+  const ownedSnapshot = USER_OWNED_SEGMENT_SOURCES.has(
+    segmentSnapshotSource(existing?.segmentSnapshotJson) ?? ""
+  );
+  const refreshPace = params.refreshFromAthleteFiveK === true && !ownedSnapshot;
+
   if (
     existing &&
     existing._count.segments > 0 &&
+    !refreshPace &&
     !plannedNeedsRematerialize({
       existing: { ...existing, segmentCount: existing._count.segments },
       scheduled,

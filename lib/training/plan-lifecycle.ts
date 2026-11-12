@@ -5,7 +5,7 @@
 import { TrainingPlanLifecycle } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { rematerializeFuturePlannedWorkoutsForPlan } from "@/lib/training/rematerialize-future-planned-workouts";
-import { resolveRaceDayKey } from "@/lib/plan-calendar-day";
+import { productTodayKey, resolveRaceDayKey } from "@/lib/plan-calendar-day";
 import { raceCalendarBeforeTodayUtc } from "@/lib/training/plan-utils";
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
 import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
@@ -284,6 +284,8 @@ export async function syncAthleteFiveKPaceToActivePlan(athleteId: string): Promi
       await rematerializeFuturePlannedWorkoutsForPlan({
         athleteId,
         planId: active.id,
+        fromDateKey: productTodayKey(),
+        refreshFromAthleteFiveK: true,
       });
     } catch (err) {
       console.error("rematerializeFuturePlannedWorkoutsForPlan after 5K sync:", err);

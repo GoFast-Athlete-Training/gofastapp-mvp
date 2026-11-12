@@ -22,7 +22,7 @@ export default function ProfileSidebar() {
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Profile</p>
         <p className="text-sm text-gray-600 mt-0.5">Training, discovery, crews</p>
       </div>
-      <nav className="flex flex-row sm:flex-col gap-1 p-2 overflow-x-auto sm:overflow-visible">
+      <nav className="grid grid-cols-2 gap-1 p-2 sm:flex sm:flex-col">
         {items.map(({ label, href, icon: Icon }) => {
           const isEditAll = href === "/athlete-edit-profile";
           const active = isEditAll
@@ -35,7 +35,7 @@ export default function ProfileSidebar() {
               key={href}
               type="button"
               onClick={() => router.push(href)}
-              className={`shrink-0 sm:w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`sm:w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                 active
                   ? "bg-orange-50 text-orange-700 border border-orange-200"
                   : "text-gray-700 hover:bg-gray-100 border border-transparent"

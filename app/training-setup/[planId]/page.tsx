@@ -382,7 +382,7 @@ export default function TrainingSetupPlanPage({
         : "",
     );
     const existingFiveK =
-      plan.currentFiveKPace?.trim() || athleteFiveKPace?.trim() || "";
+      athleteFiveKPace?.trim() || plan.currentFiveKPace?.trim() || "";
     if (existingFiveK) {
       const parts = parseFiveKPaceToParts(existingFiveK);
       setPaceMin(parts.min);
@@ -694,10 +694,7 @@ export default function TrainingSetupPlanPage({
   function resolveTargetMiles(): number | null {
     const weeklyMilesRaw = weeklyMilesTarget.trim();
     let targetMiles = weeklyMilesRaw === "" ? NaN : Math.round(Number(weeklyMilesRaw));
-    if (!Number.isFinite(targetMiles)) {
-      return null;
-    }
-    if (targetMiles < presetMinWeeklyMiles) {
+    if (!Number.isFinite(targetMiles) || targetMiles < 1) {
       return null;
     }
     if (presetMaxWeeklyMiles != null && targetMiles > presetMaxWeeklyMiles) {
@@ -707,18 +704,21 @@ export default function TrainingSetupPlanPage({
   }
 
   function weeklyTargetBandErrorMessage(): string {
+    if (weeklyMilesTarget.trim() === "") {
+      return "Enter how many miles you want to run weekly.";
+    }
     const band =
       presetMaxWeeklyMiles != null
-        ? `${presetMinWeeklyMiles}–${presetMaxWeeklyMiles} mi/week`
-        : `at least ${presetMinWeeklyMiles} mi/week`;
-    return `Enter your weekly target within this plan’s band (${band}).`;
+        ? `up to ${presetMaxWeeklyMiles} mi/week for this preset`
+        : "a positive weekly mile target";
+    return `Enter a valid weekly target (${band}).`;
   }
 
   async function saveFoundationStart(token: string): Promise<boolean> {
     const fiveKOut =
       buildFiveKPaceFromParts(paceMin.trim(), paceSec.trim()) ||
-      plan?.currentFiveKPace?.trim() ||
       athleteFiveKPace?.trim() ||
+      plan?.currentFiveKPace?.trim() ||
       null;
     if (!fiveKOut) {
       setError("Enter your current 5K pace (minutes and seconds 0–59).");
@@ -1048,6 +1048,19 @@ export default function TrainingSetupPlanPage({
             </div>
           ) : null}
 
+          {hasSchedule && !showPreferencesEditor ? (
+            <button
+              type="button"
+              onClick={() => {
+                setRegenerationSuccess(false);
+                setShowPreferencesEditor(true);
+              }}
+              className="mb-4 w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-700 sm:hidden"
+            >
+              Change preferences
+            </button>
+          ) : null}
+
           {hasSchedule ? (
             <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
               <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 w-full sm:w-auto">
@@ -1336,6 +1349,66 @@ export default function TrainingSetupPlanPage({
               )}
             </div>
 
+            <FoundationStartFields
+              weeklyMiles={currentWeeklyMiles}
+              onWeeklyMiles={setCurrentWeeklyMiles}
+              longRunMiles={longRunMiles}
+              onLongRunMiles={setLongRunMiles}
+              showInjuryCheckbox={false}
+              weeklyCaption="How many miles you run now. We build from this — not the top of the preset band."
+            />
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-800">
+                How many miles do you want to do weekly?
+              </label>
+              <p className="mb-2 text-xs text-gray-500">
+                Your normal week — we aim the plan here, not at the high end of the band.
+                {plan.training_plan_preset ? (
+                  <>
+                    {" "}
+                    This preset&apos;s guide is{" "}
+                    <span className="font-medium text-gray-800">
+                      {presetMinWeeklyMiles}
+                      {presetMaxWeeklyMiles != null
+                        ? `–${presetMaxWeeklyMiles}`
+                        : "+"}{" "}
+                      mi/week
+                    </span>
+                    ; {presetMaxWeeklyMiles != null ? `max ${presetMaxWeeklyMiles}` : "no max"}.
+                  </>
+                ) : null}
+              </p>
+              <input
+                type="number"
+                inputMode="numeric"
+                step={1}
+                min={1}
+                max={presetMaxWeeklyMiles ?? undefined}
+                className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                value={weeklyMilesTarget}
+                onChange={(e) => setWeeklyMilesTarget(e.target.value)}
+              />
+              {buildWarnings.belowEngineFloor && (
+                <p
+                  className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-950"
+                  role="status"
+                >
+                  Below this preset&apos;s guide band ({presetMinWeeklyMiles}
+                  {presetMaxWeeklyMiles != null ? `–${presetMaxWeeklyMiles}` : "+"} mi/week).
+                  We&apos;ll still build to the number you entered.
+                </p>
+              )}
+              {buildWarnings.abovePresetCeiling && presetMaxWeeklyMiles != null ? (
+                <p
+                  className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
+                  role="status"
+                >
+                  Enter at most {presetMaxWeeklyMiles} mi/week for this preset.
+                </p>
+              ) : null}
+            </div>
+
             {!hasSchedule && presetGenerateWarnings.length > 0 && (
               <div
                 className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
@@ -1408,65 +1481,6 @@ export default function TrainingSetupPlanPage({
                 </p>
               </div>
             ) : null}
-
-            <FoundationStartFields
-              weeklyMiles={currentWeeklyMiles}
-              onWeeklyMiles={setCurrentWeeklyMiles}
-              longRunMiles={longRunMiles}
-              onLongRunMiles={setLongRunMiles}
-              showInjuryCheckbox={false}
-              weeklyCaption="Starting mileage from plan setup. Edit if your baseline changed — injury reduction is not applied again here."
-            />
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-800">
-                How many miles do you want to do weekly?
-              </label>
-              <p className="mb-2 text-xs text-gray-500">
-                Your ballpark for how much you want to run in a normal week—we aim the
-                plan at it.
-                {plan.training_plan_preset ? (
-                  <>
-                    {" "}
-                    This preset allows{" "}
-                    <span className="font-medium text-gray-800">
-                      {presetMinWeeklyMiles}
-                      {presetMaxWeeklyMiles != null
-                        ? `–${presetMaxWeeklyMiles}`
-                        : "+"}{" "}
-                      mi/week
-                    </span>
-                    .
-                  </>
-                ) : null}
-              </p>
-              <input
-                type="number"
-                inputMode="numeric"
-                step={1}
-                min={presetMinWeeklyMiles}
-                max={presetMaxWeeklyMiles ?? undefined}
-                className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                value={weeklyMilesTarget}
-                onChange={(e) => setWeeklyMilesTarget(e.target.value)}
-              />
-              {buildWarnings.belowEngineFloor && (
-                <p
-                  className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
-                  role="status"
-                >
-                  Enter at least {presetMinWeeklyMiles} mi/week for this preset.
-                </p>
-              )}
-              {buildWarnings.abovePresetCeiling && presetMaxWeeklyMiles != null ? (
-                <p
-                  className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
-                  role="status"
-                >
-                  Enter at most {presetMaxWeeklyMiles} mi/week for this preset.
-                </p>
-              ) : null}
-            </div>
 
             {plan && trajectoryContext && hasSchedule ? (
               <PlanLongRunTrajectorySection

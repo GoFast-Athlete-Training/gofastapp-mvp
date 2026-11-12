@@ -185,6 +185,8 @@ export type PerformanceAnalysisSegmentInput = {
   actualPaceSecPerMile: number | null;
   actualDurationSeconds: number | null;
   actualDistanceMiles: number | null;
+  durationValue?: number | null;
+  repeatCount?: number | null;
   segment_laps?: Array<{
     id?: string;
     lapIndex?: number;
@@ -271,6 +273,8 @@ export function classifyLapPhase(params: {
   segmentLapCount: number;
   prescribedMin?: number | null;
   prescribedMax?: number | null;
+  distanceMiles?: number | null;
+  repDistanceMiles?: number | null;
 }): SegmentPhase {
   const titlePhase = classifySegmentPhase(params.segmentTitle);
   if (titlePhase !== "work") return titlePhase;
@@ -282,6 +286,17 @@ export function classifyLapPhase(params: {
     })
   ) {
     return "work";
+  }
+
+  const rep = params.repDistanceMiles;
+  if (
+    params.distanceMiles != null &&
+    rep != null &&
+    rep > 0 &&
+    rep < 0.9 &&
+    params.segmentLapCount > 1
+  ) {
+    return params.distanceMiles < rep * 0.75 ? "recovery" : "work";
   }
 
   // Collapsed 400×8: work + recovery jogs on one segment row, no separate Recovery bolt
@@ -605,6 +620,39 @@ function formatEasyLongMileHeadline(counts: { onTarget: number; total: number })
   return `${counts.onTarget} of ${counts.total} ${unit} on target`;
 }
 
+/** Interval blocks: score each work-phase lap, not the collapsed segment row. */
+function intervalWorkLapTargetCounts(params: {
+  workoutType: string;
+  segments: PerformanceAnalysisSegmentInput[];
+  workoutTargetLow: number | null;
+  workoutTargetHigh: number | null;
+}): { onTarget: number; total: number } | null {
+  const category = deriveWorkoutVisualCategory(params.workoutType, params.segments);
+  if (category !== "INTENSITY" && category !== "HYBRID") return null;
+
+  const laps = buildPhaseAwareLapRows({
+    segments: params.segments,
+    workoutTargetLow: params.workoutTargetLow,
+    workoutTargetHigh: params.workoutTargetHigh,
+  }).filter((lap) => lap.phase === "work" && lap.paceSecPerMile != null);
+
+  if (laps.length < 2) return null;
+
+  let onTarget = 0;
+  for (const lap of laps) {
+    const label = paceVsTargetLabel(
+      lap.paceSecPerMile,
+      lap.targetPaceSecPerMile ?? params.workoutTargetLow,
+      lap.targetPaceSecPerMileHigh ??
+        params.workoutTargetHigh ??
+        lap.targetPaceSecPerMile ??
+        params.workoutTargetLow
+    );
+    if (label === "in_range" || label === "faster") onTarget++;
+  }
+  return { onTarget, total: laps.length };
+}
+
 export function buildExecutionHeadline(params: {
   scorecard: WorkoutScorecard;
   workRepsOnTarget: WorkRepsOnTarget | null;
@@ -629,6 +677,14 @@ export function buildExecutionHeadline(params: {
       workoutTargetHigh: params.workoutTargetHigh ?? null,
     });
     if (mileCounts) return formatEasyLongMileHeadline(mileCounts);
+
+    const repCounts = intervalWorkLapTargetCounts({
+      workoutType: params.workoutType,
+      segments: params.segments,
+      workoutTargetLow: params.workoutTargetLow ?? null,
+      workoutTargetHigh: params.workoutTargetHigh ?? null,
+    });
+    if (repCounts) return `${repCounts.onTarget} of ${repCounts.total} reps on target`;
   }
 
   if (workRepsOnTarget != null && workRepsOnTarget.total > 0) {
@@ -716,7 +772,16 @@ export function buildWorkoutExecutionVerdict(params: {
   const paceSummary = params.scorecard.workEffort?.summary;
 
   if (category === "INTENSITY" || category === "HYBRID") {
-    const wr = params.workRepsOnTarget;
+    const lapCounts =
+      params.segments != null
+        ? intervalWorkLapTargetCounts({
+            workoutType: params.workoutType,
+            segments: params.segments,
+            workoutTargetLow: params.targetPaceSecPerMile,
+            workoutTargetHigh: params.targetPaceSecPerMileHigh,
+          })
+        : null;
+    const wr = lapCounts ?? params.workRepsOnTarget;
     if (wr && wr.total > 0) {
       const ratio = wr.onTarget / wr.total;
       if (ratio >= 1) verdict = "mostly_on_target";
@@ -930,12 +995,22 @@ export function buildPhaseAwareLapRows(params: {
     lapOrder += 1;
     const idxInSeg = lapIndexInSegment.get(segment.id) ?? 0;
     lapIndexInSegment.set(segment.id, idxInSeg + 1);
+    const repDistanceMiles =
+      segment.repeatCount != null &&
+      segment.repeatCount > 1 &&
+      segment.durationValue != null &&
+      segment.durationValue > 0 &&
+      segment.durationValue < 0.9
+        ? segment.durationValue
+        : null;
     const phase = classifyLapPhase({
       segmentTitle: segment.title,
       lapIndexInSegment: idxInSeg,
       segmentLapCount: segmentLapCount.get(segment.id) ?? 1,
       prescribedMin: lap.prescribedPaceMinSecPerMile,
       prescribedMax: lap.prescribedPaceMaxSecPerMile,
+      distanceMiles: lap.distanceMiles,
+      repDistanceMiles,
     });
     const segmentTargetLow = paceTargetSecPerMileFromSegment(
       segment.targets,

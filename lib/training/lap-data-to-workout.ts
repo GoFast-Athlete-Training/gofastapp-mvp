@@ -204,12 +204,30 @@ function isGarminRecoveryIntensity(intensity: string | null | undefined): boolea
 function isGarminWorkIntensity(intensity: string | null | undefined): boolean {
   if (!intensity) return false;
   const u = intensity.toUpperCase();
-  return (
-    u.includes("ACTIVE") ||
-    u.includes("INTERVAL") ||
-    u === "WARMUP" ||
-    u.includes("TARGET")
-  );
+  if (u.includes("WARM") || u.includes("COOL")) return false;
+  return u.includes("ACTIVE") || u.includes("INTERVAL") || u.includes("TARGET");
+}
+
+/** Lap distance sits on the prescribed rep (400m, 800m), not a jog or a mile bookend. */
+function isNearRepDistance(
+  distanceMiles: number | null | undefined,
+  repMiles: number
+): boolean {
+  if (distanceMiles == null || !Number.isFinite(distanceMiles) || distanceMiles <= 0) {
+    return false;
+  }
+  if (!Number.isFinite(repMiles) || repMiles <= 0) return false;
+  const ratio = distanceMiles / repMiles;
+  return ratio >= 0.75 && ratio <= 1.35;
+}
+
+function nextRepeatedRepMiles(sorted: BaseSeg[], segIndex: number): number | null {
+  for (let i = segIndex + 1; i < sorted.length; i++) {
+    const next = sorted[i]!;
+    if (!isRepeatedRepSegment(next)) continue;
+    if (next.durationValue > 0 && next.durationValue < 0.9) return next.durationValue;
+  }
+  return null;
 }
 
 /**
@@ -346,11 +364,21 @@ function assignByStepOrderConsumption(
     const targetMiles = prescribedDistanceMiles(seg);
     if (targetMiles <= 0) continue;
 
+    const upcomingRepMiles = isBookendTitle(seg.title)
+      ? nextRepeatedRepMiles(sorted, segIndex)
+      : null;
+
     let totalMiles = 0;
     const chunk: DerivedLap[] = [];
 
     while (lapIdxRef.value < derived.length) {
       const lap = derived[lapIdxRef.value]!;
+      if (
+        upcomingRepMiles != null &&
+        isNearRepDistance(lap.distanceMiles, upcomingRepMiles)
+      ) {
+        break;
+      }
       chunk.push(lap);
       lapIdxRef.value++;
       if (lap.distanceMiles != null && lap.distanceMiles > 0) {
@@ -358,6 +386,7 @@ function assignByStepOrderConsumption(
       }
 
       const earlyAdvanceShortLap =
+        upcomingRepMiles == null &&
         isBookendTitle(seg.title) &&
         chunk.length === 1 &&
         totalMiles > 0 &&

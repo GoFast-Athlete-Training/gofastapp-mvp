@@ -18,7 +18,10 @@ import { parseEasyRunConfigJson } from "@/lib/training/easy-run-config";
 import { parseAthletePaceAdjuster } from "@/lib/training/athlete-pace-adjuster";
 import { ensureWorkoutPrescriptionNarrative } from "@/lib/training/prescription-narrative-service";
 import { computeWorkoutPerformanceAnalysis } from "@/lib/training/workout-performance-analysis";
-import { retrySegmentBoltIfNeeded } from "@/lib/training/load-workout-analysis";
+import {
+  restampRepeatedRepsIfNeeded,
+  retrySegmentBoltIfNeeded,
+} from "@/lib/training/load-workout-analysis";
 import { loadPlannedWorkoutDetailForAthlete } from "@/lib/training/planned-workout-detail";
 import { resolveReadableWorkoutAthleteId, resolveWorkoutOwnerAthleteId } from "@/lib/training/gfwm-workout-read-access";
 
@@ -223,6 +226,8 @@ export async function GET(request: NextRequest, context: Ctx) {
     let workout = await loadWorkout();
     if (workout && (await retrySegmentBoltIfNeeded(workout))) {
       workout = await loadWorkout();
+    } else if (workout && (await restampRepeatedRepsIfNeeded(workout))) {
+      workout = await loadWorkout();
     }
 
     if (!workout) {
@@ -297,6 +302,7 @@ export async function GET(request: NextRequest, context: Ctx) {
           paceAnchor: plannedDetail.workout_catalogue?.paceAnchor ?? null,
           tempoGoalBenchmark: plannedDetail.tempoGoalBenchmark,
           goalRacePaceSecPerMile,
+          profileFiveKPace: athleteRow?.fiveKPace?.trim() || null,
         },
         performanceAnalysis,
         performanceSignals,
@@ -480,6 +486,8 @@ export async function GET(request: NextRequest, context: Ctx) {
         actualPaceSecPerMile: s.actualPaceSecPerMile,
         actualDurationSeconds: s.actualDurationSeconds,
         actualDistanceMiles: s.actualDistanceMiles,
+        durationValue: s.durationValue,
+        repeatCount: s.repeatCount,
         segment_laps: workout.garminDetailActivityId
           ? s.segment_laps.filter((lap) => lap.activityId === workout.garminDetailActivityId)
           : s.segment_laps,

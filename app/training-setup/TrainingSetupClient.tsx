@@ -1058,7 +1058,7 @@ export default function TrainingSetupClient() {
       ) {
         setBaselineWeeklyMileage(String(Math.round(Number(detail.currentWeeklyMileage))));
       }
-      const fiveKToCopy = detail.currentFiveKPace?.trim() || athleteFiveKPace?.trim() || "";
+      const fiveKToCopy = athleteFiveKPace?.trim() || detail.currentFiveKPace?.trim() || "";
       if (fiveKToCopy) {
         const parts = parseFiveKPaceToParts(fiveKToCopy);
         setPaceMin(parts.min);
@@ -1742,6 +1742,16 @@ export default function TrainingSetupClient() {
                 </button>
 
                 <div className="space-y-4">
+                  <FoundationStartFields
+                    weeklyMiles={baselineWeeklyMileage}
+                    onWeeklyMiles={setBaselineWeeklyMileage}
+                    longRunMiles={baselineLongRun}
+                    onLongRunMiles={setBaselineLongRun}
+                    returningFromInjury={returningFromInjury}
+                    onReturningFromInjury={setReturningFromInjury}
+                    weeklyCaption="How many miles you run now — we size the plan from this, not the preset high end."
+                  />
+
                   <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-xs font-medium text-gray-700">
@@ -1771,15 +1781,6 @@ export default function TrainingSetupClient() {
                       </div>
                     </div>
                   </div>
-
-                  <FoundationStartFields
-                    weeklyMiles={baselineWeeklyMileage}
-                    onWeeklyMiles={setBaselineWeeklyMileage}
-                    longRunMiles={baselineLongRun}
-                    onLongRunMiles={setBaselineLongRun}
-                    returningFromInjury={returningFromInjury}
-                    onReturningFromInjury={setReturningFromInjury}
-                  />
 
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-800">

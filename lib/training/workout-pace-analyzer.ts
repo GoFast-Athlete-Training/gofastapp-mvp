@@ -25,6 +25,7 @@ export type PlannedSegmentRow = {
   repeatCount: number | null;
   recoveryDurationType: string | null;
   recoveryDurationValue: number | null;
+  durationValue?: number | null;
 };
 
 export type WorkoutLapRow = {
@@ -34,6 +35,7 @@ export type WorkoutLapRow = {
   segmentTitle: string;
   segmentStepOrder: number;
   avgPaceSecPerMile: number | null;
+  distanceMiles?: number | null;
 };
 
 export type AimedLap = {
@@ -101,9 +103,26 @@ function aimedWorkLap(
   };
 }
 
-/** Odd lap indices within a repeat block are recovery jogs (OPEN). */
+/** Odd lap indices within a repeat block are recovery jogs (OPEN) when distance is unknown. */
 function isRecoveryLapWithinRepeatBlock(lapIndexInSegment: number): boolean {
   return lapIndexInSegment % 2 === 1;
+}
+
+function isShortOfRepDistance(
+  distanceMiles: number | null | undefined,
+  repMiles: number | null | undefined
+): boolean | null {
+  if (
+    distanceMiles == null ||
+    repMiles == null ||
+    !Number.isFinite(distanceMiles) ||
+    !Number.isFinite(repMiles) ||
+    repMiles <= 0 ||
+    repMiles >= 0.9
+  ) {
+    return null;
+  }
+  return distanceMiles < repMiles * 0.75;
 }
 
 type ExpandedPrescription =
@@ -205,7 +224,9 @@ export function translatePlannedOntoWorkout(params: {
     if (usesSameSegmentAlternation) {
       const idx = lapIndexInSegment.get(lap.segmentId) ?? 0;
       lapIndexInSegment.set(lap.segmentId, idx + 1);
-      if (isRecoveryLapWithinRepeatBlock(idx)) {
+      const shortOfRep = isShortOfRepDistance(lap.distanceMiles, seg?.durationValue);
+      if (shortOfRep === true) return openAimedLap(lap.id);
+      if (shortOfRep == null && isRecoveryLapWithinRepeatBlock(idx)) {
         return openAimedLap(lap.id);
       }
     }
@@ -260,6 +281,7 @@ export async function analyzeWorkoutPaceDeltas(params: {
           repeatCount: true,
           recoveryDurationType: true,
           recoveryDurationValue: true,
+          durationValue: true,
           segment_laps: {
             where: { activityId: params.activityId },
             orderBy: { lapIndex: "asc" },
@@ -267,6 +289,7 @@ export async function analyzeWorkoutPaceDeltas(params: {
               id: true,
               lapIndex: true,
               avgPaceSecPerMile: true,
+              distanceMiles: true,
             },
           },
         },
@@ -287,6 +310,7 @@ export async function analyzeWorkoutPaceDeltas(params: {
     repeatCount: s.repeatCount,
     recoveryDurationType: s.recoveryDurationType,
     recoveryDurationValue: s.recoveryDurationValue,
+    durationValue: s.durationValue,
   }));
 
   if (workout.plannedWorkoutId) {
@@ -302,6 +326,7 @@ export async function analyzeWorkoutPaceDeltas(params: {
         repeatCount: true,
         recoveryDurationType: true,
         recoveryDurationValue: true,
+        durationValue: true,
       },
     });
     if (planned.length > 0) {
@@ -319,6 +344,7 @@ export async function analyzeWorkoutPaceDeltas(params: {
         segmentTitle: seg.title,
         segmentStepOrder: seg.stepOrder,
         avgPaceSecPerMile: lap.avgPaceSecPerMile,
+        distanceMiles: lap.distanceMiles,
       });
     }
   }

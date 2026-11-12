@@ -116,6 +116,34 @@ test("alternates work/recovery within repeat interval segment", () => {
   assert.equal(aimed[2]?.paceDeltaSecPerMile, 0);
 });
 
+test("400s with two jogs in a row stamp only the near-400m laps", () => {
+  const aimed = translatePlannedOntoWorkout({
+    plannedSegments: [
+      {
+        id: "int",
+        stepOrder: 1,
+        title: "400m",
+        targets: [{ type: "PACE", valueLow: PACE_600, valueHigh: PACE_629 }],
+        paceTargetEncodingVersion: 2,
+        repeatCount: 4,
+        recoveryDurationType: "DISTANCE",
+        recoveryDurationValue: 0.06,
+        durationValue: 400 / 1609.34,
+      },
+    ],
+    workoutLaps: [
+      { id: "a", lapIndex: 0, segmentId: "seg", segmentTitle: "400m", segmentStepOrder: 1, avgPaceSecPerMile: 340, distanceMiles: 0.25 },
+      { id: "b", lapIndex: 1, segmentId: "seg", segmentTitle: "400m", segmentStepOrder: 1, avgPaceSecPerMile: 620, distanceMiles: 0.05 },
+      { id: "c", lapIndex: 2, segmentId: "seg", segmentTitle: "400m", segmentStepOrder: 1, avgPaceSecPerMile: 640, distanceMiles: 0.06 },
+      { id: "d", lapIndex: 3, segmentId: "seg", segmentTitle: "400m", segmentStepOrder: 1, avgPaceSecPerMile: 350, distanceMiles: 0.25 },
+    ],
+  });
+  assert.equal(aimed[0]?.prescribedPaceMinSecPerMile != null, true);
+  assert.equal(aimed[1]?.prescribedPaceMinSecPerMile, null);
+  assert.equal(aimed[2]?.prescribedPaceMinSecPerMile, null);
+  assert.equal(aimed[3]?.prescribedPaceMinSecPerMile != null, true);
+});
+
 test("mile repeats with separate Recovery segment stamps all interval work laps", () => {
   const aimed = translatePlannedOntoWorkout({
     plannedSegments: [

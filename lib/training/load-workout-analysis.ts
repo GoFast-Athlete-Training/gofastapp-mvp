@@ -12,6 +12,53 @@ import {
   type WorkoutPerformanceAnalysis,
 } from "./workout-performance-analysis";
 
+export async function restampRepeatedRepsIfNeeded(workout: {
+  id: string;
+  garminDetailActivityId: string | null;
+  segments: Array<{
+    repeatCount?: number | null;
+    durationValue?: number | null;
+    segment_laps: Array<{
+      distanceMiles?: number | null;
+      paceDeltaSecPerMile?: number | null;
+    }>;
+  }>;
+}): Promise<boolean> {
+  if (!workout.garminDetailActivityId) return false;
+  if (!repeatedRepsNeedRestamp(workout.segments)) return false;
+  await stampPaceDeltasAfterSplits({
+    workoutId: workout.id,
+    activityId: workout.garminDetailActivityId,
+  });
+  return true;
+}
+
+function repeatedRepsNeedRestamp(
+  segments: Array<{
+    repeatCount?: number | null;
+    durationValue?: number | null;
+    segment_laps: Array<{
+      distanceMiles?: number | null;
+      paceDeltaSecPerMile?: number | null;
+    }>;
+  }>
+): boolean {
+  for (const seg of segments) {
+    const reps = seg.repeatCount ?? 1;
+    const repMiles = seg.durationValue;
+    if (reps <= 1 || repMiles == null || repMiles <= 0 || repMiles >= 0.9) continue;
+    for (const lap of seg.segment_laps) {
+      const miles = lap.distanceMiles;
+      if (miles == null || !Number.isFinite(miles)) continue;
+      const near = miles >= repMiles * 0.75 && miles <= repMiles * 1.35;
+      const short = miles < repMiles * 0.75;
+      if (near && lap.paceDeltaSecPerMile == null) return true;
+      if (short && lap.paceDeltaSecPerMile != null) return true;
+    }
+  }
+  return false;
+}
+
 const workoutAnalysisInclude = {
   segments: {
     orderBy: { stepOrder: "asc" as const },
@@ -103,6 +150,12 @@ export async function loadWorkoutForAnalysis(params: {
       include: workoutAnalysisInclude,
     });
     if (reloaded) workout = reloaded;
+  } else if (await restampRepeatedRepsIfNeeded(workout)) {
+    const reloaded = await prisma.workouts.findFirst({
+      where: { id: params.workoutId, athleteId: params.athleteId },
+      include: workoutAnalysisInclude,
+    });
+    if (reloaded) workout = reloaded;
   }
 
   const analysisInput: PerformanceAnalysisWorkoutInput = {
@@ -131,6 +184,8 @@ export async function loadWorkoutForAnalysis(params: {
       actualPaceSecPerMile: s.actualPaceSecPerMile,
       actualDurationSeconds: s.actualDurationSeconds,
       actualDistanceMiles: s.actualDistanceMiles,
+      durationValue: s.durationValue,
+      repeatCount: s.repeatCount,
       segment_laps: workout.garminDetailActivityId
         ? s.segment_laps.filter((lap) => lap.activityId === workout.garminDetailActivityId)
         : s.segment_laps,
