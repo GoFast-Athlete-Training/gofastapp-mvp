@@ -91,12 +91,20 @@ function WorkSplitRow({
       <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
         <span className="font-semibold text-gray-900">{rowTitle}</span>
       </div>
-      <motionGrid plan={plan} actual={actual} delta={delta} />
+      <SplitMetricsGrid plan={plan} actual={actual} delta={delta} />
     </li>
   );
 }
 
-function motionGrid({ plan, actual, delta }: { plan: string; actual: string; delta: string }) {
+function SplitMetricsGrid({
+  plan,
+  actual,
+  delta,
+}: {
+  plan: string;
+  actual: string;
+  delta: string;
+}) {
   const deltaClass =
     delta.startsWith("+") && delta !== "+0s"
       ? "text-emerald-800"
