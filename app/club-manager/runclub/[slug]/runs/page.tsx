@@ -9,7 +9,7 @@ import api from '@/lib/api';
 import ClubManagerShell from '@/components/runclub/manager/ClubManagerShell';
 import { clubManagerClubPath, clubManagerHubPath } from '@/lib/club-manager-paths';
 import type { CompletedRunFeedItem } from '@/lib/runclub/completed-run-feed';
-import { companyRunEditorPath } from '@/lib/app-urls';
+import { runManageEditorPath } from '@/lib/app-urls';
 
 interface ManageUpcomingRun {
   id: string;
@@ -212,7 +212,6 @@ export default function ClubManagerRunsPage() {
   const router = useRouter();
   const slug = params.slug as string;
 
-  const [clubId, setClubId] = useState('');
   const [clubName, setClubName] = useState('');
   const [upcoming, setUpcoming] = useState<ManageUpcomingRun[]>([]);
   const [completed, setCompleted] = useState<CompletedRun[]>([]);
@@ -235,7 +234,6 @@ export default function ClubManagerRunsPage() {
     ]);
     if (dash.data?.club) {
       setClubName(dash.data.club.name);
-      if (dash.data.club.id) setClubId(dash.data.club.id);
     }
     if (runs.data?.success) {
       setUpcoming(runs.data.upcoming ?? []);
@@ -449,7 +447,7 @@ export default function ClubManagerRunsPage() {
                     </div>
                     <div className="flex flex-wrap gap-2 shrink-0">
                       <a
-                        href={companyRunEditorPath(run.id, clubId || undefined)}
+                        href={runManageEditorPath(run.id)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"

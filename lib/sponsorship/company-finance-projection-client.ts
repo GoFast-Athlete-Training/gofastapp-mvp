@@ -9,21 +9,17 @@ export class CompanyFinanceProjectionError extends Error {
 }
 
 function resolveFinanceProjectionAppUrl(): string {
-  const base =
-    process.env.GOFAST_SPONSOR_MANAGE_URL?.replace(/\/$/, "") ??
-    process.env.GOFAST_COMPANY_APP_URL?.replace(/\/$/, "") ??
-    process.env.GOFAST_COMPANY_API_URL?.replace(/\/$/, "") ??
-    process.env.NEXT_PUBLIC_GOFAST_COMPANY_API_URL?.replace(/\/$/, "");
+  const base = process.env.GOFAST_SPONSOR_MANAGE_URL?.replace(/\/$/, "");
   if (!base) {
     throw new CompanyFinanceProjectionError(
-      "GOFAST_SPONSOR_MANAGE_URL or GOFAST_COMPANY_APP_URL is not configured",
+      "GOFAST_SPONSOR_MANAGE_URL is not configured",
       false,
     );
   }
   return base;
 }
 
-/** Prod webhook follow-up: GSM (or Company fallback) verifies payment via Stripe event server-side. */
+/** Prod webhook follow-up: Sponsor Manage verifies payment via Stripe event server-side. */
 export async function projectPaidSponsorshipToCompany(stripeEventId: string): Promise<void> {
   const response = await fetch(`${resolveFinanceProjectionAppUrl()}/api/sponsorship/finance-projection`, {
     method: "POST",

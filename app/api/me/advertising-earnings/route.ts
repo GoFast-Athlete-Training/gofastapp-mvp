@@ -2,14 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebaseAdmin";
-import { fetchAthleteSpendEarningsFromCompany } from "@/lib/advertising/company-platform-client";
 import { fetchAthleteSponsorshipEarningsFromSponsorManage } from "@/lib/advertising/sponsor-manage-client";
 import { getAthleteConnectStatus, athleteConnectStatusSelect } from "@/lib/sponsorship/athlete-stripe-connect-service";
 import { prisma } from "@/lib/prisma";
 
 /**
  * GET /api/me/advertising-earnings
- * Spend-based earnings from Company placement receipts.
+ * Sponsorship totals come from Sponsor Manage. Placement spend is not loaded here.
  */
 export async function GET(request: Request) {
   try {
@@ -41,13 +40,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const { searchParams } = new URL(request.url);
-    const daysRaw = searchParams.get("days");
-    const days = daysRaw ? Number.parseInt(daysRaw, 10) : 30;
-    const windowDays = Number.isFinite(days) ? days : 30;
-
-    const [spendEarnings, sponsorshipEarnings, connectStatus] = await Promise.all([
-      fetchAthleteSpendEarningsFromCompany(athlete.id, authHeader, windowDays),
+    const [sponsorshipEarnings, connectStatus] = await Promise.all([
       fetchAthleteSponsorshipEarningsFromSponsorManage(athlete.id, authHeader),
       getAthleteConnectStatus(athlete),
     ]);
@@ -56,7 +49,7 @@ export async function GET(request: Request) {
       success: true,
       eligible: true,
       handle: athlete.gofastHandle,
-      earnings: spendEarnings,
+      earnings: null,
       sponsorshipEarnings,
       connectStatus,
     });

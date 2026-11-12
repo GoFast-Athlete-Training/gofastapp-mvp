@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchAndSaveRunClub } from "@/lib/runclub-sync";
+import { findLocalRunClubBySlug } from "@/lib/runclub-sync";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/runclub/pull-and-save-all
  *
- * Bulk sync RunClubs from GoFastCompany into gofastapp-mvp.
- * - If `slugs` is provided, sync only those slugs.
- * - Otherwise sync all slugs currently present in local run_clubs.
+ * Looks up local run clubs by slug. Does not fetch Company.
+ * - If `slugs` is provided, look up only those slugs.
+ * - Otherwise return every slug already stored in local run_clubs.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     for (const slug of slugs) {
       try {
-        const saved = await fetchAndSaveRunClub(slug);
+        const saved = await findLocalRunClubBySlug(slug);
         if (saved) {
           synced += 1;
         } else {

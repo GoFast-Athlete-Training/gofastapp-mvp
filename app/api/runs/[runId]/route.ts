@@ -6,7 +6,7 @@ import { getAthleteById } from '@/lib/domain-athlete';
 import { ATHLETE_ID_HEADER } from '@/lib/gofast-request-headers';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { normalizeWebsiteUrl, normalizeStravaUrl, normalizeInstagramUrl } from '@/lib/runclub-urls';
+import { normalizeInstagramUrl } from '@/lib/runclub-urls';
 import { saveRunClub } from '@/lib/save-runclub';
 import { parseRunTotalMiles } from '@/lib/parse-run-total-miles';
 import { fieldsWhenSettingPublished } from '@/lib/runInstanceApprovalPublish';
@@ -478,65 +478,7 @@ export async function GET(
       return NextResponse.json({ error: 'CityRun not found' }, { status: 404 });
     }
 
-    // RunClub is already hydrated via FK relation
-    let runClub = run.runClub;
-    
-    // If RunClub not found locally but runClubId exists, try to fetch from GoFastCompany
-    if (!runClub && run.runClubId) {
-      const gofastCompanyApiUrl = process.env.GOFAST_COMPANY_API_URL || process.env.NEXT_PUBLIC_GOFAST_COMPANY_API_URL;
-      if (gofastCompanyApiUrl) {
-        try {
-          // Need to get slug from runClubId - query local DB first
-          const localRunClub = await prisma.run_clubs.findUnique({
-            where: { id: run.runClubId },
-            select: { slug: true },
-          });
-          
-          if (localRunClub?.slug) {
-            const response = await fetch(`${gofastCompanyApiUrl}/api/runclub/public/${localRunClub.slug}`);
-            if (response.ok) {
-              const clubData = await response.json();
-              if (clubData.runClub) {
-                // Save to local DB for next time
-                // IMPORTANT: Prisma generates UUID `id` automatically - we NEVER set it manually
-                // Use update instead of upsert since we know the ID exists
-                const websiteUrl = normalizeWebsiteUrl(clubData.runClub.websiteUrl, clubData.runClub.url);
-                const stravaUrl = normalizeStravaUrl(clubData.runClub.stravaUrl, clubData.runClub.stravaClubUrl);
-                const instagramUrl = normalizeInstagramUrl(clubData.runClub.instagramUrl || clubData.runClub.instagramHandle || null);
-                await prisma.run_clubs.update({
-                  where: { id: run.runClubId },
-                  data: {
-                    name: clubData.runClub.name,
-                    logoUrl: clubData.runClub.logoUrl || clubData.runClub.logo || null,
-                    city: clubData.runClub.city || null,
-                    description: clubData.runClub.description || null,
-                    websiteUrl,
-                    instagramUrl,
-                    stravaUrl,
-                    syncedAt: new Date(),
-                  },
-                });
-                
-                // Re-fetch with updated data
-                runClub = await prisma.run_clubs.findUnique({
-                  where: { id: run.runClubId },
-                  select: {
-                    id: true,
-                    slug: true,
-                    name: true,
-                    logoUrl: true,
-                    city: true,
-                    description: true,
-                  },
-                });
-              }
-            }
-          }
-        } catch (error) {
-          console.error(`Failed to hydrate RunClub ${run.runClubId}:`, error);
-        }
-      }
-    }
+    const runClub = run.runClub;
 
     // Hydrate RunCrew if exists
     let runCrew = null;

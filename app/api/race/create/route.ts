@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { metersToMiles } from '@/lib/pace-utils';
 import {
   findRegistryByNameAndDate,
   findStaffPromotedRegistryByNameAndDate,
@@ -20,53 +19,6 @@ const PRESET_BY_KEY: Record<
   marathon: { distanceLabel: 'Marathon', distanceMeters: 42195 },
   ultra: { distanceLabel: 'Ultra', distanceMeters: 80467 },
 };
-
-function pushRaceToCompanyUpstream(
-  race: {
-    id: string;
-    name: string;
-    raceDate: Date;
-    city: string | null;
-    state: string | null;
-    registrationUrl: string | null;
-    distanceLabel: string;
-    distanceMeters: number;
-  },
-  authHeader: string | null
-) {
-  const raw =
-    process.env.NEXT_PUBLIC_COMPANY_APP_URL ||
-    process.env.GOFAST_COMPANY_API_URL ||
-    '';
-  const base = raw.replace(/\/$/, '');
-  if (!base) return;
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (authHeader) {
-    headers.Authorization = authHeader;
-  }
-
-  const body = JSON.stringify({
-    prodRaceId: race.id,
-    name: race.name,
-    raceDate: race.raceDate.toISOString(),
-    cityName: race.city,
-    state: race.state,
-    registrationUrl: race.registrationUrl,
-    raceType: race.distanceLabel,
-    distanceMiles: metersToMiles(race.distanceMeters),
-  });
-
-  void fetch(`${base}/api/race-registrations/create`, {
-    method: 'POST',
-    headers,
-    body,
-  }).catch(() => {
-    /* non-blocking */
-  });
-}
 
 // Generate a simple unique ID (cuid-like format)
 function generateId(): string {
@@ -135,20 +87,6 @@ export async function POST(request: NextRequest) {
         },
       });
     }
-
-    pushRaceToCompanyUpstream(
-      {
-        id: race.id,
-        name: race.name,
-        raceDate: race.raceDate,
-        city: race.city,
-        state: race.state,
-        registrationUrl: race.registrationUrl ?? null,
-        distanceLabel: race.distanceLabel ?? preset.distanceLabel,
-        distanceMeters: race.distanceMeters ?? preset.distanceMeters,
-      },
-      authHeader
-    );
 
     return NextResponse.json({
       success: true,

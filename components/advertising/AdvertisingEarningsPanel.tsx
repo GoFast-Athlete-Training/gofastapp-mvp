@@ -3,7 +3,22 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { AdvertisingMoneyCurve } from "@/components/advertising/AdvertisingMoneyCurve";
-import type { AthleteAdvertisingEarnings } from "@/lib/advertising/company-platform-client";
+
+type AthleteAdvertisingEarnings = {
+  source: "spend" | "impressions";
+  revenueSharePercent: number;
+  totalEstimatedEarningsCents: number;
+  totalAttributedSpendCents?: number;
+  totalQualifiedImpressions?: number;
+  totalCampaignPurchases?: number;
+  daily: Array<{
+    date: string;
+    estimatedEarningsCents: number;
+    qualifiedImpressions?: number;
+    campaignPurchases?: number;
+    attributedSpendCents?: number;
+  }>;
+};
 
 type AdvertisingEarningsPanelProps = {
   athleteId: string;

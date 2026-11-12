@@ -11,11 +11,8 @@ export type AthleteSponsorshipEarnings = {
 };
 
 function resolveSponsorManageUrl(): string | null {
-  return (
-    process.env.GOFAST_SPONSOR_MANAGE_URL?.replace(/\/$/, "") ??
-    process.env.GOFAST_COMPANY_APP_URL?.replace(/\/$/, "") ??
-    null
-  );
+  const base = process.env.GOFAST_SPONSOR_MANAGE_URL?.replace(/\/$/, "");
+  return base || null;
 }
 
 export async function fetchAthleteSponsorshipEarningsFromSponsorManage(
