@@ -20,6 +20,7 @@ import {
   isValidIanaTimezone,
   resolveEventTimezoneForWrite,
 } from "@/lib/city-run/normalize-event-timezone";
+import { DEFAULT_SOURCE_TRUST } from "@/lib/races/race-lifecycle/race-source-trust";
 
 export type IncomingRace = Record<string, unknown>;
 
@@ -329,6 +330,14 @@ export async function upsertRaceRegistryFromPayload(
       racePayload,
       "sourceRaceWeekReady"
     );
+    const resolvedSourceDiscoveryReady =
+      sourceDiscoveryReady ?? DEFAULT_SOURCE_TRUST.sourceDiscoveryReady;
+    const resolvedSourceRegistrationReady =
+      sourceRegistrationReady ?? DEFAULT_SOURCE_TRUST.sourceRegistrationReady;
+    const resolvedSourceTrainingReady =
+      sourceTrainingReady ?? DEFAULT_SOURCE_TRUST.sourceTrainingReady;
+    const resolvedSourceRaceWeekReady =
+      sourceRaceWeekReady ?? DEFAULT_SOURCE_TRUST.sourceRaceWeekReady;
     let lifecycleHorizonOverrides: unknown | undefined = undefined;
     if ("lifecycleHorizonOverrides" in racePayload) {
       lifecycleHorizonOverrides = racePayload.lifecycleHorizonOverrides ?? null;
@@ -415,14 +424,10 @@ export async function upsertRaceRegistryFromPayload(
         ? { companyRegistrationId }
         : {}),
       ...(parentRaceId !== undefined ? { parentRaceId } : {}),
-      ...(sourceDiscoveryReady !== undefined
-        ? { sourceDiscoveryReady }
-        : {}),
-      ...(sourceRegistrationReady !== undefined
-        ? { sourceRegistrationReady }
-        : {}),
-      ...(sourceTrainingReady !== undefined ? { sourceTrainingReady } : {}),
-      ...(sourceRaceWeekReady !== undefined ? { sourceRaceWeekReady } : {}),
+      sourceDiscoveryReady: resolvedSourceDiscoveryReady,
+      sourceRegistrationReady: resolvedSourceRegistrationReady,
+      sourceTrainingReady: resolvedSourceTrainingReady,
+      sourceRaceWeekReady: resolvedSourceRaceWeekReady,
       ...(lifecycleHorizonOverrides !== undefined
         ? { lifecycleHorizonOverrides }
         : {}),

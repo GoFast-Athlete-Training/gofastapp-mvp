@@ -54,15 +54,10 @@ function hubHrefForCatalogRace(race: CatalogRace): string {
   return s ? `/myrace/${encodeURIComponent(s)}` : `/race-hub/${race.id}`;
 }
 
-function isFeaturedCandidate(race: CatalogRace): boolean {
-  return Boolean(race.logoUrl?.trim() && race.summaryPhrase?.trim());
-}
-
 export default function RacesFindPage() {
   const router = useRouter();
   const [myRaces, setMyRaces] = useState<AthleteRaceRow[]>([]);
   const [catalog, setCatalog] = useState<CatalogRace[]>([]);
-  const [featuredPool, setFeaturedPool] = useState<CatalogRace[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
@@ -79,25 +74,6 @@ export default function RacesFindPage() {
     [myRaces]
   );
 
-  const hasActiveFilters = Boolean(
-    debouncedSearch.trim() ||
-      cityFilter.trim() ||
-      bostonOnly ||
-      dateFrom.trim() ||
-      dateTo.trim()
-  );
-
-  const featuredRaces = useMemo(() => {
-    if (hasActiveFilters) return [];
-    return featuredPool.filter(isFeaturedCandidate).slice(0, 2);
-  }, [featuredPool, hasActiveFilters]);
-
-  const catalogWithoutFeatured = useMemo(() => {
-    if (featuredRaces.length === 0) return catalog;
-    const featuredIds = new Set(featuredRaces.map((r) => r.id));
-    return catalog.filter((r) => !featuredIds.has(r.id));
-  }, [catalog, featuredRaces]);
-
   const loadMyRaces = useCallback(async () => {
     try {
       const { data } = await api.get<{ athleteRaces?: AthleteRaceRow[]; signups?: AthleteRaceRow[] }>(
@@ -107,18 +83,6 @@ export default function RacesFindPage() {
     } catch (e) {
       console.error(e);
       setMyRaces([]);
-    }
-  }, []);
-
-  const loadFeaturedPool = useCallback(async () => {
-    try {
-      const { data } = await api.get<{ success?: boolean; race_registry?: CatalogRace[] }>(
-        "/race/search?upcoming=true"
-      );
-      setFeaturedPool(data.race_registry ?? []);
-    } catch (e) {
-      console.error(e);
-      setFeaturedPool([]);
     }
   }, []);
 
@@ -152,8 +116,7 @@ export default function RacesFindPage() {
 
   useEffect(() => {
     loadMyRaces();
-    loadFeaturedPool();
-  }, [loadMyRaces, loadFeaturedPool]);
+  }, [loadMyRaces]);
 
   useEffect(() => {
     loadCatalog();
@@ -184,15 +147,11 @@ export default function RacesFindPage() {
     [router]
   );
 
-  const renderCatalogCard = (
-    race: CatalogRace,
-    variant: "upcoming" | "past" | "featured"
-  ) => {
+  const renderCatalogCard = (race: CatalogRace, variant: "upcoming" | "past") => {
     const signedUp = signedRaceIds.has(race.id);
     const busy = submittingRaceId === race.id;
     const bq = race.tags?.includes(BOSTON_TAG);
     const isPast = variant === "past";
-    const isFeatured = variant === "featured";
     const registrationClosed = !isRegistrationOrganizerCtaOpen({
       registrationUrl: race.registrationUrl,
       registrationCloseDate: race.registrationCloseDate,
@@ -218,25 +177,14 @@ export default function RacesFindPage() {
       <li
         key={`${variant}-${race.id}`}
         className={`rounded-xl border p-5 shadow-sm flex flex-col overflow-hidden ${
-          isFeatured
-            ? "border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-white"
-            : isPast
-              ? "border-gray-100 bg-gray-50/80 opacity-90"
-              : "border-gray-200 bg-white"
+          isPast
+            ? "border-gray-100 bg-gray-50/80 opacity-90"
+            : "border-gray-200 bg-white"
         }`}
       >
-        {isFeatured ? (
-          <span className="mb-3 inline-flex w-fit rounded-full bg-orange-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-            Featured
-          </span>
-        ) : null}
         <div className="flex gap-4 min-w-0">
           {race.logoUrl ? (
-            <div
-              className={`shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-100 ${
-                isFeatured ? "w-20 h-20" : "w-16 h-16"
-              }`}
-            >
+            <div className="shrink-0 rounded-lg bg-gray-100 overflow-hidden border border-gray-100 w-16 h-16">
               <img
                 src={race.logoUrl}
                 alt=""
@@ -257,11 +205,7 @@ export default function RacesFindPage() {
                 </span>
               ) : null}
             </div>
-            <h3
-              className={`mt-1 font-semibold text-gray-900 leading-snug ${
-                isFeatured ? "text-xl" : "text-lg"
-              }`}
-            >
+            <h3 className="mt-1 font-semibold text-gray-900 leading-snug text-lg">
               {race.name}
             </h3>
             {location ? <p className="mt-0.5 text-sm text-gray-500">{location}</p> : null}
@@ -427,7 +371,7 @@ export default function RacesFindPage() {
               type="text"
               value={cityFilter}
               onChange={(e) => setCityFilter(e.target.value)}
-              placeholder="Arlington"
+              placeholder="City"
               className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
             />
           </div>
@@ -479,31 +423,20 @@ export default function RacesFindPage() {
           ) : null}
         </div>
 
-        {featuredRaces.length > 0 ? (
-          <div>
-            <h2 className="text-sm font-semibold text-gray-800 mb-3">Featured races</h2>
-            <ul className="grid gap-4 sm:grid-cols-2">
-              {featuredRaces.map((race) => renderCatalogCard(race, "featured"))}
-            </ul>
-          </div>
-        ) : null}
-
         {loadingCatalog ? (
           <p className="text-gray-500 text-sm">Loading races…</p>
-        ) : catalogWithoutFeatured.length === 0 && featuredRaces.length === 0 ? (
+        ) : catalog.length === 0 ? (
           <p className="text-gray-600 text-sm">
             No races match these filters. Try widening the date range or clearing search.
           </p>
-        ) : catalogWithoutFeatured.length > 0 ? (
-          <>
-            {featuredRaces.length > 0 ? (
-              <h2 className="text-sm font-semibold text-gray-800">All upcoming races</h2>
-            ) : null}
+        ) : (
+          <div>
+            <h2 className="text-sm font-semibold text-gray-800 mb-3">Upcoming races</h2>
             <ul className="grid gap-4 sm:grid-cols-2">
-              {catalogWithoutFeatured.map((race) => renderCatalogCard(race, "upcoming"))}
+              {catalog.map((race) => renderCatalogCard(race, "upcoming"))}
             </ul>
-          </>
-        ) : null}
+          </div>
+        )}
 
         <p className="text-sm text-gray-600 pt-2 border-t border-gray-100">
           <Link href="/races#race-calendar" className="font-semibold text-orange-700 hover:underline">

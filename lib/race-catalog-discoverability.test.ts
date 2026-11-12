@@ -10,6 +10,7 @@ describe('discoverCatalogWhere', () => {
       isActive: true,
       isCancelled: false,
       companyRaceId: { not: null },
+      sourceDiscoveryReady: true,
     });
   });
 
