@@ -35,6 +35,17 @@ export function registryRowHasPublicCharity(row: {
  * Standalone public course page (gofast-contentpublic) — /course/[slug].
  * Uses same base URL as race pages; courseSlug comes from Company race_courses.slug via prodpush.
  */
+/** Race prep card on the content site — /race/{slug}/prep */
+export function getPublicRacePrepUrl(raceSlug: string | null | undefined): string | null {
+  const s = raceSlug?.trim();
+  if (!s) return null;
+  const base =
+    process.env.NEXT_PUBLIC_CONTENT_PUBLIC_URL?.replace(/\/$/, "") ||
+    process.env.NEXT_PUBLIC_CONTENT_SITE_URL?.replace(/\/$/, "") ||
+    "https://races.gofastcrushgoals.com";
+  return `${base}/race/${encodeURIComponent(s)}/prep`;
+}
+
 /** Race-scoped course overview on the content site — /race/{slug}/course */
 export function getPublicRaceCourseUrl(raceSlug: string | null | undefined): string | null {
   const s = raceSlug?.trim();
