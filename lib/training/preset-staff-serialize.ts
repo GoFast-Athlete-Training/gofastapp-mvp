@@ -28,6 +28,18 @@ export const staffPlanPresetInclude = {
   buildToPeakPhasePreset: { select: { id: true, name: true } },
   taperPhasePreset: { select: { id: true, name: true } },
   raceWeekPhasePreset: { select: { id: true, name: true } },
+  persona: {
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      capability: true,
+      dedication: true,
+      personaGoalLabel: true,
+      intentSummary: true,
+      athletePersonaSummary: true,
+    },
+  },
 } as const;
 
 export type StaffPresetRow = Prisma.training_plan_presetGetPayload<{
@@ -47,6 +59,7 @@ export function serializeStaffPlanPreset(row: StaffPresetRow) {
     targetDistanceLabel: row.targetDistanceLabel,
     coachIntent: row.coachIntent,
     personaId: row.personaId,
+    persona: row.persona,
     goalId: row.goalId,
     minWeeklyMiles: row.minWeeklyMiles,
     maxWeeklyMiles: row.maxWeeklyMiles,

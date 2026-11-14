@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,7 +29,7 @@ type PerformanceSummaryResponse = {
   inRaceCloseOut?: boolean;
 };
 
-export default function PerformancePage() {
+function PerformancePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const weeklyReview = searchParams.get("weeklyReview") === "1";
@@ -159,5 +159,19 @@ export default function PerformancePage() {
         )}
       </div>
     </AthleteAppShell>
+  );
+}
+
+export default function PerformancePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <p className="text-gray-500">Loading…</p>
+        </div>
+      }
+    >
+      <PerformancePageContent />
+    </Suspense>
   );
 }

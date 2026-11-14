@@ -9,6 +9,8 @@ export type DayValidateRunRow = {
   webUrl: string | null;
   runClubWebsiteUrl: string | null;
   runClubStravaUrl: string | null;
+  /** Set when the packet covers more than one city. */
+  cityName?: string | null;
 };
 
 function formatStartTime(
@@ -21,12 +23,15 @@ function formatStartTime(
   return `${hour}:${min}${period?.trim() ? ` ${period.trim()}` : ""}`;
 }
 
-/** Plain-text packet for LLM fact-check — one metro day. */
+/** Plain-text packet for LLM fact-check — one day, one city or all metros. */
 export function buildDayValidateLlmPacket(opts: {
   cityLabel: string;
   dayYmd: string;
   runs: DayValidateRunRow[];
+  /** False: each run line includes its city. Default true. */
+  scopedToCity?: boolean;
 }): string {
+  const scopedToCity = opts.scopedToCity !== false;
   const lines: string[] = [
     `City: ${opts.cityLabel}`,
     `Date: ${opts.dayYmd}`,
@@ -44,12 +49,19 @@ export function buildDayValidateLlmPacket(opts: {
   ];
 
   if (opts.runs.length === 0) {
-    lines.push("(No runs on file for this city and date.)");
+    lines.push(
+      scopedToCity
+        ? "(No runs on file for this city and date.)"
+        : "(No runs on file for this date.)"
+    );
     return lines.join("\n");
   }
 
   for (const run of opts.runs) {
     lines.push(`Run id: ${run.id}`);
+    if (!scopedToCity) {
+      lines.push(`City: ${run.cityName?.trim() || "(unknown)"}`);
+    }
     lines.push(`Title: ${run.title}`);
     lines.push(`Date: ${run.dateYmd}`);
     lines.push(`Start time: ${run.startTimeLabel}`);
@@ -77,6 +89,7 @@ export function dayRunRowFromManageRun(run: {
   meetUpPoint?: string | null;
   stravaEventUrl?: string | null;
   webUrl?: string | null;
+  cityName?: string | null;
   runClub?: {
     name?: string | null;
     websiteUrl?: string | null;
@@ -95,5 +108,6 @@ export function dayRunRowFromManageRun(run: {
     webUrl: run.webUrl ?? null,
     runClubWebsiteUrl: run.runClub?.websiteUrl ?? null,
     runClubStravaUrl: run.runClub?.stravaUrl ?? null,
+    cityName: run.cityName ?? null,
   };
 }

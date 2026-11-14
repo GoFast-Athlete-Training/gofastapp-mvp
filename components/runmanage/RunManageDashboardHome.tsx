@@ -3,35 +3,38 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ClipboardCopy, Upload } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
 import { RUN_MANAGE_THIS_WEEK_PATH, runManageCreatePath } from "@/lib/runmanage/paths";
-import { cockpitBucketForRun } from "@/lib/runmanage/run-cockpit-buckets";
+import { dayRunRowFromManageRun } from "@/lib/runmanage/day-validate-llm-packet";
+import { RunManageDayCorrectionsDialog } from "@/components/runmanage/RunManageDayCorrectionsDialog";
 import {
   RunManageWeekStrip,
   startOfWeekMonday,
   ymdLocal,
 } from "@/components/runmanage/RunManageWeekStrip";
 
-interface RunClub {
+interface Run {
   id: string;
-  name: string;
+  date: string;
 }
 
-interface Run {
+type DayRun = {
   id: string;
   title: string;
   date: string;
   startTimeHour: number | null;
   startTimeMinute: number | null;
   startTimePeriod: string | null;
-  runClub: RunClub | null;
-  cityRunType?: string | null;
-  runBrandId?: string | null;
-  runClubId?: string | null;
-  runStoreId?: string | null;
-  athleteGeneratedId?: string | null;
-}
+  meetUpPoint: string | null;
+  stravaEventUrl?: string | null;
+  webUrl?: string | null;
+  runClub: {
+    name?: string | null;
+    websiteUrl?: string | null;
+    stravaUrl?: string | null;
+  } | null;
+};
 
 function formatRunDate(iso: string) {
   try {
@@ -45,23 +48,9 @@ function formatRunDate(iso: string) {
   }
 }
 
-function formatTime(hour: number | null, minute: number | null, period: string | null) {
-  if (hour === null || minute === null) return "";
-  const minStr = minute.toString().padStart(2, "0");
-  return `${hour}:${minStr} ${period || "AM"}`;
-}
-
 function dateKeyFromRun(run: Run): string {
   if (!run.date) return "";
   return ymdLocal(new Date(run.date));
-}
-
-function ownerForRun(run: Run): string {
-  if (run.runClub?.name) return run.runClub.name;
-  const bucket = cockpitBucketForRun(run);
-  if (bucket === "individual") return "Athlete";
-  if (bucket === "run_store") return "Store";
-  return "—";
 }
 
 export function RunManageDashboardHome() {
@@ -70,6 +59,13 @@ export function RunManageDashboardHome() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDayYmd, setSelectedDayYmd] = useState<string | null>(null);
+  const [dayRuns, setDayRuns] = useState<DayRun[]>([]);
+  const [llmPacket, setLlmPacket] = useState("");
+  const [dayLoading, setDayLoading] = useState(false);
+  const [llmOpen, setLlmOpen] = useState(false);
+  const [correctionsOpen, setCorrectionsOpen] = useState(false);
+  const [copiedPacket, setCopiedPacket] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const weekOffset = parseInt(searchParams.get("weekOffset") ?? "0", 10) || 0;
 
   const setWeekOffset = (next: number) => {
@@ -101,7 +97,43 @@ export function RunManageDashboardHome() {
         setLoading(false);
       }
     })();
-  }, [weekOffset]);
+  }, [weekOffset, reloadKey]);
+
+  useEffect(() => {
+    if (!selectedDayYmd) {
+      setDayRuns([]);
+      setLlmPacket("");
+      setDayLoading(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      setDayLoading(true);
+      try {
+        const params = new URLSearchParams({ dayYmd: selectedDayYmd });
+        const res = await runmanageApi.get(`/api/runmanage/this-week/day-runs?${params.toString()}`);
+        if (cancelled) return;
+        if (res.data?.success) {
+          setDayRuns((res.data.runs ?? []) as DayRun[]);
+          setLlmPacket(String(res.data.packet ?? ""));
+        } else {
+          setDayRuns([]);
+          setLlmPacket("");
+        }
+      } catch (error) {
+        console.error("Error fetching day runs:", error);
+        if (!cancelled) {
+          setDayRuns([]);
+          setLlmPacket("");
+        }
+      } finally {
+        if (!cancelled) setDayLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDayYmd, reloadKey]);
 
   const weekStart = useMemo(() => {
     const base = startOfWeekMonday(new Date());
@@ -115,42 +147,49 @@ export function RunManageDashboardHome() {
     return end;
   }, [weekStart]);
 
-  const runsInWeek = useMemo(() => {
-    return runs.filter((r) => {
-      if (!r.date) return false;
-      const d = new Date(r.date);
-      return d >= weekStart && d < weekEndExclusive;
-    });
-  }, [runs, weekStart, weekEndExclusive]);
-
   const runsByDayInWeek = useMemo(() => {
     const map = new Map<string, number>();
-    for (const r of runsInWeek) {
+    for (const r of runs) {
+      if (!r.date) continue;
+      const d = new Date(r.date);
+      if (d < weekStart || d >= weekEndExclusive) continue;
       const key = dateKeyFromRun(r);
       if (!key) continue;
       map.set(key, (map.get(key) ?? 0) + 1);
     }
     return map;
-  }, [runsInWeek]);
+  }, [runs, weekStart, weekEndExclusive]);
 
-  const weekListRuns = useMemo(() => {
-    let list = runsInWeek;
-    if (selectedDayYmd) {
-      list = list.filter((r) => dateKeyFromRun(r) === selectedDayYmd);
-    }
-    return [...list].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [runsInWeek, selectedDayYmd]);
+  const runsForParse = useMemo(
+    () =>
+      dayRuns.map((r) =>
+        dayRunRowFromManageRun({
+          id: r.id,
+          title: r.title,
+          date: r.date ?? selectedDayYmd ?? "",
+          startTimeHour: r.startTimeHour,
+          startTimeMinute: r.startTimeMinute,
+          startTimePeriod: r.startTimePeriod,
+          meetUpPoint: r.meetUpPoint,
+          stravaEventUrl: r.stravaEventUrl,
+          webUrl: r.webUrl,
+          runClub: r.runClub,
+        })
+      ),
+    [dayRuns, selectedDayYmd]
+  );
 
-  const listTitle = selectedDayYmd
-    ? `Runs on ${formatRunDate(selectedDayYmd + "T12:00:00")}`
-    : "This week";
+  const allowedRunIds = useMemo(() => dayRuns.map((r) => r.id), [dayRuns]);
+  const dayTitle = selectedDayYmd
+    ? formatRunDate(`${selectedDayYmd}T12:00:00`)
+    : "";
 
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-1 text-gray-600">All metros — runs that exist this week.</p>
+          <p className="mt-1 text-gray-600">All metros — select a day to check the runs.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -183,60 +222,104 @@ export function RunManageDashboardHome() {
         }}
       />
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold text-gray-900">{listTitle}</h2>
-        {loading ? (
-          <p className="text-gray-500">Loading runs…</p>
-        ) : weekListRuns.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500">
-            Nothing this week.{" "}
-            <Link href={RUN_MANAGE_THIS_WEEK_PATH} className="font-medium text-sky-700 hover:underline">
-              Manage this week&apos;s runs
-            </Link>
-            {" or "}
-            <Link href={runManageCreatePath()} className="font-medium text-sky-700 hover:underline">
-              create a one-off run
-            </Link>
-            .
-          </p>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
-                <tr>
-                  <th className="px-4 py-3">Day & time</th>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Owner</th>
-                  <th className="px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {weekListRuns.map((run) => (
-                  <tr key={run.id} className="hover:bg-gray-50/80">
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-800">
-                      {formatRunDate(run.date)}
-                      <div className="text-xs text-gray-500">
-                        {formatTime(run.startTimeHour, run.startTimeMinute, run.startTimePeriod)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{run.title}</td>
-                    <td className="px-4 py-3 text-gray-700">{ownerForRun(run)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/runmanage/runs/${run.id}?mode=edit`}
-                        className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700"
-                      >
-                        Edit
-                        <ChevronRight className="h-4 w-4" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {loading && !selectedDayYmd ? (
+        <p className="text-sm text-gray-500">Loading the week…</p>
+      ) : null}
+
+      {!selectedDayYmd ? (
+        <p className="text-sm text-gray-600">Select a day.</p>
+      ) : (
+        <section className="space-y-3 rounded-xl border border-sky-100 bg-sky-50/40 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">{dayTitle}</h2>
+              <p className="text-sm text-gray-600">
+                {dayLoading
+                  ? "Loading this day…"
+                  : `${dayRuns.length} run${dayRuns.length === 1 ? "" : "s"}`}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={dayLoading}
+                onClick={() => {
+                  setCopiedPacket(false);
+                  setLlmOpen(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                <ClipboardCopy className="h-4 w-4" />
+                Check this day
+              </button>
+              <button
+                type="button"
+                disabled={dayLoading || allowedRunIds.length === 0}
+                onClick={() => setCorrectionsOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                <Upload className="h-4 w-4" />
+                Ingest updates
+              </button>
+            </div>
           </div>
-        )}
-      </section>
+          <p className="text-sm text-gray-600">
+            One packet covers this day. Copy it, then paste corrections back here.
+          </p>
+        </section>
+      )}
+
+      {llmOpen ? (
+        <LlmPacketDialog
+          packet={llmPacket}
+          copied={copiedPacket}
+          onCopy={async () => {
+            await navigator.clipboard.writeText(llmPacket);
+            setCopiedPacket(true);
+          }}
+          onClose={() => setLlmOpen(false)}
+        />
+      ) : null}
+
+      <RunManageDayCorrectionsDialog
+        open={correctionsOpen}
+        onClose={() => setCorrectionsOpen(false)}
+        allowedRunIds={allowedRunIds}
+        runsForParse={runsForParse}
+        onApplied={() => setReloadKey((n) => n + 1)}
+      />
+    </div>
+  );
+}
+
+function LlmPacketDialog({
+  packet,
+  copied,
+  onCopy,
+  onClose,
+}: {
+  packet: string;
+  copied: boolean;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="Close" />
+      <div className="relative z-[201] max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl">
+        <div className="border-b px-5 py-4">
+          <h2 className="text-lg font-semibold">LLM fact-check — this day</h2>
+        </div>
+        <pre className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap p-5 font-mono text-xs">{packet}</pre>
+        <div className="flex justify-end gap-2 border-t px-5 py-4">
+          <button type="button" onClick={() => void onCopy()} className="rounded-lg border px-3 py-2 text-sm">
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <button type="button" onClick={onClose} className="rounded-lg bg-sky-600 px-3 py-2 text-sm text-white">
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

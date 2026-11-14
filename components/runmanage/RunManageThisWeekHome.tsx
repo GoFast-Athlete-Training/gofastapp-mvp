@@ -17,7 +17,6 @@ import {
 import { checkSeriesDateStamp, seriesDateStampLabel } from "@/lib/runmanage/series-date-stamp-check";
 import {
   runManageCreateFromSeriesPath,
-  runInstanceEditPath,
   RUN_MANAGE_THIS_WEEK_PATH,
 } from "@/lib/runmanage/paths";
 import { RunManageDayCorrectionsDialog } from "@/components/runmanage/RunManageDayCorrectionsDialog";
@@ -48,7 +47,6 @@ export function RunManageThisWeekHome() {
   const city = searchParams.get("city")?.trim() ?? "";
   const clubId = searchParams.get("clubId")?.trim() ?? "";
   const selectedDayYmd = searchParams.get("dayYmd")?.trim() ?? "";
-  const seeAll = searchParams.get("seeAll") === "1";
   const weekOffset = parseInt(searchParams.get("weekOffset") ?? "0", 10) || 0;
 
   const [filterOptions, setFilterOptions] = useState<RegionCityOption[]>([]);
@@ -197,6 +195,11 @@ export function RunManageThisWeekHome() {
     return seriesRows.filter((r) => r.weekSlotYmd === selectedDayYmd);
   }, [seriesRows, selectedDayYmd]);
 
+  const missingSlotRows = useMemo(
+    () => dayChunkRows.filter((row) => !row.weekRun),
+    [dayChunkRows]
+  );
+
   const backToDayHref = useMemo(() => {
     const params = new URLSearchParams();
     if (region) params.set("region", region);
@@ -338,21 +341,12 @@ export function RunManageThisWeekHome() {
 
       {region && city ? (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-gray-600">2. Pick a day this week</p>
-            <button
-              type="button"
-              onClick={() => setParams({ seeAll: seeAll ? undefined : "1", dayYmd: undefined })}
-              className="text-sm font-medium text-sky-800 hover:underline"
-            >
-              {seeAll ? "Back to day view" : "See all slots this week"}
-            </button>
-          </div>
+          <p className="text-sm text-gray-600">2. Pick a day this week</p>
           <RunManageWeekStrip
             weekStart={weekStart}
             runsByDay={runsByDay}
             selectedDayYmd={selectedDayYmd || null}
-            onSelectDay={(ymd) => setParams({ dayYmd: ymd ?? undefined, seeAll: undefined })}
+            onSelectDay={(ymd) => setParams({ dayYmd: ymd ?? undefined })}
             onPrevWeek={() => {
               const win = weekWindowContaining(new Date(), weekOffset - 1);
               void win;
@@ -381,42 +375,6 @@ export function RunManageThisWeekHome() {
         </div>
       ) : null}
 
-      {seeAll && region && city ? (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b bg-gray-50 text-xs font-semibold uppercase text-gray-600">
-              <tr>
-                <th className="px-3 py-2">Day</th>
-                <th className="px-3 py-2">Club</th>
-                <th className="px-3 py-2">Time</th>
-                <th className="px-3 py-2 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {seriesRows.map((row) => (
-                <tr key={row.seriesId}>
-                  <td className="px-3 py-2">{row.weekSlotYmd}</td>
-                  <td className="px-3 py-2">{row.clubName}</td>
-                  <td className="px-3 py-2">{formatTime(row.startTimeHour, row.startTimeMinute, row.startTimePeriod)}</td>
-                  <td className="px-3 py-2 text-right">
-                    {row.weekRun ? (
-                      <Link
-                        href={`/runmanage/runs/${row.weekRun.id}?mode=edit&returnTo=${encodeURIComponent(backToDayHref)}`}
-                        className="text-sky-700 font-medium"
-                      >
-                        Open
-                      </Link>
-                    ) : (
-                      <span className="text-gray-500">Needs build</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-
       {selectedDayYmd && (region && city || clubId) ? (
         <section className="space-y-4 rounded-xl border border-sky-100 bg-sky-50/40 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -431,7 +389,7 @@ export function RunManageThisWeekHome() {
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50"
               >
                 <ClipboardCopy className="h-4 w-4" />
-                Generate for LLM
+                Check this day
               </button>
               <button
                 type="button"
@@ -445,57 +403,54 @@ export function RunManageThisWeekHome() {
             </div>
           </div>
 
-          <ul className="space-y-2">
-            {dayChunkRows.map((row) => {
-              const check = checkSeriesDateStamp({
-                series: row,
-                weekRunId: row.weekRun?.id ?? null,
-                latestPriorRunId: row.latestPriorRun?.id ?? null,
-              });
-              const openHref = row.weekRun
-                ? `/runmanage/runs/${row.weekRun.id}?mode=edit&returnTo=${encodeURIComponent(backToDayHref)}`
-                : null;
-              return (
-                <li
-                  key={row.seriesId}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white bg-white px-4 py-3 shadow-sm"
-                >
-                  <div>
-                    <p className="font-medium text-gray-900">{row.clubName}</p>
-                    <p className="text-xs text-gray-600">
-                      {formatTime(row.startTimeHour, row.startTimeMinute, row.startTimePeriod)} · {row.meetUpPoint}
-                    </p>
-                    <span className="mt-1 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-800">
-                      {seriesDateStampLabel(check.kind)}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    {openHref ? (
-                      <Link href={openHref} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white">
-                        Open
-                      </Link>
-                    ) : check.kind === "reuse_last_run" ? (
-                      <button
-                        type="button"
-                        disabled={actingSeriesId === row.seriesId}
-                        onClick={() => void handleReuseLastRun(row)}
-                        className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                      >
-                        Reuse last run
-                      </button>
-                    ) : (
-                      <Link
-                        href={runManageCreateFromSeriesPath(row.seriesId, { dateYmd: row.weekSlotYmd })}
-                        className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white"
-                      >
-                        Build
-                      </Link>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          {region && city && missingSlotRows.length === 0 ? (
+            <p className="text-sm text-gray-600">Every slot already has a run. Check this day.</p>
+          ) : missingSlotRows.length > 0 ? (
+            <ul className="space-y-2">
+              {missingSlotRows.map((row) => {
+                const check = checkSeriesDateStamp({
+                  series: row,
+                  weekRunId: row.weekRun?.id ?? null,
+                  latestPriorRunId: row.latestPriorRun?.id ?? null,
+                });
+                return (
+                  <li
+                    key={row.seriesId}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white bg-white px-4 py-3 shadow-sm"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{row.clubName}</p>
+                      <p className="text-xs text-gray-600">
+                        {formatTime(row.startTimeHour, row.startTimeMinute, row.startTimePeriod)} · {row.meetUpPoint}
+                      </p>
+                      <span className="mt-1 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-800">
+                        {seriesDateStampLabel(check.kind)}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {check.kind === "reuse_last_run" ? (
+                        <button
+                          type="button"
+                          disabled={actingSeriesId === row.seriesId}
+                          onClick={() => void handleReuseLastRun(row)}
+                          className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                        >
+                          Reuse last run
+                        </button>
+                      ) : (
+                        <Link
+                          href={runManageCreateFromSeriesPath(row.seriesId, { dateYmd: row.weekSlotYmd })}
+                          className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white"
+                        >
+                          Build
+                        </Link>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
         </section>
       ) : null}
 

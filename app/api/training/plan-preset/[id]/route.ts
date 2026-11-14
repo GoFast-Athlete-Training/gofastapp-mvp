@@ -156,6 +156,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   for (const key of [
     "entryLongRunMiles",
     "peakLongRunMiles",
+    "baseStartLongRunMiles",
     "baseEndLongRunMiles",
     "longRunCutback",
     "raceWeekMiles",

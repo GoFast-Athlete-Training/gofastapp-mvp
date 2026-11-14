@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
+import { workoutAdherenceByPlanIds } from "@/lib/training/company-plan-adherence";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 import { CoachReviewStatus } from "@prisma/client";
 
@@ -25,6 +26,8 @@ export async function GET(
           lastName: true,
           email: true,
           gofastHandle: true,
+          city: true,
+          state: true,
         },
       },
       race_registry: {
@@ -39,9 +42,17 @@ export async function GET(
       athlete_race: {
         select: {
           id: true,
+          name: true,
           goalTime: true,
           goalRacePace: true,
           goalDistance: true,
+          raceDay: true,
+          athlete_race_result: {
+            select: {
+              officialFinishTime: true,
+              goalAchieved: true,
+            },
+          },
         },
       },
       _count: { select: { planned_workouts: true } },
@@ -51,6 +62,9 @@ export async function GET(
   if (!plan) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
+
+  const adherenceMap = await workoutAdherenceByPlanIds([plan.id]);
+  const adherence = adherenceMap.get(plan.id) ?? { planned: 0, completed: 0 };
 
   const { catalogPresetSummaryForApi } = await import(
     "@/lib/training/hydrate-catalog-preset-from-training-manage"
@@ -63,6 +77,7 @@ export async function GET(
   const serialized = {
     ...plan,
     training_plan_preset: catalogPreset,
+    adherence,
     startDate: ymdFromDate(plan.startDate),
     race_registry: plan.race_registry
       ? {
