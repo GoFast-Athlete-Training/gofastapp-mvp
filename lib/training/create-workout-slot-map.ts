@@ -155,7 +155,7 @@ function displayGroupToMainSlot<T extends SegmentLike & { title?: string; target
 
   const workSlot = segmentLikeToSlot(group.work);
   const rec = group.recovery ?? group.betweenRepeatsRecovery;
-  if (rec && reps > 1 && !segmentHasPaceTarget(rec)) {
+  if (rec && reps > 1) {
     workSlot.repeatCount = reps;
     workSlot.recoveryDurationType = rec.durationType;
     workSlot.recoveryDurationValue = Number(rec.durationValue);

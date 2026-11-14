@@ -35,6 +35,8 @@ function renderPiece(piece: WorkoutShapePiece, index: number) {
             Between reps: {piece.betweenRepRest.durationValue}{" "}
             {piece.betweenRepRest.durationType === "TIME" ? "min" : "mi"}
           </li>
+        ) : piece.betweenRepNote ? (
+          <li className="text-gray-600">Between reps: {piece.betweenRepNote}</li>
         ) : null}
       </ul>
     </li>

@@ -5,7 +5,6 @@ import { requireAthleteFromBearer } from "@/lib/training/require-athlete";
 import { parseOptionalWorkoutDate } from "@/lib/training/workout-date-parse";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 import { segmentSnapshotDocumentFromDbRows } from "@/lib/training/workout-segment-snapshot";
-import { pushWorkoutToGarminForAthlete } from "@/lib/garmin-workouts/push-workout-for-athlete";
 
 export const dynamic = "force-dynamic";
 
@@ -337,36 +336,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let garminPush:
-      | {
-          ok: true;
-          scheduledDate: string;
-          workoutPushed: boolean;
-        }
-      | {
-          ok: false;
-          code: string;
-          message: string;
-        }
-      | null = null;
-
-    if (!body.skipGarminPush) {
-      const pushResult = await pushWorkoutToGarminForAthlete(athlete.id, workout.id);
-      if (pushResult.ok) {
-        garminPush = {
-          ok: true,
-          scheduledDate: pushResult.scheduledDate,
-          workoutPushed: pushResult.workoutPushed,
-        };
-      } else if (pushResult.code !== "garmin_disconnected") {
-        garminPush = {
-          ok: false,
-          code: pushResult.code,
-          message: pushResult.message,
-        };
-      }
-    }
-
     const refreshed = await prisma.workouts.findUnique({
       where: { id: workout.id },
       include: { segments: true },
@@ -374,7 +343,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       workout: refreshed ?? workout,
-      garminPush,
+      garminPush: null,
     });
   } catch (error: any) {
     console.error("Error creating workout:", error);

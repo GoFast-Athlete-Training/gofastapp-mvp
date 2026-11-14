@@ -264,10 +264,11 @@ function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWor
       : convertMinutesToSeconds(segment.durationValue),
   };
   
-  // Parse targets JSON array
-  if (segment.targets && segment.targets.length > 0) {
-    // First target is primary
-    const primaryTarget = segment.targets[0];
+  // Running workouts allow one target. Pace wins when heart rate is also set.
+  const rawTargets = segment.targets ?? [];
+  const paceTarget = rawTargets.find((t) => String(t.type ?? "").toUpperCase() === "PACE");
+  const primaryTarget = paceTarget ?? rawTargets[0];
+  if (primaryTarget) {
     const targetType = primaryTarget.type.toUpperCase() as keyof typeof GarminTargetType;
     
     if (GarminTargetType[targetType]) {
@@ -319,62 +320,6 @@ function buildSegmentStep(stepOrder: number, segment: WorkoutSegment): GarminWor
         }
         if (primaryTarget.value !== undefined && step.targetValueLow === undefined) {
           step.targetValue = primaryTarget.value;
-        }
-      }
-      
-      // Second target (if exists) becomes secondary target
-      if (segment.targets.length > 1) {
-        const secondaryTarget = segment.targets[1];
-        const secondaryTargetType = secondaryTarget.type.toUpperCase() as keyof typeof GarminTargetType;
-        
-        if (GarminTargetType[secondaryTargetType]) {
-          step.secondaryTargetType = GarminTargetType[secondaryTargetType];
-          
-          if (GarminTargetType[secondaryTargetType] === GarminTargetType.PACE) {
-            const lo2 =
-              secondaryTarget.valueLow !== undefined
-                ? mapPace(secondaryTarget.valueLow)
-                : undefined;
-            const hi2 =
-              secondaryTarget.valueHigh !== undefined
-                ? mapPace(secondaryTarget.valueHigh)
-                : undefined;
-            const single2 =
-              secondaryTarget.value !== undefined
-                ? mapPace(secondaryTarget.value)
-                : undefined;
-            let sFast: number | undefined;
-            let sSlow: number | undefined;
-            if (lo2 !== undefined && hi2 !== undefined) {
-              sFast = lo2;
-              sSlow = hi2;
-            } else if (single2 !== undefined) {
-              sFast = single2;
-              sSlow = single2;
-            } else if (lo2 !== undefined) {
-              sFast = lo2;
-              sSlow = lo2;
-            } else if (hi2 !== undefined) {
-              sFast = hi2;
-              sSlow = hi2;
-            }
-            if (sFast !== undefined && sSlow !== undefined) {
-              applyPaceBandAsGarminSpeed(step, sFast, sSlow, stepOrder, "secondary");
-            }
-          } else {
-            if (secondaryTarget.valueLow !== undefined) {
-              step.secondaryTargetValueLow = secondaryTarget.valueLow;
-            }
-            if (secondaryTarget.valueHigh !== undefined) {
-              step.secondaryTargetValueHigh = secondaryTarget.valueHigh;
-            }
-            if (
-              secondaryTarget.value !== undefined &&
-              step.secondaryTargetValueLow === undefined
-            ) {
-              step.secondaryTargetValue = secondaryTarget.value;
-            }
-          }
         }
       }
     }

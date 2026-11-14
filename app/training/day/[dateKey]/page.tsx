@@ -648,7 +648,10 @@ export default function TrainingPlanDayPreviewPage() {
       scheduledDate?: string;
     };
     if (!res.ok) {
-      throw new Error(data.error || data.details || "Could not send to Garmin");
+      const summary = data.error || "Could not send to Garmin";
+      const message =
+        data.details && data.details !== summary ? `${summary}: ${data.details}` : summary;
+      throw new Error(message);
     }
     if (showSuccess) {
       setGarminPushMessage(

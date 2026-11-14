@@ -489,7 +489,7 @@ export default function WorkoutCreateEntry(props: Props) {
           Upload CSV
         </h3>
         <p className="text-xs text-gray-600 mb-2">
-          Columns: title, durationType (DISTANCE or TIME), durationValue, pace (M:SS), optional repeatCount.
+          Columns: title, durationType (DISTANCE or TIME), durationValue, paceMin and paceMax (M:SS), optional repeatCount, recoveryDurationType, recoveryDurationValue.
         </p>
         <a
           href={`data:text/csv;charset=utf-8,${encodeURIComponent(WORKOUT_SEGMENT_CSV_TEMPLATE)}`}

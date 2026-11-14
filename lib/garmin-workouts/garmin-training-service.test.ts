@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assembleGarminWorkout } from "./garmin-training-service";
-import { GarminIntensity, GarminRepeatType } from "./types";
+import { GarminIntensity, GarminRepeatType, GarminTargetType } from "./types";
 import { parsedPasteToWorkoutSteps } from "@/lib/training/paste-workout-pipeline";
 import { tryParsePastedWorkoutText } from "@/lib/training/parse-pasted-workout";
 import { collapseFlatSegmentsForEditor, expandSegmentsForGarminPush } from "@/lib/training/segment-summary";
-import { secondsPerMileToSecondsPerKm } from "@/lib/workout-generator/pace-calculator";
+import {
+  KM_PER_MILE,
+  parsePaceToSecondsPerMile,
+  secondsPerMileToSecondsPerKm,
+  secondsPerMileToStoredPaceSecKm,
+} from "@/lib/workout-generator/pace-calculator";
 
 const M400 = 400 / 1609.34;
 
@@ -166,4 +171,95 @@ test("assembleGarminWorkout heals corrupted durationValue 400 (meters stored as 
 
   const repeat = workout.steps[0]!;
   assert.equal(repeat.steps![0]!.durationValue, 400);
+});
+
+test("assembleGarminWorkout sends pace only when a running repeat also has heart rate", () => {
+  const workout = assembleGarminWorkout({
+    id: "w1",
+    title: "Saturday MP",
+    workoutType: "Easy",
+    segments: [
+      {
+        id: "s1",
+        workoutId: "w1",
+        stepOrder: 1,
+        title: "Work",
+        durationType: "DISTANCE",
+        durationValue: 5,
+        repeatCount: 3,
+        targets: [
+          { type: "PACE", valueLow: 400, valueHigh: 410 },
+          { type: "HEART_RATE", valueLow: 120, valueHigh: 160 },
+        ],
+      },
+    ],
+  });
+
+  const step = workout.steps[0]!.steps![0]!;
+  assert.equal(step.targetType, GarminTargetType.SPEED);
+  assert.equal(step.secondaryTargetType, undefined);
+  assert.ok(step.targetValueLow != null);
+  assert.ok(step.targetValueHigh != null);
+});
+
+test("assembleGarminWorkout keeps heart rate as the only target when pace is absent", () => {
+  const workout = assembleGarminWorkout({
+    id: "w1",
+    title: "HR run",
+    workoutType: "Easy",
+    segments: [
+      {
+        id: "s1",
+        workoutId: "w1",
+        stepOrder: 1,
+        title: "Work",
+        durationType: "DISTANCE",
+        durationValue: 5,
+        targets: [{ type: "HEART_RATE", valueLow: 120, valueHigh: 160 }],
+      },
+    ],
+  });
+
+  const step = workout.steps[0]!;
+  assert.equal(step.targetType, GarminTargetType.HEART_RATE);
+  assert.equal(step.targetValueLow, 120);
+  assert.equal(step.targetValueHigh, 160);
+  assert.equal(step.secondaryTargetType, undefined);
+});
+
+function expectedSpeedMps(secKm: number): number {
+  const secPerMile = Math.round(secKm) * KM_PER_MILE;
+  return Math.round((3600 / secPerMile) * 0.44704 * 1000) / 1000;
+}
+
+test("assembleGarminWorkout sends a saved 6:50–7:00 band with no extra pad", () => {
+  const fast = secondsPerMileToStoredPaceSecKm(parsePaceToSecondsPerMile("6:50"));
+  const slow = secondsPerMileToStoredPaceSecKm(parsePaceToSecondsPerMile("7:00"));
+  const workout = assembleGarminWorkout({
+    id: "w1",
+    title: "Saturday MP",
+    workoutType: "LongRun",
+    segments: [
+      {
+        id: "s1",
+        workoutId: "w1",
+        stepOrder: 1,
+        title: "Work",
+        durationType: "DISTANCE",
+        durationValue: 5,
+        paceTargetEncodingVersion: 2,
+        targets: [{ type: "PACE", valueLow: fast, valueHigh: slow }],
+      },
+    ],
+  });
+
+  assert.equal(workout.workoutName, "Saturday MP");
+  const step = workout.steps[0]!;
+  assert.equal(step.targetType, GarminTargetType.SPEED);
+  assert.equal(step.targetValueHigh, expectedSpeedMps(fast));
+  assert.equal(step.targetValueLow, expectedSpeedMps(slow));
+  const paddedFast = secondsPerMileToStoredPaceSecKm(parsePaceToSecondsPerMile("6:40"));
+  const paddedSlow = secondsPerMileToStoredPaceSecKm(parsePaceToSecondsPerMile("7:10"));
+  assert.notEqual(step.targetValueHigh, expectedSpeedMps(paddedFast));
+  assert.notEqual(step.targetValueLow, expectedSpeedMps(paddedSlow));
 });

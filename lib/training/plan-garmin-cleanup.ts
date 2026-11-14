@@ -11,7 +11,8 @@ const EMPTY: PlanGarminCleanupResult = {
 };
 
 /**
- * Clear stack push stamps on future plan days. We no longer store Garmin schedule/workout ids.
+ * Clear stack push stamps on future plan days.
+ * garminWorkoutId stays so the next send updates that watch workout.
  */
 export async function cleanupFutureGarminSchedulesForPlan(params: {
   planId: string;

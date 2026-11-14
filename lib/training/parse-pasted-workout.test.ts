@@ -6,6 +6,7 @@ import {
   inferRepDistanceMiles,
 } from "./parse-pasted-workout";
 import { parsedPasteToWorkoutSteps } from "./paste-workout-pipeline";
+import { workoutShapeFromParsed } from "./workout-shape-service";
 import { collapseFlatSegmentsForEditor } from "./segment-summary";
 import { formatStoredPaceAsMinPerMile } from "@/lib/workout-generator/pace-calculator";
 import { apiSegmentsToSlots } from "./create-workout-slot-map";
@@ -251,6 +252,52 @@ test("parses 2 x 3 miles at marathon pace with 120 second rest", () => {
   assert.equal(work!.durationValue, 3);
   assert.equal(work!.recoveryDurationType, "TIME");
   assert.ok(Math.abs((work!.recoveryDurationValue ?? 0) - 2) < 0.01);
+});
+
+test("parses a labeled 3×5 marathon note once, with range bookends and an untimed recovery", () => {
+  const note = `Workout: 3 × 5 Miles @ Marathon Pace
+- Warmup: 2–3 miles easy
+- Main Set: 3 × 5 miles @ goal marathon pace (MP)
+- Recovery: Easy jog / brief fueling break between reps (flexible duration; avoid cooling down)
+- Cooldown: 1–2 miles easy
+- Total: 18–21+ miles`;
+  const parsed = tryParsePastedWorkoutText(note, "LongRun");
+  assert.ok(parsed);
+  assert.equal(parsed.suggestedTitle, "3 × 5 Miles @ Marathon Pace");
+  const repeats = parsed.segments.filter((s) => (s.repeatCount ?? 0) > 1);
+  assert.equal(repeats.length, 1);
+  assert.equal(repeats[0]?.repeatCount, 3);
+  assert.equal(repeats[0]?.durationValue, 5);
+  assert.equal(repeats[0]?.paceOffsetSecPerMile, 45);
+  assert.equal(repeats[0]?.betweenRepNote, "easy jog");
+  assert.equal(parsed.segments[0]?.title, "Warmup");
+  assert.equal(parsed.segments[0]?.durationValue, 2.5);
+  assert.equal(parsed.segments[parsed.segments.length - 1]?.title, "Cooldown");
+  assert.equal(parsed.segments[parsed.segments.length - 1]?.durationValue, 1.5);
+  const shape = workoutShapeFromParsed(parsed);
+  const repeatPiece = shape.pieces.find((piece) => piece.kind === "repeat");
+  assert.equal(repeatPiece?.kind, "repeat");
+  if (repeatPiece?.kind === "repeat") {
+    assert.equal(repeatPiece.betweenRepNote, "easy jog");
+    assert.equal(repeatPiece.repeatCount, 3);
+  }
+  assert.equal(shape.pieces[0]?.kind, "bookend");
+  assert.equal(shape.pieces[0]?.kind === "bookend" ? shape.pieces[0].durationValue : 0, 2.5);
+  assert.equal(shape.pieces.at(-1)?.kind, "bookend");
+  assert.equal(shape.pieces.at(-1)?.kind === "bookend" ? shape.pieces.at(-1)!.durationValue : 0, 1.5);
+});
+
+test("parses colon bookend ranges around a single repeat", () => {
+  const note = "Warmup: 2–3 miles easy, then 8 x 1 mile at marathon pace, Cooldown: 1-2 miles easy";
+  const parsed = tryParsePastedWorkoutText(note, "LongRun");
+  assert.ok(parsed);
+  assert.equal(parsed.segments.length, 3);
+  assert.equal(parsed.segments[0]?.title, "Warmup");
+  assert.equal(parsed.segments[0]?.durationValue, 2.5);
+  assert.equal(parsed.segments[1]?.repeatCount, 8);
+  assert.equal(parsed.segments[1]?.durationValue, 1);
+  assert.equal(parsed.segments[2]?.title, "Cooldown");
+  assert.equal(parsed.segments[2]?.durationValue, 1.5);
 });
 
 test("parses 800m repeats with between-rep recovery and explicit pace band", () => {

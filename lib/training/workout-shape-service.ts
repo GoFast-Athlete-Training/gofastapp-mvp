@@ -44,6 +44,8 @@ export type ShapeRepeatBlock = {
   steps: ShapeStep[];
   /** Between-rep rest on a single-effort repeat (e.g. 2×3 mi with 120s rest). */
   betweenRepRest?: { durationType: "DISTANCE" | "TIME"; durationValue: number };
+  /** Untimed between-rep label. Shown on confirm; not turned into a segment. */
+  betweenRepNote?: string;
 };
 
 export type ShapeBookend = {
@@ -173,7 +175,10 @@ export function workoutShapeFromParsed(parsed: ParsedPasteWorkout): WorkoutShape
       kind: "repeat",
       repeatCount: reps,
       steps: [effortStep],
-      ...(reps > 1 ? { betweenRepRest } : {}),
+      ...(reps > 1 && betweenRepRest ? { betweenRepRest } : {}),
+      ...(reps > 1 && !betweenRepRest && seg.betweenRepNote
+        ? { betweenRepNote: seg.betweenRepNote }
+        : {}),
     });
   }
 

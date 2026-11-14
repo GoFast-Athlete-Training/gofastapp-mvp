@@ -3180,8 +3180,12 @@ model planned_workouts {
   weekNumber                Int?
   dayAssigned               String?
   planCycleIndex            Int?
-  /// Stack stamp: encoder fired for this plan day. Not a Garmin receipt.
+  /// True after Garmin accepts the workout and the calendar schedule.
   workoutPushed             Boolean             @default(false)
+  /// Garmin Training API workout id. A resend updates this workout.
+  garminWorkoutId           Int?
+  /// Calendar schedule for that workout. Replaced on resend so the day does not gain another copy.
+  garminScheduleId          Int?
   /// Athlete edited prescribe after push — show ready CTA again for (Updated) re-send.
   workoutEditedAfterPush    Boolean             @default(false)
   segmentSnapshotJson       Json?
@@ -3304,8 +3308,12 @@ model workouts {
   segmentExecutionSegmentCount    Int?
   /// Frozen prescription segments at last materialize/send (segments table remains FK source for edits).
   segmentSnapshotJson               Json?
-  /// Stack stamp: encoder fired for this standalone run (same meaning as planned_workouts.workoutPushed).
+  /// True after Garmin accepts the workout and the calendar schedule.
   workoutPushed                     Boolean             @default(false)
+  /// Garmin Training API workout id. A resend updates this workout.
+  garminWorkoutId                   Int?
+  /// Calendar schedule for that workout. Replaced on resend so the day does not gain another copy.
+  garminScheduleId                  Int?
   /// Athlete edited prescribe after push — show ready CTA again for (Updated) re-send.
   workoutEditedAfterPush            Boolean             @default(false)
   /// Normalized copy of ingest summary payload (`athlete_activities.summaryData`).

@@ -5,9 +5,12 @@ import {
   createGarminTrainingApiForAthlete,
 } from "@/lib/garmin-workouts/garmin-training-api";
 import {
+  deleteGarminScheduleIfPresent,
   scheduleFailureToGarminApiResult,
   scheduleWorkoutOnCalendar,
+  type GarminScheduleClient,
 } from "@/lib/garmin-workouts/garmin-schedule-service";
+import type { GarminWorkout } from "@/lib/garmin-workouts/types";
 import { GarminNotConnectedError, requireGarminTokenFresh } from "@/lib/domain-garmin";
 import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
 import { dayNameToOurDow } from "@/lib/training/schedule-parser";
@@ -86,10 +89,12 @@ function segmentSnapshotFromWorkout(
   );
 }
 
-/** Stack stamp: encoder is about to fire — not a Garmin receipt. */
+/** Stamp only after Garmin accepts the workout and the calendar schedule. */
 async function stampPlannedWorkoutPushed(params: {
   plannedWorkoutId: string;
   snapshot: ReturnType<typeof segmentSnapshotFromWorkout>;
+  garminWorkoutId: number;
+  garminScheduleId: number | null;
 }): Promise<void> {
   await prisma.planned_workouts.update({
     where: { id: params.plannedWorkoutId },
@@ -97,6 +102,8 @@ async function stampPlannedWorkoutPushed(params: {
       workoutPushed: true,
       workoutEditedAfterPush: false,
       segmentSnapshotJson: params.snapshot,
+      garminWorkoutId: params.garminWorkoutId,
+      garminScheduleId: params.garminScheduleId,
       updatedAt: new Date(),
     },
   });
@@ -105,6 +112,8 @@ async function stampPlannedWorkoutPushed(params: {
 async function stampStandaloneWorkoutPushed(params: {
   workoutId: string;
   snapshot: ReturnType<typeof segmentSnapshotFromWorkout>;
+  garminWorkoutId: number;
+  garminScheduleId: number | null;
 }): Promise<void> {
   await prisma.workouts.update({
     where: { id: params.workoutId },
@@ -112,15 +121,99 @@ async function stampStandaloneWorkoutPushed(params: {
       workoutPushed: true,
       workoutEditedAfterPush: false,
       segmentSnapshotJson: params.snapshot,
+      garminWorkoutId: params.garminWorkoutId,
+      garminScheduleId: params.garminScheduleId,
       updatedAt: new Date(),
     },
   });
 }
 
-function withUpdatedGarminTitle(baseTitle: string, isUpdatedResend: boolean): string {
-  if (!isUpdatedResend) return baseTitle;
-  if (/^\(Updated\)\s/i.test(baseTitle)) return baseTitle;
-  return `(Updated) ${baseTitle}`;
+type GarminPushClient = GarminScheduleClient & {
+  createWorkout: (workout: GarminWorkout) => Promise<{ workoutId: number }>;
+  updateWorkout: (workoutId: number, workout: GarminWorkout) => Promise<void>;
+};
+
+export type GarminDeliveryResult =
+  | {
+      ok: true;
+      garminWorkoutId: number;
+      garminScheduleId: number | null;
+      isUpdatedResend: boolean;
+    }
+  | {
+      ok: false;
+      code: "garmin_api";
+      message: string;
+      garminStatus?: number;
+    };
+
+/**
+ * Update the stored Garmin workout when we already have its id.
+ * Otherwise create one and remember the id before scheduling, so a failed
+ * schedule does not create a second workout on the next send.
+ * The saved title is the watch title. No "(Updated)" prefix.
+ */
+export async function upsertAndScheduleGarminWorkout(params: {
+  client: GarminPushClient;
+  payload: GarminWorkout;
+  existingGarminWorkoutId: number | null;
+  existingGarminScheduleId: number | null;
+  scheduledDate: string;
+  rememberWorkoutId: (garminWorkoutId: number) => Promise<void>;
+}): Promise<GarminDeliveryResult> {
+  const isUpdatedResend = params.existingGarminWorkoutId != null;
+  let garminWorkoutId = params.existingGarminWorkoutId;
+  try {
+    if (garminWorkoutId != null) {
+      await params.client.updateWorkout(garminWorkoutId, params.payload);
+    } else {
+      const created = await params.client.createWorkout(params.payload);
+      garminWorkoutId = created?.workoutId ?? null;
+      if (garminWorkoutId == null) {
+        return {
+          ok: false,
+          code: "garmin_api",
+          message: "Garmin did not return a workout id for scheduling",
+        };
+      }
+      await params.rememberWorkoutId(garminWorkoutId);
+    }
+  } catch (error: unknown) {
+    if (error instanceof GarminApiError) {
+      return {
+        ok: false,
+        code: "garmin_api",
+        message: error.details || "Garmin API error",
+        garminStatus: error.status,
+      };
+    }
+    throw error;
+  }
+
+  if (isUpdatedResend) {
+    await deleteGarminScheduleIfPresent(params.client, params.existingGarminScheduleId);
+  }
+
+  const scheduleResult = await scheduleWorkoutOnCalendar(params.client, {
+    garminWorkoutId,
+    scheduledDate: params.scheduledDate,
+  });
+  if (!scheduleResult.ok) {
+    const fail = scheduleFailureToGarminApiResult(scheduleResult);
+    return {
+      ok: false,
+      code: fail.code,
+      message: fail.message,
+      garminStatus: fail.garminStatus,
+    };
+  }
+
+  return {
+    ok: true,
+    garminWorkoutId,
+    garminScheduleId: scheduleResult.garminScheduleId,
+    isUpdatedResend,
+  };
 }
 
 /**
@@ -149,8 +242,6 @@ export async function pushPlannedWorkoutToGarminForAthlete(
     if (!planned) {
       return { ok: false, code: "not_found", message: "Planned workout not found" };
     }
-
-    const isUpdatedResend = planned.workoutPushed;
 
     if (!planned.segments?.length && planned.planId && planned.date) {
       await materializeWorkoutForPlanDay({
@@ -189,11 +280,9 @@ export async function pushPlannedWorkoutToGarminForAthlete(
     }
 
     const snapshot = segmentSnapshotFromWorkout(planned.segments);
-    await stampPlannedWorkoutPushed({ plannedWorkoutId: planned.id, snapshot });
-
     const token = await requireGarminTokenFresh(athleteId);
 
-    const baseTitle =
+    const garminTitle =
       planned.cityRunMatchLabel?.trim() ||
       garminPushTitleForPlannedWorkout({
         title: planned.title,
@@ -204,7 +293,6 @@ export async function pushPlannedWorkoutToGarminForAthlete(
         workoutType: planned.workoutType,
         estimatedDistanceInMeters: planned.estimatedDistanceInMeters,
       });
-    const garminTitle = withUpdatedGarminTitle(baseTitle, isUpdatedResend);
 
     const garminSegments = expandSegmentsForGarminPush(
       planned.segments.map((seg) => ({
@@ -241,35 +329,33 @@ export async function pushPlannedWorkoutToGarminForAthlete(
     });
 
     const client = createGarminTrainingApiForAthlete(athleteId, token);
-    const createResult = await client.createWorkout(garminWorkoutPayload);
-    const garminWorkoutId = createResult?.workoutId;
-    if (garminWorkoutId == null) {
-      return {
-        ok: false,
-        code: "garmin_api",
-        message: "Garmin did not return a workout id for scheduling",
-      };
-    }
-
-    const scheduleResult = await scheduleWorkoutOnCalendar(client, {
-      garminWorkoutId,
+    const delivered = await upsertAndScheduleGarminWorkout({
+      client,
+      payload: garminWorkoutPayload,
+      existingGarminWorkoutId: planned.garminWorkoutId ?? null,
+      existingGarminScheduleId: planned.garminScheduleId ?? null,
       scheduledDate,
+      rememberWorkoutId: async (garminWorkoutId) => {
+        await prisma.planned_workouts.update({
+          where: { id: planned.id },
+          data: { garminWorkoutId },
+        });
+      },
     });
-    if (!scheduleResult.ok) {
-      const fail = scheduleFailureToGarminApiResult(scheduleResult);
-      return {
-        ok: false,
-        code: fail.code,
-        message: fail.message,
-        garminStatus: fail.garminStatus,
-      };
-    }
+    if (!delivered.ok) return delivered;
+
+    await stampPlannedWorkoutPushed({
+      plannedWorkoutId: planned.id,
+      snapshot,
+      garminWorkoutId: delivered.garminWorkoutId,
+      garminScheduleId: delivered.garminScheduleId,
+    });
 
     return {
       ok: true,
       scheduledDate,
       workoutPushed: true,
-      isUpdatedResend,
+      isUpdatedResend: delivered.isUpdatedResend,
     };
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {
@@ -360,8 +446,6 @@ export async function pushWorkoutToGarminForAthlete(
       return { ok: false, code: "no_segments", message: "Workout has no segments" };
     }
 
-    const isUpdatedResend = workout.workoutPushed === true;
-
     let scheduledDate: string;
     if (options.scheduleDateYmdOverride?.trim()) {
       scheduledDate = options.scheduleDateYmdOverride.trim();
@@ -398,7 +482,7 @@ export async function pushWorkoutToGarminForAthlete(
 
     const token = await requireGarminTokenFresh(athleteId);
 
-    const baseGarminTitle =
+    const garminTitle =
       workout.planId != null
         ? garminPushTitleForPlannedWorkout({
             title: workout.title,
@@ -413,7 +497,6 @@ export async function pushWorkoutToGarminForAthlete(
             title: workout.title,
             weekNumber: workout.weekNumber,
           });
-    const garminTitle = withUpdatedGarminTitle(baseGarminTitle, isUpdatedResend);
 
     const garminSegments = expandSegmentsForGarminPush(workout.segments);
 
@@ -445,41 +528,34 @@ export async function pushWorkoutToGarminForAthlete(
     });
 
     const client = createGarminTrainingApiForAthlete(athleteId, token);
-    const createResult = await client.createWorkout(garminWorkoutPayload);
-    const garminWorkoutId = createResult?.workoutId;
-    if (garminWorkoutId == null) {
-      return {
-        ok: false,
-        code: "garmin_api",
-        message: "Garmin did not return a workout id for scheduling",
-      };
-    }
-
-    const scheduleResult = await scheduleWorkoutOnCalendar(client, {
-      garminWorkoutId,
-      scheduledDate,
-    });
-    if (!scheduleResult.ok) {
-      const fail = scheduleFailureToGarminApiResult(scheduleResult);
-      return {
-        ok: false,
-        code: fail.code,
-        message: fail.message,
-        garminStatus: fail.garminStatus,
-      };
-    }
-
     const snapshot = segmentSnapshotFromWorkout(workout.segments);
+    const delivered = await upsertAndScheduleGarminWorkout({
+      client,
+      payload: garminWorkoutPayload,
+      existingGarminWorkoutId: workout.garminWorkoutId ?? null,
+      existingGarminScheduleId: workout.garminScheduleId ?? null,
+      scheduledDate,
+      rememberWorkoutId: async (garminWorkoutId) => {
+        await prisma.workouts.update({
+          where: { id: workout.id },
+          data: { garminWorkoutId },
+        });
+      },
+    });
+    if (!delivered.ok) return delivered;
+
     await stampStandaloneWorkoutPushed({
       workoutId: workout.id,
       snapshot,
+      garminWorkoutId: delivered.garminWorkoutId,
+      garminScheduleId: delivered.garminScheduleId,
     });
 
     return {
       ok: true,
       scheduledDate,
       workoutPushed: true,
-      isUpdatedResend,
+      isUpdatedResend: delivered.isUpdatedResend,
     };
   } catch (error: unknown) {
     if (error instanceof GarminNotConnectedError) {

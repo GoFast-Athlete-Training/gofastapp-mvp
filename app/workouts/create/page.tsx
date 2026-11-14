@@ -29,6 +29,7 @@ import {
   formatSegmentDistance,
   formatSegmentDuration,
 } from "@/lib/training/segment-summary";
+import { titleAfterSegmentCsvImport } from "@/lib/workout/parse-workout-segments-csv";
 import {
   apiSegmentsToSlots,
   intervalBlockHeaderLabel,
@@ -641,8 +642,9 @@ function CreateWorkoutPageInner() {
   const handleCsvSegments = (steps: WorkoutStep[]) => {
     applyDerivedSegmentsToCreateForm({
       segments: steps as ApiSegment[],
-      suggestedTitle: "CSV workout",
-      suggestedDescription: "Imported from CSV",
+      suggestedTitle: "",
+      suggestedDescription: "",
+      keepExistingCopy: true,
     });
     setCreateEntryPath(null);
   };
@@ -709,6 +711,7 @@ function CreateWorkoutPageInner() {
     segments: ApiSegment[];
     suggestedTitle: string;
     suggestedDescription: string;
+    keepExistingCopy?: boolean;
   }) => {
     const slots = apiSegmentsToSlots(params.segments);
     setWarmup(slots.warmup);
@@ -721,8 +724,12 @@ function CreateWorkoutPageInner() {
       titleCandidate && !genericTitles.has(titleCandidate)
         ? titleCandidate
         : descCandidate.slice(0, 80) || titleCandidate || "Workout";
-    setName((prev) => prev.trim() || resolvedTitle);
-    setDescription((prev) => prev.trim() || descCandidate);
+    if (params.keepExistingCopy) {
+      setName((prev) => titleAfterSegmentCsvImport(prev));
+    } else {
+      setName((prev) => prev.trim() || resolvedTitle);
+      setDescription((prev) => prev.trim() || descCandidate);
+    }
     if (!raceDayMode) {
       setWorkoutType(inferWorkoutTypeFromApiSegments(params.segments));
     }
@@ -1246,7 +1253,6 @@ function CreateWorkoutPageInner() {
         segments,
         ...(scheduledDate.trim() ? { date: scheduledDate.trim() } : {}),
         ...(selectedCatalogueId ? { catalogueWorkoutId: selectedCatalogueId } : {}),
-        ...(fromHostRun ? { skipGarminPush: true } : {}),
       };
 
       const response = await api.post("workouts", workoutData);
