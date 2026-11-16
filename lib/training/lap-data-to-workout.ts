@@ -160,6 +160,68 @@ function garminLapsAlternateWorkRecovery(
   return pairs >= 1;
 }
 
+/** 3×5 and other multi-mile repeats. Mile and 400 repeats stay on the W/R walk. */
+function isLongDistanceRepeat(seg: BaseSeg): boolean {
+  return isRepeatedRepSegment(seg) && seg.durationValue > 1.1;
+}
+
+function isShortJogBetweenLongReps(lap: DerivedLap): boolean {
+  if (isGarminRecoveryIntensity(lap.intensity)) return true;
+  if (isGarminWorkIntensity(lap.intensity)) return false;
+  if (lap.distanceMiles == null || lap.distanceMiles <= 0) return false;
+  return lap.distanceMiles < 0.45;
+}
+
+/**
+ * A 5-mile rep is several mile laps plus a short jog. Keep each mile as its own
+ * lap for pace analysis, and keep the jog off those miles.
+ */
+function consumeLongRepeatByDistance(params: {
+  derived: DerivedLap[];
+  bySeg: Map<string, DerivedLap[]>;
+  intervalSeg: BaseSeg;
+  recoverySegId: string;
+  reps: number;
+  lapIdxRef: { value: number };
+}): void {
+  const { derived, bySeg, intervalSeg, recoverySegId, reps, lapIdxRef } = params;
+  const repMiles = intervalSeg.durationValue;
+  let placed = 0;
+
+  while (placed < reps && lapIdxRef.value < derived.length) {
+    while (
+      lapIdxRef.value < derived.length &&
+      isShortJogBetweenLongReps(derived[lapIdxRef.value]!)
+    ) {
+      bySeg.get(recoverySegId)!.push(derived[lapIdxRef.value]!);
+      lapIdxRef.value++;
+    }
+    if (lapIdxRef.value >= derived.length) break;
+
+    const chunk: DerivedLap[] = [];
+    let miles = 0;
+    while (lapIdxRef.value < derived.length && miles < repMiles * 0.85) {
+      const lap = derived[lapIdxRef.value]!;
+      if (chunk.length > 0 && isShortJogBetweenLongReps(lap)) break;
+      chunk.push(lap);
+      lapIdxRef.value++;
+      if (lap.distanceMiles != null && lap.distanceMiles > 0) miles += lap.distanceMiles;
+    }
+    if (chunk.length === 0) break;
+    for (const lap of chunk) bySeg.get(intervalSeg.id)!.push(lap);
+    placed++;
+
+    if (
+      placed < reps &&
+      lapIdxRef.value < derived.length &&
+      isShortJogBetweenLongReps(derived[lapIdxRef.value]!)
+    ) {
+      bySeg.get(recoverySegId)!.push(derived[lapIdxRef.value]!);
+      lapIdxRef.value++;
+    }
+  }
+}
+
 function usesModularWorkRecovery(
   seg: BaseSeg,
   sorted: BaseSeg[],
@@ -168,6 +230,7 @@ function usesModularWorkRecovery(
   lapIdxRef?: { value: number }
 ): boolean {
   if (!isRepeatedRepSegment(seg)) return false;
+  if (isLongDistanceRepeat(seg)) return false;
   if (hasInlineRecovery(seg)) return true;
   if (findPairedRecoverySegmentId(sorted, segIndex)) return true;
   if (inferModularMileRepeats(seg)) return true;
@@ -337,6 +400,18 @@ function assignByStepOrderConsumption(
     if (isRepeatedRepSegment(seg)) {
       const reps = Math.max(1, seg.repeatCount ?? 1);
 
+      if (isLongDistanceRepeat(seg)) {
+        consumeLongRepeatByDistance({
+          derived,
+          bySeg,
+          intervalSeg: seg,
+          recoverySegId: findPairedRecoverySegmentId(sorted, segIndex) ?? seg.id,
+          reps,
+          lapIdxRef,
+        });
+        continue;
+      }
+
       if (usesModularWorkRecovery(seg, sorted, segIndex, derived, lapIdxRef)) {
         const recoverySegId =
           findPairedRecoverySegmentId(sorted, segIndex) ?? seg.id;
@@ -385,12 +460,21 @@ function assignByStepOrderConsumption(
         totalMiles += lap.distanceMiles;
       }
 
+      const remainingMiles = targetMiles - totalMiles;
+      const nextLap = derived[lapIdxRef.value];
+      const nextLapOvershootsBookend =
+        nextLap != null &&
+        nextLap.distanceMiles != null &&
+        nextLap.distanceMiles > 0 &&
+        remainingMiles > 0 &&
+        nextLap.distanceMiles > remainingMiles * 1.25;
       const earlyAdvanceShortLap =
         upcomingRepMiles == null &&
         isBookendTitle(seg.title) &&
         chunk.length === 1 &&
         totalMiles > 0 &&
-        totalMiles < targetMiles * 0.95;
+        totalMiles < targetMiles * 0.95 &&
+        nextLapOvershootsBookend;
 
       if (earlyAdvanceShortLap) break;
 

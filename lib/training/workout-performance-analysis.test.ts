@@ -367,6 +367,58 @@ test("recovery laps are labeled recovery not slower", () => {
   assert.equal(rows[2]!.vsPlanPaceLabel, "Recovery");
 });
 
+test("each mile of a 5-mile repeat stays work and the jog stays recovery", () => {
+  assert.equal(
+    classifyLapPhase({
+      segmentTitle: "Work",
+      lapIndexInSegment: 1,
+      segmentLapCount: 6,
+      distanceMiles: 1,
+      repDistanceMiles: 5,
+    }),
+    "work"
+  );
+  assert.equal(
+    classifyLapPhase({
+      segmentTitle: "Work",
+      lapIndexInSegment: 5,
+      segmentLapCount: 6,
+      distanceMiles: 0.25,
+      repDistanceMiles: 5,
+    }),
+    "recovery"
+  );
+
+  const rows = buildPhaseAwareLapRows({
+    segments: [
+      {
+        id: "work",
+        title: "Work",
+        stepOrder: 2,
+        durationValue: 5,
+        repeatCount: 3,
+        targets: [{ type: "PACE", valueLow: 256, valueHigh: 259 }],
+        paceTargetEncodingVersion: 2,
+        actualPaceSecPerMile: null,
+        actualDurationSeconds: null,
+        actualDistanceMiles: null,
+        segment_laps: [
+          { lapIndex: 0, avgPaceSecPerMile: 412, distanceMiles: 1, prescribedPaceMinSecPerMile: 412, prescribedPaceMaxSecPerMile: 417 },
+          { lapIndex: 1, avgPaceSecPerMile: 413, distanceMiles: 1, prescribedPaceMinSecPerMile: 412, prescribedPaceMaxSecPerMile: 417 },
+          { lapIndex: 2, avgPaceSecPerMile: 540, distanceMiles: 0.25 },
+        ],
+      },
+    ],
+    workoutTargetLow: null,
+    workoutTargetHigh: null,
+  });
+  const work = rows.filter((row) => row.phase === "work");
+  assert.equal(work.length, 2);
+  assert.ok(work.every((row) => row.distanceMiles === 1));
+  assert.ok(work.every((row) => row.targetPaceSecPerMile === 412));
+  assert.equal(rows.filter((row) => row.phase === "recovery").length, 1);
+});
+
 test("classifyLapPhase uses Recovery segment title not Interval band", () => {
   assert.equal(
     classifyLapPhase({

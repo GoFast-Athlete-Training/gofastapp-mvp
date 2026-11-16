@@ -504,6 +504,74 @@ test("fragmented 400 FIT file: near-400m laps are the work reps, jogs stay off t
   assert.equal(result.bySegment.get("w")![0]!.lapIndex, 0);
 });
 
+test("3×5 mile repeat keeps warmup miles and scores three reps", () => {
+  const segments = [
+    {
+      id: "warm",
+      stepOrder: 1,
+      title: "Warmup",
+      durationType: "DISTANCE",
+      durationValue: 2,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+    {
+      id: "work",
+      stepOrder: 2,
+      title: "Work",
+      durationType: "DISTANCE",
+      durationValue: 5,
+      repeatCount: 3,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+      recoveryDurationType: "TIME",
+      recoveryDurationValue: 2,
+    },
+    {
+      id: "cool",
+      stepOrder: 3,
+      title: "Cooldown",
+      durationType: "DISTANCE",
+      durationValue: 2,
+      repeatCount: null,
+      targets: null,
+      paceTargetEncodingVersion: 2,
+    },
+  ];
+  const miles = [
+    lap(0, 510, 1),
+    lap(1, 510, 1),
+  ];
+  let idx = 2;
+  for (let rep = 0; rep < 3; rep++) {
+    for (let m = 0; m < 5; m++) {
+      miles.push(lap(idx, 412 + m, 1));
+      idx++;
+    }
+    if (rep < 2) {
+      miles.push(lap(idx, 540, 0.25));
+      idx++;
+    }
+  }
+  miles.push(lap(idx, 541, 1), lap(idx + 1, 541, 1));
+
+  const result = assignLapsForTest(miles, segments, "Easy");
+  assert.ok(result);
+  assert.equal(result.bySegment.get("warm")!.length, 2);
+  assert.equal(
+    result.bySegment.get("warm")!.reduce((sum, l) => sum + (l.distanceMiles ?? 0), 0),
+    2
+  );
+  const work = result.bySegment.get("work")!;
+  const workMiles = work.filter((l) => (l.distanceMiles ?? 0) >= 0.9);
+  const jogs = work.filter((l) => (l.distanceMiles ?? 0) < 0.45);
+  assert.equal(workMiles.length, 15);
+  assert.ok(workMiles.every((l) => l.distanceMiles === 1));
+  assert.equal(jogs.length, 2);
+  assert.equal(result.bySegment.get("cool")!.length, 2);
+});
+
 test("unassignable laps return null", () => {
   const segments = [
     {

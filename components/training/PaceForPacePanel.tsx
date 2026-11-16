@@ -47,7 +47,7 @@ function isGenericWorkTitle(title: string | null | undefined): boolean {
   return t === "work" || t === "segment";
 }
 
-function splitRowTitle(
+export function splitRowTitle(
   lap: PhaseAwareLapRow,
   workoutType: string | null | undefined,
   workOrdinal: number

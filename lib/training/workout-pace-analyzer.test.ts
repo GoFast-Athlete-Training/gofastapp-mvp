@@ -116,6 +116,36 @@ test("alternates work/recovery within repeat interval segment", () => {
   assert.equal(aimed[2]?.paceDeltaSecPerMile, 0);
 });
 
+test("each mile of a 5-mile repeat gets the pace band", () => {
+  const aimed = translatePlannedOntoWorkout({
+    plannedSegments: [
+      {
+        id: "work",
+        stepOrder: 1,
+        title: "Work",
+        targets: [{ type: "PACE", valueLow: PACE_600, valueHigh: PACE_629 }],
+        paceTargetEncodingVersion: 2,
+        repeatCount: 3,
+        durationValue: 5,
+        recoveryDurationType: "TIME",
+        recoveryDurationValue: 2,
+      },
+    ],
+    workoutLaps: [0, 1, 2].map((i) => ({
+      id: `mile${i}`,
+      lapIndex: i,
+      segmentId: "work",
+      segmentTitle: "Work",
+      segmentStepOrder: 1,
+      avgPaceSecPerMile: 370 + i,
+      distanceMiles: 1,
+    })),
+  });
+  assert.equal(aimed.length, 3);
+  assert.ok(aimed.every((lap) => lap.prescribedPaceMinSecPerMile != null));
+  assert.ok(aimed.every((lap) => lap.paceDeltaSecPerMile != null));
+});
+
 test("400s with two jogs in a row stamp only the near-400m laps", () => {
   const aimed = translatePlannedOntoWorkout({
     plannedSegments: [

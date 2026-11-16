@@ -224,6 +224,11 @@ export function translatePlannedOntoWorkout(params: {
     if (usesSameSegmentAlternation) {
       const idx = lapIndexInSegment.get(lap.segmentId) ?? 0;
       lapIndexInSegment.set(lap.segmentId, idx + 1);
+      const repMiles = seg?.durationValue ?? 0;
+      if (repMiles > 1.1) {
+        if ((lap.distanceMiles ?? 1) < 0.45) return openAimedLap(lap.id);
+        return aimedWorkLap(lap.id, lap.avgPaceSecPerMile, band.min!, band.max);
+      }
       const shortOfRep = isShortOfRepDistance(lap.distanceMiles, seg?.durationValue);
       if (shortOfRep === true) return openAimedLap(lap.id);
       if (shortOfRep == null && isRecoveryLapWithinRepeatBlock(idx)) {

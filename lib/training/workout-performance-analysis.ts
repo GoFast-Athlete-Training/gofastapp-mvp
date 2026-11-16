@@ -119,6 +119,8 @@ export type PhaseAwareLapRow = {
   paceSecPerMile: number | null;
   avgHr: number | null;
   distanceMiles: number | null;
+  /** Easy/Long run work lap that belongs to a multi-mile repeat, not a continuous mile. */
+  multiMileRepeat?: boolean;
   targetPaceSecPerMile: number | null;
   targetPaceSecPerMileHigh: number | null;
   vsPlanPaceLabel: string;
@@ -289,6 +291,16 @@ export function classifyLapPhase(params: {
   }
 
   const rep = params.repDistanceMiles;
+  if (rep != null && rep > 1.1) {
+    if (
+      params.distanceMiles != null &&
+      params.distanceMiles > 0 &&
+      params.distanceMiles < 0.45
+    ) {
+      return "recovery";
+    }
+    return "work";
+  }
   if (
     params.distanceMiles != null &&
     rep != null &&
@@ -999,8 +1011,7 @@ export function buildPhaseAwareLapRows(params: {
       segment.repeatCount != null &&
       segment.repeatCount > 1 &&
       segment.durationValue != null &&
-      segment.durationValue > 0 &&
-      segment.durationValue < 0.9
+      segment.durationValue > 0
         ? segment.durationValue
         : null;
     const phase = classifyLapPhase({
@@ -1044,6 +1055,10 @@ export function buildPhaseAwareLapRows(params: {
       paceSecPerMile: lap.avgPaceSecPerMile ?? null,
       avgHr: lap.avgHeartRate ?? null,
       distanceMiles: lap.distanceMiles ?? null,
+      multiMileRepeat:
+        phase === "work" &&
+        (segment.repeatCount ?? 0) > 1 &&
+        (segment.durationValue ?? 0) > 1.1,
       targetPaceSecPerMile: targetLow,
       targetPaceSecPerMileHigh: targetHigh,
       vsPlanPaceLabel: vs.label,
