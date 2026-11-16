@@ -42,6 +42,21 @@ export function weeklyMileageTargetWithinPresetBand(
   return true;
 }
 
+/** Offramp when a typed target sits outside the guide band. Does not change the number. */
+export function weeklyTargetOfframpMessage(
+  miles: number,
+  band: { min: number; max: number | null }
+): string | null {
+  const n = Math.round(miles);
+  if (n < band.min) {
+    return `This plan starts at ${band.min} miles a week. Choose a higher target, or pick a different preset.`;
+  }
+  if (band.max != null && n > band.max) {
+    return `This plan goes up to ${band.max} miles a week. Choose a lower target, or pick a different preset.`;
+  }
+  return null;
+}
+
 export function presetWeeklyBandErrorLabel(band: { min: number; max: number | null }): string {
   return band.max != null
     ? `${band.min}–${band.max} mi/week`

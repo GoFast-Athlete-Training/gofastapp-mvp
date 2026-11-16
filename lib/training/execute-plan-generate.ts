@@ -260,34 +260,16 @@ export async function executePlanGenerate(params: {
     catalogueRowsFull.map((r) => [r.id, r])
   );
 
-  /** Athlete preference inside the self-select band. Peak volume is the peak-block ramp, not this number. */
-  const requestedWeeklyMileageTarget = Math.max(
-    params.minWeeklyMiles,
-    Math.min(100, params.weeklyMileageTarget)
-  );
+  /** Athlete's typed weekly target. Peak volume is the peak-block ramp, not this number. */
+  const requestedWeeklyMileageTarget = Math.round(params.weeklyMileageTarget);
   const bandMin = phasePreset?.minWeeklyMiles ?? Number(vol.minWeeklyMiles);
-  const bandMax =
-    phasePreset?.maxWeeklyMiles ??
-    phaseBuild?.peakWeeklyMiles ??
-    planConfig.maxWeeklyMiles ??
-    null;
   const peakVolumeRaw = phasePreset?.peakWeeklyVolumeMiles;
   const peakVolumeMiles =
     peakVolumeRaw != null && Number.isFinite(peakVolumeRaw) && peakVolumeRaw > 0
       ? Math.round(peakVolumeRaw)
       : null;
 
-  let weeklyMileageTarget = requestedWeeklyMileageTarget;
-  if (bandMax != null && Number.isFinite(bandMax) && bandMax > 0) {
-    weeklyMileageTarget = Math.min(weeklyMileageTarget, bandMax);
-  }
-  if (peakVolumeMiles != null && weeklyMileageTarget > peakVolumeMiles) {
-    weeklyMileageTarget = peakVolumeMiles;
-  }
-  weeklyMileageTarget = Math.max(
-    params.minWeeklyMiles,
-    Math.min(100, weeklyMileageTarget),
-  );
+  const weeklyMileageTarget = requestedWeeklyMileageTarget;
   const athleteWeeklyVolumeGoal = weeklyMileageTarget;
   const rampPeakMiles = peakVolumeMiles ?? athleteWeeklyVolumeGoal;
 

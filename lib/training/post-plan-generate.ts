@@ -99,17 +99,14 @@ export async function planGeneratePostHandler(
             ? Math.round(Number(plan.currentWeeklyMileage))
             : null);
 
-    if (weeklyMileageTarget == null || !Number.isFinite(weeklyMileageTarget)) {
+    if (weeklyMileageTarget == null || !Number.isFinite(weeklyMileageTarget) || weeklyMileageTarget < 1) {
       return NextResponse.json(
         { error: "weeklyMileageTarget is required to generate a schedule." },
         { status: 400 },
       );
     }
 
-    weeklyMileageTarget = Math.max(
-      minWeeklyMiles,
-      Math.min(100, weeklyMileageTarget),
-    );
+    weeklyMileageTarget = Math.round(weeklyMileageTarget);
 
     if (plan.presetId) {
       const { catalogPresetSummaryForApi } = await import(
@@ -122,12 +119,6 @@ export async function planGeneratePostHandler(
       if (presetBand) {
         const bandMin = Math.max(1, presetBand.minWeeklyMiles);
         minWeeklyMiles = Math.max(minWeeklyMiles, bandMin);
-        if (
-          presetBand.maxWeeklyMiles != null &&
-          Number.isFinite(presetBand.maxWeeklyMiles)
-        ) {
-          weeklyMileageTarget = Math.min(presetBand.maxWeeklyMiles, weeklyMileageTarget);
-        }
       }
     }
 

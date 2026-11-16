@@ -66,8 +66,8 @@ import {
 } from "@/lib/training/plan-display-title";
 import { resolveGoalRaceMetersInput } from "@/lib/training/resolve-goal-race-meters";
 import {
-  clampWeeklyMilesToPresetBand,
   presetWeeklyMilesBand,
+  weeklyTargetOfframpMessage,
 } from "@/lib/training/preset-weekly-mileage-band";
 
 type PlanWeekRow =
@@ -355,7 +355,6 @@ export default function TrainingSetupPlanPage({
     } else {
       setPreferredDaysLocal([]);
     }
-    const band = presetWeeklyMilesBand(plan.training_plan_preset);
     let rawWeekly: number | null = null;
     if (
       plan.weeklyMileageTarget != null &&
@@ -371,7 +370,7 @@ export default function TrainingSetupPlanPage({
     if (rawWeekly == null) {
       setWeeklyMilesTarget("");
     } else {
-      setWeeklyMilesTarget(String(clampWeeklyMilesToPresetBand(rawWeekly, band)));
+      setWeeklyMilesTarget(String(rawWeekly));
     }
     const pld = plan.preferredLongRunDow;
     if (pld === 6 || pld === 7) {
@@ -720,25 +719,33 @@ export default function TrainingSetupPlanPage({
 
   function resolveTargetMiles(): number | null {
     const weeklyMilesRaw = weeklyMilesTarget.trim();
-    let targetMiles = weeklyMilesRaw === "" ? NaN : Math.round(Number(weeklyMilesRaw));
+    const targetMiles = weeklyMilesRaw === "" ? NaN : Math.round(Number(weeklyMilesRaw));
     if (!Number.isFinite(targetMiles) || targetMiles < 1) {
       return null;
     }
-    if (presetMaxWeeklyMiles != null && targetMiles > presetMaxWeeklyMiles) {
+    if (
+      weeklyTargetOfframpMessage(targetMiles, {
+        min: presetMinWeeklyMiles,
+        max: presetMaxWeeklyMiles,
+      })
+    ) {
       return null;
     }
     return targetMiles;
   }
 
   function weeklyTargetBandErrorMessage(): string {
-    if (weeklyMilesTarget.trim() === "") {
-      return "Enter how many miles you want to run weekly.";
-    }
-    const band =
-      presetMaxWeeklyMiles != null
-        ? `up to ${presetMaxWeeklyMiles} mi/week for this preset`
-        : "a positive weekly mile target";
-    return `Enter a valid weekly target (${band}).`;
+    const weeklyMilesRaw = weeklyMilesTarget.trim();
+    const targetMiles = weeklyMilesRaw === "" ? NaN : Math.round(Number(weeklyMilesRaw));
+    const offramp =
+      Number.isFinite(targetMiles) && targetMiles >= 1
+        ? weeklyTargetOfframpMessage(targetMiles, {
+            min: presetMinWeeklyMiles,
+            max: presetMaxWeeklyMiles,
+          })
+        : null;
+    if (offramp) return offramp;
+    return "Enter how many miles you want to run weekly.";
   }
 
   async function saveFoundationStart(token: string): Promise<boolean> {
@@ -1464,29 +1471,21 @@ export default function TrainingSetupPlanPage({
                 inputMode="numeric"
                 step={1}
                 min={1}
-                max={presetMaxWeeklyMiles ?? undefined}
                 className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                 value={weeklyMilesTarget}
                 onChange={(e) => setWeeklyMilesTarget(e.target.value)}
               />
-              {buildWarnings.belowEngineFloor && (
-                <p
-                  className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-950"
-                  role="status"
-                >
-                  Below this preset&apos;s guide band ({presetMinWeeklyMiles}
-                  {presetMaxWeeklyMiles != null ? `–${presetMaxWeeklyMiles}` : "+"} mi/week).
-                  We&apos;ll still build to the number you entered.
-                </p>
-              )}
-              {buildWarnings.abovePresetCeiling && presetMaxWeeklyMiles != null ? (
+              {(buildWarnings.belowEngineFloor || buildWarnings.abovePresetCeiling) && (
                 <p
                   className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
                   role="status"
                 >
-                  Enter at most {presetMaxWeeklyMiles} mi/week for this preset.
+                  {weeklyTargetOfframpMessage(Math.round(Number(weeklyMilesTarget)), {
+                    min: presetMinWeeklyMiles,
+                    max: presetMaxWeeklyMiles,
+                  })}
                 </p>
-              ) : null}
+              )}
             </div>
 
             {!hasSchedule && presetGenerateWarnings.length > 0 && (
@@ -1823,7 +1822,12 @@ export default function TrainingSetupPlanPage({
               onClick={() =>
                 void (hasSchedule ? regenerateSchedule() : savePreferredAndGenerate())
               }
-              disabled={generating}
+              disabled={
+                generating ||
+                weeklyMilesTarget.trim() === "" ||
+                buildWarnings.belowEngineFloor ||
+                buildWarnings.abovePresetCeiling
+              }
               className="w-full rounded-lg bg-orange-500 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-orange-600 disabled:opacity-50"
             >
               {generating

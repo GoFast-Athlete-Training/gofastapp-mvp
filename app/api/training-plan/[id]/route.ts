@@ -451,7 +451,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
               { status: 400 }
             );
           }
-          data.weeklyMileageTarget = Math.max(25, Math.min(100, rounded));
+          data.weeklyMileageTarget = rounded;
         }
       }
       if (body.peakLongRunPoolMiles != null) {
