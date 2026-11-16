@@ -23,12 +23,11 @@ import {
   planRaceSnapshotsToPrismaJson,
 } from "@/lib/training/plan-race-snapshots";
 import {
+  deleteActivePlanForNewPlan,
   ensureRetiredActivePlansForPastRaces,
   isRaceCalendarBeforeTodayUtc,
 } from "@/lib/training/plan-lifecycle";
 import { planStartDayKeyFromRow } from "@/lib/training/plan-utils";
-import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
-import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
 import { isAthletePresetBlueprintComplete } from "@/lib/training/athlete-preset-blueprint";
 import { buildWeekByWeekPlanShellSchedule } from "@/lib/training/plan-week-by-week-shell";
 import { Prisma } from "@prisma/client";
@@ -60,7 +59,6 @@ export async function POST(request: NextRequest) {
       presetId: bodyPresetId,
       athletePresetId: bodyAthletePresetId,
       replaceActivePlan,
-      retireActivePlan: bodyRetireActivePlan,
       weekByWeekLoad,
     } = body;
     const body5k = bodyFiveK ?? bodyLegacy5k;
@@ -277,24 +275,21 @@ export async function POST(request: NextRequest) {
       presetIdResolved = preset.id;
     }
 
-    const existingActive = await prisma.training_plans.findFirst({
-      where: {
-        athleteId: athlete.id,
-        lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-      },
-      select: { id: true, name: true },
+    const replaced = await deleteActivePlanForNewPlan({
+      athleteId: athlete.id,
+      replace: replaceActivePlan === true || replaceActivePlan === "true",
+      sameAthleteRaceId: terminalAthleteRace.id,
     });
-    if (existingActive && replaceActivePlan !== true && replaceActivePlan !== "true") {
+    if (!replaced.ok) {
       return NextResponse.json(
         {
-          error:
-            "You already have an active training plan. Set replaceActivePlan: true to replace it, or archive/delete the current plan first.",
-          existingActivePlanId: existingActive.id,
+          error: replaced.error,
+          code: replaced.status,
+          existingActivePlanId: replaced.existingPlanId,
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
-
     const allAthleteRaces = await prisma.athlete_races.findMany({
       where: { athleteId: athlete.id },
       orderBy: { raceDate: "asc" },
@@ -316,32 +311,17 @@ export async function POST(request: NextRequest) {
 
     const now = new Date();
     const plan = await prisma.$transaction(async (tx) => {
-      if (existingActive) {
-        const retireMode =
-          bodyRetireActivePlan === "archive" ? "archive" : "park";
-        if (retireMode === "archive") {
-          await tx.training_plans.updateMany({
-            where: {
-              athleteId: athlete.id,
-              lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-            },
-            data: {
-              lifecycleStatus: TrainingPlanLifecycle.ARCHIVED,
-              updatedAt: now,
-            },
-          });
-        } else {
-          await tx.training_plans.updateMany({
-            where: {
-              athleteId: athlete.id,
-              lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-            },
-            data: {
-              lifecycleStatus: TrainingPlanLifecycle.PARKED,
-              updatedAt: now,
-            },
-          });
-        }
+      const stillActive = await tx.training_plans.findFirst({
+        where: {
+          athleteId: athlete.id,
+          lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+        },
+        select: { id: true },
+      });
+      if (stillActive) {
+        throw new Error(
+          "You already have an active training plan. Delete it before starting a new one.",
+        );
       }
       return tx.training_plans.create({
         data: {
@@ -371,17 +351,6 @@ export async function POST(request: NextRequest) {
         },
       });
     });
-
-    if (existingActive) {
-      await cleanupFutureGarminSchedulesForPlan({
-        planId: existingActive.id,
-        athleteId: athlete.id,
-      });
-      await cleanupFutureWorkoutsForRetiredPlan({
-        planId: existingActive.id,
-        athleteId: athlete.id,
-      });
-    }
 
     await snapPrimaryRaceToPlanTerminal({
       athleteId: athlete.id,
@@ -461,15 +430,10 @@ export async function GET(request: NextRequest) {
     const lifecycleFilter =
       statusParam === "active"
         ? TrainingPlanLifecycle.ACTIVE
-        : statusParam === "parked"
-          ? TrainingPlanLifecycle.PARKED
+        : statusParam === "paused" || statusParam === "parked"
+          ? TrainingPlanLifecycle.PAUSED
           : statusParam === "archived"
-            ? {
-                in: [
-                  TrainingPlanLifecycle.ARCHIVED,
-                  TrainingPlanLifecycle.PARKED,
-                ],
-              }
+            ? TrainingPlanLifecycle.ARCHIVED
             : null;
 
     const plans = await prisma.training_plans.findMany({

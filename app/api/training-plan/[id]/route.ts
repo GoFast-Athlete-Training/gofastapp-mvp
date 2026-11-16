@@ -26,7 +26,10 @@ import {
 import { persistPlanRaceSnapshots } from "@/lib/training/race-plan-calendar-service";
 import { loadMyRace } from "@/lib/races/load-my-race";
 import { snapPrimaryRaceToPlanTerminal } from "@/lib/athlete-primary-race";
-import { restoreParkedPlan } from "@/lib/training/plan-lifecycle";
+import {
+  pauseTrainingPlan,
+  resumePausedPlan,
+} from "@/lib/training/plan-lifecycle";
 import {
   computeRaceReadiness,
   deriveKCoefficient,
@@ -277,13 +280,13 @@ export async function PATCH(request: NextRequest, context: Ctx) {
 
     const body = await request.json();
 
-    if (body.restoreAsActive === true) {
-      const result = await restoreParkedPlan({
+    if (body.restoreAsActive === true || body.resumePaused === true) {
+      const result = await resumePausedPlan({
         athleteId: auth.athlete.id,
-        parkedPlanId: id,
+        planId: id,
       });
       if (!result.ok) {
-        return NextResponse.json({ error: result.error }, { status: 404 });
+        return NextResponse.json({ error: result.error }, { status: 409 });
       }
       const planRow = await prisma.training_plans.findFirst({
         where: { id, athleteId: auth.athlete.id },
@@ -511,8 +514,27 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       }
     }
 
-    if (body.lifecycleStatus === TrainingPlanLifecycle.ACTIVE) {
-      await archiveOtherActivePlans(auth.athlete.id, id);
+    if (body.lifecycleStatus === TrainingPlanLifecycle.PAUSED) {
+      const paused = await pauseTrainingPlan({
+        athleteId: auth.athlete.id,
+        planId: id,
+      });
+      if (!paused.ok) {
+        return NextResponse.json({ error: paused.error }, { status: 400 });
+      }
+      data.lifecycleStatus = TrainingPlanLifecycle.PAUSED;
+    } else if (body.lifecycleStatus === TrainingPlanLifecycle.ACTIVE) {
+      if (existing.lifecycleStatus === TrainingPlanLifecycle.PAUSED) {
+        const resumed = await resumePausedPlan({
+          athleteId: auth.athlete.id,
+          planId: id,
+        });
+        if (!resumed.ok) {
+          return NextResponse.json({ error: resumed.error }, { status: 409 });
+        }
+      } else {
+        await archiveOtherActivePlans(auth.athlete.id, id);
+      }
       data.lifecycleStatus = TrainingPlanLifecycle.ACTIVE;
     } else if (body.lifecycleStatus === TrainingPlanLifecycle.ARCHIVED) {
       data.lifecycleStatus = TrainingPlanLifecycle.ARCHIVED;

@@ -393,7 +393,7 @@ export default function AdoptThisPlanPanel({
                 checked={replaceActivePlan}
                 onChange={(e) => setReplaceActivePlan(e.target.checked)}
               />
-              Park my current active plan and adopt this one
+              Delete my current plan and adopt this one
             </label>
           ) : null}
 

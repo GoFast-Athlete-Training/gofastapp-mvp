@@ -1,5 +1,5 @@
 /**
- * Remove future unmatched workout rows left on ARCHIVED/PARKED training plans.
+ * Remove future unmatched workout rows left on ARCHIVED/PAUSED training plans.
  * Run: npx tsx scripts/cleanup-retired-plans-future-workouts.ts [athleteId]
  *
  * Omit athleteId to clean all retired plans in the database.
@@ -15,7 +15,7 @@ async function main() {
   if (athleteId) {
     console.log(`Scoping cleanup to athlete ${athleteId}`);
   } else {
-    console.log("Cleaning future rows for all ARCHIVED/PARKED plans");
+    console.log("Cleaning future rows for all ARCHIVED/PAUSED plans");
   }
 
   const summary = await cleanupAllRetiredPlansFutureWorkouts({ athleteId });

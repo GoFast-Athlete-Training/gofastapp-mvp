@@ -4,7 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPersona } from "@/lib/training/plan-entity-serialize";
+import { parsePersonaTrainingProfile } from "@/lib/training/persona-training-profile";
 import { normalizeSlug } from "@/lib/training/plan-entity-slugs";
+import { Prisma } from "@prisma/client";
 
 function str(v: unknown): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
@@ -74,6 +76,13 @@ export async function PATCH(
     }
     if ("workoutFrequencyCap" in body) {
       data.workoutFrequencyCap = intOrNull(body.workoutFrequencyCap);
+    }
+    if ("trainingProfile" in body) {
+      const parsed = parsePersonaTrainingProfile(body.trainingProfile);
+      if (!parsed.ok) {
+        return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
+      }
+      data.trainingProfile = parsed.profile ?? Prisma.JsonNull;
     }
 
     const row = await prisma.training_plan_persona.update({

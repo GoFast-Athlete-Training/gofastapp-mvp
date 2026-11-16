@@ -1,5 +1,8 @@
 /**
- * Plan lifecycle — ACTIVE, PARKED, ARCHIVED.
+ * Plan lifecycle — ACTIVE, PAUSED, ARCHIVED.
+ *
+ * Pause is an explicit athlete stop (injury, time off). Regenerate rewrites
+ * schedule JSON on the same row. A new plan deletes the current row first.
  */
 
 import { TrainingPlanLifecycle } from "@prisma/client";
@@ -9,6 +12,7 @@ import { productTodayKey, resolveRaceDayKey } from "@/lib/plan-calendar-day";
 import { raceCalendarBeforeTodayUtc } from "@/lib/training/plan-utils";
 import { cleanupFutureGarminSchedulesForPlan } from "@/lib/training/plan-garmin-cleanup";
 import { cleanupFutureWorkoutsForRetiredPlan } from "@/lib/training/plan-regenerate-cleanup";
+import { cleanupPlanWorkoutsBeforeDelete } from "@/lib/training/plan-delete-cleanup";
 import { shouldAutoArchivePlanForRaceDate } from "@/lib/training/race-plan-closeout";
 
 /** Race calendar day strictly before product today — aligns with training hub "past race" treatment. */
@@ -33,50 +37,166 @@ export async function cascadeLinkedGoalAfterPlanArchived(
   /* no-op — goal is on athlete_races row */
 }
 
-/** Mark every ACTIVE plan for this athlete as PARKED (explicit replace, not archive). */
-export async function parkOtherActivePlans(
-  athleteId: string,
-  exceptPlanId?: string | null
-): Promise<void> {
-  const toPark = await prisma.training_plans.findMany({
+/** Remove one plan row. Completed workouts stay on the log, detached from the plan. */
+export async function deleteTrainingPlan(params: {
+  athleteId: string;
+  planId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const existing = await prisma.training_plans.findFirst({
+    where: { id: params.planId, athleteId: params.athleteId },
+    select: { id: true },
+  });
+  if (!existing) return { ok: false, error: "Plan not found" };
+
+  await cleanupFutureGarminSchedulesForPlan({
+    planId: params.planId,
+    athleteId: params.athleteId,
+  });
+  await cleanupPlanWorkoutsBeforeDelete({
+    planId: params.planId,
+    athleteId: params.athleteId,
+  });
+  await prisma.training_plans.delete({ where: { id: params.planId } });
+  return { ok: true };
+}
+
+export type DeleteActiveForNewPlanResult =
+  | { ok: true; deletedPlanId: string | null }
+  | {
+      ok: false;
+      status: "regenerate" | "conflict";
+      error: string;
+      existingPlanId: string;
+    };
+
+/**
+ * Starting a new plan deletes the current active row. It never pauses.
+ * The same race must regenerate the existing plan instead.
+ */
+export async function deleteActivePlanForNewPlan(params: {
+  athleteId: string;
+  replace: boolean;
+  sameAthleteRaceId?: string | null;
+}): Promise<DeleteActiveForNewPlanResult> {
+  const existing = await prisma.training_plans.findFirst({
     where: {
-      athleteId,
+      athleteId: params.athleteId,
       lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-      ...(exceptPlanId ? { NOT: { id: exceptPlanId } } : {}),
+    },
+    select: { id: true, athleteRaceId: true },
+  });
+  if (!existing) return { ok: true, deletedPlanId: null };
+
+  if (
+    params.sameAthleteRaceId &&
+    existing.athleteRaceId === params.sameAthleteRaceId
+  ) {
+    return {
+      ok: false,
+      status: "regenerate",
+      existingPlanId: existing.id,
+      error:
+        "You already have an active plan for this race. Regenerate it instead of creating a new one.",
+    };
+  }
+
+  if (!params.replace) {
+    return {
+      ok: false,
+      status: "conflict",
+      existingPlanId: existing.id,
+      error:
+        "You already have an active training plan. Delete it before starting a new one.",
+    };
+  }
+
+  const deleted = await deleteTrainingPlan({
+    athleteId: params.athleteId,
+    planId: existing.id,
+  });
+  if (!deleted.ok) {
+    return {
+      ok: false,
+      status: "conflict",
+      existingPlanId: existing.id,
+      error: deleted.error,
+    };
+  }
+  return { ok: true, deletedPlanId: existing.id };
+}
+
+/** Athlete asked to stop the active plan and pick it up later. */
+export async function pauseTrainingPlan(params: {
+  athleteId: string;
+  planId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const row = await prisma.training_plans.findFirst({
+    where: {
+      id: params.planId,
+      athleteId: params.athleteId,
+      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
     },
     select: { id: true },
   });
+  if (!row) return { ok: false, error: "Only the active plan can be paused" };
 
-  if (toPark.length === 0) return;
-
-  await prisma.training_plans.updateMany({
-    where: {
-      athleteId,
-      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-      ...(exceptPlanId ? { NOT: { id: exceptPlanId } } : {}),
-    },
+  await prisma.training_plans.update({
+    where: { id: params.planId },
     data: {
-      lifecycleStatus: TrainingPlanLifecycle.PARKED,
+      lifecycleStatus: TrainingPlanLifecycle.PAUSED,
       updatedAt: new Date(),
     },
   });
-
-  await Promise.all(
-    toPark.map(async (p) => {
-      await cleanupFutureGarminSchedulesForPlan({
-        planId: p.id,
-        athleteId,
-      });
-      await cleanupFutureWorkoutsForRetiredPlan({
-        planId: p.id,
-        athleteId,
-      });
-    })
-  );
+  await cleanupFutureGarminSchedulesForPlan({
+    planId: params.planId,
+    athleteId: params.athleteId,
+  });
+  await cleanupFutureWorkoutsForRetiredPlan({
+    planId: params.planId,
+    athleteId: params.athleteId,
+  });
+  return { ok: true };
 }
 
-/** @deprecated use parkOtherActivePlans */
-export const markOtherActivePlansAsUnused = parkOtherActivePlans;
+/** Turn a paused plan back on. Does not pause or archive any other plan. */
+export async function resumePausedPlan(params: {
+  athleteId: string;
+  planId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const paused = await prisma.training_plans.findFirst({
+    where: {
+      id: params.planId,
+      athleteId: params.athleteId,
+      lifecycleStatus: TrainingPlanLifecycle.PAUSED,
+    },
+    select: { id: true },
+  });
+  if (!paused) return { ok: false, error: "Paused plan not found" };
+
+  const otherActive = await prisma.training_plans.findFirst({
+    where: {
+      athleteId: params.athleteId,
+      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+      NOT: { id: params.planId },
+    },
+    select: { id: true },
+  });
+  if (otherActive) {
+    return {
+      ok: false,
+      error: "Delete or archive your active plan before resuming this one.",
+    };
+  }
+
+  await prisma.training_plans.update({
+    where: { id: params.planId },
+    data: {
+      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
+      updatedAt: new Date(),
+    },
+  });
+  return { ok: true };
+}
 
 /** Archive every ACTIVE plan for this athlete except the given id (if provided). */
 export async function archiveOtherActivePlans(
@@ -117,84 +237,6 @@ export async function archiveOtherActivePlans(
       });
     })
   );
-}
-
-export type RetireActivePlanMode = "park" | "archive";
-
-/** Retire the current ACTIVE plan when replacing with a new one. */
-export async function retireActivePlanForReplace(
-  athleteId: string,
-  mode: RetireActivePlanMode
-): Promise<void> {
-  if (mode === "archive") {
-    await archiveOtherActivePlans(athleteId);
-  } else {
-    await parkOtherActivePlans(athleteId);
-  }
-}
-
-/** Reactivate a PARKED plan; park the current ACTIVE plan. */
-export async function restoreParkedPlan(params: {
-  athleteId: string;
-  parkedPlanId: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const parked = await prisma.training_plans.findFirst({
-    where: {
-      id: params.parkedPlanId,
-      athleteId: params.athleteId,
-      lifecycleStatus: TrainingPlanLifecycle.PARKED,
-    },
-    select: { id: true },
-  });
-  if (!parked) {
-    return { ok: false, error: "Parked plan not found" };
-  }
-
-  const outgoingActive = await prisma.training_plans.findMany({
-    where: {
-      athleteId: params.athleteId,
-      lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-      NOT: { id: params.parkedPlanId },
-    },
-    select: { id: true },
-  });
-
-  const now = new Date();
-  await prisma.$transaction(async (tx) => {
-    await tx.training_plans.updateMany({
-      where: {
-        athleteId: params.athleteId,
-        lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-        NOT: { id: params.parkedPlanId },
-      },
-      data: {
-        lifecycleStatus: TrainingPlanLifecycle.PARKED,
-        updatedAt: now,
-      },
-    });
-    await tx.training_plans.update({
-      where: { id: params.parkedPlanId },
-      data: {
-        lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-        updatedAt: now,
-      },
-    });
-  });
-
-  await Promise.all(
-    outgoingActive.map(async (p) => {
-      await cleanupFutureGarminSchedulesForPlan({
-        planId: p.id,
-        athleteId: params.athleteId,
-      });
-      await cleanupFutureWorkoutsForRetiredPlan({
-        planId: p.id,
-        athleteId: params.athleteId,
-      });
-    })
-  );
-
-  return { ok: true };
 }
 
 /** Archive one ACTIVE plan for this athlete (cleanup + cascade). */

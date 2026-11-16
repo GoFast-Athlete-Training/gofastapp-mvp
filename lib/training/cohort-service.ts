@@ -9,6 +9,7 @@ import {
   type TrainingCohortStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { deleteActivePlanForNewPlan } from "@/lib/training/plan-lifecycle";
 import { createGoal } from "@/lib/goal-service";
 import { upsertRaceMembershipFromSignup } from "@/lib/race-container-membership";
 import { syncAthleteProfileSnapshot } from "@/lib/athlete-profile-snapshot";
@@ -395,6 +396,24 @@ export async function joinTrainingCohort(
 
   const planName = `${race.name} — group training`;
 
+  const existingRaceForJoin = await prisma.athlete_races.findUnique({
+    where: {
+      athleteId_raceRegistryId: {
+        athleteId,
+        raceRegistryId: race.id,
+      },
+    },
+    select: { id: true },
+  });
+  const replaced = await deleteActivePlanForNewPlan({
+    athleteId,
+    replace: replaceActivePlan === true,
+    sameAthleteRaceId: existingRaceForJoin?.id ?? null,
+  });
+  if (!replaced.ok) {
+    throw new Error(replaced.error);
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     await tx.athlete_races.upsert({
       where: {
@@ -439,20 +458,10 @@ export async function joinTrainingCohort(
       select: { id: true },
     });
 
-    if (existingActive && !replaceActivePlan) {
-      throw new Error(
-        "You already have an active training plan. Confirm replace to join this group plan."
-      );
-    }
-
     if (existingActive) {
-      await tx.training_plans.updateMany({
-        where: { athleteId, lifecycleStatus: TrainingPlanLifecycle.ACTIVE },
-        data: {
-          lifecycleStatus: TrainingPlanLifecycle.PARKED,
-          updatedAt: new Date(),
-        },
-      });
+      throw new Error(
+        "You already have an active training plan. Delete it before joining this group plan."
+      );
     }
 
     const now = new Date();

@@ -13,6 +13,7 @@ import {
 } from "@prisma/client";
 import { dateKeyFromDate } from "@/lib/calendar-date";
 import { prisma } from "@/lib/prisma";
+import { deleteActivePlanForNewPlan } from "@/lib/training/plan-lifecycle";
 import { metersToMiles } from "@/lib/pace-utils";
 import { goalRacePaceDisplayString, resolveGoalRacePace } from "@/lib/training/goal-pace-calculator";
 import {
@@ -497,6 +498,24 @@ export async function adoptPublicTrainingPlan(
   const planName = `${publicPlan.title} — my build`;
   const snapshot = publicPlan.customWorkoutSnapshot as PublicPlanCustomWorkoutSnapshot | null;
 
+  const existingRaceForAdopt = await prisma.athlete_races.findUnique({
+    where: {
+      athleteId_raceRegistryId: {
+        athleteId: input.athleteId,
+        raceRegistryId: race.id,
+      },
+    },
+    select: { id: true },
+  });
+  const replaced = await deleteActivePlanForNewPlan({
+    athleteId: input.athleteId,
+    replace: input.replaceActivePlan === true,
+    sameAthleteRaceId: existingRaceForAdopt?.id ?? null,
+  });
+  if (!replaced.ok) {
+    throw new Error(replaced.error);
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     const athleteRaceRow = await tx.athlete_races.upsert({
       where: {
@@ -535,23 +554,10 @@ export async function adoptPublicTrainingPlan(
       select: { id: true },
     });
 
-    if (existingActive && !input.replaceActivePlan) {
-      throw new Error(
-        "You already have an active training plan. Confirm replace to adopt this plan."
-      );
-    }
-
     if (existingActive) {
-      await tx.training_plans.updateMany({
-        where: {
-          athleteId: input.athleteId,
-          lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-        },
-        data: {
-          lifecycleStatus: TrainingPlanLifecycle.PARKED,
-          updatedAt: new Date(),
-        },
-      });
+      throw new Error(
+        "You already have an active training plan. Delete it before adopting a new one."
+      );
     }
 
     const now = new Date();

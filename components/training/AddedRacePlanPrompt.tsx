@@ -50,7 +50,6 @@ export function AddedRacePlanPrompt({
   function goToAddPlan() {
     const qs = new URLSearchParams({
       athleteRaceId: addedRaceAthleteRaceId,
-      retireActivePlan: "park",
     });
     router.push(`/training-setup?${qs.toString()}`);
     onSuccess?.();

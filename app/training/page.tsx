@@ -142,6 +142,7 @@ export default function TrainingHubPage() {
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [pausing, setPausing] = useState(false);
   const [legacyPlanReselect, setLegacyPlanReselect] = useState<{
     id: string;
     name: string;
@@ -241,7 +242,7 @@ export default function TrainingHubPage() {
         fetch("/api/training-plan?status=active", {
           headers: athleteBearerFetchHeaders(token),
         }),
-        fetch("/api/training-plan?status=parked", {
+        fetch("/api/training-plan?status=paused", {
           headers: athleteBearerFetchHeaders(token),
         }),
       ]);
@@ -252,7 +253,7 @@ export default function TrainingHubPage() {
           parkedData.plans.map(
             (p: { id: string; name: string; race_registry?: { name: string } | null }) => ({
               id: p.id,
-              name: p.name?.trim() || "Parked plan",
+              name: p.name?.trim() || "Paused plan",
               race_registry: p.race_registry ?? null,
             })
           )
@@ -514,7 +515,7 @@ export default function TrainingHubPage() {
     const parked = parkedPlans.find((p) => p.id === parkedPlanId);
     if (
       !window.confirm(
-        `Restore "${parked?.name ?? "this plan"}" as your active plan? Your current plan will be parked.`
+        `Resume "${parked?.name ?? "this plan"}"? It becomes your active plan.`
       )
     ) {
       return;
@@ -541,6 +542,40 @@ export default function TrainingHubPage() {
       setHubError(e instanceof Error ? e.message : "Could not restore plan");
     } finally {
       setRestoringParkedId(null);
+    }
+  }
+
+  async function pauseActivePlan() {
+    if (!planDetail) return;
+    if (
+      !window.confirm(
+        `Pause "${planDetail.name}"? You can resume it later. Future workouts come off the schedule until then.`
+      )
+    ) {
+      return;
+    }
+    setPausing(true);
+    try {
+      const u = auth.currentUser;
+      if (!u) return;
+      const token = await u.getIdToken();
+      const res = await fetch(`/api/training-plan/${planDetail.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...athleteBearerFetchHeaders(token),
+        },
+        body: JSON.stringify({ lifecycleStatus: "PAUSED" }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not pause plan");
+      }
+      await loadHub();
+    } catch (e) {
+      setHubError(e instanceof Error ? e.message : "Could not pause plan");
+    } finally {
+      setPausing(false);
     }
   }
 
@@ -1101,6 +1136,7 @@ export default function TrainingHubPage() {
                     presetMaxWeeklyMiles={presetMaxWeeklyMiles}
                     archiving={archiving}
                     deleting={deleting}
+                    pausing={pausing}
                     parkedPlans={parkedPlans}
                     restoringParkedId={restoringParkedId}
                     getToken={getHubToken}
@@ -1109,6 +1145,7 @@ export default function TrainingHubPage() {
                     onRefreshWeek={() => void fetchWeekDays(weekNumber)}
                     onArchive={() => void archiveActivePlan()}
                     onDelete={() => void deleteActivePlan()}
+                    onPause={() => void pauseActivePlan()}
                     onRestoreParked={(id) => void restoreParkedPlan(id)}
                   />
                 </div>

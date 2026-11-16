@@ -4,6 +4,7 @@ import {
   calendarTrainingWeekCountFromKeys,
   productTodayKey,
   raceCalendarBeforeProductToday,
+  emptyFirstWeekNotice,
   scheduleAnchorDayKey,
   totalWeeksFromDayKeys,
 } from "@/lib/plan-calendar-day";
@@ -26,6 +27,26 @@ describe("plan-calendar-day", () => {
     assert.equal(
       scheduleAnchorDayKey("2026-11-15", [1, 2, 3, 4, 5, 6], "2027-04-18"),
       "2026-11-16"
+    );
+  });
+
+  test("empty first week notice offers a one-off instead of blaming Sunday", () => {
+    const notice = emptyFirstWeekNotice({
+      startDate: "2026-11-15",
+      preferredDays: [2, 3, 4, 5, 6],
+      raceDate: "2027-04-18",
+    });
+    assert.equal(notice?.oneOffDow, 7);
+    assert.equal(notice?.anchorDay, "2026-11-16");
+    assert.match(notice?.message ?? "", /We noticed there's no running day left/);
+    assert.equal(notice?.message.includes("isn't a training day"), false);
+    assert.equal(
+      emptyFirstWeekNotice({
+        startDate: "2026-11-16",
+        preferredDays: [2, 3, 4, 5, 6],
+        raceDate: "2027-04-18",
+      }),
+      null
     );
   });
 

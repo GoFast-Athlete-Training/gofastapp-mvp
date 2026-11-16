@@ -71,6 +71,24 @@ test("Sunday start with Monday–Saturday days does not leave week 1 empty", () 
   );
 });
 
+test("week-one extra day is an easy run only in that first week", () => {
+  const { schedule } = assignWorkoutDays({
+    ...baseInput,
+    planStartDate: dateKeyToUtcNoonDate("2026-11-15"),
+    raceDate: dateKeyToUtcNoonDate("2027-04-18"),
+    preferredDays: [2, 3, 4, 5, 6],
+    totalWeeks: 8,
+    weekOneExtraDow: 7,
+  });
+  const week1 = schedule[0];
+  assert.deepEqual(
+    week1?.days.map((d) => [d.dow, d.workoutType]),
+    [[7, "Easy"]]
+  );
+  const laterSunday = schedule.slice(1).some((week) => week.days.some((d) => d.dow === 7));
+  assert.equal(laterSunday, false);
+});
+
 test("easy days receive catalogue workout ids from easy rotation", () => {
   const { schedule } = assignWorkoutDays(baseInput);
   const easyDays = schedule.flatMap((w) => w.days.filter((d) => d.workoutType === "Easy"));

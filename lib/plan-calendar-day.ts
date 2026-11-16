@@ -8,6 +8,7 @@ import {
   dateKeyFromDate,
   dateKeyFromIsoOrDateKey,
   dateKeyToUtcNoonDate,
+  formatCalendarDate,
   isDateKey,
 } from "@/lib/calendar-date";
 import { DEFAULT_CITY_RUN_TIMEZONE } from "@/lib/city-run/city-run-starts-at-setter";
@@ -166,6 +167,60 @@ export function scheduleAnchorDayKey(
   const nextMonday = addCalendarDays(mondayKeyOfWeekContaining(planStartDay), 7);
   if (raceDay && nextMonday >= raceDay) return planStartDay;
   return nextMonday;
+}
+
+const WEEKDAY_NAMES = [
+  "",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+export type EmptyFirstWeekNotice = {
+  /** Weekday of the chosen start (1=Mon … 7=Sun). The one-off day. */
+  oneOffDow: number;
+  anchorDay: string;
+  anchorLabel: string;
+  message: string;
+};
+
+/** Friendly note when the start week has no running day left. Null when week 1 can stay. */
+export function emptyFirstWeekNotice(input: {
+  startDate: string | null | undefined;
+  preferredDays: number[];
+  raceDate?: string | null;
+}): EmptyFirstWeekNotice | null {
+  const startDay = normalizeDateKeyInput(input.startDate);
+  const preferredCount = input.preferredDays.filter((day) => day >= 1 && day <= 7).length;
+  if (!startDay || preferredCount === 0) return null;
+  const raceDay = normalizeDateKeyInput(input.raceDate);
+  const anchor = scheduleAnchorDayKey(startDay, input.preferredDays, raceDay);
+  if (anchor === startDay) return null;
+  const oneOffDow = ourDowFromDateKey(startDay);
+  const weekOf = formatCalendarDate(startDay, { month: "short", day: "numeric" });
+  const anchorWeekday = WEEKDAY_NAMES[ourDowFromDateKey(anchor)] ?? "Monday";
+  const anchorLabel = `${anchorWeekday}, ${formatCalendarDate(anchor, { month: "short", day: "numeric" })}`;
+  return {
+    oneOffDow,
+    anchorDay: anchor,
+    anchorLabel,
+    message: `We noticed there's no running day left in the week of ${weekOf}. Week 1 can start ${anchorLabel}. Want a one-off day this week so you can start now? That's fine too.`,
+  };
+}
+
+export function parseWeekOneExtraDow(value: unknown): number | null {
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  if (!Number.isInteger(n) || n < 1 || n > 7) return null;
+  return n;
+}
+
+export function weekOneExtraDowFromCyclePool(data: unknown): number | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  return parseWeekOneExtraDow((data as { weekOneExtraDow?: unknown }).weekOneExtraDow);
 }
 
 export function raceCalendarBeforeProductToday(raceDay: string): boolean {

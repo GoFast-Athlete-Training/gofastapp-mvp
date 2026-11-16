@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { dateKeyFromDate } from "@/lib/calendar-date";
 import {
   calendarDayWritePair,
+  ourDowFromDateKey,
   scheduleAnchorDayKey,
 } from "@/lib/plan-calendar-day";
 import { calendarTrainingWeekCount } from "@/lib/training/plan-utils";
@@ -92,6 +93,11 @@ export async function executePlanGenerate(params: {
   includedSecondaryAthleteRaceIds?: string[] | null;
   /** @deprecated use includedSecondaryAthleteRaceIds */
   includedSecondarySignupIds?: string[] | null;
+  /**
+   * Easy day on the start weekday for week 1 only.
+   * Used when that week would otherwise have no running day.
+   */
+  weekOneExtraDow?: number | null;
 }): Promise<{ planId: string; weekCount: number }> {
   const { athleteId, plan } = params;
 
@@ -148,11 +154,22 @@ export async function executePlanGenerate(params: {
 
   const requestedStartDay = dateKeyFromDate(plan.startDate);
   const raceDayKey = dateKeyFromDate(race.raceDate);
-  const scheduleStartDay = scheduleAnchorDayKey(
+  const anchoredStartDay = scheduleAnchorDayKey(
     requestedStartDay,
     preferredDays,
     raceDayKey
   );
+  const requestedExtra =
+    params.weekOneExtraDow != null &&
+    params.weekOneExtraDow >= 1 &&
+    params.weekOneExtraDow <= 7
+      ? params.weekOneExtraDow
+      : null;
+  const useWeekOneExtra =
+    requestedExtra != null &&
+    requestedExtra === ourDowFromDateKey(requestedStartDay) &&
+    anchoredStartDay !== requestedStartDay;
+  const scheduleStartDay = useWeekOneExtra ? requestedStartDay : anchoredStartDay;
   const scheduleStartDate =
     scheduleStartDay === requestedStartDay
       ? plan.startDate
@@ -325,6 +342,7 @@ export async function executePlanGenerate(params: {
     weeklyTempoSessions,
     weeklyIntervalSessions,
     standardRaceWeek: !hasPresetTaperOrRaceWeek,
+    weekOneExtraDow: useWeekOneExtra ? requestedExtra : null,
   });
 
   const schedule = placement.schedule;
@@ -527,7 +545,7 @@ export async function executePlanGenerate(params: {
       intervals: intervalsPositions.length,
       tempo: tempoPositions.length,
     },
-    foundation: foundationPlan
+      foundation: foundationPlan
       ? {
           missingData: foundationPlan.missingData,
           derived: foundationPlan.derived,
@@ -538,6 +556,7 @@ export async function executePlanGenerate(params: {
           peakWeeklyMiles: foundationPlan.peakWeeklyMiles,
         }
       : null,
+    ...(useWeekOneExtra && requestedExtra != null ? { weekOneExtraDow: requestedExtra } : {}),
   };
 
   const minWeeklyFromPreset = Number(vol.minWeeklyMiles);

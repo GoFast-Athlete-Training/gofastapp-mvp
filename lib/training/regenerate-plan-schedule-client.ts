@@ -6,6 +6,8 @@ export type RegeneratePlanScheduleParams = {
   weeklyMileageTarget: number;
   minWeeklyMiles: number;
   includedSecondaryAthleteRaceIds?: string[];
+  /** Null clears a saved one-off. Omit to keep the last choice. */
+  weekOneExtraDow?: number | null;
 };
 
 export type RegeneratePlanScheduleResult =
@@ -31,6 +33,9 @@ export async function postRegenerateTrainingPlanSchedule(
             includedSecondaryAthleteRaceIds: params.includedSecondaryAthleteRaceIds,
             includedSecondarySignupIds: params.includedSecondaryAthleteRaceIds,
           }
+        : {}),
+      ...(params.weekOneExtraDow !== undefined
+        ? { weekOneExtraDow: params.weekOneExtraDow }
         : {}),
     }),
   });

@@ -71,7 +71,7 @@ export async function cleanupFuturePlanWorkoutsAfterRegenerate(params: {
   };
 }
 
-/** When parking/archiving a superseded plan — clear its future materialized rows. */
+/** When pausing or archiving a plan — clear its future materialized rows. */
 export async function cleanupFutureWorkoutsForRetiredPlan(params: {
   planId: string;
   athleteId: string;

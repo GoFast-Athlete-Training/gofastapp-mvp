@@ -5,6 +5,10 @@ import type {
   TrainingPlanGoalType,
 } from "@prisma/client";
 import { prismaKindToGoalType } from "@/lib/training/goal-type-map";
+import {
+  coercePersonaTrainingProfile,
+  type PersonaTrainingProfile,
+} from "@/lib/training/persona-training-profile";
 
 export type PlanPersonaApi = {
   id: string;
@@ -30,6 +34,7 @@ export type PlanPersonaApi = {
   estimated5kTimeSeconds: number | null;
   estimated5kPerformanceSummary: string | null;
   estimated5kPerformanceRationale: string | null;
+  trainingProfile: PersonaTrainingProfile | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -78,6 +83,7 @@ export function serializePlanPersona(row: training_plan_persona): PlanPersonaApi
     estimated5kTimeSeconds: row.estimated5kTimeSeconds,
     estimated5kPerformanceSummary: row.estimated5kPerformanceSummary,
     estimated5kPerformanceRationale: row.estimated5kPerformanceRationale,
+    trainingProfile: coercePersonaTrainingProfile(row.trainingProfile),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

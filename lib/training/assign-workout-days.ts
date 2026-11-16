@@ -55,6 +55,8 @@ export type WorkoutDayInput = {
    * race−2 = taper tempo, race−1 = off, no long run that week, race day = Race.
    */
   standardRaceWeek?: boolean;
+  /** Easy day for week 1 only, when the athlete starts on a week with no preferred day left. */
+  weekOneExtraDow?: number | null;
 };
 
 const DEFAULT_WEEKLY_TEMPO = 1;
@@ -367,18 +369,26 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
       }
       return true;
     });
-    const eRotMod = Math.max(input.easyPositions.length, 1);
-    for (const d of easyDayList) {
+    const placeEasy = (d: number) => {
+      if (placement.has(d) || !dayInPlanWindow(d)) return;
+      if (standardRaceWeek) {
+        const role = raceRoleForSlot(d);
+        if (role === "rest" || role === "race") return;
+      }
       if (input.easyPositions.length > 0) {
         const ordBefore = easySessionOrdinal;
+        const eRotMod = Math.max(input.easyPositions.length, 1);
         const pci = ordBefore % (eRotMod > 0 ? eRotMod : 1);
         const posId = catalogueIdForRotation(input.easyPositions, ordBefore);
-        tryPlaceEntrySkeleton(d, {
-          kind: "easy",
-          catalogueWorkoutId: posId,
-          planCycleIndex: pci,
-        });
-        easySessionOrdinal++;
+        if (
+          tryPlaceEntrySkeleton(d, {
+            kind: "easy",
+            catalogueWorkoutId: posId,
+            planCycleIndex: pci,
+          })
+        ) {
+          easySessionOrdinal++;
+        }
       } else {
         tryPlaceEntrySkeleton(d, {
           kind: "easy",
@@ -386,6 +396,10 @@ export function assignWorkoutDays(input: WorkoutDayInput): {
           planCycleIndex: null,
         });
       }
+    };
+    for (const d of easyDayList) placeEasy(d);
+    if (weekNumber === 1 && input.weekOneExtraDow != null) {
+      placeEasy(input.weekOneExtraDow);
     }
 
     /** Map placements → typed days sorted by dow */

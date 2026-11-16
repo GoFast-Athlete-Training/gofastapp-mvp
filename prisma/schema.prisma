@@ -20,8 +20,8 @@ enum AthleteRole {
 enum TrainingPlanLifecycle {
   ACTIVE
   ARCHIVED
-  /// Plan paused on purpose — athlete can pick up later (replaces OLD_PLAN_UNUSED).
-  PARKED
+  /// Athlete paused this plan on purpose and can resume it later.
+  PAUSED
 }
 
 enum AthletePresetFitnessPhase {
@@ -2267,6 +2267,8 @@ model training_plan_persona {
   estimated5kPerformanceSummary   String?
   estimated5kPerformanceRationale String?
   athletePersonaSummary           String?
+  /// Athlete training characteristics from the persona builder. Plan prescription stays on the preset.
+  trainingProfile                 Json?
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 

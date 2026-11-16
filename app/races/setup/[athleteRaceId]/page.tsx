@@ -166,7 +166,6 @@ export default function RaceSetupPage({
 
   function addPlanHref() {
     const qs = new URLSearchParams({ athleteRaceId });
-    if (activePlanId) qs.set("retireActivePlan", "park");
     return `/training-setup?${qs.toString()}`;
   }
 

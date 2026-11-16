@@ -1,11 +1,11 @@
-import type {
-  AthletePersonaCapability,
-  AthletePersonaDedication,
-  FitnessDelta,
+import {
   Prisma,
-  ProgressionAggressiveness,
-  TrainingPlanGoalKind,
-  TrainingPlanGoalType,
+  type AthletePersonaCapability,
+  type AthletePersonaDedication,
+  type FitnessDelta,
+  type ProgressionAggressiveness,
+  type TrainingPlanGoalKind,
+  type TrainingPlanGoalType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
@@ -14,6 +14,7 @@ import {
   normalizeSlug,
 } from "@/lib/training/plan-entity-slugs";
 import { goalTypeToPrismaKind } from "@/lib/training/goal-type-map";
+import type { PersonaTrainingProfile } from "@/lib/training/persona-training-profile";
 import type { TrainingPlanGoalType as GoalTypeContract } from "@/lib/training/preset-realignment-types";
 
 export type PersonaUpsertInput = {
@@ -38,6 +39,7 @@ export type PersonaUpsertInput = {
   estimated5kPerformanceSummary?: string | null;
   estimated5kPerformanceRationale?: string | null;
   athletePersonaSummary?: string | null;
+  trainingProfile?: PersonaTrainingProfile | null;
 };
 
 export type GoalUpsertInput = {
@@ -107,6 +109,13 @@ export async function upsertPersonaBySlug(input: PersonaUpsertInput & { personaS
         : null,
     estimated5kPerformanceSummary: input.estimated5kPerformanceSummary?.trim() || null,
     estimated5kPerformanceRationale: input.estimated5kPerformanceRationale?.trim() || null,
+    ...(input.trainingProfile !== undefined
+      ? {
+          trainingProfile: input.trainingProfile
+            ? (input.trainingProfile as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
+        }
+      : {}),
   };
 
   return prisma.training_plan_persona.upsert({
@@ -122,8 +131,18 @@ export async function upsertPersonaBySlug(input: PersonaUpsertInput & { personaS
       ...(input.intentSummary !== undefined
         ? { intentSummary: input.intentSummary?.trim() || null }
         : {}),
+      ...(input.athletePersonaSummary !== undefined
+        ? { athletePersonaSummary: input.athletePersonaSummary?.trim() || null }
+        : {}),
       ...(input.workoutFrequencyCap !== undefined
         ? { workoutFrequencyCap: data.workoutFrequencyCap }
+        : {}),
+      ...(input.trainingProfile !== undefined
+        ? {
+            trainingProfile: input.trainingProfile
+              ? (input.trainingProfile as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+          }
         : {}),
     },
   });

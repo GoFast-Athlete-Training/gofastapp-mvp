@@ -6,6 +6,10 @@ import { executePlanGenerate } from "@/lib/training/execute-plan-generate";
 import { ensureTrainingPlanPresetLinked } from "@/lib/training/ensure-training-plan-preset-linked";
 import { cleanupFuturePlanWorkoutsAfterRegenerate } from "@/lib/training/plan-regenerate-cleanup";
 import { syncPlanAfterGenerate } from "@/lib/training/post-generate-sync";
+import {
+  parseWeekOneExtraDow,
+  weekOneExtraDowFromCyclePool,
+} from "@/lib/plan-calendar-day";
 
 export async function planGeneratePostHandler(
   request: NextRequest
@@ -41,6 +45,22 @@ export async function planGeneratePostHandler(
         { error: "Plan must have athleteRaceId set before generation" },
         { status: 400 }
       );
+    }
+
+    let weekOneExtraDow = weekOneExtraDowFromCyclePool(plan.cyclePoolData);
+    if (Object.prototype.hasOwnProperty.call(body, "weekOneExtraDow")) {
+      if (body.weekOneExtraDow == null || body.weekOneExtraDow === "") {
+        weekOneExtraDow = null;
+      } else {
+        const parsed = parseWeekOneExtraDow(body.weekOneExtraDow);
+        if (parsed == null) {
+          return NextResponse.json(
+            { error: "weekOneExtraDow must be 1 (Mon) through 7 (Sun)" },
+            { status: 400 }
+          );
+        }
+        weekOneExtraDow = parsed;
+      }
     }
 
     /** Regenerate replaces stale planSchedule JSON (e.g. pre–race-week-fix last week that was race-only). */
@@ -152,6 +172,7 @@ export async function planGeneratePostHandler(
       minWeeklyMiles,
       includedSecondaryAthleteRaceIds,
       includedSecondarySignupIds: includedSecondaryAthleteRaceIds,
+      weekOneExtraDow,
     });
 
     const cleanup = await cleanupFuturePlanWorkoutsAfterRegenerate({

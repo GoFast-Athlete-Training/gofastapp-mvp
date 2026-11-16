@@ -33,6 +33,7 @@ import {
   athleteRaceDistanceReady,
 } from "@/components/races/AthleteRaceDistanceField";
 import { fetchTrainingPlanDetail } from "@/lib/training/fetch-plan-week-client";
+import { postRegenerateTrainingPlanSchedule } from "@/lib/training/regenerate-plan-schedule-client";
 import { WeekByWeekSetupPanel } from "@/components/training/WeekByWeekSetupPanel";
 import {
   planWeekPhaseForNumber,
@@ -334,10 +335,6 @@ export default function TrainingSetupClient() {
     searchParams.get("athleteRaceId")?.trim() ||
     searchParams.get("goalId")?.trim() ||
     "";
-  const retireActivePlanFromUrl =
-    searchParams.get("retireActivePlan") === "archive" ? "archive" : "park";
-  const replacingFromAddedRace = searchParams.has("retireActivePlan");
-
   const [ready, setReady] = useState(false);
   const [loadingOrientation, setLoadingOrientation] = useState(true);
   const [goals, setGoals] = useState<GoalRow[]>([]);
@@ -772,7 +769,6 @@ export default function TrainingSetupClient() {
     const today = new Date();
     setStartDate(today.toISOString().split("T")[0]);
     const qs = new URLSearchParams({ athleteRaceId: g.id });
-    if (replacingFromAddedRace) qs.set("retireActivePlan", retireActivePlanFromUrl);
     router.replace(`/training-setup?${qs.toString()}`, { scroll: false });
   }
 
@@ -923,7 +919,40 @@ export default function TrainingSetupClient() {
     setCreateFeedbackMessage(null);
     try {
       const token = await getToken();
-      const hasOtherActivePlan = activePlans.some((p) => p.lifecycleStatus === "ACTIVE");
+      const raceId = wizardGoal.athleteRaceId ?? wizardGoal.id;
+      const sameRaceActive = activePlans.find(
+        (p) => p.lifecycleStatus === "ACTIVE" && p.athleteRaceId === raceId,
+      );
+      if (sameRaceActive) {
+        if (!weekByWeekLoad) {
+          const rawMiles = Number(baselineWeeklyMileage);
+          const target =
+            Number.isFinite(rawMiles) && rawMiles > 0
+              ? Math.round(rawMiles)
+              : (presetForCreate?.minWeeklyMiles ?? 40);
+          const generated = await postRegenerateTrainingPlanSchedule({
+            token,
+            trainingPlanId: sameRaceActive.id,
+            weeklyMileageTarget: target,
+            minWeeklyMiles: presetForCreate?.minWeeklyMiles ?? 25,
+          });
+          if (!generated.ok) {
+            setFormError(generated.error);
+            return;
+          }
+        }
+        router.push(`/training-setup/${sameRaceActive.id}`);
+        return;
+      }
+      const otherActive = activePlans.find((p) => p.lifecycleStatus === "ACTIVE");
+      if (
+        otherActive &&
+        !window.confirm(
+          `Delete "${otherActive.name}" and start this plan? The current plan is removed.`,
+        )
+      ) {
+        return;
+      }
       const res = await fetch("/api/training-plan", {
         method: "POST",
         headers: {
@@ -944,14 +973,7 @@ export default function TrainingSetupClient() {
             : athletePresetForCreate
               ? { athletePresetId: athletePresetForCreate }
               : { presetId: presetForCreate!.id }),
-          ...(hasOtherActivePlan || replacingFromAddedRace
-            ? {
-                replaceActivePlan: true,
-                retireActivePlan: replacingFromAddedRace
-                  ? retireActivePlanFromUrl
-                  : "park",
-              }
-            : {}),
+          ...(otherActive ? { replaceActivePlan: true } : {}),
         }),
       });
       let data: { error?: string; plan?: { id: string } } = {};
@@ -1220,13 +1242,8 @@ export default function TrainingSetupClient() {
                     <span className="font-medium text-gray-900">
                       {activePlanForOtherRace.race_registry?.name ?? "another race"}
                     </span>
-                    . Starting a plan for {rr.name} will park that plan.
+                    . Starting a plan for {rr.name} deletes that plan.
                   </p>
-                  {replacingFromAddedRace ? (
-                    <p className="mt-2 text-xs text-amber-900/90">
-                      Your current plan will be parked when you finish setup.
-                    </p>
-                  ) : null}
                 </div>
                 <div className="grid gap-3">
                   <button
@@ -1281,13 +1298,6 @@ export default function TrainingSetupClient() {
                         Use a GoFast training level, or create your own blueprint. Tell us your
                         history and your goal.
                       </p>
-                      {replacingFromAddedRace ? (
-                        <p className="mt-2 text-xs text-amber-900/90">
-                          Your current plan will be{" "}
-                          {retireActivePlanFromUrl === "archive" ? "archived" : "parked"} when you
-                          finish setup.
-                        </p>
-                      ) : null}
                     </div>
                     <div className="grid gap-3">
                       <button

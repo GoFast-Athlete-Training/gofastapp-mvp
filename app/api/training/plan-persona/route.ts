@@ -5,6 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { serializePlanPersona } from "@/lib/training/plan-entity-serialize";
 import { findPersonaBySlug, upsertPersonaBySlug } from "@/lib/training/plan-persona-goal";
+import {
+  parsePersonaTrainingProfile,
+  type PersonaTrainingProfile,
+} from "@/lib/training/persona-training-profile";
 import { normalizeSlug } from "@/lib/training/plan-entity-slugs";
 import type { AthletePersonaCapability, AthletePersonaDedication } from "@prisma/client";
 
@@ -70,6 +74,15 @@ export async function POST(request: NextRequest) {
 
     const slugOverride = typeof body.slug === "string" ? normalizeSlug(body.slug) : "";
 
+    let trainingProfile: PersonaTrainingProfile | null | undefined;
+    if ("trainingProfile" in body) {
+      const parsed = parsePersonaTrainingProfile(body.trainingProfile);
+      if (!parsed.ok) {
+        return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
+      }
+      trainingProfile = parsed.profile;
+    }
+
     const row = await upsertPersonaBySlug({
       slug: slugOverride || undefined,
       personaSlug: typeof body.personaSlug === "string" ? body.personaSlug : undefined,
@@ -84,7 +97,7 @@ export async function POST(request: NextRequest) {
             : null,
       intentSummary: typeof body.intentSummary === "string" ? body.intentSummary : null,
       athletePersonaSummary:
-        typeof body.athletePersonaSummary === "string" ? body.athletePersonaSummary : null,
+        typeof body.athletePersonaSummary === "string" ? body.athletePersonaSummary : undefined,
       workoutFrequencyCap:
         typeof body.workoutFrequencyCap === "number" ? body.workoutFrequencyCap : null,
       runningHistory: typeof body.runningHistory === "string" ? body.runningHistory : null,
@@ -113,6 +126,7 @@ export async function POST(request: NextRequest) {
         typeof body.estimated5kPerformanceRationale === "string"
           ? body.estimated5kPerformanceRationale
           : null,
+      ...(trainingProfile !== undefined ? { trainingProfile } : {}),
     });
 
     return NextResponse.json(

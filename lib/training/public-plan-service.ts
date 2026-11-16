@@ -13,6 +13,7 @@ import {
 import { randomUUID } from "crypto";
 import { dateKeyFromDate } from "@/lib/calendar-date";
 import { prisma } from "@/lib/prisma";
+import { deleteActivePlanForNewPlan } from "@/lib/training/plan-lifecycle";
 import {
   calendarDayWritePair,
   resolveRaceDayKey,
@@ -578,6 +579,15 @@ export async function adoptPublishedPlanBySlug(
 
   const planName = `${sourcePlan.name} — my build`;
 
+  const replaced = await deleteActivePlanForNewPlan({
+    athleteId: input.athleteId,
+    replace: input.replaceActivePlan === true,
+    sameAthleteRaceId: athleteRace.id,
+  });
+  if (!replaced.ok) {
+    throw new Error(replaced.error);
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     const athleteRaceRow = await tx.athlete_races.update({
       where: { id: athleteRace.id },
@@ -596,23 +606,10 @@ export async function adoptPublishedPlanBySlug(
       select: { id: true },
     });
 
-    if (existingActive && !input.replaceActivePlan) {
-      throw new Error(
-        "You already have an active training plan. Confirm replace to adopt this plan."
-      );
-    }
-
     if (existingActive) {
-      await tx.training_plans.updateMany({
-        where: {
-          athleteId: input.athleteId,
-          lifecycleStatus: TrainingPlanLifecycle.ACTIVE,
-        },
-        data: {
-          lifecycleStatus: TrainingPlanLifecycle.PARKED,
-          updatedAt: new Date(),
-        },
-      });
+      throw new Error(
+        "You already have an active training plan. Delete it before adopting a new one."
+      );
     }
 
     const now = new Date();

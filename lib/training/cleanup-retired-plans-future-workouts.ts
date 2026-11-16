@@ -1,5 +1,5 @@
 /**
- * One-shot cleanup: remove future unmatched workout rows for ARCHIVED/PARKED plans.
+ * One-shot cleanup: remove future unmatched workout rows for ARCHIVED/PAUSED plans.
  * Past and matched rows are preserved.
  */
 
@@ -23,7 +23,7 @@ export type RetiredPlanCleanupSummary = {
 };
 
 /**
- * Run cleanupFutureWorkoutsForRetiredPlan for every ARCHIVED/PARKED training plan.
+ * Run cleanupFutureWorkoutsForRetiredPlan for every ARCHIVED/PAUSED training plan.
  * Optional athleteId scopes to one athlete (e.g. your account after a bad alert).
  */
 export async function cleanupAllRetiredPlansFutureWorkouts(params?: {
@@ -32,7 +32,7 @@ export async function cleanupAllRetiredPlansFutureWorkouts(params?: {
   const retiredPlans = await prisma.training_plans.findMany({
     where: {
       lifecycleStatus: {
-        in: [TrainingPlanLifecycle.ARCHIVED, TrainingPlanLifecycle.PARKED],
+        in: [TrainingPlanLifecycle.ARCHIVED, TrainingPlanLifecycle.PAUSED],
       },
       ...(params?.athleteId ? { athleteId: params.athleteId } : {}),
     },

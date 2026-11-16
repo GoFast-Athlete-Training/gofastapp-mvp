@@ -181,7 +181,7 @@ export default function TrainingCohortConfirmPage() {
               onChange={(e) => setReplacePlan(e.target.checked)}
               className="mt-1"
             />
-            Replace my current active training plan
+            Delete my current plan and join this group
           </label>
         ) : null}
 

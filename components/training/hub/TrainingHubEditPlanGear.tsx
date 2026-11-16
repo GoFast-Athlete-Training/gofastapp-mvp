@@ -21,6 +21,7 @@ type Props = {
   presetMaxWeeklyMiles: number | null;
   archiving: boolean;
   deleting: boolean;
+  pausing: boolean;
   parkedPlans: { id: string; name: string; race_registry?: { name: string } | null }[];
   restoringParkedId: string | null;
   getToken: () => Promise<string>;
@@ -29,6 +30,7 @@ type Props = {
   onRefreshWeek: () => void;
   onArchive: () => void;
   onDelete: () => void;
+  onPause: () => void;
   onRestoreParked: (id: string) => void;
 };
 
@@ -44,6 +46,7 @@ export function TrainingHubEditPlanGear({
   presetMaxWeeklyMiles,
   archiving,
   deleting,
+  pausing,
   parkedPlans,
   restoringParkedId,
   getToken,
@@ -52,6 +55,7 @@ export function TrainingHubEditPlanGear({
   onRefreshWeek,
   onArchive,
   onDelete,
+  onPause,
   onRestoreParked,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -126,7 +130,18 @@ export function TrainingHubEditPlanGear({
             <div className="my-1 border-t border-gray-100" />
             <button
               type="button"
-              disabled={archiving || deleting}
+              disabled={pausing || archiving || deleting}
+              onClick={() => {
+                closeAll();
+                onPause();
+              }}
+              className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {pausing ? "Pausing…" : "Pause"}
+            </button>
+            <button
+              type="button"
+              disabled={archiving || deleting || pausing}
               onClick={() => {
                 closeAll();
                 onArchive();
@@ -137,7 +152,7 @@ export function TrainingHubEditPlanGear({
             </button>
             <button
               type="button"
-              disabled={deleting || archiving}
+              disabled={deleting || archiving || pausing}
               onClick={() => {
                 closeAll();
                 onDelete();
@@ -150,7 +165,7 @@ export function TrainingHubEditPlanGear({
               <>
                 <div className="my-1 border-t border-gray-100" />
                 <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Parked plans
+                  Paused plans
                 </p>
                 {parkedPlans.map((p) => (
                   <button
@@ -164,8 +179,8 @@ export function TrainingHubEditPlanGear({
                     className="w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                   >
                     {restoringParkedId === p.id
-                      ? "Restoring…"
-                      : `Restore ${p.race_registry?.name ?? p.name}`}
+                      ? "Resuming…"
+                      : `Resume ${p.race_registry?.name ?? p.name}`}
                   </button>
                 ))}
               </>

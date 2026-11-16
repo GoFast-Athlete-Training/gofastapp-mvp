@@ -102,7 +102,7 @@ export default function AdoptPublicPlanPanel({ slug, planTitle, presetTitle }: P
               checked={replaceActivePlan}
               onChange={(e) => setReplaceActivePlan(e.target.checked)}
             />
-            Replace my current active plan
+            Delete my current plan and use this one
           </label>
         ) : null}
       </div>

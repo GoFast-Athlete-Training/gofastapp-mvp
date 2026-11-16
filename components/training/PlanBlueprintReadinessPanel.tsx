@@ -1,7 +1,6 @@
 "use client";
 
 import { athleteBearerFetchHeaders } from "@/lib/athlete-bearer-fetch-headers";
-import { formatPlanDateDisplay } from "@/lib/training/plan-utils";
 import { useCallback, useEffect, useState } from "react";
 
 export type BlueprintReadinessPayload = {
@@ -36,26 +35,13 @@ function CheckRow({ ok, label }: { ok: boolean; label: string }) {
 
 export function PlanBlueprintReadinessPanel({
   planId,
-  startDateYmd,
-  raceDateYmd,
-  onStartDateSaved,
   getToken,
 }: {
   planId: string;
-  startDateYmd: string;
-  raceDateYmd: string | null;
-  onStartDateSaved: () => void;
   getToken: () => Promise<string | null>;
 }) {
   const [readiness, setReadiness] = useState<BlueprintReadinessPayload | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [startDateLocal, setStartDateLocal] = useState(startDateYmd.slice(0, 10));
-  const [savingStart, setSavingStart] = useState(false);
-  const [startSaveError, setStartSaveError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setStartDateLocal(startDateYmd.slice(0, 10));
-  }, [startDateYmd]);
 
   const loadReadiness = useCallback(async () => {
     setLoadError(null);
@@ -86,38 +72,6 @@ export function PlanBlueprintReadinessPanel({
   useEffect(() => {
     void loadReadiness();
   }, [loadReadiness]);
-
-  async function saveStartDate() {
-    if (!startDateLocal) return;
-    setSavingStart(true);
-    setStartSaveError(null);
-    try {
-      const token = await getToken();
-      if (!token) {
-        setStartSaveError("Sign in to update start date");
-        return;
-      }
-      const res = await fetch(`/api/training-plan/${planId}`, {
-        method: "PATCH",
-        headers: {
-          ...athleteBearerFetchHeaders(token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ startDate: startDateLocal.slice(0, 10) }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setStartSaveError(data.error ?? "Could not update start date");
-        return;
-      }
-      onStartDateSaved();
-      await loadReadiness();
-    } catch {
-      setStartSaveError("Could not update start date");
-    } finally {
-      setSavingStart(false);
-    }
-  }
 
   return (
     <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 text-sm text-gray-800">
@@ -182,35 +136,6 @@ export function PlanBlueprintReadinessPanel({
         <p className="mt-2 text-gray-600">Loading blueprint…</p>
       )}
 
-      <div className="mt-4 border-t border-sky-200/80 pt-4">
-        <label className="block text-sm font-medium text-gray-900">
-          When do you want to start training?
-        </label>
-        <p className="mt-1 text-xs text-gray-600">
-          Goal race{" "}
-          {raceDateYmd ? formatPlanDateDisplay(raceDateYmd) : "date not set"} — moving start
-          changes how many build vs taper weeks you get.
-        </p>
-        <div className="mt-2 flex flex-wrap items-end gap-2">
-          <input
-            type="date"
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            value={startDateLocal}
-            onChange={(e) => setStartDateLocal(e.target.value)}
-          />
-          <button
-            type="button"
-            disabled={savingStart || startDateLocal === startDateYmd.slice(0, 10)}
-            onClick={() => void saveStartDate()}
-            className="rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-800 disabled:opacity-50"
-          >
-            {savingStart ? "Saving…" : "Update start date"}
-          </button>
-        </div>
-        {startSaveError ? (
-          <p className="mt-2 text-xs text-red-700">{startSaveError}</p>
-        ) : null}
-      </div>
     </div>
   );
 }

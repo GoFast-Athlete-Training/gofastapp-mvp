@@ -13,10 +13,11 @@ import {
   type PhaseRange,
 } from "@/lib/training/plan-phases";
 import { cataloguePhaseFallbackForWeek, localTodayKey } from "@/lib/training/plan-utils";
+import { addCalendarDays } from "@/lib/calendar-date";
 import {
+  emptyFirstWeekNotice,
   normalizeDateKeyInput,
-  ourDowFromDateKey,
-  scheduleAnchorDayKey,
+  weekOneExtraDowFromCyclePool,
 } from "@/lib/plan-calendar-day";
 import {
   effectiveTrainingWeekCount,
@@ -112,6 +113,7 @@ type PlanDetail = {
   preferredLongRunDow?: number | null;
   preferredTempoDow?: number | null;
   preferredIntervalDow?: number | null;
+  cyclePoolData?: unknown;
   weeklyMileageTarget?: number | null;
   peakLongRunPoolMiles?: number | null;
   currentWeeklyMileage?: number | null;
@@ -155,17 +157,6 @@ const DAY_OPTIONS: { value: number; label: string }[] = [
 const LONG_RUN_DAY_OPTIONS: { value: number; label: string }[] = [
   { value: 6, label: "Saturday" },
   { value: 7, label: "Sunday" },
-];
-
-const FULL_DAY_NAMES = [
-  "",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
 ];
 
 function dayLabelsFromValues(values: number[]): string {
@@ -252,6 +243,8 @@ export default function TrainingSetupPlanPage({
   const [preferredIntervalDowLocal, setPreferredIntervalDowLocal] = useState<number | null>(
     null
   );
+  const [startDateLocal, setStartDateLocal] = useState("");
+  const [weekOneChoice, setWeekOneChoice] = useState<"next-week" | "one-off">("next-week");
   const [error, setError] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [showPreferencesEditor, setShowPreferencesEditor] = useState(false);
@@ -269,6 +262,7 @@ export default function TrainingSetupPlanPage({
     new Set()
   );
   const [archiving, setArchiving] = useState(false);
+  const [pausing, setPausing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [peakLongRunPoolDraft, setPeakLongRunPoolDraft] = useState<number | null>(null);
   async function getToken() {
@@ -387,6 +381,10 @@ export default function TrainingSetupPlanPage({
     }
     setPreferredTempoDowLocal(plan.preferredTempoDow ?? null);
     setPreferredIntervalDowLocal(plan.preferredIntervalDow ?? null);
+    setStartDateLocal(normalizeDateKeyInput(plan.startDate) ?? "");
+    setWeekOneChoice(
+      weekOneExtraDowFromCyclePool(plan.cyclePoolData) != null ? "one-off" : "next-week"
+    );
     const current = plan.currentWeeklyMileage;
     setCurrentWeeklyMiles(
       current != null && Number.isFinite(Number(current)) ? String(current) : "",
@@ -411,6 +409,8 @@ export default function TrainingSetupPlanPage({
     plan?.preferredLongRunDow,
     plan?.preferredTempoDow,
     plan?.preferredIntervalDow,
+    plan?.startDate,
+    plan?.cyclePoolData,
     plan?.weeklyMileageTarget,
     plan?.currentWeeklyMileage,
     athleteFiveKPace,
@@ -521,18 +521,19 @@ export default function TrainingSetupPlanPage({
     [preferredDaysLocal]
   );
 
-  const emptyFirstWeekNote = useMemo(() => {
-    if (!plan?.startDate || preferredCount === 0) return null;
-    const startDay = normalizeDateKeyInput(plan.startDate);
-    if (!startDay) return null;
-    const raceDay = plan.race_registry?.raceDate
-      ? normalizeDateKeyInput(plan.race_registry.raceDate)
-      : null;
-    const anchor = scheduleAnchorDayKey(startDay, preferredDaysLocal, raceDay);
-    if (anchor === startDay) return null;
-    const weekday = FULL_DAY_NAMES[ourDowFromDateKey(startDay)] ?? "That day";
-    return `${weekday} isn't a training day, so week 1 starts Monday, ${formatPlanDateDisplay(anchor)}.`;
-  }, [plan?.startDate, plan?.race_registry?.raceDate, preferredCount, preferredDaysLocal]);
+  const startDateForNotice = hasSchedule ? plan?.startDate : startDateLocal;
+  const emptyFirstWeek = useMemo(() => {
+    if (!startDateForNotice || preferredCount === 0) return null;
+    return emptyFirstWeekNotice({
+      startDate: startDateForNotice,
+      preferredDays: preferredDaysLocal,
+      raceDate: plan?.race_registry?.raceDate ?? null,
+    });
+  }, [startDateForNotice, plan?.race_registry?.raceDate, preferredCount, preferredDaysLocal]);
+  const raceDateMax = useMemo(() => {
+    const raceDay = normalizeDateKeyInput(plan?.race_registry?.raceDate);
+    return raceDay ? addCalendarDays(raceDay, -1) : undefined;
+  }, [plan?.race_registry?.raceDate]);
 
   const { min: presetMinWeeklyMiles, max: presetMaxWeeklyMiles } = useMemo(
     () => presetWeeklyMilesBand(plan?.training_plan_preset),
@@ -814,6 +815,10 @@ export default function TrainingSetupPlanPage({
       setError("Select at least one preferred training day.");
       return false;
     }
+    if (!hasSchedule && !normalizeDateKeyInput(startDateLocal)) {
+      setError("Pick a plan start date.");
+      return false;
+    }
 
     const prefCheck = validatePreferredTempoInterval({
       preferredTempoDow: preferredTempoDowLocal,
@@ -841,6 +846,7 @@ export default function TrainingSetupPlanPage({
         preferredLongRunDow: preferredLongRunDowLocal,
         preferredTempoDow: preferredTempoDowLocal,
         preferredIntervalDow: preferredIntervalDowLocal,
+        ...(!hasSchedule && startDateLocal ? { startDate: startDateLocal } : {}),
       }),
     });
     const patchData = await patchRes.json();
@@ -858,6 +864,7 @@ export default function TrainingSetupPlanPage({
       weeklyMileageTarget: targetMiles,
       minWeeklyMiles: presetMinWeeklyMiles,
       includedSecondaryAthleteRaceIds: [...includedSecondaryAthleteRaceIds],
+      weekOneExtraDow: emptyFirstWeek && weekOneChoice === "one-off" ? emptyFirstWeek.oneOffDow : null,
     });
     if (!result.ok) {
       setError(result.error);
@@ -910,6 +917,39 @@ export default function TrainingSetupPlanPage({
       setError(e instanceof Error ? e.message : "Regeneration failed");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function pausePlan() {
+    if (!plan) return;
+    if (
+      !window.confirm(
+        `Pause "${plan.name}"? You can resume it later. Future workouts come off the schedule until then.`
+      )
+    ) {
+      return;
+    }
+    setPausing(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/training-plan/${planId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...athleteBearerFetchHeaders(token),
+        },
+        body: JSON.stringify({ lifecycleStatus: "PAUSED" }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not pause plan");
+      }
+      router.push("/training");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not pause plan");
+    } finally {
+      setPausing(false);
     }
   }
 
@@ -1097,7 +1137,15 @@ export default function TrainingSetupPlanPage({
               </Link>
               <button
                 type="button"
-                disabled={archiving || deleting}
+                disabled={pausing || archiving || deleting}
+                onClick={() => void pausePlan()}
+                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {pausing ? "Pausing…" : "Pause plan"}
+              </button>
+              <button
+                type="button"
+                disabled={archiving || deleting || pausing}
                 onClick={() => void archivePlan()}
                 className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
               >
@@ -1105,7 +1153,7 @@ export default function TrainingSetupPlanPage({
               </button>
               <button
                 type="button"
-                disabled={deleting || archiving}
+                disabled={deleting || archiving || pausing}
                 onClick={() => void deletePlan()}
                 className="inline-flex items-center rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
               >
@@ -1456,13 +1504,7 @@ export default function TrainingSetupPlanPage({
             )}
 
             {!hasSchedule && plan ? (
-              <PlanBlueprintReadinessPanel
-                planId={plan.id}
-                startDateYmd={plan.startDate}
-                raceDateYmd={plan.race_registry?.raceDate ?? null}
-                getToken={getToken}
-                onStartDateSaved={() => void loadPlan()}
-              />
+              <PlanBlueprintReadinessPanel planId={plan.id} getToken={getToken} />
             ) : null}
 
             {(showPreferencesEditor || !hasSchedule) && secondaryCandidates.length > 0 ? (
@@ -1584,6 +1626,61 @@ export default function TrainingSetupPlanPage({
                 </p>
               )}
             </div>
+
+            {preferredCount > 0 ? (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-800" htmlFor="plan-start-date">
+                  Plan start date
+                </label>
+                {hasSchedule ? (
+                  <p className="text-sm text-gray-800">{formatPlanDateDisplay(plan.startDate)}</p>
+                ) : (
+                  <input
+                    id="plan-start-date"
+                    type="date"
+                    max={raceDateMax}
+                    className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    value={startDateLocal}
+                    onChange={(e) => {
+                      setStartDateLocal(e.target.value);
+                      setError(null);
+                    }}
+                  />
+                )}
+                {emptyFirstWeek ? (
+                  <div
+                    className="mt-3 rounded-lg border border-orange-100 bg-orange-50 px-3 py-2.5 text-sm text-gray-800"
+                    role="status"
+                  >
+                    <p>{emptyFirstWeek.message}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setWeekOneChoice("next-week")}
+                        className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                          weekOneChoice === "next-week"
+                            ? "bg-orange-500 text-white"
+                            : "border border-orange-200 bg-white text-gray-800"
+                        }`}
+                      >
+                        Start {emptyFirstWeek.anchorLabel}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWeekOneChoice("one-off")}
+                        className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                          weekOneChoice === "one-off"
+                            ? "bg-orange-500 text-white"
+                            : "border border-orange-200 bg-white text-gray-800"
+                        }`}
+                      >
+                        Add a one-off day this week
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div>
               <p className="mb-2 text-sm font-medium text-gray-800">Long run day</p>
@@ -1720,15 +1817,6 @@ export default function TrainingSetupPlanPage({
                 })}
               </div>
             </div>
-
-            {emptyFirstWeekNote ? (
-              <p
-                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
-                role="status"
-              >
-                {emptyFirstWeekNote}
-              </p>
-            ) : null}
 
             <button
               type="button"

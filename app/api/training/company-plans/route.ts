@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
 
   if (lifecycleRaw && !LIFECYCLES.has(lifecycleRaw)) {
     return NextResponse.json(
-      { success: false, error: "lifecycleStatus must be ACTIVE, PARKED, or ARCHIVED" },
+      { success: false, error: "lifecycleStatus must be ACTIVE, PAUSED, or ARCHIVED" },
       { status: 400 },
     );
   }
