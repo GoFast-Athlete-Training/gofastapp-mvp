@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/runmanage/run-series?region=&city=&weekOffset=&runClubId=&view=manage|week
- * Week view: region/city optional (narrow the list). Manage view: needs region + city.
+ * Week view: region/city optional (narrow the list). Manage view: region required, city optional.
  */
 export async function GET(request: NextRequest) {
   const auth = await assertRunManageAuth(request);
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   try {
     if (view === "manage") {
-      if (runClubId && !regionSlug && !citySlug) {
+      if (runClubId && !regionSlug) {
         const manageSeries = await listRunSeriesForClub(runClubId);
         return NextResponse.json({
           success: true,
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
           manageSeries,
         });
       }
-      if (!regionSlug || !citySlug) {
+      if (!regionSlug) {
         return NextResponse.json({
           success: true,
           needsFilters: true,
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       }
       const manageSeries = await listRunSeriesForManage({
         regionSlug,
-        citySlug,
+        citySlug: citySlug || null,
         runClubId,
       });
       return NextResponse.json({

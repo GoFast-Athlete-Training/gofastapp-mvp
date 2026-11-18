@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { RunManageClubHome } from "@/components/runmanage/RunManageClubHome";
 
 export default async function RunManageClubHubPage({
   params,
@@ -6,5 +6,5 @@ export default async function RunManageClubHubPage({
   params: Promise<{ clubId: string }>;
 }) {
   const { clubId } = await params;
-  redirect(`/runmanage/series?clubId=${encodeURIComponent(clubId.trim())}`);
+  return <RunManageClubHome clubId={clubId.trim()} />;
 }

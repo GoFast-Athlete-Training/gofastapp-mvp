@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
-import { CalendarDays, LayoutGrid, ListChecks, PlusCircle } from "lucide-react";
+import { Building2, CalendarDays, LayoutGrid, ListChecks, PlusCircle } from "lucide-react";
 import { useRunManageAuth } from "@/components/runmanage/RunManageProviders";
 import {
+  RUN_MANAGE_CLUBS_PATH,
   RUN_MANAGE_DASHBOARD_PATH,
   RUN_MANAGE_SERIES_PATH,
   RUN_MANAGE_THIS_WEEK_PATH,
@@ -32,10 +33,13 @@ const NAV_ITEMS = [
     label: "Manage series",
     icon: CalendarDays,
     match: (p: string | null) =>
-      p === RUN_MANAGE_SERIES_PATH ||
-      p?.startsWith(`${RUN_MANAGE_SERIES_PATH}/`) ||
-      p?.startsWith("/runmanage/clubs") ||
-      false,
+      p === RUN_MANAGE_SERIES_PATH || p?.startsWith(`${RUN_MANAGE_SERIES_PATH}/`) || false,
+  },
+  {
+    href: RUN_MANAGE_CLUBS_PATH,
+    label: "Manage clubs",
+    icon: Building2,
+    match: (p: string | null) => p === RUN_MANAGE_CLUBS_PATH || p?.startsWith(`${RUN_MANAGE_CLUBS_PATH}/`),
   },
   {
     href: "/runmanage/runs/new",

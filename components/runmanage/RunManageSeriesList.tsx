@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, Loader2, Pencil, Plus } from "lucide-react";
+import { AlertTriangle, Loader2, Plus } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
-import { formatDayLabel } from "@/lib/runmanage/format-day-label";
 import type { SeriesManageRow } from "@/lib/runmanage/series-manage-list";
+import { RunManageSeriesDayList } from "@/components/runmanage/RunManageSeriesDayList";
 import { RunManageSeriesMetaForm } from "@/components/runmanage/RunManageSeriesMetaForm";
 
 export default function RunManageSeriesList() {
@@ -22,8 +22,8 @@ export default function RunManageSeriesList() {
   const [editRow, setEditRow] = useState<SeriesManageRow | null>(null);
 
   const load = useCallback(async () => {
-    const clubOnly = Boolean(clubFilter && !regionFilter && !cityFilter);
-    if (!clubOnly && (!regionFilter || !cityFilter)) {
+    const clubOnly = Boolean(clubFilter && !regionFilter);
+    if (!clubOnly && !regionFilter) {
       setRows([]);
       setLoading(false);
       return;
@@ -36,7 +36,7 @@ export default function RunManageSeriesList() {
         params.set("clubId", clubFilter);
       } else {
         params.set("region", regionFilter);
-        params.set("city", cityFilter);
+        if (cityFilter) params.set("city", cityFilter);
         if (clubFilter) params.set("clubId", clubFilter);
       }
       const res = await runmanageApi.get(`/api/runmanage/run-series?${params.toString()}`);
@@ -71,15 +71,8 @@ export default function RunManageSeriesList() {
     }
   }, [focusSeriesId, rows]);
 
-  const clubScoped = Boolean(clubFilter && !regionFilter && !cityFilter);
-  const filtersReady = clubScoped || Boolean(regionFilter && cityFilter);
-
-  function formatTime(row: SeriesManageRow): string {
-    if (row.startTimeHour == null) return "—";
-    const min = String(row.startTimeMinute ?? 0).padStart(2, "0");
-    const p = row.startTimePeriod?.trim() || "";
-    return `${row.startTimeHour}:${min}${p ? ` ${p}` : ""}`;
-  }
+  const clubScoped = Boolean(clubFilter && !regionFilter);
+  const filtersReady = clubScoped || Boolean(regionFilter);
 
   return (
     <div className="space-y-6">
@@ -115,79 +108,27 @@ export default function RunManageSeriesList() {
 
       {!filtersReady ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-8 text-center text-sm text-amber-950">
-          Select a region and city in the scope bar above, or open this page from a run with a club in the URL.
+          Select a region in the scope bar above, or open this page from a run with a club in the URL.
         </p>
       ) : loading ? (
         <div className="flex items-center gap-2 py-16 text-gray-500">
           <Loader2 className="h-5 w-5 animate-spin" />
           Loading series…
         </div>
-      ) : rows.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-gray-300 bg-white py-12 text-center text-sm text-gray-500">
-          No weekly series in this city yet.{" "}
-          <button
-            type="button"
-            className="font-medium text-sky-700 hover:underline"
-            onClick={() => {
-              setEditRow(null);
-              setFormOpen(true);
-            }}
-          >
-            Add one
-          </button>
-          .
-        </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
-              <tr>
-                <th className="px-4 py-3">Day & time</th>
-                <th className="px-4 py-3">Series</th>
-                <th className="px-4 py-3">Club</th>
-                <th className="px-4 py-3">Meet-up</th>
-                <th className="px-4 py-3 text-right">Runs</th>
-                <th className="px-4 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50/80">
-                  <td className="px-4 py-3 whitespace-nowrap text-gray-800">
-                    {formatDayLabel(row.dayOfWeek)} · {formatTime(row)}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-gray-900">
-                    {row.name?.trim() || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700">{row.clubName ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-600 max-w-xs truncate">
-                    {row.meetUpPoint?.trim() || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right text-gray-600">{row.runCount}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditRow(row);
-                        setFormOpen(true);
-                      }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <RunManageSeriesDayList
+          rows={rows}
+          onEdit={(row) => {
+            setEditRow(row);
+            setFormOpen(true);
+          }}
+        />
       )}
 
       <p className="text-xs text-gray-500">
         To build or validate this week&apos;s dated runs, use{" "}
-        <Link href="/runmanage/runs" className="font-medium text-sky-700 hover:underline">
-          This week
+        <Link href="/runmanage/this-week" className="font-medium text-sky-700 hover:underline">
+          Manage this week&apos;s runs
         </Link>
         .
       </p>

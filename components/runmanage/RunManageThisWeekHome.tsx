@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ClipboardCopy, Loader2, Search, Upload } from "lucide-react";
+import { ChevronDown, ClipboardCopy, Loader2, Search, Upload } from "lucide-react";
 import runmanageApi from "@/lib/runmanage/api-client";
 import type { OperationalSeriesRow } from "@/lib/runmanage/series-operational-list";
 import type { WeekWindow } from "@/lib/runmanage/calendar-week";
-import { weekWindowContaining } from "@/lib/runmanage/calendar-week";
 import type { RegionCityOption } from "@/lib/runmanage/week-board-filters";
 import {
   RunManageWeekStrip,
@@ -16,6 +15,7 @@ import {
 } from "@/components/runmanage/RunManageWeekStrip";
 import { checkSeriesDateStamp, seriesDateStampLabel } from "@/lib/runmanage/series-date-stamp-check";
 import {
+  runInstanceEditPath,
   runManageCreateFromSeriesPath,
   RUN_MANAGE_THIS_WEEK_PATH,
 } from "@/lib/runmanage/paths";
@@ -61,6 +61,9 @@ export function RunManageThisWeekHome() {
   const [correctionsOpen, setCorrectionsOpen] = useState(false);
   const [llmOpen, setLlmOpen] = useState(false);
   const [copiedPacket, setCopiedPacket] = useState(false);
+  const [dayQuery, setDayQuery] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  const [publishNote, setPublishNote] = useState<string | null>(null);
 
   const setParams = useCallback(
     (next: Record<string, string | undefined>) => {
@@ -103,14 +106,16 @@ export function RunManageThisWeekHome() {
   }, [filterOptions, region]);
 
   const loadWeek = useCallback(async () => {
-    if (!region || !city) {
+    if (!region && !clubId) {
       setSeriesRows([]);
       setWeekWindow(null);
       return;
     }
     setLoading(true);
     try {
-      const params = new URLSearchParams({ view: "week", region, city });
+      const params = new URLSearchParams({ view: "week" });
+      if (region) params.set("region", region);
+      if (city) params.set("city", city);
       if (clubId) params.set("clubId", clubId);
       if (weekOffset) params.set("weekOffset", String(weekOffset));
       const res = await runmanageApi.get(`/api/runmanage/run-series?${params.toString()}`);
@@ -126,13 +131,14 @@ export function RunManageThisWeekHome() {
   }, [region, city, clubId, weekOffset]);
 
   const loadDay = useCallback(async () => {
-    if (!region || !city || !selectedDayYmd) {
+    if (!region || !selectedDayYmd) {
       setDayRuns([]);
       setLlmPacket("");
       return;
     }
     try {
-      const params = new URLSearchParams({ region, city, dayYmd: selectedDayYmd });
+      const params = new URLSearchParams({ region, dayYmd: selectedDayYmd });
+      if (city) params.set("city", city);
       const res = await runmanageApi.get(`/api/runmanage/this-week/day-runs?${params.toString()}`);
       if (res.data?.success) {
         setDayRuns((res.data.runs ?? []) as DayRun[]);
@@ -195,9 +201,54 @@ export function RunManageThisWeekHome() {
     return seriesRows.filter((r) => r.weekSlotYmd === selectedDayYmd);
   }, [seriesRows, selectedDayYmd]);
 
-  const missingSlotRows = useMemo(
-    () => dayChunkRows.filter((row) => !row.weekRun),
-    [dayChunkRows]
+  const cityNameBySlug = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const option of filterOptions) {
+      if (!map.has(option.citySlug)) map.set(option.citySlug, option.cityName);
+    }
+    return map;
+  }, [filterOptions]);
+
+  const cityLabelFor = useCallback(
+    (row: OperationalSeriesRow) => {
+      const slug = row.citySlug?.trim();
+      if (slug && cityNameBySlug.has(slug)) return cityNameBySlug.get(slug) ?? slug;
+      return row.clubCity?.trim() || slug || "Unknown city";
+    },
+    [cityNameBySlug]
+  );
+
+  const visibleDayRows = useMemo(() => {
+    const term = dayQuery.trim().toLowerCase();
+    if (!term) return dayChunkRows;
+    return dayChunkRows.filter((row) => {
+      const hay = [row.clubName, row.meetUpPoint, row.name, cityLabelFor(row), row.citySlug]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(term);
+    });
+  }, [dayChunkRows, dayQuery, cityLabelFor]);
+
+  const dayCityGroups = useMemo(() => {
+    const map = new Map<string, OperationalSeriesRow[]>();
+    for (const row of visibleDayRows) {
+      const key = cityLabelFor(row);
+      const list = map.get(key) ?? [];
+      list.push(row);
+      map.set(key, list);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [visibleDayRows, cityLabelFor]);
+
+  const multiCityDay = !city && dayCityGroups.length > 1;
+
+  const publishableRunIds = useMemo(
+    () =>
+      dayRuns
+        .filter((run) => !clubId || run.runClub?.id === clubId)
+        .map((run) => run.id),
+    [dayRuns, clubId]
   );
 
   const backToDayHref = useMemo(() => {
@@ -254,15 +305,111 @@ export function RunManageThisWeekHome() {
     }
   };
 
+  const handlePublishAll = async () => {
+    if (publishableRunIds.length === 0) return;
+    setPublishing(true);
+    setPublishNote(null);
+    try {
+      const res = await runmanageApi.post("/api/runs/manage/bulk-publish", {
+        runIds: publishableRunIds,
+      });
+      if (!res.data?.success) {
+        setPublishNote(res.data?.error || "Could not publish these runs");
+        return;
+      }
+      setPublishNote(
+        typeof res.data.message === "string"
+          ? res.data.message
+          : `Published ${res.data.published ?? publishableRunIds.length} runs`
+      );
+      await loadWeek();
+      await loadDay();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } }; message?: string };
+      setPublishNote(err.response?.data?.error || err.message || "Could not publish these runs");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const editRunHref = (runId: string) => {
+    const base = runInstanceEditPath(runId);
+    return `${base}&returnTo=${encodeURIComponent(backToDayHref)}`;
+  };
+
+  const renderDaySlot = (row: OperationalSeriesRow, showCity: boolean) => {
+    const check = checkSeriesDateStamp({
+      series: row,
+      weekRunId: row.weekRun?.id ?? null,
+      latestPriorRunId: row.latestPriorRun?.id ?? null,
+    });
+    const run = row.weekRun;
+    return (
+      <li
+        key={row.seriesId}
+        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white bg-white px-4 py-3 shadow-sm"
+      >
+        <div className="min-w-0">
+          <p className="font-medium text-gray-900">{row.clubName ?? "Club"}</p>
+          <p className="text-xs text-gray-600">
+            {formatTime(row.startTimeHour, row.startTimeMinute, row.startTimePeriod)} · {row.meetUpPoint}
+          </p>
+          {showCity ? (
+            <p className="mt-0.5 text-xs text-gray-500">{cityLabelFor(row)}</p>
+          ) : null}
+          {run ? (
+            <span
+              className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                run.published ? "bg-emerald-100 text-emerald-900" : "bg-gray-100 text-gray-800"
+              }`}
+            >
+              {run.published ? "Live" : "Not live"}
+            </span>
+          ) : (
+            <span className="mt-1 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-800">
+              {seriesDateStampLabel(check.kind)}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {run ? (
+            <Link
+              href={editRunHref(run.id)}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+            >
+              Edit
+            </Link>
+          ) : check.kind === "reuse_last_run" ? (
+            <button
+              type="button"
+              disabled={actingSeriesId === row.seriesId}
+              onClick={() => void handleReuseLastRun(row)}
+              className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              Reuse last run
+            </button>
+          ) : (
+            <Link
+              href={runManageCreateFromSeriesPath(row.seriesId, { dateYmd: row.weekSlotYmd })}
+              className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white"
+            >
+              Build
+            </Link>
+          )}
+        </div>
+      </li>
+    );
+  };
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Manage this week&apos;s runs</h1>
-        <p className="mt-1 text-gray-600">Pick a city, then a day. Work in bite-sized chunks.</p>
+        <p className="mt-1 text-gray-600">Pick a region, then a day. A city narrows the list.</p>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-4">
-        <p className="text-sm font-semibold text-gray-900">1. Pick a city</p>
+        <p className="text-sm font-semibold text-gray-900">1. Pick a region</p>
         <div className="flex flex-wrap gap-3">
           <label className="block text-sm">
             <span className="font-medium text-gray-700">Region</span>
@@ -289,7 +436,7 @@ export function RunManageThisWeekHome() {
               onChange={(e) => setParams({ city: e.target.value, dayYmd: undefined })}
               className="mt-1 block min-w-[180px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm disabled:bg-gray-50"
             >
-              <option value="">Select city…</option>
+              <option value="">All cities in region</option>
               {cityOptions.map((c) => (
                 <option key={c.slug} value={c.slug}>
                   {c.name}
@@ -339,33 +486,33 @@ export function RunManageThisWeekHome() {
         ) : null}
       </div>
 
-      {region && city ? (
+      {region || clubId ? (
         <>
           <p className="text-sm text-gray-600">2. Pick a day this week</p>
           <RunManageWeekStrip
             weekStart={weekStart}
             runsByDay={runsByDay}
             selectedDayYmd={selectedDayYmd || null}
-            onSelectDay={(ymd) => setParams({ dayYmd: ymd ?? undefined })}
-            onPrevWeek={() => {
-              const win = weekWindowContaining(new Date(), weekOffset - 1);
-              void win;
-              setParams({ weekOffset: weekOffset - 1 === 0 ? undefined : String(weekOffset - 1), dayYmd: undefined });
+            onSelectDay={(ymd) => {
+              setDayQuery("");
+              setPublishNote(null);
+              setParams({ dayYmd: ymd ?? undefined });
             }}
-            onNextWeek={() =>
-              setParams({ weekOffset: String(weekOffset + 1), dayYmd: undefined })
-            }
+            onPrevWeek={() => {
+              setDayQuery("");
+              setPublishNote(null);
+              setParams({
+                weekOffset: weekOffset - 1 === 0 ? undefined : String(weekOffset - 1),
+                dayYmd: undefined,
+              });
+            }}
+            onNextWeek={() => {
+              setDayQuery("");
+              setPublishNote(null);
+              setParams({ weekOffset: String(weekOffset + 1), dayYmd: undefined });
+            }}
           />
         </>
-      ) : clubId ? (
-        <RunManageWeekStrip
-          weekStart={weekStart}
-          runsByDay={runsByDay}
-          selectedDayYmd={selectedDayYmd || null}
-          onSelectDay={(ymd) => setParams({ dayYmd: ymd ?? undefined })}
-          onPrevWeek={() => setParams({ weekOffset: String(weekOffset - 1), dayYmd: undefined })}
-          onNextWeek={() => setParams({ weekOffset: String(weekOffset + 1), dayYmd: undefined })}
-        />
       ) : null}
 
       {loading ? (
@@ -375,21 +522,37 @@ export function RunManageThisWeekHome() {
         </div>
       ) : null}
 
-      {selectedDayYmd && (region && city || clubId) ? (
+      {selectedDayYmd && (region || clubId) ? (
         <section className="space-y-4 rounded-xl border border-sky-100 bg-sky-50/40 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">{selectedDayYmd}</h2>
-              <p className="text-sm text-gray-600">{dayChunkRows.length} slots · {dayRuns.length} runs exist</p>
+              <p className="text-sm text-gray-600">
+                {dayChunkRows.length} slots · {dayRuns.length} runs
+                {city ? "" : " in this region"}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setLlmOpen(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50"
+                disabled={publishing || publishableRunIds.length === 0}
+                onClick={() => void handlePublishAll()}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Publish all
+              </button>
+              <button
+                type="button"
+                disabled={!region || dayRuns.length === 0}
+                onClick={() => {
+                  setCopiedPacket(false);
+                  setLlmOpen(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
               >
                 <ClipboardCopy className="h-4 w-4" />
-                Check this day
+                Validate with LLM
               </button>
               <button
                 type="button"
@@ -403,54 +566,43 @@ export function RunManageThisWeekHome() {
             </div>
           </div>
 
-          {region && city && missingSlotRows.length === 0 ? (
-            <p className="text-sm text-gray-600">Every slot already has a run. Check this day.</p>
-          ) : missingSlotRows.length > 0 ? (
-            <ul className="space-y-2">
-              {missingSlotRows.map((row) => {
-                const check = checkSeriesDateStamp({
-                  series: row,
-                  weekRunId: row.weekRun?.id ?? null,
-                  latestPriorRunId: row.latestPriorRun?.id ?? null,
-                });
-                return (
-                  <li
-                    key={row.seriesId}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white bg-white px-4 py-3 shadow-sm"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900">{row.clubName}</p>
-                      <p className="text-xs text-gray-600">
-                        {formatTime(row.startTimeHour, row.startTimeMinute, row.startTimePeriod)} · {row.meetUpPoint}
-                      </p>
-                      <span className="mt-1 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-800">
-                        {seriesDateStampLabel(check.kind)}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      {check.kind === "reuse_last_run" ? (
-                        <button
-                          type="button"
-                          disabled={actingSeriesId === row.seriesId}
-                          onClick={() => void handleReuseLastRun(row)}
-                          className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                        >
-                          Reuse last run
-                        </button>
-                      ) : (
-                        <Link
-                          href={runManageCreateFromSeriesPath(row.seriesId, { dateYmd: row.weekSlotYmd })}
-                          className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white"
-                        >
-                          Build
-                        </Link>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
+          {publishNote ? <p className="text-sm text-gray-700">{publishNote}</p> : null}
+
+          <label className="relative block max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="search"
+              value={dayQuery}
+              onChange={(e) => setDayQuery(e.target.value)}
+              placeholder="Search club, meet-up, or city…"
+              aria-label="Search this day's slots"
+              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm"
+            />
+          </label>
+
+          {visibleDayRows.length === 0 ? (
+            <p className="text-sm text-gray-600">
+              {dayChunkRows.length === 0
+                ? "No slots on this day."
+                : "No slots match that search."}
+            </p>
+          ) : multiCityDay ? (
+            <div className="space-y-2">
+              {dayCityGroups.map(([label, rows], index) => (
+                <CollapsibleSection
+                  key={`${selectedDayYmd}-${label}`}
+                  title={label}
+                  count={rows.length}
+                  defaultOpen={index === 0}
+                  forceOpen={Boolean(dayQuery.trim())}
+                >
+                  <ul className="space-y-2 px-2 pb-2">{rows.map((row) => renderDaySlot(row, false))}</ul>
+                </CollapsibleSection>
+              ))}
+            </div>
+          ) : (
+            <ul className="space-y-2">{visibleDayRows.map((row) => renderDaySlot(row, !city))}</ul>
+          )}
         </section>
       ) : null}
 
@@ -477,6 +629,42 @@ export function RunManageThisWeekHome() {
         }}
       />
     </div>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  count,
+  defaultOpen,
+  forceOpen,
+  children,
+}: {
+  title: string;
+  count: number;
+  defaultOpen: boolean;
+  forceOpen: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const shown = forceOpen || open;
+  return (
+    <details
+      open={shown}
+      onToggle={(event) => {
+        if (forceOpen) return;
+        setOpen(event.currentTarget.open);
+      }}
+      className="overflow-hidden rounded-lg border border-white bg-white/70"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-gray-900 [&::-webkit-details-marker]:hidden">
+        <span>
+          {title}
+          <span className="ml-2 font-normal text-gray-500">{count}</span>
+        </span>
+        <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${shown ? "rotate-180" : ""}`} />
+      </summary>
+      {children}
+    </details>
   );
 }
 

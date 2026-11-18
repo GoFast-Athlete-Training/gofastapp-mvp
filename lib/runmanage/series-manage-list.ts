@@ -14,62 +14,92 @@ export type SeriesManageRow = {
   meetUpCity: string | null;
   meetUpState: string | null;
   citySlug: string | null;
+  cityName: string | null;
   runClubId: string | null;
   clubName: string | null;
   runCount: number;
 };
 
+const seriesInclude = {
+  runClub: { select: { name: true } },
+  cities: { select: { name: true } },
+  _count: { select: { city_runs: true } },
+} as const;
+
+type SeriesQueryRow = {
+  id: string;
+  slug: string | null;
+  name: string | null;
+  description: string | null;
+  dayOfWeek: string;
+  startTimeHour: number | null;
+  startTimeMinute: number | null;
+  startTimePeriod: string | null;
+  meetUpPoint: string | null;
+  meetUpCity: string | null;
+  meetUpState: string | null;
+  citySlug: string | null;
+  runClubId: string | null;
+  runClub: { name: string } | null;
+  cities: { name: string } | null;
+  _count: { city_runs: number };
+};
+
+function mapSeriesRow(row: SeriesQueryRow): SeriesManageRow {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    dayOfWeek: row.dayOfWeek,
+    startTimeHour: row.startTimeHour,
+    startTimeMinute: row.startTimeMinute,
+    startTimePeriod: row.startTimePeriod,
+    meetUpPoint: row.meetUpPoint,
+    meetUpCity: row.meetUpCity,
+    meetUpState: row.meetUpState,
+    citySlug: row.citySlug,
+    cityName: row.cities?.name ?? null,
+    runClubId: row.runClubId,
+    clubName: row.runClub?.name ?? null,
+    runCount: row._count.city_runs,
+  };
+}
+
 export async function listRunSeriesForManage(opts: {
   regionSlug: string;
-  citySlug: string;
+  citySlug?: string | null;
   runClubId?: string | null;
 }): Promise<SeriesManageRow[]> {
   const regionSlug = opts.regionSlug.trim();
-  const citySlug = opts.citySlug.trim();
-  if (!regionSlug || !citySlug) {
+  const citySlug = opts.citySlug?.trim() || "";
+  if (!regionSlug) {
     return [];
   }
 
-  const city = await prisma.cities.findFirst({
+  const cities = await prisma.cities.findMany({
     where: {
-      slug: citySlug,
       region: { slug: regionSlug },
+      ...(citySlug ? { slug: citySlug } : {}),
     },
     select: { id: true, slug: true },
   });
-  if (!city) {
+  if (cities.length === 0) {
     return [];
   }
 
   const rows = await prisma.run_series.findMany({
     where: {
-      OR: [{ citySlug: city.slug }, { cityId: city.id }],
+      OR: [
+        { citySlug: { in: cities.map((city) => city.slug) } },
+        { cityId: { in: cities.map((city) => city.id) } },
+      ],
       ...(opts.runClubId?.trim() ? { runClubId: opts.runClubId.trim() } : {}),
     },
-    include: {
-      runClub: { select: { name: true } },
-      _count: { select: { city_runs: true } },
-    },
+    include: seriesInclude,
   });
 
-  const mapped: SeriesManageRow[] = rows.map((s) => ({
-    id: s.id,
-    slug: s.slug,
-    name: s.name,
-    description: s.description,
-    dayOfWeek: s.dayOfWeek,
-    startTimeHour: s.startTimeHour,
-    startTimeMinute: s.startTimeMinute,
-    startTimePeriod: s.startTimePeriod,
-    meetUpPoint: s.meetUpPoint,
-    meetUpCity: s.meetUpCity,
-    meetUpState: s.meetUpState,
-    citySlug: s.citySlug,
-    runClubId: s.runClubId,
-    clubName: s.runClub?.name ?? null,
-    runCount: s._count.city_runs,
-  }));
-
+  const mapped = rows.map((row) => mapSeriesRow(row));
   mapped.sort(compareSeriesByWeekdayTime);
   return mapped;
 }
@@ -81,29 +111,10 @@ export async function listRunSeriesForClub(runClubId: string): Promise<SeriesMan
 
   const rows = await prisma.run_series.findMany({
     where: { runClubId: id },
-    include: {
-      runClub: { select: { name: true } },
-      _count: { select: { city_runs: true } },
-    },
+    include: seriesInclude,
   });
 
-  const mapped: SeriesManageRow[] = rows.map((s) => ({
-    id: s.id,
-    slug: s.slug,
-    name: s.name,
-    description: s.description,
-    dayOfWeek: s.dayOfWeek,
-    startTimeHour: s.startTimeHour,
-    startTimeMinute: s.startTimeMinute,
-    startTimePeriod: s.startTimePeriod,
-    meetUpPoint: s.meetUpPoint,
-    meetUpCity: s.meetUpCity,
-    meetUpState: s.meetUpState,
-    citySlug: s.citySlug,
-    runClubId: s.runClubId,
-    clubName: s.runClub?.name ?? null,
-    runCount: s._count.city_runs,
-  }));
+  const mapped = rows.map((row) => mapSeriesRow(row));
 
   mapped.sort(compareSeriesByWeekdayTime);
   return mapped;

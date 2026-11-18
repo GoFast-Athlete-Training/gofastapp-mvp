@@ -25,8 +25,10 @@ export async function GET(
       name: true,
       logoUrl: true,
       city: true,
+      citySlug: true,
       state: true,
       description: true,
+      allRunsDescription: true,
       websiteUrl: true,
       instagramUrl: true,
       stravaUrl: true,
@@ -66,10 +68,27 @@ export async function PUT(
   const stravaUrl =
     body.stravaUrl !== undefined ? normalizeStravaUrl(body.stravaUrl) : undefined;
 
+  const description =
+    body.description !== undefined
+      ? typeof body.description === "string" && body.description.trim()
+        ? body.description.trim()
+        : null
+      : undefined;
+  const allRunsDescription =
+    body.allRunsDescription !== undefined
+      ? typeof body.allRunsDescription === "string" && body.allRunsDescription.trim()
+        ? body.allRunsDescription.trim()
+        : null
+      : undefined;
+  const runUrl = body.runUrl !== undefined ? normalizeWebsiteUrl(body.runUrl) : undefined;
+
   const data: Record<string, string | null | undefined> = {};
   if (websiteUrl !== undefined) data.websiteUrl = websiteUrl;
   if (instagramUrl !== undefined) data.instagramUrl = instagramUrl;
   if (stravaUrl !== undefined) data.stravaUrl = stravaUrl;
+  if (runUrl !== undefined) data.runUrl = runUrl;
+  if (description !== undefined) data.description = description;
+  if (allRunsDescription !== undefined) data.allRunsDescription = allRunsDescription;
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ success: false, error: "No fields to update" }, { status: 400 });
@@ -82,9 +101,15 @@ export async function PUT(
       id: true,
       slug: true,
       name: true,
+      city: true,
+      citySlug: true,
+      state: true,
+      description: true,
+      allRunsDescription: true,
       websiteUrl: true,
       instagramUrl: true,
       stravaUrl: true,
+      runUrl: true,
     },
   });
 
