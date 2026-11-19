@@ -316,6 +316,8 @@ export async function materializeWorkoutForPlanDay(params: {
    * Leaves athlete-authored snapshots (ingest, race-day builder, manual segment edits) in place.
    */
   refreshFromAthleteFiveK?: boolean;
+  /** Replace existing segments even when the day was athlete-authored or already matched. */
+  forceRematerialize?: boolean;
 }): Promise<MaterializeWorkoutForPlanDayResult> {
   const { planId, athleteId, dateParam } = params;
   const anchor = parseDateParam(dateParam.trim());
@@ -455,11 +457,13 @@ export async function materializeWorkoutForPlanDay(params: {
     segmentSnapshotSource(existing?.segmentSnapshotJson) ?? ""
   );
   const refreshPace = params.refreshFromAthleteFiveK === true && !ownedSnapshot;
+  const forceRematerialize = params.forceRematerialize === true;
 
   if (
     existing &&
     existing._count.segments > 0 &&
     !refreshPace &&
+    !forceRematerialize &&
     !plannedNeedsRematerialize({
       existing: { ...existing, segmentCount: existing._count.segments },
       scheduled,
@@ -478,7 +482,7 @@ export async function materializeWorkoutForPlanDay(params: {
   });
   assertPrescriptionSteps(steps, scheduled, dateKey);
 
-  if (existing && existing._count.segments > 0) {
+  if (existing && (existing._count.segments > 0 || forceRematerialize)) {
     await prisma.planned_workout_segments.deleteMany({
       where: { plannedWorkoutId: existing.id },
     });

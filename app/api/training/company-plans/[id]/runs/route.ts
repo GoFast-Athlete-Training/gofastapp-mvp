@@ -26,6 +26,8 @@ export async function PATCH(
     dow?: unknown;
     miles?: unknown;
     remove?: unknown;
+    catalogueWorkoutId?: unknown;
+    workoutType?: unknown;
   } | null;
   if (!body) {
     return NextResponse.json({ success: false, error: "Invalid body" }, { status: 400 });
@@ -37,6 +39,9 @@ export async function PATCH(
     body.miles == null || body.miles === ""
       ? undefined
       : Number(body.miles);
+  const catalogueWorkoutId =
+    typeof body.catalogueWorkoutId === "string" ? body.catalogueWorkoutId : undefined;
+  const workoutType = typeof body.workoutType === "string" ? body.workoutType : undefined;
   const result = await editPlanScheduleRun({
     planId: plan.id,
     athleteId: plan.athleteId,
@@ -44,9 +49,15 @@ export async function PATCH(
     dow,
     miles,
     remove: body.remove === true,
+    catalogueWorkoutId,
+    workoutType,
   });
   if (!result.ok) {
     return NextResponse.json({ success: false, error: result.error }, { status: 400 });
   }
-  return NextResponse.json({ success: true, planSchedule: result.planSchedule });
+  return NextResponse.json({
+    success: true,
+    planSchedule: result.planSchedule,
+    ...(result.plannedWorkoutId ? { plannedWorkoutId: result.plannedWorkoutId } : {}),
+  });
 }
