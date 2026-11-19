@@ -272,9 +272,6 @@ async function swapPlanScheduleCatalogueDay(params: {
     },
   });
 
-  if (existing?.workoutPushed) {
-    return { ok: false, error: "This day is already on Garmin. It was not swapped." };
-  }
   if (
     existing &&
     (existing.workoutCompleted ||

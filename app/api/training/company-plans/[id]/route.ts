@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertStaffBearerAuth } from "@/lib/training/training-engine-auth";
 import { workoutAdherenceByPlanIds } from "@/lib/training/company-plan-adherence";
+import { loadCompanyPlanGodWeeks } from "@/lib/training/company-plan-god-view";
 import { ymdFromDate } from "@/lib/training/plan-utils";
 import { CoachReviewStatus } from "@prisma/client";
 
@@ -74,10 +75,17 @@ export async function GET(
     ? await catalogPresetSummaryForApi(plan.presetId, authHeader)
     : null;
 
+  const godWeeks = await loadCompanyPlanGodWeeks({
+    id: plan.id,
+    startDate: plan.startDate,
+    planSchedule: plan.planSchedule,
+  });
+
   const serialized = {
     ...plan,
     training_plan_preset: catalogPreset,
     adherence,
+    godWeeks,
     startDate: ymdFromDate(plan.startDate),
     race_registry: plan.race_registry
       ? {
