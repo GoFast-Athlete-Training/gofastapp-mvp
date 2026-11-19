@@ -114,7 +114,7 @@ export function applyCatalogueDaySwap(
     dow: number;
     workoutType: WorkoutType;
     miles: number;
-    catalogueWorkoutId: string;
+    catalogueWorkoutId: string | null;
   },
 ): { ok: true; next: unknown[] } | { ok: false; error: string } {
   if (!Array.isArray(planSchedule)) {
@@ -147,7 +147,7 @@ function catalogueSwappedDay(
     dow: number;
     workoutType: WorkoutType;
     miles: number;
-    catalogueWorkoutId: string;
+    catalogueWorkoutId: string | null;
   },
 ): PlanDaySchedule {
   return {

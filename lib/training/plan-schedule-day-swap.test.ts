@@ -81,6 +81,21 @@ test("applyCatalogueDaySwap replaces Thursday and clears race imprint", () => {
   assert.equal(day?.workoutId, null);
 });
 
+test("applyCatalogueDaySwap can clear the catalogue id for a custom segment day", () => {
+  const result = applyCatalogueDaySwap(schedule, {
+    weekNumber: 2,
+    dow: 4,
+    workoutType: "Intervals",
+    miles: 8.5,
+    catalogueWorkoutId: null,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const week = result.next[0] as { days: Array<{ dow: number; catalogueWorkoutId: string | null }> };
+  const thursday = week.days.find((day) => day.dow === 4);
+  assert.equal(thursday?.catalogueWorkoutId, null);
+});
+
 test("applyCatalogueDaySwap errors when the week is missing", () => {
   const result = applyCatalogueDaySwap(schedule, {
     weekNumber: 9,
