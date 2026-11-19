@@ -22,17 +22,6 @@ export type BlueprintReadinessPayload = {
   shortPlanWarning: string | null;
 };
 
-function CheckRow({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <li className="flex items-start gap-2 text-sm">
-      <span className={ok ? "text-emerald-700" : "text-amber-700"} aria-hidden>
-        {ok ? "✓" : "○"}
-      </span>
-      <span className={ok ? "text-gray-800" : "text-gray-600"}>{label}</span>
-    </li>
-  );
-}
-
 export function PlanBlueprintReadinessPanel({
   planId,
   getToken,
@@ -73,69 +62,27 @@ export function PlanBlueprintReadinessPanel({
     void loadReadiness();
   }, [loadReadiness]);
 
-  return (
-    <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4 text-sm text-gray-800">
-      <p className="font-semibold text-gray-900">Training blueprint</p>
-      {loadError ? (
-        <p className="mt-2 text-amber-900">{loadError}</p>
-      ) : readiness ? (
-        <>
-          <p className="mt-2 text-gray-700">
-            {readiness.presetTitle ? (
-              <>
-                <span className="font-medium text-gray-900">{readiness.presetTitle}</span>
-                {readiness.presetSlug ? (
-                  <span className="text-gray-500"> · {readiness.presetSlug}</span>
-                ) : null}
-                {readiness.presetId ? (
-                  <span className="block text-xs text-gray-500 mt-0.5 font-mono">
-                    {readiness.presetId}
-                  </span>
-                ) : null}
-              </>
-            ) : (
-              "No preset title loaded yet."
-            )}
-          </p>
-          <ul className="mt-3 space-y-1">
-            <CheckRow ok={readiness.hasBuild} label="Build phase (rotations)" />
-            <CheckRow ok={readiness.hasTaper} label="Taper phase (volume caps)" />
-            <CheckRow ok={readiness.hasRaceWeek} label="Race week slots" />
-            <CheckRow ok={readiness.hasEasyRotation} label="Easy run rotation" />
-          </ul>
-          <p className="mt-3 tabular-nums text-gray-800">
-            <span className="font-medium">{readiness.weeksToGoal} weeks</span> to goal
-            {readiness.buildWeekCount > 0 ? (
-              <>
-                {" "}
-                · {readiness.buildWeekCount} build · {readiness.taperWeekCount} taper
-              </>
-            ) : (
-              <> · mostly taper/race weeks</>
-            )}
-          </p>
-          {readiness.taperUsesPresetCaps ? (
-            <p className="mt-1 text-xs text-sky-900/90">
-              Taper uses your coach&apos;s week caps (same weekly rotation as build, lower miles).
-            </p>
-          ) : null}
-          {readiness.errors.length > 0 ? (
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-amber-950">
-              {readiness.errors.map((e, i) => (
-                <li key={i}>{e}</li>
-              ))}
-            </ul>
-          ) : null}
-          {readiness.warnings.map((w, i) => (
-            <p key={i} className="mt-2 text-xs text-amber-900/95">
-              {w}
-            </p>
-          ))}
-        </>
-      ) : (
-        <p className="mt-2 text-gray-600">Loading blueprint…</p>
-      )}
+  if (loadError) {
+    return <p className="text-sm text-amber-900">{loadError}</p>;
+  }
+  if (!readiness) return null;
 
+  const notes = [
+    ...readiness.errors,
+    ...(readiness.shortPlanWarning ? [readiness.shortPlanWarning] : []),
+  ];
+  if (notes.length === 0) return null;
+
+  return (
+    <div
+      className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950"
+      role="status"
+    >
+      {notes.map((note) => (
+        <p key={note} className="mt-1 first:mt-0">
+          {note}
+        </p>
+      ))}
     </div>
   );
 }

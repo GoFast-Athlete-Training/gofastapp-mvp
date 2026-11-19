@@ -1,4 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import {
+  cataloguePrescriptionLine,
+  collapsedSegmentTitles,
+  type CataloguePrescriptionInput,
+} from "@/lib/training/catalogue-prescription-line";
 import { dateForDayInWeek } from "@/lib/training/plan-schedule-dates";
 import { isStructuredPlanWeek, type PlanDaySchedule } from "@/lib/training/plan-schedule-schema";
 import { utcDateOnly } from "@/lib/training/plan-utils";
@@ -35,9 +40,22 @@ function dateKeyFor(planStartDate: Date, weekNumber: number, dow: number): strin
   return utcDateOnly(dateForDayInWeek(planStartDate, weekNumber, dow)).toISOString().slice(0, 10);
 }
 
-function stepsFrom(segments: { title: string }[], narrative: string | null): string | null {
-  const titles = segments.map((segment) => segment.title.trim()).filter(Boolean);
-  if (titles.length > 0) return titles.slice(0, 12).join(" · ");
+const catalogueSelect = {
+  id: true,
+  name: true,
+  paceAnchor: true,
+  segmentPaceDist: true,
+  workBaseReps: true,
+  workBaseRepMeters: true,
+  workBaseMiles: true,
+  workBasePaceOffsetSecPerMile: true,
+  workPaceOffsetSecPerMile: true,
+  recoveryDistanceMeters: true,
+  recoveryDurationSeconds: true,
+  recoveryPaceOffsetSecPerMile: true,
+} as const;
+
+function narrativeLine(narrative: string | null): string | null {
   const text = narrative?.trim();
   return text ? text.slice(0, 280) : null;
 }
@@ -64,7 +82,6 @@ export async function loadCompanyPlanGodWeeks(plan: {
       garminWorkoutId: true,
       garminScheduleId: true,
       workoutCompleted: true,
-      workout_catalogue: { select: { name: true } },
       segments: { orderBy: { stepOrder: "asc" }, select: { title: true } },
     },
   });
@@ -76,13 +93,16 @@ export async function loadCompanyPlanGodWeeks(plan: {
       if (day.catalogueWorkoutId) catalogueIds.add(day.catalogueWorkoutId);
     }
   }
-  const catalogueNames = new Map<string, string>();
+  for (const row of planned) {
+    if (row.catalogueWorkoutId) catalogueIds.add(row.catalogueWorkoutId);
+  }
+  const catalogueById = new Map<string, CataloguePrescriptionInput & { id: string; name: string }>();
   if (catalogueIds.size > 0) {
     const rows = await prisma.workout_catalogue.findMany({
       where: { id: { in: [...catalogueIds] } },
-      select: { id: true, name: true },
+      select: catalogueSelect,
     });
-    for (const row of rows) catalogueNames.set(row.id, row.name);
+    for (const row of rows) catalogueById.set(row.id, row);
   }
 
   const plannedByDay = new Map<string, (typeof planned)[number]>();
@@ -102,10 +122,13 @@ export async function loadCompanyPlanGodWeeks(plan: {
       const dateKey = dateKeyFor(plan.startDate, week.weekNumber, dow);
       const row = plannedByDay.get(dateKey) ?? null;
       const catalogueId = row?.catalogueWorkoutId ?? scheduled?.catalogueWorkoutId ?? null;
-      const catalogueName =
-        row?.workout_catalogue?.name ?? (catalogueId ? catalogueNames.get(catalogueId) ?? null : null);
-      const steps = row ? stepsFrom(row.segments, row.prescriptionNarrative) : null;
-      const prescribed = Boolean(row && (steps || catalogueName));
+      const catalogue = catalogueId ? catalogueById.get(catalogueId) ?? null : null;
+      const catalogueName = catalogue?.name ?? null;
+      const prescription = catalogue ? cataloguePrescriptionLine(catalogue) : null;
+      const steps =
+        prescription ??
+        (row ? collapsedSegmentTitles(row.segments) ?? narrativeLine(row.prescriptionNarrative) : null);
+      const prescribed = Boolean(steps || catalogueName);
       const milesFromPlanned =
         row?.estimatedDistanceInMeters != null && row.estimatedDistanceInMeters > 0
           ? Math.round((row.estimatedDistanceInMeters / 1609.34) * 10) / 10
