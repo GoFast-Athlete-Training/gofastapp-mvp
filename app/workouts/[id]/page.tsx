@@ -72,6 +72,11 @@ import {
   displayGroupTitle,
 } from "@/lib/training/segment-summary";
 import {
+  quickSegmentDurationForSave,
+  workoutCardDistanceField,
+  workoutCardDistanceKind,
+} from "@/lib/training/workout-card-distance";
+import {
   displayWorkoutListTitle,
   formatPlannedWorkoutTitle,
 } from "@/lib/training/workout-display-title";
@@ -606,7 +611,7 @@ function newClientKey(): string {
   return `k_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** Always edit distance segments in miles — never convert to meters in the modify UI. */
+/** Mile string for the raw segment editor. Quick cards show track distances in meters separately. */
 function formatMilesForEditInput(miles: number): string {
   if (!Number.isFinite(miles) || miles <= 0) return "";
   if (miles < 1) {
@@ -811,6 +816,8 @@ type SegmentQuickOverride = {
   quickPaceHighSec?: string;
   durationType?: "DISTANCE" | "TIME";
   durationValue?: string;
+  /** Unit of durationValue when the athlete edited a distance. Unset means the stored miles. */
+  distanceUnit?: "mi" | "m";
   recoveryDurationType?: string;
   recoveryDurationValue?: string;
 };
@@ -827,6 +834,15 @@ function segmentQuickOverrideHasEdits(o: SegmentQuickOverride): boolean {
     o.recoveryDurationType !== undefined ||
     o.recoveryDurationValue !== undefined
   );
+}
+
+/** Meter edits become exact miles. A display-only meter label has no durationValue override. */
+function durationForQuickSave(
+  row: Pick<EditableSegment, "durationType" | "durationValue">,
+  override: SegmentQuickOverride | undefined
+): string {
+  const unit = override?.durationValue !== undefined ? override.distanceUnit : undefined;
+  return quickSegmentDurationForSave(row.durationType, row.durationValue, unit);
 }
 
 function mergedQuickEditable(seg: WorkoutSegment, o?: SegmentQuickOverride): EditableSegment {
@@ -1552,28 +1568,39 @@ export default function WorkoutDetailPage() {
           const rows: EditableSegment[] = [];
           for (let r = 0; r < reps; r++) {
             for (const step of group.cycleSteps) {
-              const merged = mergedQuickEditable(step, segmentOverrides[step.id]);
-              rows.push({ ...merged, repeatCount: "" });
+              const stepOverride = segmentOverrides[step.id];
+              const merged = mergedQuickEditable(step, stepOverride);
+              rows.push({
+                ...merged,
+                repeatCount: "",
+                durationValue: durationForQuickSave(merged, stepOverride),
+              });
             }
             if (r < reps - 1 && group.betweenRepeatsRecovery) {
+              const recOverride = segmentOverrides[group.betweenRepeatsRecovery.id];
               const mergedRec = mergedQuickEditable(
                 group.betweenRepeatsRecovery,
-                segmentOverrides[group.betweenRepeatsRecovery.id]
+                recOverride
               );
-              rows.push({ ...mergedRec, repeatCount: "" });
+              rows.push({
+                ...mergedRec,
+                repeatCount: "",
+                durationValue: durationForQuickSave(mergedRec, recOverride),
+              });
             }
           }
           return rows;
         }
-        const reps =
-          segmentOverrides[group.work.id]?.repeatCount ?? effectiveRepeatCount(group);
+        const workOverride = segmentOverrides[group.work.id];
+        const reps = workOverride?.repeatCount ?? effectiveRepeatCount(group);
         const mergedWork = mergedQuickEditable(group.work, {
-          ...segmentOverrides[group.work.id],
+          ...workOverride,
           repeatCount: reps > 1 ? reps : undefined,
         });
         const conversational = conversationalPaceBySegmentId[group.work.id];
         const workRow: EditableSegment = {
           ...mergedWork,
+          durationValue: durationForQuickSave(mergedWork, workOverride),
           paceLowMin: conversational ? "" : mergedWork.paceLowMin,
           paceLowSec: conversational ? "" : mergedWork.paceLowSec,
           paceHighMin: conversational ? "" : mergedWork.paceHighMin,
@@ -1581,11 +1608,16 @@ export default function WorkoutDetailPage() {
           repeatCount: String(reps > 1 ? reps : ""),
         };
         if (group.recovery) {
-          const mergedRec = mergedQuickEditable(
-            group.recovery,
-            segmentOverrides[group.recovery.id]
-          );
-          return [workRow, { ...mergedRec, repeatCount: "" }];
+          const recOverride = segmentOverrides[group.recovery.id];
+          const mergedRec = mergedQuickEditable(group.recovery, recOverride);
+          return [
+            workRow,
+            {
+              ...mergedRec,
+              repeatCount: "",
+              durationValue: durationForQuickSave(mergedRec, recOverride),
+            },
+          ];
         }
         return [workRow];
       });
@@ -2949,6 +2981,27 @@ export default function WorkoutDetailPage() {
                 const recoveryQuickEditable = recoverySeg
                   ? mergedQuickEditable(recoverySeg, segmentOverrides[recoverySeg.id])
                   : null;
+                const workDistance =
+                  quickEditable.durationType === "DISTANCE"
+                    ? workoutCardDistanceField({
+                        storedMiles: Number(segment.durationValue),
+                        kind: workoutCardDistanceKind(segment.title, "work"),
+                        overrideValue: o?.durationValue,
+                        overrideUnit: o?.distanceUnit,
+                      })
+                    : null;
+                const recoveryOverride = recoverySeg
+                  ? segmentOverrides[recoverySeg.id]
+                  : undefined;
+                const recoveryDistance =
+                  recoverySeg && recoveryQuickEditable?.durationType === "DISTANCE"
+                    ? workoutCardDistanceField({
+                        storedMiles: Number(recoverySeg.durationValue),
+                        kind: workoutCardDistanceKind(recoverySeg.title, "recovery"),
+                        overrideValue: recoveryOverride?.durationValue,
+                        overrideUnit: recoveryOverride?.distanceUnit,
+                      })
+                    : null;
                 const mpPaceBlock =
                   workout?.goalRacePaceSecPerMile != null &&
                   isMarathonPaceWorkBlockTitle(segment.title);
@@ -3153,16 +3206,17 @@ export default function WorkoutDetailPage() {
                                   <input
                                     type="text"
                                     inputMode="decimal"
-                                    value={quickEditable.durationValue}
+                                    value={workDistance?.value ?? quickEditable.durationValue}
                                     onChange={(e) =>
                                       patchQuickSegmentOverride(segment.id, {
                                         durationValue: e.target.value,
+                                        distanceUnit: workDistance?.unit ?? "mi",
                                       })
                                     }
                                     className="flex-1 min-w-[5rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
                                   />
                                   <span className="rounded bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-900">
-                                    mi
+                                    {workDistance?.unit ?? "mi"}
                                   </span>
                                 </>
                               ) : (
@@ -3216,17 +3270,22 @@ export default function WorkoutDetailPage() {
                               <input
                                 type="text"
                                 inputMode="decimal"
-                                value={recoveryQuickEditable.durationValue}
+                                value={
+                                  recoveryDistance?.value ?? recoveryQuickEditable.durationValue
+                                }
                                 onChange={(e) =>
                                   patchQuickSegmentOverride(recoverySeg.id, {
                                     durationValue: e.target.value,
+                                    ...(recoveryDistance
+                                      ? { distanceUnit: recoveryDistance.unit }
+                                      : {}),
                                   })
                                 }
                                 className="flex-1 min-w-[5rem] rounded-lg border border-gray-300 px-3 py-2 text-sm"
                               />
-                              {recoveryQuickEditable.durationType === "DISTANCE" ? (
+                              {recoveryDistance ? (
                                 <span className="rounded bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-900">
-                                  mi
+                                  {recoveryDistance.unit}
                                 </span>
                               ) : null}
                             </div>
