@@ -105,6 +105,11 @@ export async function PUT(request: NextRequest, ctx: RouteCtx) {
   }
 }
 
+/** Training Manage saves with PATCH and proxies that method here. */
+export async function PATCH(request: NextRequest, ctx: RouteCtx) {
+  return PUT(request, ctx);
+}
+
 export async function DELETE(request: NextRequest, ctx: RouteCtx) {
   const authErr = await assertStaffBearerAuth(request);
   if (authErr) return authErr;

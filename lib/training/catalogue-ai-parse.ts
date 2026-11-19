@@ -61,7 +61,7 @@ Tempo + mpSimulation (still uses % of scheduled run for phases when the athlete 
 INTERVALS (repeats, 400/800/1600, etc.): set these; usually leave workBaseMiles null
 - "workBaseReps": number | null
 - "workBaseRepMeters": number | null — meters per rep
-- "recoveryDistanceMeters": number | null — jog distance between reps (**flat ladder** / legacy repeats). Omit with no recoveryDurationSeconds → default **400 m**. Use **0** only to disable distance-based jog (timed recovery may still apply).
+- "recoveryDistanceMeters": number | null — jog distance between reps (**flat ladder** / legacy repeats). **null or 0** means no scripted jog. Do not invent 400 m when the text omits rest.
 - "recoveryDurationSeconds": number | null — optional **timed** recovery between those same reps (**seconds**, e.g. 90). If positive, materialization prefers **TIME** over distance. Omit if unused.
 - "workBasePaceOffsetSecPerMile": number | null — vs 5K for each work rep
 - "recoveryPaceOffsetSecPerMile": number | null
@@ -84,7 +84,7 @@ INTERVALS segmentPaceDist — choose ladder vs block repeat carefully:
   { "layout": "blockRepeat", "segments": [ { "distanceMeters": 400, "paceOffsetSecPerMile": -20 }, { "distanceMeters": 400, "paceOffsetSecPerMile": 48 } ], "repeatCount": 6 }
   Omit "recoveryBetweenCyclesSeconds" unless the text explicitly asks for timed rest BETWEEN whole repeats of the cycle.
 
-- **Rep ladder** (flat array): use ONLY when repeats are **grouped by row**. The builder inserts recovery **after each work rep**. Set **recoveryDurationSeconds** for timed recovery (**seconds** — materialized as a TIME step; overrides distance when positive) **or recoveryDistanceMeters** for jog distance (**default 400 m** when both omit). Do **not** model alternating fast/float as two ladder rows × reps — use blockRepeat instead.
+- **Rep ladder** (flat array): use ONLY when repeats are **grouped by row**. The builder inserts recovery **after each work rep**. Set **recoveryDurationSeconds** for timed recovery (**seconds** — materialized as a TIME step; overrides distance when positive) **or recoveryDistanceMeters** for jog distance. Leave both null when the text does not specify rest — null is no scripted jog, not 400 m. Do **not** model alternating fast/float as two ladder rows × reps — use blockRepeat instead.
 
 - Pyramid / varied-distance ladders with per-row reps: flat array shape as usual.
 

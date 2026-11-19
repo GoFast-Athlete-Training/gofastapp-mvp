@@ -15,7 +15,7 @@ export type CatalogueBetweenRepRecovery =
 
 /**
  * @param entry.recoveryDurationSeconds — if finite and positive, materialize TIME recovery (minutes).
- * @param entry.recoveryDistanceMeters — else if 0 → no jog; else if positive → DISTANCE miles; else null → default 400 m.
+ * @param entry.recoveryDistanceMeters — else if 0 or null → no jog; else if positive → DISTANCE miles.
  */
 export function betweenRepRecoveryForMaterialization(entry: {
   recoveryDurationSeconds: number | null;
@@ -31,17 +31,11 @@ export function betweenRepRecoveryForMaterialization(entry: {
   const dRaw = entry.recoveryDistanceMeters;
   if (dRaw != null) {
     const d = Number(dRaw);
-    if (Number.isFinite(d)) {
-      if (d === 0) return { kind: "none" };
-      if (d > 0) {
-        return { kind: "distance", durationValueMiles: roundDecimals(d / 1609.34, 3) };
-      }
+    if (Number.isFinite(d) && d > 0) {
+      return { kind: "distance", durationValueMiles: roundDecimals(d / 1609.34, 3) };
     }
   }
-  return {
-    kind: "distance",
-    durationValueMiles: roundDecimals(400 / 1609.34, 3),
-  };
+  return { kind: "none" };
 }
 
 /** Human-readable line for athlete-facing prescription previews (distance or time). */
