@@ -22,6 +22,7 @@ import {
 } from "@/lib/training/preset-distance-match";
 import { metersToMiles } from "@/lib/pace-utils";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
+import { DateField } from "@/components/athlete/DateField";
 import { AthletePresetBuilder } from "@/components/training/AthletePresetBuilder";
 import {
   FoundationStartFields,
@@ -1820,12 +1821,11 @@ export default function TrainingSetupClient() {
                     <label className="mb-1 block text-sm font-medium text-gray-800">
                       Plan start date
                     </label>
-                    <input
-                      type="date"
+                    <DateField
                       className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                       value={startDate}
-                      onChange={(e) => {
-                        setStartDate(e.target.value);
+                      onChange={(next) => {
+                        setStartDate(next);
                         setFormError(null);
                       }}
                     />

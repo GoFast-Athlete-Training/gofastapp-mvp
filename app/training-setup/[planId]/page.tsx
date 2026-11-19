@@ -6,6 +6,7 @@ import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AthleteAppShell from "@/components/athlete/AthleteAppShell";
+import { DateField } from "@/components/athlete/DateField";
 import PlanWeekViewer from "@/components/training/PlanWeekViewer";
 import {
   parsePhasesJson,
@@ -1634,14 +1635,13 @@ export default function TrainingSetupPlanPage({
                 {hasSchedule ? (
                   <p className="text-sm text-gray-800">{formatPlanDateDisplay(plan.startDate)}</p>
                 ) : (
-                  <input
+                  <DateField
                     id="plan-start-date"
-                    type="date"
                     max={raceDateMax}
                     className="w-full max-w-md rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                     value={startDateLocal}
-                    onChange={(e) => {
-                      setStartDateLocal(e.target.value);
+                    onChange={(next) => {
+                      setStartDateLocal(next);
                       setError(null);
                     }}
                   />

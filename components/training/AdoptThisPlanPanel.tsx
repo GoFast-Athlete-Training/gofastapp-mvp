@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DateField } from "@/components/athlete/DateField";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
@@ -378,10 +379,9 @@ export default function AdoptThisPlanPanel({
 
           <label className="block text-sm">
             <span className="font-medium text-gray-700">Plan start date</span>
-            <input
-              type="date"
+            <DateField
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={setStartDate}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
           </label>

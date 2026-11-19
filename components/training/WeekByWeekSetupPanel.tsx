@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { DateField } from "@/components/athlete/DateField";
 
 type CreateFeedbackKind = "goals" | "dates" | "distanceMismatch" | "incompletePreset" | "generic";
 
@@ -107,11 +108,10 @@ export function WeekByWeekSetupPanel({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-800">Plan start date</label>
-          <input
-            type="date"
+          <DateField
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
             value={startDate}
-            onChange={(e) => onStartDateChange(e.target.value)}
+            onChange={onStartDateChange}
           />
           {shortCalendarHint}
         </div>
